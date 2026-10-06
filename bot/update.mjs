@@ -123,7 +123,8 @@ export async function pullUpdates() {
     changed = await installArchive(latest.sha);
   }
   if (changed.some((f) => f.startsWith('template/package'))) {
-    await run('npm', ['install', '--silent'], {cwd: join(ROOT, 'template'), timeout: 600_000, shell: process.platform === 'win32'});
+    // Exact lockfile versions, no package install scripts.
+    await run('npm', ['ci', '--ignore-scripts', '--silent'], {cwd: join(ROOT, 'template'), timeout: 600_000, shell: process.platform === 'win32'});
   }
   return changed;
 }

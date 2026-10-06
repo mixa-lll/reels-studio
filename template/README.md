@@ -5,6 +5,7 @@
 - `public/` — music, screen captures (PNG sequences under `public/screens/<scene>/0001.png`), images.
 
 ```bash
+npm ci --ignore-scripts              # once, in template/ (exact lockfile versions)
 node scripts/new-reel.mjs <slug>      # from the repo root: a new reel folder with this template inside
 npx remotion studio                   # live preview, from the project folder
 node scripts/render.mjs <project> <versions/v1/slug-v1.mp4>

@@ -34,7 +34,7 @@ Manual install: the same steps, by hand, are in [SETUP.md](SETUP.md).
 - **Updates on your say-so.** Every 6 hours the bot checks this repo; when there is a new version it shows what changed and an **⬆️ Update** button. Nothing is installed without the tap. Your material in `studio/` is never touched; if you changed the bot locally, the agent merges.
 - **It learns your taste.** General feedback («hook shorter than 4 s», «no shaking camera») goes into `studio/PLAYBOOK.md` and applies to every next reel.
 
-Commands: `/ideas` — ideas now, `/unfinished` — get back to an unfinished reel, `/stop` — stop the current task, `/new` — fresh agent session.
+Commands: `/ideas` — ideas now, `/unfinished` — get back to an unfinished reel, `/settings` — when ideas arrive (time, days, off) and other switches, `/stop` — stop the current task, `/new` — fresh agent session.
 
 ## Layout
 
@@ -49,7 +49,7 @@ studio/       yours: brief, ideas, playbook, reels/  (gitignored)
 data/         bot state, inbox, logs                 (gitignored)
 ```
 
-Change settings by asking the bot («send ideas at 9», «stop sending ideas»). Technical settings — agent, model, session limits, speech model — are written by the installing agent into `.env` (see [.env.example](.env.example)).
+Change settings in `/settings` or just by asking the bot («send ideas at 9», «stop sending ideas»). Technical settings — agent, model, session limits, speech model — are written by the installing agent into `.env` (see [.env.example](.env.example)).
 
 ## Good to know
 

@@ -1,6 +1,6 @@
 # What this bot does on your computer
 
-Written for the owner and for the agent that installs the bot: everything the code does, so it can be checked rather than trusted. The bot is ~2,100 lines of plain JavaScript in `bot/` and `scripts/`, with no npm dependencies; read them before installing.
+Written for the owner and for the agent that installs the bot: everything the code does, so it can be checked rather than trusted. The bot is ~2,600 lines of plain JavaScript in `bot/` and `scripts/`, with no npm dependencies; read them before installing.
 
 ## Who controls it
 
@@ -22,9 +22,9 @@ Tools it starts may download what they need:
 
 | Tool | Downloads | When |
 |---|---|---|
-| `npm install` | Remotion and React from the npm registry | setup; an approved update that changes `template/package*.json` |
+| `npm ci --ignore-scripts` | Remotion and React from the npm registry, exact versions from `template/package-lock.json`, no package install scripts run | setup; an approved update that changes `template/package*.json` |
 | Remotion | headless Chromium; Google Fonts while rendering | setup; renders |
-| `uv` installer (`astral.sh`) | `uv` itself, into `~/.local/bin`, no sudo, PATH untouched | the first voice message, if `uv` is missing |
+| GitHub releases of `astral-sh/uv` | the `uv` binary, into `data/tools/` | the first voice message, if `uv` is missing |
 | `uvx whisper-ctranslate2` | the speech-to-text package (PyPI) and model (Hugging Face) | the first voice message |
 
 The agent (Claude Code or Codex) talks to its own provider and, while making a reel, may open web pages and download music the owner's request needs — the same as when you use it yourself.
@@ -37,8 +37,8 @@ The agent (Claude Code or Codex) talks to its own provider and, while making a r
 |---|---|---|
 | the agent CLI (`claude -p` / `codex exec`) | one turn per owner message, prompt on stdin | `bot/agents.mjs` |
 | `git` (only in a git clone) / `tar` | update check and approved updates | `bot/update.mjs` |
-| `npm` | template dependencies after an approved update | `bot/update.mjs` |
-| `uv` installer, `uvx` | local speech-to-text (installed on first use) | `bot/stt.mjs` |
+| `npm ci --ignore-scripts` | template dependencies after an approved update | `bot/update.mjs` |
+| `tar`, `uvx` | unpack `uv` (first use), local speech-to-text | `bot/stt.mjs` |
 | `ffmpeg` / `ffprobe` | fit files into Telegram's limits, loudness | `bot/media.mjs`, `scripts/loudnorm.mjs` |
 | `ps` / `taskkill` | find and stop the agent's processes on «Stop» | `bot/agents.mjs` |
 | `node` | the bot, its supervisor, renders | `bot/run.mjs`, `scripts/render.mjs` |
@@ -46,7 +46,7 @@ The agent (Claude Code or Codex) talks to its own provider and, while making a r
 ## Files
 
 - Written by the bot: `data/` (state, logs, files the owner sent, menus, render jobs, backups of bot files you edited before an update replaced them), `studio/` (brief, ideas, playbook, reels), `template/node_modules`; on an approved update, the bot's own files in this folder.
-- In your home folder, only if a voice message arrives and `uv` is missing: `~/.local/bin/uv`, `~/.local/bin/uvx` and their caches.
+- Caches of the tools it starts (uv's package cache, the Whisper model, npm, Remotion's Chromium) go to the usual per-user cache folders.
 - Outside the folder, once at setup: one autostart entry — `~/Library/LaunchAgents/com.reels-bot.plist` (macOS), `~/.config/systemd/user/reels-bot.service` (Linux) or `reels-bot.vbs` in the Startup folder (Windows).
 - Secrets: the bot token and `OWNER_CODE` live only in `.env` (gitignored, never printed, never sent anywhere but Telegram).
 

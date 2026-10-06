@@ -89,6 +89,26 @@ await check('menus: steps with own answer, settings with apply', async () => {
   assert(applied.includes('"F"'), applied);
 });
 
+await check('settings menu: idea time, days, off, typed time', async () => {
+  const {view, onSettingsButton, parseTime, ideasDay} = await import('../bot/prefs.mjs');
+  let s = {ideasAt: '10:00'};
+  const main = view(s, 'main', {lang: 'en', agent: 'claude'});
+  assert(main.text.includes('every day at 10:00') && main.reply_markup.inline_keyboard.length >= 4, main.text);
+  const apply = (data) => {
+    const r = onSettingsButton(data, s);
+    s = {...s, ...r.patch};
+    return r;
+  };
+  assert(apply('set:time').awaitTime && apply('set:at:09:00').show === 'main' && s.ideasAt === '09:00', JSON.stringify(s));
+  assert(apply('set:days').show === 'days' && apply('set:days:weekdays') && s.ideasDays === 'weekdays', JSON.stringify(s));
+  apply('set:ideas:off');
+  assert(s.ideasAt === '' && view(s, 'main', {lang: 'en'}).text.includes('Ideas: off'), JSON.stringify(s));
+  apply('set:at:09:00');
+  assert(s.ideasAt === '09:00', 'turned back on');
+  assert(parseTime('9:30') === '09:30' && parseTime('930') === '09:30' && parseTime('18') === '18:00' && parseTime('25:00') === null, 'parseTime');
+  assert(!ideasDay({ideasDays: 'weekdays'}, new Date('2026-10-04T12:00')) && ideasDay({ideasDays: 'weekdays'}, new Date('2026-10-05T12:00')), 'weekdays');
+});
+
 await check('agent adapter: stdin prompt, session, activity', async () => {
   const bin = fakeAgentBin();
   const calls = [];

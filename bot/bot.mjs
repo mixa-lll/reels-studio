@@ -4,12 +4,13 @@
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {DATA, INBOX, ROOT, STUDIO, env, loadState, saveState, settings} from './config.mjs';
+import {DATA, INBOX, ROOT, STUDIO, env, loadState, saveState, settings, writeSettings} from './config.mjs';
 import {killTree, runAgent} from './agents.mjs';
 import {activityLabel, classify} from './activity.mjs';
 import {activeMenu, onMenuButton, onMenuText} from './menu.mjs';
 import {currentKeys, forgetKeys, replyKeyboard, splitKeyLine} from './keys.mjs';
 import {applyProfile} from './profile.mjs';
+import {badTime, ideasDay, onSettingsButton, parseTime, view as settingsView} from './prefs.mjs';
 import {transcribe} from './stt.mjs';
 import {describe, remember} from './intake.mjs';
 import {explain, lostSession} from './errors.mjs';
@@ -146,6 +147,52 @@ async function clearKeyboard() {
   if (!forgetKeys()) return;
   const msg = await tg.call('sendMessage', {chat_id: state.chatId, text: '⌛', disable_notification: true, reply_markup: {remove_keyboard: true}}).catch(() => null);
   if (msg) await tg.call('deleteMessage', {chat_id: state.chatId, message_id: msg.message_id}).catch(() => {});
+}
+
+// ---------- /settings ----------
+
+const settingsOpts = () => ({lang: LANG, agent: env.agent});
+
+async function showSettings() {
+  const v = settingsView(settings(), 'main', settingsOpts());
+  await tg.sendText(state.chatId, v.text, {silent: true, reply_markup: v.reply_markup});
+}
+
+async function editSettings(messageId, which) {
+  const v = settingsView(settings(), which, settingsOpts());
+  const {toHtml} = await import('./format.mjs');
+  await tg.call('editMessageText', {chat_id: state.chatId, message_id: messageId, text: toHtml(v.text), parse_mode: 'HTML', reply_markup: v.reply_markup}).catch(() => {});
+}
+
+// A time chosen after today's slot has passed starts tomorrow, not right away.
+function scheduleFrom(time) {
+  if (time && new Date().toTimeString().slice(0, 5) >= time) {
+    state.lastIdeasDay = new Date().toLocaleDateString('sv');
+    saveState(state);
+  }
+}
+
+async function onSettings(q) {
+  const r = onSettingsButton(q.data, settings());
+  const id = q.message.message_id;
+  state.awaitingTime = r.awaitTime ? id : undefined;
+  saveState(state);
+  if (r.close) return tg.call('editMessageReplyMarkup', {chat_id: state.chatId, message_id: id, reply_markup: {inline_keyboard: []}}).catch(() => {});
+  if (Object.keys(r.patch).length) writeSettings(r.patch);
+  if (r.scheduled) scheduleFrom(r.scheduled);
+  await editSettings(id, r.show);
+}
+
+// A typed time while the time picker is open.
+async function onSettingsTime(text) {
+  const time = parseTime(text);
+  if (!time) return tg.sendText(state.chatId, badTime(LANG), {silent: true});
+  writeSettings({ideasAt: time});
+  scheduleFrom(time);
+  const id = state.awaitingTime;
+  delete state.awaitingTime;
+  saveState(state);
+  await editSettings(id, 'main');
 }
 
 // ---------- unfinished reels ----------
@@ -450,6 +497,8 @@ async function onMessage(msg) {
   }
   if (cmd === 'ideas') return enqueue(T.ideasPrompt);
   if (cmd === 'unfinished') return showUnfinished();
+  if (cmd === 'settings') return showSettings();
+  if (state.awaitingTime && msg.text && !cmd) return onSettingsTime(msg.text);
 
   // 👀 = seen: while the agent is busy (it will be queued) or while a voice note is transcribed.
   if (current || msg.voice || msg.video_note) {
@@ -501,6 +550,7 @@ function batch(prompt) {
 async function onButton(q) {
   await tg.call('answerCallbackQuery', {callback_query_id: q.id}).catch(() => {});
   if (q.from.id !== state.ownerId || q.data === 'ctl:done') return;
+  if (q.data.startsWith('set:')) return onSettings(q);
   if (q.data.startsWith('u:')) {
     const folder = q.data.slice(2);
     const label = q.message?.reply_markup?.inline_keyboard?.flat().find((b) => b.callback_data === q.data)?.text ?? folder;
@@ -544,9 +594,10 @@ async function onButton(q) {
 // ---------- daily ideas ----------
 
 setInterval(() => {
-  const {ideasAt = '10:00'} = settings();
-  if (!ideasAt || !state.ownerId) return;
+  const s = settings();
+  const {ideasAt = '10:00'} = s;
   const now = new Date();
+  if (!ideasAt || !state.ownerId || !ideasDay(s, now)) return;
   const day = now.toLocaleDateString('sv');
   const hhmm = now.toTimeString().slice(0, 5);
   if (hhmm >= ideasAt && state.lastIdeasDay !== day) {

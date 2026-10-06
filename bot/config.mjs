@@ -37,6 +37,14 @@ export function settings() {
   }
 }
 
+/** Merges `patch` into studio/settings.json (undefined values remove a key). */
+export function writeSettings(patch) {
+  const next = {...settings(), ...patch};
+  for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+  writeFileSync(join(STUDIO, 'settings.json'), JSON.stringify(next, null, 2) + '\n');
+  return next;
+}
+
 /** Reads data/state.json: owner, chat, current session and its counters. */
 export function loadState() {
   try {

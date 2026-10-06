@@ -5,7 +5,7 @@ import {openAsBlob} from 'node:fs';
 import {join} from 'node:path';
 import {ROOT} from './config.mjs';
 
-const PROFILE_VERSION = 4;
+const PROFILE_VERSION = 5;
 
 const TEXT = {
   ru: {
@@ -18,7 +18,7 @@ const TEXT = {
       + '✅ «Принять» — и файл в полном качестве у тебя\n\n'
       + 'Нажми «Старт» и расскажи, о чём будут рилсы.',
     short: 'Идеи, монтаж и правки рилсов прямо в чате — текстом или голосом. Работает на твоём AI-агенте.',
-    commands: {ideas: 'Идеи для рилсов прямо сейчас', unfinished: 'Незаконченные рилсы — вернуться и доделать', stop: 'Остановить текущую задачу', new: 'Начать новую сессию агента'},
+    commands: {ideas: 'Идеи для рилсов прямо сейчас', unfinished: 'Незаконченные рилсы — вернуться и доделать', settings: 'Настройки: когда присылать идеи и другое', stop: 'Остановить текущую задачу', new: 'Начать новую сессию агента'},
   },
   en: {
     description:
@@ -30,7 +30,7 @@ const TEXT = {
       + '✅ «Accept» — and the full-quality file is yours\n\n'
       + 'Press Start and tell me what your reels are about.',
     short: 'Reel ideas, editing and revisions right in the chat, by text or voice. Runs on your own AI agent.',
-    commands: {ideas: 'Reel ideas right now', unfinished: 'Unfinished reels — get back to one', stop: 'Stop the current task', new: 'Start a new agent session'},
+    commands: {ideas: 'Reel ideas right now', unfinished: 'Unfinished reels — get back to one', settings: 'Settings: when ideas arrive and more', stop: 'Stop the current task', new: 'Start a new agent session'},
   },
 };
 
