@@ -10,6 +10,8 @@
 //   --menu steps.json                             open a button menu now (see bot/menu.mjs)
 //
 // Messages with buttons get a «type or dictate your own» line automatically.
+// Sound: questions (with buttons), videos and documents notify; plain status texts and
+// audio/photo previews arrive silently. --notify / --silent override.
 import {readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {parseArgs} from 'node:util';
@@ -28,6 +30,8 @@ const {values: o} = parseArgs({
     keyboard: {type: 'string'},
     document: {type: 'boolean'},
     menu: {type: 'string'},
+    silent: {type: 'boolean'},
+    notify: {type: 'boolean'},
   },
 });
 
@@ -59,7 +63,8 @@ if (o.text) {
   }
   const text = markup ? `${o.text}\n\n${customHint()}` : o.text;
   await tg.call('sendChatAction', {chat_id: chatId, action: 'typing'});
-  await tg.sendText(chatId, text, markup ? {reply_markup: markup} : {});
+  const silent = o.silent || (!markup && !o.notify);
+  await tg.sendText(chatId, text, {silent, ...(markup ? {reply_markup: markup} : {})});
 } else if (o.file) {
   const video = /\.(mp4|mov|webm)$/i.test(o.file) && !o.document;
   await tg.call('sendChatAction', {chat_id: chatId, action: video ? 'upload_video' : 'upload_document'});
@@ -68,7 +73,16 @@ if (o.text) {
     markup ??= {inline_keyboard: []};
     markup.inline_keyboard.push([{text: tuneLabel(), callback_data: `m:${menuId}:open`}]);
   }
-  await tg.sendFile(chatId, o.file, {caption: o.caption, markup, asDocument: o.document});
+  try {
+    const preview = !o.document && /\.(mp3|m4a|wav|ogg|png|jpe?g|webp|gif)$/i.test(o.file);
+    await tg.sendFile(chatId, o.file, {caption: o.caption, markup, asDocument: o.document, silent: o.silent || (preview && !o.notify)});
+  } catch (e) {
+    // The owner hears about it too, not only the agent.
+    const ru = process.env.BOT_LANG !== 'en';
+    await tg.sendText(chatId, `⚠️ ${ru ? 'Не смог отправить файл' : 'Could not send the file'} ${o.file}: ${e.message}`).catch(() => {});
+    console.error(`send failed: ${e.message}`);
+    process.exit(1);
+  }
 } else if (menuId) {
   await post(tg, chatId, loadMenu(menuId));
 }

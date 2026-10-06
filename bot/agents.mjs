@@ -2,7 +2,9 @@
 // coarse activity (for the progress line) back to the bot.
 import {execFileSync, spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
-import {ROOT} from './config.mjs';
+import {writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {DATA, ROOT} from './config.mjs';
 
 // Tool calls → a neutral shape for bot/activity.mjs.
 function claudeCall(tool) {
@@ -15,14 +17,23 @@ function claudeCall(tool) {
   return {tool: 'other'};
 }
 
+function emptyMcp() {
+  const file = join(DATA, 'mcp-none.json');
+  writeFileSync(file, '{"mcpServers":{}}');
+  return file;
+}
+
 const ADAPTERS = {
   claude: {
     bin: 'claude',
     // The prompt goes in on stdin: no quoting issues with .cmd shims on Windows.
-    args: ({sessionId, model}) => [
+    args: ({sessionId, model, isolated}) => [
       '-p',
       '--output-format', 'stream-json', '--verbose',
       '--dangerously-skip-permissions',
+      // Without the owner's global settings, plugins, hooks and MCP servers. An empty
+      // MCP config file, not inline JSON: cmd.exe on Windows mangles quotes.
+      ...(isolated ? ['--setting-sources', 'project,local', '--strict-mcp-config', '--mcp-config', emptyMcp()] : []),
       ...(model ? ['--model', model] : []),
       ...(sessionId ? ['--resume', sessionId] : []),
     ],
@@ -36,7 +47,10 @@ const ADAPTERS = {
         const tool = ev.message?.content?.find((c) => c.type === 'tool_use');
         return {context, call: tool ? claudeCall(tool) : undefined};
       }
-      if (ev.type === 'result') return {sessionId: ev.session_id, text: ev.result ?? '', error: ev.is_error};
+      if (ev.type === 'result') {
+        const error = ev.is_error || (ev.subtype && ev.subtype !== 'success');
+        return {sessionId: ev.session_id, text: ev.result ?? (error ? ev.subtype : ''), error};
+      }
       return {};
     },
   },
@@ -61,6 +75,7 @@ const ADAPTERS = {
       }
       if (ev.type === 'item.completed' && item?.type === 'agent_message') return {text: item.text};
       if (ev.type === 'turn.failed') return {error: true, text: ev.error?.message ?? 'turn failed'};
+      if (ev.type === 'error') return {error: true, text: ev.message ?? JSON.stringify(ev)};
       return {};
     },
   },
@@ -99,13 +114,13 @@ export function killTree(pid) {
 
 /**
  * Runs one agent turn. Calls onCall({tool, path?, command?}) on every tool call.
- * Resolves to {sessionId, text, error, cancelled, context}; `kill()` on the returned
+ * Resolves to {sessionId, text, error, cancelled, context, code, stderr, spawnError}; `kill()` on the returned
  * handle stops the agent and everything it spawned. The session survives a kill.
  */
-export function runAgent({agent, bin, model, prompt, sessionId, onCall}) {
+export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated = false}) {
   const a = ADAPTERS[agent];
   if (!a) throw new Error(`Unknown AGENT "${agent}", expected one of: ${AGENTS.join(', ')}`);
-  const child = spawn(bin || a.bin, a.args({sessionId, model}), {
+  const child = spawn(bin || a.bin, a.args({sessionId, model, isolated}), {
     cwd: ROOT,
     stdio: ['pipe', 'pipe', 'pipe'],
     // npm-installed CLIs are .cmd shims on Windows, which only a shell can start.
@@ -136,15 +151,18 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall}) {
       if (r.error) out.error = true;
     });
     child.on('close', (code) => {
+      out.code = code;
+      out.stderr = stderr.trim();
       // Agents exit with code 143 rather than by signal, so track the kill ourselves.
       if (killed) out.cancelled = true;
-      else if (code !== 0 && !out.text) {
+      else if (code !== 0) {
         out.error = true;
-        out.text = stderr.trim().split('\n').slice(-5).join('\n') || `exit code ${code}`;
+        if (!out.text) out.text = out.stderr.split('\n').slice(-5).join('\n') || `exit code ${code}`;
       }
       resolve(out);
     });
-    child.on('error', (e) => resolve({...out, error: true, text: e.message}));
+    // Spawn failures (e.g. ENOENT: the CLI is not installed or AGENT_BIN is wrong).
+    child.on('error', (e) => resolve({...out, error: true, spawnError: e.code ?? 'spawn', text: e.message}));
   });
 
   const kill = () => {

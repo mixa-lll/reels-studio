@@ -1,4 +1,5 @@
 {
   "ideasAt": "10:00",
-  "autoUpdate": true
+  "autoUpdate": true,
+  "agentGlobalSettings": false
 }

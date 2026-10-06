@@ -20,6 +20,8 @@ export const env = {
   agent: process.env.AGENT || 'claude',
   agentBin: process.env.AGENT_BIN || '',
   agentModel: process.env.AGENT_MODEL || '',
+  // Secret in the t.me/<bot>?start=<code> link that makes its opener the owner.
+  ownerCode: process.env.OWNER_CODE || '',
   // A session is rotated (after a handoff note) when any limit is hit.
   sessionMaxTokens: Number(process.env.SESSION_MAX_TOKENS || 120_000),
   sessionMaxTurns: Number(process.env.SESSION_MAX_TURNS || 40),

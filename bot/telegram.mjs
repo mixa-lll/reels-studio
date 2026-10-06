@@ -3,6 +3,7 @@ import {openAsBlob} from 'node:fs';
 import {writeFile} from 'node:fs/promises';
 import {basename} from 'node:path';
 import {chunks, toHtml} from './format.mjs';
+import {fitForTelegram} from './media.mjs';
 
 /** Creates a client bound to a bot token. */
 export function telegram(token) {
@@ -34,12 +35,16 @@ export function telegram(token) {
   return {
     call,
 
-    /** Sends Markdown as Telegram HTML in chunks; falls back to plain text if rejected. */
-    async sendText(chatId, text, extra = {}) {
+    /**
+     * Sends Markdown as Telegram HTML in chunks; falls back to plain text if rejected.
+     * `silent: true` delivers without a notification sound (statuses, acknowledgements).
+     */
+    async sendText(chatId, text, {silent = false, ...extra} = {}) {
       const parts = chunks(text);
       for (const [i, md] of parts.entries()) {
-        // Buttons go under the last chunk only.
-        const more = i === parts.length - 1 ? extra : {};
+        // Buttons and the notification go with the last chunk only.
+        const last = i === parts.length - 1;
+        const more = {...(last ? extra : {}), disable_notification: silent || !last};
         try {
           await call('sendMessage', {chat_id: chatId, text: toHtml(md), parse_mode: 'HTML', link_preview_options: {is_disabled: true}, ...more});
         } catch {
@@ -49,7 +54,7 @@ export function telegram(token) {
     },
 
     /** Sends a file; videos and photos play inline unless asDocument is set. */
-    async sendFile(chatId, path, {caption, buttons, markup, asDocument} = {}) {
+    async sendFile(chatId, path, {caption, buttons, markup, asDocument, silent = false} = {}) {
       const ext = path.split('.').pop().toLowerCase();
       const kind = asDocument ? 'document'
         : ['mp4', 'mov', 'webm'].includes(ext) ? 'video'
@@ -57,12 +62,22 @@ export function telegram(token) {
         : ['mp3', 'm4a', 'wav', 'ogg'].includes(ext) ? 'audio'
         : 'document';
       const method = {video: 'sendVideo', photo: 'sendPhoto', audio: 'sendAudio', document: 'sendDocument'}[kind];
-      return upload(method, kind, path, {
+      // Over the limit: send a compressed copy and say where the original is.
+      const fit = fitForTelegram(path, kind);
+      if (fit.note) {
+        const ru = process.env.BOT_LANG !== 'en';
+        const line = ru
+          ? `📦 Сжал ${fit.note}, чтобы пролезть в лимит Telegram. Оригинал: ${path}`
+          : `📦 Compressed ${fit.note} to fit Telegram's limit. Original: ${path}`;
+        caption = caption ? `${caption}\n\n${line}` : line;
+      }
+      return upload(method, kind, fit.path, {
         chat_id: String(chatId),
-        caption: caption && toHtml(caption),
+        caption: caption && toHtml(caption.slice(0, 1000)),
         parse_mode: caption ? 'HTML' : undefined,
         reply_markup: markup ?? (buttons?.length ? keyboard(buttons) : undefined),
         supports_streaming: kind === 'video' ? 'true' : undefined,
+        disable_notification: silent ? 'true' : undefined,
       });
     },
 

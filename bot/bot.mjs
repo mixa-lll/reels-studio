@@ -5,12 +5,14 @@ import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {DATA, INBOX, ROOT, STUDIO, env, loadState, saveState, settings} from './config.mjs';
-import {runAgent} from './agents.mjs';
+import {killTree, runAgent} from './agents.mjs';
 import {activityLabel, classify} from './activity.mjs';
 import {activeMenu, onMenuButton, onMenuText} from './menu.mjs';
 import {currentKeys, forgetKeys, replyKeyboard, splitKeyLine} from './keys.mjs';
 import {applyProfile} from './profile.mjs';
 import {transcribe} from './stt.mjs';
+import {describe, remember} from './intake.mjs';
+import {explain, lostSession} from './errors.mjs';
 import {botChangedSince, head, pendingUpdates, pullUpdates} from './update.mjs';
 import {telegram} from './telegram.mjs';
 
@@ -32,9 +34,12 @@ const T = {
     saving: '🧠 Сохраняю контекст перед новой сессией',
     idle: 'Сейчас ничего не делаю.',
     fresh: '🆕 Следующее сообщение начнёт новую сессию. Что важно — сохраню перед этим.',
-    failed: '⚠️ Агент упал:',
     unfinished: '🗂 Незаконченные рилсы — выбери, к какому вернуться:',
     hint: 'Или напиши / надиктуй свой вариант',
+    private: 'Это личный бот. Свой можно поставить: github.com/fivol/reels-bot',
+    tooBig: (what, size) => `⚠️ ${what} весит ${size} — Telegram не даёт ботам скачивать файлы больше 20 МБ. Пришли его обычным видео/фото (не «файлом» — Telegram сам сожмёт) или ссылкой на Google Диск / Яндекс Диск.`,
+    sttFailed: '⚠️ Не смог распознать голосовое (локальный Whisper не запустился). Агенту передал файл; если он не разберёт — напиши текстом.',
+    downloadFailed: (what, err) => `⚠️ Не смог скачать ${what}: ${err}. Попробуй прислать ещё раз.`,
     noUnfinished: 'Незаконченных рилсов нет. /ideas — новые идеи.',
     updated: (subjects) => `🔄 Я обновился:\n${subjects.map((x) => `• ${x}`).join('\n')}`,
     ideasPrompt: 'Пачка идей для рилсов: раздел «1. Ideas» в REELS.md.',
@@ -50,9 +55,12 @@ const T = {
     saving: '🧠 Saving context before a new session',
     idle: 'Nothing is running.',
     fresh: '🆕 The next message starts a new session. What matters is saved first.',
-    failed: '⚠️ The agent failed:',
     unfinished: '🗂 Unfinished reels — pick one to get back to:',
     hint: 'Or type / dictate your own',
+    private: 'This is a personal bot. Get your own: github.com/fivol/reels-bot',
+    tooBig: (what, size) => `⚠️ The ${what} is ${size} — Telegram does not let bots download files over 20 MB. Send it as a regular video/photo (not as a file, Telegram compresses it) or as a Google Drive / Dropbox link.`,
+    sttFailed: '⚠️ Could not transcribe the voice message (local Whisper failed). The agent got the file; if it cannot read it, please type it.',
+    downloadFailed: (what, err) => `⚠️ Could not download the ${what}: ${err}. Please send it again.`,
     noUnfinished: 'No unfinished reels. /ideas for new ones.',
     updated: (subjects) => `🔄 I updated myself:\n${subjects.map((x) => `• ${x}`).join('\n')}`,
     ideasPrompt: 'A batch of reel ideas: section "1. Ideas" in REELS.md.',
@@ -85,6 +93,7 @@ if (existsSync(PID_FILE)) {
 writeFileSync(PID_FILE, String(process.pid));
 process.on('exit', () => {
   // A restart mid-turn: stop the agent and leave a note, the turn is redone on start.
+  stopRenders();
   if (current?.handle) {
     current.handle.kill();
     if (state.pending) state.note = 'The bot restarted while you were working on the message below. Check what is already done on disk, then finish it.';
@@ -95,9 +104,20 @@ process.on('exit', () => {
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
 
 const tg = telegram(env.token);
+
+// A crash of the bot itself is reported too; the service manager then restarts it.
+for (const ev of ['uncaughtException', 'unhandledRejection']) {
+  process.on(ev, async (e) => {
+    console.error(ev, e);
+    const text = `⚠️ ${LANG === 'en' ? 'The bot crashed and restarts' : 'Бот упал и перезапускается'}: ${String(e?.message ?? e).slice(0, 500)}`;
+    await Promise.race([state.chatId ? tg.sendText(state.chatId, text, {silent: true}) : null, new Promise((r) => setTimeout(r, 3000))]).catch(() => {});
+    process.exit(1);
+  });
+}
 const state = loadState();
 const STATUS_FILE = join(DATA, 'status.txt');
 const SENT_FILE = join(DATA, 'sent.txt');
+const KEYS_FILE = join(DATA, 'keyboard.json');
 const queue = [];
 let current = null; // {handle, statusId, startedAt, activity, lastText, sentMark, reason}
 
@@ -140,9 +160,10 @@ function unfinishedReels() {
 
 async function showUnfinished() {
   const reels = unfinishedReels();
-  if (!reels.length) return tg.sendText(state.chatId, T.noUnfinished);
+  if (!reels.length) return tg.sendText(state.chatId, T.noUnfinished, {silent: true});
   await tg.call('sendMessage', {
     chat_id: state.chatId,
+    disable_notification: true,
     text: T.unfinished,
     reply_markup: {inline_keyboard: reels.map((r) => [{text: `${r.title}${r.version ? ` · ${r.version}` : ''}`.slice(0, 60), callback_data: `u:${r.folder}`.slice(0, 64)}])},
   });
@@ -246,6 +267,8 @@ async function runWithStatus(prompt, firstLine) {
     bin: env.agentBin,
     model: env.agentModel,
     sessionId: state.sessionId,
+    // studio/settings.json `agentGlobalSettings: false` hides the owner's global agent setup.
+    isolated: settings().agentGlobalSettings === false,
     prompt: state.sessionId ? prompt : openingPrompt(prompt),
     onCall: (call) => {
       const key = classify(call);
@@ -255,6 +278,7 @@ async function runWithStatus(prompt, firstLine) {
   current.handle = handle;
   const res = await handle.done;
   res.reason = current.reason;
+  res.startedAt = current.startedAt;
   await refreshing;
   await dropStatus();
   current = null;
@@ -280,7 +304,7 @@ async function rotate() {
   return true;
 }
 
-async function runTurn(prompt) {
+async function runTurn(prompt, retried = false) {
   // Kept until the turn ends, so a restart can redo it.
   state.pending = prompt;
   saveState(state);
@@ -291,6 +315,7 @@ async function runTurn(prompt) {
   const res = await runWithStatus(prompt, T.accepted);
   delete state.pending;
   saveState(state);
+  if (res.error && !res.cancelled) return onAgentError(res, prompt, retried);
   if (res.cancelled) {
     // Tell the next turn why the previous one ended mid-way.
     if (res.reason === 'stop') state.note = 'Your previous turn was stopped by the owner. Do not resume it unless asked.';
@@ -299,12 +324,38 @@ async function runTurn(prompt) {
     return;
   }
   // A trailing `⌨️ A | B` line becomes the owner's keyboard of next options.
-  const {text: body, labels} = res.error ? {text: `${T.failed}\n${res.text}`, labels: null} : splitKeyLine(res.text.trim());
+  let {text: body, labels} = splitKeyLine(res.text.trim());
+  // Nothing more after the agent already asked its question with a keyboard (e.g. the
+  // review after a version), or when it ends with NO_REPLY.
+  const askedAlready = mtime(KEYS_FILE) > res.startedAt;
+  if (!labels && (askedAlready || /^NO_REPLY\.?$/i.test(body))) body = '';
   if (body || labels) {
     await tg.call('sendChatAction', {chat_id: state.chatId, action: 'typing'});
     const extra = labels ? {reply_markup: replyKeyboard(labels, {placeholder: T.hint})} : {};
     await tg.sendText(state.chatId, labels ? `${body || '👇'}\n\n✍️ ${T.hint}` : body, extra);
   }
+}
+
+// Notifications: only messages that need the owner (questions, versions, results,
+// errors) make a sound; statuses and acknowledgements arrive silently.
+//
+// Every failure reaches the owner: a plain explanation, the raw error and its code,
+// and a «Retry» button that re-sends the same message.
+async function onAgentError(res, prompt, retried) {
+  // A session the agent no longer knows: start a fresh one once, silently.
+  if (!retried && state.sessionId && lostSession(res)) {
+    for (const k of ['sessionId', 'sessionTurns', 'sessionContext']) delete state[k];
+    saveState(state);
+    return runTurn(prompt, true);
+  }
+  const e = explain(res, {lang: LANG, bin: env.agentBin || env.agent});
+  console.error('agent error', e.kind, res.code, (res.text ?? '').slice(0, 300));
+  if (e.kind === 'context') {
+    // Too long to even write a handoff: drop the session, the files keep the memory.
+    for (const k of ['sessionId', 'sessionTurns', 'sessionContext']) delete state[k];
+    saveState(state);
+  }
+  await tg.sendText(state.chatId, e.text, {reply_markup: replyKeyboard([e.retry], {retry: prompt, retryLabel: e.retry})});
 }
 
 async function drain() {
@@ -330,8 +381,23 @@ function enqueue(prompt) {
   if (!current) drain();
 }
 
+// Background renders run outside the agent's process tree; stop them explicitly.
+function stopRenders() {
+  const dir = join(DATA, 'renders');
+  if (!existsSync(dir)) return;
+  for (const f of readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+    try {
+      const job = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+      if (job.status !== 'running') continue;
+      killTree(job.pid);
+      writeFileSync(join(dir, f), JSON.stringify({...job, status: 'failed', code: 'stopped', tail: 'stopped by the owner or a bot restart'}, null, 2));
+    } catch {}
+  }
+}
+
 /** Stops the running turn. 'stop' drops the queue, 'now' runs it right away. */
 function interrupt(reason) {
+  stopRenders();
   if (reason === 'stop') queue.length = 0;
   if (!current) return false;
   current.reason = reason;
@@ -341,57 +407,32 @@ function interrupt(reason) {
 
 // ---------- incoming updates ----------
 
-// Returns {prompt, said}: the full message for the agent and just what the owner typed or said.
-async function describe(msg) {
-  const parts = [];
-  let said = null;
-  const reply = msg.reply_to_message;
-  if (reply) parts.push(`(in reply to: "${reply.caption ?? reply.text ?? 'a file'}")`);
-  const file =
-    msg.voice ? {id: msg.voice.file_id, name: `voice-${msg.message_id}.ogg`, kind: 'voice note'}
-    : msg.video_note ? {id: msg.video_note.file_id, name: `circle-${msg.message_id}.mp4`, kind: 'video note'}
-    : msg.video ? {id: msg.video.file_id, name: msg.video.file_name ?? `video-${msg.message_id}.mp4`, kind: 'video'}
-    : msg.audio ? {id: msg.audio.file_id, name: msg.audio.file_name ?? `audio-${msg.message_id}.mp3`, kind: 'audio'}
-    : msg.document ? {id: msg.document.file_id, name: msg.document.file_name ?? `file-${msg.message_id}`, kind: 'file'}
-    : msg.photo ? {id: msg.photo.at(-1).file_id, name: `photo-${msg.message_id}.jpg`, kind: 'photo'}
-    : null;
-  if (file) {
-    const dest = join(INBOX, `${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`);
-    try {
-      await tg.download(file.id, dest);
-      parts.push(`(attached ${file.kind}: ${dest})`);
-      // Agents cannot hear: voice and video notes arrive as text.
-      if (file.kind === 'voice note' || file.kind === 'video note') {
-        said = await transcribe(dest, LANG);
-        parts.push(said ? `(transcript: "${said}")` : '(transcription failed; ask the owner for text if you cannot transcribe it yourself)');
-      }
-    } catch (e) {
-      parts.push(`(attached ${file.kind}, download failed: ${e.message}; Bot API limit is 20 MB)`);
-    }
-  }
-  const text = msg.text ?? msg.caption;
-  if (text) parts.push(text);
-  return {prompt: parts.join('\n'), said: text ?? said};
-}
-
 async function onMessage(msg) {
+  // Private chats only: a bot added to a group leaves it.
+  if (msg.chat.type !== 'private') {
+    if (msg.chat.type !== 'channel') await tg.call('leaveChat', {chat_id: msg.chat.id}).catch(() => {});
+    return;
+  }
   if (!state.ownerId) {
-    // The first person to write becomes the owner; everyone else is ignored.
+    // With OWNER_CODE set (the installer does it), only the t.me/<bot>?start=<code>
+    // link makes someone the owner; without it, the first person to write does.
+    const code = msg.text?.match(/^\/start\s+(\S+)/)?.[1];
+    if (env.ownerCode && code !== env.ownerCode) return tg.sendText(msg.chat.id, T.private, {silent: true});
     Object.assign(state, {ownerId: msg.from.id, chatId: msg.chat.id});
     saveState(state);
     await tg.sendText(state.chatId, T.hello);
     return;
   }
-  if (msg.from.id !== state.ownerId) return;
+  if (msg.from.id !== state.ownerId) return tg.sendText(msg.chat.id, T.private, {silent: true}).catch(() => {});
 
   const cmd = msg.text?.match(/^\/(\w+)/)?.[1];
-  if (cmd === 'start') return tg.sendText(state.chatId, T.hello);
-  if (cmd === 'stop') return tg.sendText(state.chatId, interrupt('stop') ? T.cancelled : T.idle);
+  if (cmd === 'start') return tg.sendText(state.chatId, T.hello, {silent: true});
+  if (cmd === 'stop') return tg.sendText(state.chatId, interrupt('stop') ? T.cancelled : T.idle, {silent: true});
   if (cmd === 'new') {
     // The handoff runs lazily, right before the next turn.
     state.rotate = true;
     saveState(state);
-    return tg.sendText(state.chatId, T.fresh);
+    return tg.sendText(state.chatId, T.fresh, {silent: true});
   }
   if (cmd === 'ideas') return enqueue(T.ideasPrompt);
   if (cmd === 'unfinished') return showUnfinished();
@@ -400,10 +441,17 @@ async function onMessage(msg) {
   if (current || msg.voice || msg.video_note) {
     await tg.call('setMessageReaction', {chat_id: state.chatId, message_id: msg.message_id, reaction: [{type: 'emoji', emoji: '👀'}]}).catch(() => {});
   }
-  const {prompt, said} = await describe(msg);
+  const {prompt, said, problems} = await describe(tg, msg, {transcribe, lang: LANG});
+  for (const p of problems) {
+    const text = p.kind === 'tooBig' ? T.tooBig(p.what, p.size) : p.kind === 'stt' ? T.sttFailed : T.downloadFailed(p.what, p.error);
+    await tg.sendText(state.chatId, text).catch(() => {});
+  }
+  if (prompt) remember(prompt);
+
   // A tap on a reply-keyboard button arrives as plain text with its label.
   const keys = currentKeys();
   if (msg.text && keys?.labels?.includes(msg.text)) {
+    if (keys.retry && msg.text === keys.retryLabel) return enqueue(keys.retry);
     if (msg.text === keys.tune && keys.menu) {
       await clearKeyboard();
       const result = await onMenuButton(tg, state.chatId, `m:${keys.menu}:open`);
@@ -419,7 +467,20 @@ async function onMessage(msg) {
     if (result) enqueue(result);
     return;
   }
-  if (prompt) enqueue(prompt);
+  if (prompt) batch(prompt);
+}
+
+// Albums and quick follow-ups arrive as separate messages; wait a moment and hand
+// them to the agent together.
+let batchParts = [];
+let batchTimer = null;
+function batch(prompt) {
+  batchParts.push(prompt);
+  clearTimeout(batchTimer);
+  batchTimer = setTimeout(() => {
+    const all = batchParts.splice(0);
+    enqueue(all.length > 1 ? all.map((p, i) => `[message ${i + 1}]\n${p}`).join('\n\n') : all[0]);
+  }, 2000);
 }
 
 async function onButton(q) {
@@ -439,7 +500,7 @@ async function onButton(q) {
   }
   if (q.data === 'ctl:stop' || q.data === 'ctl:now') {
     interrupt(q.data.slice(4));
-    if (q.data === 'ctl:stop') await tg.sendText(state.chatId, T.cancelled);
+    if (q.data === 'ctl:stop') await tg.sendText(state.chatId, T.cancelled, {silent: true});
     return;
   }
   const msg = q.message;
@@ -482,7 +543,7 @@ const MERGE_PROMPT = (err) => `Updates for the bot itself are available upstream
 
 async function announceUpdate() {
   if (!state.updateNote || !state.chatId) return;
-  await tg.sendText(state.chatId, T.updated(state.updateNote)).catch(() => {});
+  await tg.sendText(state.chatId, T.updated(state.updateNote), {silent: true}).catch(() => {});
   delete state.updateNote;
   saveState(state);
 }
@@ -547,12 +608,13 @@ if (state.pending) {
 let offset = state.offset ?? 0;
 for (;;) {
   try {
-    const updates = await tg.call('getUpdates', {offset, timeout: 50, allowed_updates: ['message', 'callback_query']});
+    const updates = await tg.call('getUpdates', {offset, timeout: 50, allowed_updates: ['message', 'edited_message', 'callback_query']});
     for (const u of updates) {
       offset = u.update_id + 1;
       state.offset = offset;
       saveState(state);
-      if (u.message) await onMessage(u.message).catch((e) => console.error('message', e));
+      const m = u.message ?? u.edited_message;
+      if (m) await onMessage(m).catch((e) => console.error('message', e));
       if (u.callback_query) await onButton(u.callback_query).catch((e) => console.error('button', e));
     }
   } catch (e) {

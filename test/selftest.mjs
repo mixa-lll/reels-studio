@@ -116,6 +116,36 @@ await check('agent adapter: cancel stops the agent and its children', async () =
   assert(!child, `child survived: ${child}`);
 });
 
+await check('intake: forwards, hidden links, stickers, oversized files, history', async () => {
+  const {describe, remember} = await import('../bot/intake.mjs');
+  const tg = {download: async (id, dest) => writeFileSync(dest, 'x')};
+  const opts = {transcribe: async () => 'hello', lang: 'en'};
+  const fwd = await describe(tg, {message_id: 1, text: 'look here', entities: [{type: 'text_link', url: 'https://e.org/a'}], forward_origin: {type: 'channel', chat: {title: 'News', username: 'news'}, message_id: 5, date: 1700000000}}, opts);
+  assert(fwd.prompt.includes('forwarded from News (t.me/news/5)') && fwd.prompt.includes('https://e.org/a'), fwd.prompt);
+  const st = await describe(tg, {message_id: 2, sticker: {file_id: 's', emoji: '🔥', is_video: true, set_name: 'pack'}}, opts);
+  assert(st.prompt.includes('sticker: 🔥 from set pack') && st.prompt.includes('.webm'), st.prompt);
+  const big = await describe(tg, {message_id: 3, video: {file_id: 'v', file_size: 30 * 1024 * 1024}}, opts);
+  assert(big.problems[0]?.kind === 'tooBig' && big.prompt.includes('too big'), JSON.stringify(big));
+  const voice = await describe(tg, {message_id: 4, voice: {file_id: 'a', file_size: 10}}, opts);
+  assert(voice.said === 'hello' && voice.prompt.includes('transcript'), voice.prompt);
+  remember(fwd.prompt);
+  assert(readFileSync(join(process.env.REELS_DATA, 'inbox', 'history.md'), 'utf8').includes('look here'), 'history');
+});
+
+await check('errors: plain-language explanations', async () => {
+  const {explain, lostSession} = await import('../bot/errors.mjs');
+  const kinds = [
+    [{spawnError: 'ENOENT', text: 'spawn claude ENOENT'}, 'spawn'],
+    [{text: 'Claude AI usage limit reached|1791300000', code: 1}, 'limit'],
+    [{text: 'Invalid API key · Please run /login', code: 1}, 'login'],
+    [{text: 'API Error: 529 overloaded_error', code: 1}, 'network'],
+    [{text: 'Segmentation fault', code: 139}, 'unknown'],
+  ].map(([r, k]) => [explain(r, {lang: 'en', bin: 'claude'}), k]);
+  for (const [e, k] of kinds) assert(e.kind === k, `${k}: got ${e.kind}`);
+  assert(kinds[4][0].text.includes('139') && kinds[4][0].text.includes('Segmentation fault'), 'raw error shown');
+  assert(lostSession({text: 'No conversation found with session ID: x'}), 'lost session');
+});
+
 if (!quick) {
   let reel;
   await check('new reel: template copied, node_modules linked', () => {
@@ -130,6 +160,23 @@ if (!quick) {
     node(['scripts/render.mjs', join(reel, 'project'), raw, '🎬 test', '--', '--frames=0-59'], {stdio: 'pipe'});
     assert(statSync(raw).size > 10_000, 'empty video');
     assert(readFileSync(join(process.env.REELS_DATA, 'status.txt'), 'utf8').startsWith('🎬 test'), 'no progress');
+  });
+
+  await check('render in the background, then wait', () => {
+    const started = node(['scripts/render.mjs', join(reel, 'project'), join(TMP, 'bg.mp4'), '🎬 bg', '--background', '--', '--frames=0-29']);
+    const job = started.match(/job ([a-f0-9]+)/)?.[1];
+    assert(job, started);
+    const r = spawnSync(process.execPath, ['scripts/render.mjs', '--wait', job, '300'], {cwd: ROOT, encoding: 'utf8', env: process.env});
+    assert(r.status === 0 && statSync(join(TMP, 'bg.mp4')).size > 5000, `${r.status} ${r.stdout}${r.stderr}`);
+  });
+
+  await check('oversized video is compressed under 50 MB', async () => {
+    const {fitForTelegram} = await import('../bot/media.mjs');
+    const big = join(TMP, 'big.mp4');
+    ffmpeg(['-y', '-f', 'lavfi', '-i', 'testsrc2=size=1080x1920:rate=30', '-t', '16', '-c:v', 'libx264', '-b:v', '40M', '-maxrate', '40M', '-bufsize', '80M', big]);
+    assert(statSync(big).size > 50 * 1024 * 1024, `test file only ${statSync(big).size}`);
+    const fit = fitForTelegram(big, 'video');
+    assert(fit.note && statSync(fit.path).size < 50 * 1024 * 1024, JSON.stringify(fit));
   });
 
   await check('loudness: scripts/loudnorm.mjs on a video with a tone', () => {

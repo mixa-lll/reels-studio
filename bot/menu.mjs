@@ -122,7 +122,7 @@ const resolve = (p) => (isAbsolute(p) ? p : join(ROOT, p));
 export async function post(tg, chatId, m) {
   if (m.messageId) await tg.call('deleteMessage', {chat_id: chatId, message_id: m.messageId}).catch(() => {});
   await sendPreviews(tg, chatId, m);
-  const msg = await tg.call('sendMessage', {chat_id: chatId, ...render(m)});
+  const msg = await tg.call('sendMessage', {chat_id: chatId, disable_notification: true, ...render(m)});
   m.messageId = msg.message_id;
   saveMenu(m);
   setActive(m);
@@ -134,7 +134,7 @@ async function sendPreviews(tg, chatId, m) {
   const s = m.sections[m.view];
   const files = s.options.filter((o) => o.file && existsSync(resolve(o.file)));
   m.previewed.push(m.view);
-  for (const o of files) await tg.sendFile(chatId, resolve(o.file), {caption: o.label}).catch(() => {});
+  for (const o of files) await tg.sendFile(chatId, resolve(o.file), {caption: o.label, silent: true}).catch(() => {});
   return files.length > 0;
 }
 

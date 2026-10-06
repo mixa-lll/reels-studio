@@ -9,8 +9,8 @@ const FILE = join(DATA, 'keyboard.json');
 const KEY_LINE = /\n?\s*⌨️\s*(.+?)\s*$/;
 
 /** Reply-keyboard markup; the labels are remembered so taps can be recognised. */
-export function replyKeyboard(labels, {menu, tune, placeholder} = {}) {
-  writeFileSync(FILE, JSON.stringify({labels, menu, tune}));
+export function replyKeyboard(labels, {menu, tune, placeholder, retry, retryLabel} = {}) {
+  writeFileSync(FILE, JSON.stringify({labels, menu, tune, retry, retryLabel}));
   return {
     keyboard: labels.map((text) => [{text}]),
     resize_keyboard: true,
