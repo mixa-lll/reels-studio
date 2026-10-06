@@ -1,0 +1,16 @@
+[Unit]
+Description=reels-bot
+After=network-online.target
+
+[Service]
+WorkingDirectory=__ROOT__
+ExecStart=__NODE__ __ROOT__/bot/bot.mjs
+Environment=PATH=__PATH__
+Environment=REELS_BOT_SUPERVISED=1
+Restart=always
+RestartSec=5
+StandardOutput=append:__ROOT__/data/bot.log
+StandardError=append:__ROOT__/data/bot.log
+
+[Install]
+WantedBy=default.target

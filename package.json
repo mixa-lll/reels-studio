@@ -1,0 +1,14 @@
+{
+  "name": "reels-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Telegram bot that pitches, edits and revises short vertical videos with your own coding agent (Claude Code or Codex).",
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "start": "node bot/bot.mjs",
+    "send": "node bot/send.mjs",
+    "test": "node test/selftest.mjs"
+  },
+  "license": "MIT"
+}
