@@ -62,7 +62,7 @@ function forCommand(cmd = '') {
   if (/bot[\\/]send\.mjs/.test(cmd)) return /--status/.test(cmd) ? null : 'send';
   if (/render\.mjs|remotion render/.test(cmd)) return 'render';
   if (/remotion still/.test(cmd)) return 'cover';
-  if (/beats\.py|librosa/.test(cmd)) return 'beats';
+  if (/beats\.mjs/.test(cmd)) return 'beats';
   if (/loudnorm|alimiter/.test(cmd)) return 'sound';
   if (/whisper/.test(cmd)) return 'listen';
   if (/\.(mp3|wav|m4a)\b/.test(cmd) && /curl|wget|Invoke-WebRequest|iwr/.test(cmd)) return 'music';

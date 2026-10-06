@@ -18,7 +18,7 @@ Send this to your agent (Claude Code, Codex, …):
 
 > Install a reels bot for me: https://github.com/fivol/reels-bot — follow SETUP.md.
 
-It installs everything and asks you for one thing: to create a bot in [@BotFather](https://t.me/BotFather) and paste its reply. No files to edit, no terminal.
+The only requirement is Node 22+ (the agent installs it if missing, without admin rights); no git, Homebrew, Python or ffmpeg needed. It installs everything and asks you for one thing: to create a bot in [@BotFather](https://t.me/BotFather) and paste its reply. No files to edit, no terminal.
 
 Manual install: the same steps, by hand, are in [SETUP.md](SETUP.md).
 
@@ -31,7 +31,7 @@ Manual install: the same steps, by hand, are in [SETUP.md](SETUP.md).
 - **Clear errors.** Plan limit used up, not logged in, network down, outdated agent — the bot says so in plain words with the raw error and a **🔁 Retry** button. Files over Telegram's limits are compressed to fit (sending) or explained (receiving over 20 MB).
 - **Talk by voice.** Dictate ideas, answers and edits as voice messages; they are transcribed locally with Whisper, no API keys.
 - **Memory in files, not in the chat.** Your brief, ideas backlog, taste playbook and every reel's history live in `studio/`. The agent session is just a cache: when it grows too big, too long or goes stale, the agent writes a handoff note and a fresh session continues from it. `/new` does the same on demand.
-- **Updates itself.** Every 6 hours the bot checks this repo for new versions and, when idle, pulls them, restarts and tells you what changed. Your material in `studio/` is never touched; if you changed the bot locally, the agent merges. Say «don't update yourself» to turn it off.
+- **Updates on your say-so.** Every 6 hours the bot checks this repo; when there is a new version it shows what changed and an **⬆️ Update** button. Nothing is installed without the tap. Your material in `studio/` is never touched; if you changed the bot locally, the agent merges.
 - **It learns your taste.** General feedback («hook shorter than 4 s», «no shaking camera») goes into `studio/PLAYBOOK.md` and applies to every next reel.
 
 Commands: `/ideas` — ideas now, `/unfinished` — get back to an unfinished reel, `/stop` — stop the current task, `/new` — fresh agent session.
@@ -54,7 +54,7 @@ Change settings by asking the bot («send ideas at 9», «stop sending ideas»).
 ## Good to know
 
 - **Who it talks to.** Only its owner: the installer gives you a personal link (`t.me/<bot>?start=<secret>`), and whoever opens it first becomes the owner. Everyone else gets a one-line «this is a personal bot». Private chats only — added to a group, it leaves.
-- **Safety.** The bot runs your agent without permission prompts in this folder; keep the token private. With Claude Code you choose at setup whether it may use your global plugins and MCP connections. It never publishes anything — posting is up to you.
+- **Safety.** Only you control it: the agent acts on your messages only, outside its folder only where you allow, never publishes anything, and updates only on your tap. Exactly what the code does — network, processes, files — is listed in [SECURITY.md](SECURITY.md); the installing agent checks it and explains it to you before installing.
 - **Cost.** It uses your agent's subscription or API account. A reel with a few revisions is a handful of long agent turns.
 - **Remotion license.** Free for individuals and companies of up to 3 people; larger companies need a [company license](https://www.remotion.dev/license).
 - **Music.** The agent suggests royalty-free tracks (e.g. Mixkit). Check the license of anything you bring yourself.

@@ -1,5 +1,6 @@
 {
   "ideasAt": "10:00",
-  "autoUpdate": true,
-  "agentGlobalSettings": false
+  "updateChecks": true,
+  "agentGlobalSettings": false,
+  "allowedPaths": []
 }

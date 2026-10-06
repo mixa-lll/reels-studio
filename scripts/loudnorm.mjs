@@ -3,21 +3,16 @@
 // Uses system ffmpeg when present, otherwise the one bundled with Remotion.
 // Usage: node scripts/loudnorm.mjs <in.mp4> <out.mp4>
 import {spawnSync} from 'node:child_process';
-import {dirname, join} from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {ffCommand} from '../bot/media.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const [input, output] = process.argv.slice(2);
 if (!input || !output) {
   console.error('Usage: node scripts/loudnorm.mjs <in.mp4> <out.mp4>');
   process.exit(1);
 }
 
-const hasFfmpeg = spawnSync('ffmpeg', ['-version'], {stdio: 'ignore'}).status === 0;
-const remotion = join(ROOT, 'template', 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
 function ff(args) {
-  const ffArgs = ['-hide_banner', ...args];
-  const [cmd, full] = hasFfmpeg ? ['ffmpeg', ffArgs] : [process.execPath, [remotion, 'ffmpeg', ...ffArgs]];
+  const [cmd, full] = ffCommand('ffmpeg', ['-hide_banner', ...args]);
   const r = spawnSync(cmd, full, {encoding: 'utf8', windowsHide: true, maxBuffer: 64 << 20});
   if (r.status !== 0) throw new Error(r.stderr.split('\n').slice(-5).join('\n'));
   return r.stderr + r.stdout;

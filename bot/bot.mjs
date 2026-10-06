@@ -13,7 +13,8 @@ import {applyProfile} from './profile.mjs';
 import {transcribe} from './stt.mjs';
 import {describe, remember} from './intake.mjs';
 import {explain, lostSession} from './errors.mjs';
-import {botChangedSince, head, pendingUpdates, pullUpdates} from './update.mjs';
+import * as updates from './update.mjs';
+const {botChangedSince, head, pendingUpdates, pullUpdates, remoteUrl, upstreamHead} = updates;
 import {telegram} from './telegram.mjs';
 
 if (!env.token) {
@@ -39,9 +40,15 @@ const T = {
     private: 'Это личный бот. Свой можно поставить: github.com/fivol/reels-bot',
     tooBig: (what, size) => `⚠️ ${what} весит ${size} — Telegram не даёт ботам скачивать файлы больше 20 МБ. Пришли его обычным видео/фото (не «файлом» — Telegram сам сожмёт) или ссылкой на Google Диск / Яндекс Диск.`,
     sttFailed: '⚠️ Не смог распознать голосовое (локальный Whisper не запустился). Агенту передал файл; если он не разберёт — напиши текстом.',
+    sttSetup: '🎙 Первое голосовое: ставлю распознавание речи. Это разово, займёт пару минут.',
     downloadFailed: (what, err) => `⚠️ Не смог скачать ${what}: ${err}. Попробуй прислать ещё раз.`,
     noUnfinished: 'Незаконченных рилсов нет. /ideas — новые идеи.',
-    updated: (subjects) => `🔄 Я обновился:\n${subjects.map((x) => `• ${x}`).join('\n')}`,
+    updated: (subjects) => `🔄 Обновился:\n${subjects.map((x) => `• ${x}`).join('\n')}`,
+    updateAvailable: (subjects, url) => `🔄 Есть новая версия бота:\n${subjects.map((x) => `• ${x}`).join('\n')}\n\nОбновление подтянет код из ${url || 'репозитория'}; твои рилсы, настройки и история не меняются. Без твоего «Обновить» ничего не ставится.`,
+    updateYes: '⬆️ Обновить',
+    updateNo: 'Не сейчас',
+    updateLater: 'Обновлюсь, как только закончу текущую задачу.',
+    backedUp: (dir) => `твои правки в файлах бота сохранены в ${dir}`,
     ideasPrompt: 'Пачка идей для рилсов: раздел «1. Ideas» в REELS.md.',
   },
   en: {
@@ -60,9 +67,15 @@ const T = {
     private: 'This is a personal bot. Get your own: github.com/fivol/reels-bot',
     tooBig: (what, size) => `⚠️ The ${what} is ${size} — Telegram does not let bots download files over 20 MB. Send it as a regular video/photo (not as a file, Telegram compresses it) or as a Google Drive / Dropbox link.`,
     sttFailed: '⚠️ Could not transcribe the voice message (local Whisper failed). The agent got the file; if it cannot read it, please type it.',
+    sttSetup: '🎙 First voice message: setting up speech recognition. One time only, a couple of minutes.',
     downloadFailed: (what, err) => `⚠️ Could not download the ${what}: ${err}. Please send it again.`,
     noUnfinished: 'No unfinished reels. /ideas for new ones.',
-    updated: (subjects) => `🔄 I updated myself:\n${subjects.map((x) => `• ${x}`).join('\n')}`,
+    updated: (subjects) => `🔄 Updated:\n${subjects.map((x) => `• ${x}`).join('\n')}`,
+    updateAvailable: (subjects, url) => `🔄 A new version of the bot is available:\n${subjects.map((x) => `• ${x}`).join('\n')}\n\nUpdating pulls the code from ${url || 'the repository'}; your reels, settings and history stay as they are. Nothing is installed without your «Update».`,
+    updateYes: '⬆️ Update',
+    updateNo: 'Not now',
+    updateLater: 'I will update as soon as the current task is done.',
+    backedUp: (dir) => `your edits to the bot's files are saved in ${dir}`,
     ideasPrompt: 'A batch of reel ideas: section "1. Ideas" in REELS.md.',
   },
 }[LANG];
@@ -373,6 +386,7 @@ async function drain() {
       current = null;
     }
   }
+  if (!current && !queue.length && state.updateApproved) applyUpdate();
 }
 
 function enqueue(prompt) {
@@ -441,7 +455,8 @@ async function onMessage(msg) {
   if (current || msg.voice || msg.video_note) {
     await tg.call('setMessageReaction', {chat_id: state.chatId, message_id: msg.message_id, reaction: [{type: 'emoji', emoji: '👀'}]}).catch(() => {});
   }
-  const {prompt, said, problems} = await describe(tg, msg, {transcribe, lang: LANG});
+  const onInstall = () => tg.sendText(state.chatId, T.sttSetup, {silent: true}).catch(() => {});
+  const {prompt, said, problems} = await describe(tg, msg, {transcribe, lang: LANG, onInstall});
   for (const p of problems) {
     const text = p.kind === 'tooBig' ? T.tooBig(p.what, p.size) : p.kind === 'stt' ? T.sttFailed : T.downloadFailed(p.what, p.error);
     await tg.sendText(state.chatId, text).catch(() => {});
@@ -498,6 +513,15 @@ async function onButton(q) {
     if (result) enqueue(result);
     return;
   }
+  if (q.data === 'upd:yes' || q.data === 'upd:no') {
+    const label = q.data === 'upd:yes' ? T.updateYes : T.updateNo;
+    await tg.call('editMessageReplyMarkup', {chat_id: state.chatId, message_id: q.message.message_id, reply_markup: {inline_keyboard: [[{text: `✅ ${label}`, callback_data: 'ctl:done'}]]}}).catch(() => {});
+    if (q.data === 'upd:yes') {
+      if (current || queue.length) await tg.sendText(state.chatId, T.updateLater, {silent: true});
+      await applyUpdate();
+    }
+    return;
+  }
   if (q.data === 'ctl:stop' || q.data === 'ctl:now') {
     interrupt(q.data.slice(4));
     if (q.data === 'ctl:stop') await tg.sendText(state.chatId, T.cancelled, {silent: true});
@@ -532,14 +556,14 @@ setInterval(() => {
   }
 }, 60_000);
 
-// ---------- self-update ----------
+// ---------- updates ----------
 //
-// Every 6 hours (and shortly after start) pull new commits from the repo while idle,
-// then restart if the bot's own code changed. A failed fast-forward (local edits,
-// diverged history) is handed to the agent to merge.
+// Every 6 hours (and shortly after start) the bot fetches its repo. New commits are
+// never applied on their own: the owner gets the list of changes and an «Update»
+// button. A failed fast-forward (local edits, diverged history) goes to the agent.
 
 const BOOT_HEAD = await head();
-const MERGE_PROMPT = (err) => `Updates for the bot itself are available upstream, but \`git pull --ff-only\` failed:\n${err}\nMerge them, keeping the owner's local changes; run \`node --check\` on every file in bot/. Do not touch studio/ or data/. Then tell the owner in one line what is new.`;
+const MERGE_PROMPT = (err) => `The owner approved updating the bot itself, but \`git pull --ff-only\` failed:\n${err}\nMerge the upstream changes, keeping the owner's local changes; run \`node --check\` on every file in bot/. Do not touch studio/ or data/. Then tell the owner in one line what is new.`;
 
 async function announceUpdate() {
   if (!state.updateNote || !state.chatId) return;
@@ -564,36 +588,54 @@ function restart() {
   process.exit(0);
 }
 
-async function selfUpdate() {
-  if (settings().autoUpdate === false || current || queue.length) return;
+// `updateChecks: false` stops even asking; `autoUpdate` is the old name of the key.
+const updatesOff = () => settings().updateChecks === false || settings().autoUpdate === false;
+
+async function checkUpdates() {
+  if (updatesOff() || !state.chatId) return;
   try {
     const subjects = await pendingUpdates();
-    if (subjects.length) {
-      try {
-        const changed = await pullUpdates();
-        state.updateNote = subjects.slice(0, 10);
-        // The running session read the old workflow; the next turn starts fresh from a handoff.
-        if (changed.some((f) => /^(REELS|AGENTS)\.md$/.test(f))) state.rotate = true;
-        saveState(state);
-      } catch (e) {
-        if (state.mergeAsked !== subjects[0]) {
-          state.mergeAsked = subjects[0];
-          saveState(state);
-          enqueue(MERGE_PROMPT(e.message.split('\n').slice(0, 5).join('\n')));
-        }
-        return;
-      }
+    const upstream = await upstreamHead();
+    if (subjects.length && upstream && state.updateOffered !== upstream) {
+      state.updateOffered = upstream;
+      saveState(state);
+      await tg.sendText(state.chatId, T.updateAvailable(subjects.slice(0, 10), await remoteUrl()), {
+        reply_markup: {inline_keyboard: [[{text: T.updateYes, callback_data: 'upd:yes'}, {text: T.updateNo, callback_data: 'upd:no'}]]},
+      });
     }
-    // Also covers code the agent merged or edited: restart onto it while idle.
-    if (!current && !queue.length && (await botChangedSince(BOOT_HEAD))) return restart();
-    await announceUpdate();
+    // Code the agent merged or edited: restart onto it while idle.
+    if (!current && !queue.length && (await botChangedSince(BOOT_HEAD))) restart();
   } catch (e) {
     console.error('update', e.message.split('\n')[0]);
   }
 }
 
-setTimeout(selfUpdate, 60_000);
-setInterval(selfUpdate, 6 * 3_600_000);
+// Runs after the owner's «Update»; waits for the current task to finish first.
+async function applyUpdate() {
+  if (current || queue.length) {
+    state.updateApproved = true;
+    return saveState(state);
+  }
+  delete state.updateApproved;
+  saveState(state);
+  try {
+    const subjects = await pendingUpdates();
+    if (!subjects.length) return;
+    const changed = await pullUpdates();
+    // Edited bot files replaced by an archive update were backed up; say where.
+    state.updateNote = [...subjects.slice(0, 10), ...(updates.lastBackup ? [T.backedUp(updates.lastBackup)] : [])];
+    // The running session read the old workflow; the next turn starts fresh from a handoff.
+    if (changed.some((f) => /^(REELS|AGENTS)\.md$/.test(f))) state.rotate = true;
+    saveState(state);
+    if (await botChangedSince(BOOT_HEAD)) return restart();
+    await announceUpdate();
+  } catch (e) {
+    enqueue(MERGE_PROMPT(e.message.split('\n').slice(0, 5).join('\n')));
+  }
+}
+
+setTimeout(checkUpdates, 60_000);
+setInterval(checkUpdates, 6 * 3_600_000);
 
 // ---------- long polling ----------
 

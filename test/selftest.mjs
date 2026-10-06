@@ -170,13 +170,19 @@ if (!quick) {
     assert(r.status === 0 && statSync(join(TMP, 'bg.mp4')).size > 5000, `${r.status} ${r.stdout}${r.stderr}`);
   });
 
-  await check('oversized video is compressed under 50 MB', async () => {
+  await check('oversized video is compressed under the limit', async () => {
     const {fitForTelegram} = await import('../bot/media.mjs');
-    const big = join(TMP, 'big.mp4');
-    ffmpeg(['-y', '-f', 'lavfi', '-i', 'testsrc2=size=1080x1920:rate=30', '-t', '16', '-c:v', 'libx264', '-b:v', '40M', '-maxrate', '40M', '-bufsize', '80M', big]);
-    assert(statSync(big).size > 50 * 1024 * 1024, `test file only ${statSync(big).size}`);
-    const fit = fitForTelegram(big, 'video');
-    assert(fit.note && statSync(fit.path).size < 50 * 1024 * 1024, JSON.stringify(fit));
+    // The 1 s render against a small limit: the same code path as a 74 MB reel against 50 MB.
+    const limit = Math.floor(statSync(raw).size * 0.6);
+    const fit = fitForTelegram(raw, 'video', limit);
+    assert(fit.note && statSync(fit.path).size <= limit, JSON.stringify({fit, size: statSync(fit.path).size, limit}));
+  });
+
+  await check('beat grid: 120 BPM click track', () => {
+    const clicks = join(TMP, 'clicks.wav');
+    writeFileSync(clicks, clickTrack(120, 20));
+    const out = JSON.parse(node(['scripts/beats.mjs', clicks]));
+    assert(Math.abs(out.bpm - 120) < 1 && Math.abs(out.barSeconds - 2) < 0.02 && out.bars.length >= 9, JSON.stringify({bpm: out.bpm, bar: out.barSeconds}));
   });
 
   await check('loudness: scripts/loudnorm.mjs on a video with a tone', () => {
@@ -215,6 +221,22 @@ function fakeAgentBin() {
   const sh = join(TMP, 'fake-claude');
   writeFileSync(sh, `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, {mode: 0o755});
   return sh;
+}
+
+// A mono 16-bit WAV with a 30 ms 1 kHz click on every beat.
+function clickTrack(bpm, seconds, rate = 22050) {
+  const n = rate * seconds;
+  const wav = Buffer.alloc(44 + n * 2);
+  wav.write('RIFF', 0); wav.writeUInt32LE(36 + n * 2, 4); wav.write('WAVEfmt ', 8);
+  wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(rate, 24); wav.writeUInt32LE(rate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+  wav.write('data', 36); wav.writeUInt32LE(n * 2, 40);
+  const beat = (60 / bpm) * rate;
+  for (let i = 0; i < n; i++) {
+    const v = i % beat < 0.03 * rate ? Math.sin((2 * Math.PI * 1000 * i) / rate) * 0.8 : 0;
+    wav.writeInt16LE(Math.round(v * 32767), 44 + i * 2);
+  }
+  return wav;
 }
 
 function ffmpeg(args) {

@@ -11,4 +11,4 @@ node scripts/render.mjs <project> <versions/v1/slug-v1.mp4>
 npx remotion still src/index.ts Cover <versions/v1/slug-v1-cover.png>
 ```
 
-Set `barSeconds` from `scripts/beats.py` so cuts land on bar starts.
+Set `barSeconds` from `node scripts/beats.mjs <track>` so cuts land on bar starts.

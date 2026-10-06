@@ -65,7 +65,7 @@ function other(msg) {
  * reports what could not be taken in `problems` (plain-language, for the owner).
  * Returns {prompt, said, problems}.
  */
-export async function describe(tg, msg, {transcribe, lang}) {
+export async function describe(tg, msg, {transcribe, lang, onInstall}) {
   const parts = [];
   const problems = [];
   let said = null;
@@ -92,7 +92,7 @@ export async function describe(tg, msg, {transcribe, lang}) {
         await tg.download(file.id, dest);
         parts.push(`(attached ${file.kind}${file.note ? `: ${file.note}` : ''} → ${dest})`);
         if (file.kind === 'voice note' || file.kind === 'video note') {
-          said = await transcribe(dest, lang);
+          said = await transcribe(dest, lang, {onInstall});
           if (said) parts.push(`(transcript: "${said}")`);
           else {
             problems.push({kind: 'stt'});
