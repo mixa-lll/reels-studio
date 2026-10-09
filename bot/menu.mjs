@@ -1,7 +1,10 @@
 // Button menus the agent describes once and the bot walks locally, so taps are
 // instant and cost no agent turns. Two modes:
-//   steps — a setup wizard: one section after another, «do the rest yourself» on every step;
-//   menu  — a settings menu: sections listed with current values, changes applied together.
+//   steps — a setup wizard: one question after another, «do the rest yourself» on every step.
+//           Each step is a blocking question, so it is a new message with a reply keyboard:
+//           the tap stays in the chat as the owner's answer and nothing is edited away.
+//   menu  — a settings menu (an optional action): one message with inline buttons, sections
+//           listed with current values, changes applied together.
 //
 // Menu file (written by the agent, passed to `send.mjs --menu`):
 // {
@@ -18,9 +21,11 @@ import {randomBytes} from 'node:crypto';
 import {isAbsolute, join} from 'node:path';
 import {DATA, ROOT} from './config.mjs';
 import {toHtml} from './format.mjs';
+import {forgetKeys, replyKeyboard} from './keys.mjs';
 
 const DIR = join(DATA, 'menus');
 const ACTIVE = join(DIR, 'active');
+const PENDING = join(DIR, 'pending');
 mkdirSync(DIR, {recursive: true});
 
 const L = {
@@ -37,6 +42,7 @@ const L = {
     closed: 'Настройки закрыты без изменений.',
     chosen: 'Выбрано:',
     rest: 'остальное — на твой вкус',
+    making: 'Собираю рилс.',
   },
   en: {
     step: (i, n) => `Step ${i}/${n}`,
@@ -51,6 +57,7 @@ const L = {
     closed: 'Settings closed without changes.',
     chosen: 'Chosen:',
     rest: 'the rest is up to you',
+    making: 'Making the reel.',
   },
 };
 const lang = () => (process.env.BOT_LANG === 'en' ? 'en' : 'ru');
@@ -81,6 +88,21 @@ export function createMenu(spec) {
   return id;
 }
 
+/**
+ * Holds a menu the agent opened mid-turn until its final reply is out, so the owner reads
+ * the status first and the question last, right above the keyboard.
+ */
+export const deferMenu = (id) => writeFileSync(PENDING, id);
+
+/** Posts the menu held by deferMenu, if any; `drop` discards it (the turn failed). */
+export async function postPending(tg, chatId, {drop = false} = {}) {
+  const id = existsSync(PENDING) ? readFileSync(PENDING, 'utf8').trim() : '';
+  rmSync(PENDING, {force: true});
+  const m = id && !drop && loadMenu(id);
+  if (m) await post(tg, chatId, m);
+  return Boolean(m);
+}
+
 const optionValue = (o) => o.value ?? o.label;
 const labelOf = (s, value) => s.options?.find((o) => optionValue(o) === value)?.label ?? value;
 const cb = (m, action) => ({callback_data: `m:${m.id}:${action}`});
@@ -97,10 +119,13 @@ export function render(m) {
     const notes = s.options.filter((o) => o.note).map((o) => `• ${o.label} — ${o.note}`);
     const head = m.mode === 'steps' ? `${tx.step(i + 1, m.sections.length)} · ${s.title}` : s.title;
     text = [`**${m.title}**`, '', `**${head}**`, s.prompt, notes.join('\n'), '', tx.custom].filter((x) => x !== undefined).join('\n');
+    if (m.mode === 'steps') {
+      const labels = [...s.options.map((o) => `${optionValue(o) === chosen ? '✅ ' : ''}${o.label}`), ...(i > 0 ? [tx.back] : []), tx.auto];
+      return {text: toHtml(text), parse_mode: 'HTML', reply_markup: replyKeyboard(labels, {placeholder: tx.custom.replace(/^✍️\s*/, '')})};
+    }
     s.options.forEach((o, j) => rows.push([{text: `${optionValue(o) === chosen ? '✅ ' : ''}${o.label}`, ...cb(m, `o${i}.${j}`)}]));
     const nav = [];
     if (m.mode === 'menu' || i > 0) nav.push({text: tx.back, ...cb(m, 'back')});
-    if (m.mode === 'steps') nav.push({text: tx.auto, ...cb(m, 'auto')});
     rows.push(nav);
   } else {
     const changed = Object.keys(m.picks);
@@ -120,9 +145,11 @@ const resolve = (p) => (isAbsolute(p) ? p : join(ROOT, p));
 
 /** Posts the menu as a new message, with previews of the current section first. */
 export async function post(tg, chatId, m) {
-  if (m.messageId) await tg.call('deleteMessage', {chat_id: chatId, message_id: m.messageId}).catch(() => {});
+  // A steps question stays in the chat as asked; only an inline menu is replaced.
+  if (m.messageId && m.mode === 'menu') await tg.call('deleteMessage', {chat_id: chatId, message_id: m.messageId}).catch(() => {});
   await sendPreviews(tg, chatId, m);
-  const msg = await tg.call('sendMessage', {chat_id: chatId, disable_notification: true, ...render(m)});
+  // A question waits for the owner: it notifies; an inline menu they opened does not.
+  const msg = await tg.call('sendMessage', {chat_id: chatId, disable_notification: m.mode === 'menu', ...render(m)});
   m.messageId = msg.message_id;
   saveMenu(m);
   setActive(m);
@@ -139,6 +166,7 @@ async function sendPreviews(tg, chatId, m) {
 }
 
 async function show(tg, chatId, m) {
+  if (m.mode === 'steps') return post(tg, chatId, m);
   // New previews would land below the menu: repost it under them instead of editing.
   if (m.view >= 0 && !m.previewed.includes(m.view) && m.sections[m.view].options.some((o) => o.file)) {
     return post(tg, chatId, m);
@@ -157,7 +185,14 @@ async function finish(tg, chatId, m, kind) {
   const picks = Object.entries(m.picks).map(([i, p]) => ({section: m.sections[i].title, ...p}));
   const lines = picks.map((p) => `• ${p.section}: ${p.label}`);
   const summary = kind === 'close' ? tx.closed : [tx.chosen, ...lines, ...(kind === 'auto' ? [`• ${tx.rest}`] : [])].join('\n');
-  await tg.call('editMessageText', {chat_id: chatId, message_id: m.messageId, text: toHtml(`**${m.title}**\n\n${summary}`), parse_mode: 'HTML'}).catch(() => {});
+  if (m.mode === 'steps') {
+    // A new message, not an edit: the questions and answers above stay as they were,
+    // and this one takes the keyboard away for good.
+    forgetKeys();
+    await tg.call('sendMessage', {chat_id: chatId, disable_notification: true, text: toHtml(`**${m.title}**\n\n${summary}\n\n${tx.making}`), parse_mode: 'HTML', reply_markup: {remove_keyboard: true}}).catch(() => {});
+  } else {
+    await tg.call('editMessageText', {chat_id: chatId, message_id: m.messageId, text: toHtml(`**${m.title}**\n\n${summary}`), parse_mode: 'HTML'}).catch(() => {});
+  }
   if (kind === 'close') return null;
 
   const desc = picks.map((p) => `- ${p.section}: ${p.custom ? `owner's own words: "${p.value}"` : `"${p.label}" (value: ${p.value})`}`).join('\n') || '- nothing';
@@ -211,7 +246,21 @@ export async function onMenuButton(tg, chatId, data) {
   return null;
 }
 
-/** A typed or dictated answer while a section is open. Returns a prompt or null. */
+/**
+ * A message while a section is open: in steps mode a keyboard tap (option, back, «do the
+ * rest yourself»), otherwise the owner's own typed or dictated answer. Returns a prompt or null.
+ */
 export async function onMenuText(tg, chatId, m, text) {
+  if (m.mode === 'steps') {
+    const tx = t();
+    const label = text.replace(/^✅\s*/, '');
+    if (label === tx.auto) return finish(tg, chatId, m, 'auto');
+    if (label === tx.back && m.view > 0) {
+      m.view -= 1;
+      return show(tg, chatId, m).then(() => null);
+    }
+    const o = m.sections[m.view].options.find((x) => x.label === label);
+    if (o) return pick(tg, chatId, m, m.view, {label: o.label, value: optionValue(o)});
+  }
   return pick(tg, chatId, m, m.view, {label: `✍️ ${text.length > 40 ? `${text.slice(0, 40)}…` : text}`, value: text, custom: true});
 }

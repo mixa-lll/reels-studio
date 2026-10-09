@@ -69,18 +69,27 @@ await check('activity line: Windows and POSIX paths', () => {
 await check('menus: steps with own answer, settings with apply', async () => {
   const log = [];
   let id = 1;
-  const tg = {call: async (m) => (log.push(m), {message_id: id++}), sendFile: async () => log.push('file')};
+  const tg = {call: async (m, p) => (log.push({m, p}), {message_id: id++}), sendFile: async () => log.push('file')};
+  const lastKeys = () => log.filter((x) => x.p?.reply_markup?.keyboard).at(-1).p.reply_markup.keyboard.map((r) => r[0].text);
   const steps = {mode: 'steps', title: 'T', sections: [
     {title: 'Look', options: [{label: 'A', value: 'a'}, {label: 'B', value: 'b'}]},
     {title: 'Music', options: [{label: 'M', value: 'm'}]},
     {title: 'Pace', options: [{label: 'Fast', value: 'f'}]},
   ]};
   const s = menu.createMenu(steps);
-  await menu.post(tg, 1, menu.loadMenu(s));
-  await menu.onMenuButton(tg, 1, `m:${s}:o0.1`);
+  // Opened mid-turn, shown only after the reply; each step is a reply-keyboard question.
+  menu.deferMenu(s);
+  assert(!log.length, 'menu shown before the reply');
+  assert(await menu.postPending(tg, 1), 'pending menu not shown');
+  assert(lastKeys().includes('B') && !log.some((x) => x.p?.reply_markup?.inline_keyboard), 'steps need a reply keyboard');
+  await menu.onMenuText(tg, 1, menu.activeMenu(), 'B');
+  const music = lastKeys();
+  assert(music.includes('M') && music.length === 3, music.join(','));
   await menu.onMenuText(tg, 1, menu.activeMenu(), 'my own track');
-  const done = await menu.onMenuButton(tg, 1, `m:${s}:auto`);
+  const done = await menu.onMenuText(tg, 1, menu.activeMenu(), lastKeys().at(-1));
   assert(done.includes('"B"') && done.includes('my own track') && done.includes('Decide yourself: Pace'), done);
+  assert(!log.some((x) => x.m === 'deleteMessage' || x.m === 'editMessageText'), 'questions must stay as asked');
+  assert(log.at(-1).p.reply_markup?.remove_keyboard, 'keyboard not removed at the end');
   const tune = menu.createMenu({mode: 'menu', title: 'v1', sections: [{title: 'Hook', current: 'q', options: [{label: 'Q', value: 'q'}, {label: 'F', value: 'f'}]}]});
   await menu.onMenuButton(tg, 1, `m:${tune}:open`);
   const open = readFileSync(join(process.env.REELS_DATA, 'menus', 'active'), 'utf8');

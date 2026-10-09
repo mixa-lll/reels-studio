@@ -8,7 +8,7 @@
 //                                                 the input field; --menu adds «🎛 Настроить подробнее»
 //   --text "…" [--buttons "A|B"]                  message + inline buttons (optional actions on it)
 //   --file path.mp4 --caption "…" [--buttons "…"] [--menu tune.json] [--document]
-//   --menu steps.json                             open a button menu now (see bot/menu.mjs)
+//   --menu steps.json                             open a button menu after your final reply (see bot/menu.mjs)
 //
 // Messages with buttons get a «type or dictate your own» line automatically.
 // Sound: questions (with buttons), videos and documents notify; plain status texts and
@@ -17,7 +17,7 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {parseArgs} from 'node:util';
 import {DATA, env, loadState} from './config.mjs';
-import {createMenu, customHint, loadMenu, post, tuneLabel} from './menu.mjs';
+import {createMenu, customHint, deferMenu, tuneLabel} from './menu.mjs';
 import {moreIdeasLabel, replyKeyboard} from './keys.mjs';
 import {keyboard, telegram} from './telegram.mjs';
 
@@ -89,7 +89,8 @@ if (o.text) {
     process.exit(1);
   }
 } else if (menuId) {
-  await post(tg, chatId, loadMenu(menuId));
+  // Opened by the bot right after the final reply, so the question comes last.
+  deferMenu(menuId);
 }
 // Tell the bot to move its progress line below what we just sent.
 writeFileSync(join(DATA, 'sent.txt'), String(Date.now()));

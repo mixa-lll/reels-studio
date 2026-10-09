@@ -8,7 +8,7 @@ import {DATA, INBOX, ROOT, STUDIO, env, loadState, saveState, settings, writeSet
 import {APPROVED as CLAIM_APPROVED, REQUEST as CLAIM_REQUEST} from './claim.mjs';
 import {killTree, runAgent} from './agents.mjs';
 import {activityLabel, classify} from './activity.mjs';
-import {activeMenu, onMenuButton, onMenuText} from './menu.mjs';
+import {activeMenu, onMenuButton, onMenuText, postPending} from './menu.mjs';
 import {currentKeys, forgetKeys, replyKeyboard, splitKeyLine} from './keys.mjs';
 import {applyProfile} from './profile.mjs';
 import {keepAwake, taskAwake} from './awake.mjs';
@@ -164,12 +164,26 @@ if (await applyProfile(tg, env.token, state, LANG).catch((e) => console.error('p
 
 const mtime = (f) => (existsSync(f) ? statSync(f).mtimeMs : 0);
 
-// A stale reply keyboard goes as soon as work moves on; a throwaway message carries
-// the removal (it can't ride on the progress message, which has inline buttons).
+// A stale reply keyboard goes as soon as work moves on; a small «⌛» message carries
+// the removal (it can't ride on the progress message, which has inline buttons). It stays
+// until a later message takes over the keyboard: deleting it right away brings the old
+// keyboard back in Telegram clients, which show the last keyboard still in the chat.
 async function clearKeyboard() {
   if (!forgetKeys()) return;
   const msg = await tg.call('sendMessage', {chat_id: state.chatId, text: '⌛', disable_notification: true, reply_markup: {remove_keyboard: true}}).catch(() => null);
-  if (msg) await tg.call('deleteMessage', {chat_id: state.chatId, message_id: msg.message_id}).catch(() => {});
+  if (!msg) return;
+  await dropKeyAck();
+  state.keyAck = msg.message_id;
+  saveState(state);
+}
+
+/** Deletes the «⌛» once a newer message carries a keyboard or its removal. */
+async function dropKeyAck() {
+  const id = state.keyAck;
+  if (!id) return;
+  delete state.keyAck;
+  saveState(state);
+  await tg.call('deleteMessage', {chat_id: state.chatId, message_id: id}).catch(() => {});
 }
 
 // ---------- owner ----------
@@ -449,6 +463,8 @@ async function runTurn(prompt, retried = false) {
   if (res.cancelled && (res.reason === 'stalled' || res.reason === 'overtime')) {
     return onAgentError({...res, error: true, forcedKind: res.reason}, prompt, true);
   }
+  // A menu opened during a failed or stopped turn is not shown.
+  if (res.error || res.cancelled) await postPending(tg, state.chatId, {drop: true});
   if (res.error && !res.cancelled) return onAgentError(res, prompt, retried);
   if (res.cancelled) {
     // Tell the next turn why the previous one ended mid-way.
@@ -476,6 +492,9 @@ async function runTurn(prompt, retried = false) {
     saveState(state);
     await flushOutbox();
   }
+  // A steps menu the agent opened comes after its reply: status first, question last.
+  const asked = (await postPending(tg, state.chatId)) || askedAlready || Boolean(labels);
+  if (asked) await dropKeyAck();
 }
 
 // Notifications: only messages that need the owner (questions, versions, results,
@@ -646,6 +665,13 @@ async function onMessage(msg) {
   }
   if (prompt) remember(prompt);
 
+  // A setup step is a question with a reply keyboard: the tap or a typed answer goes to it.
+  const step = said && !msg.reply_to_message && activeMenu();
+  if (step?.mode === 'steps') {
+    const result = await onMenuText(tg, state.chatId, step, said);
+    if (result) enqueue(result);
+    return;
+  }
   // A tap on a reply-keyboard button arrives as plain text with its label.
   const keys = currentKeys();
   if (msg.text && keys?.labels?.includes(msg.text)) {
@@ -848,7 +874,10 @@ async function flushOutbox() {
   const o = state.outbox;
   if (!o || !state.chatId) return;
   await tg.call('sendChatAction', {chat_id: state.chatId, action: 'typing'}).catch(() => {});
-  await tg.sendText(state.chatId, o.text, o.labels ? {reply_markup: replyKeyboard(o.labels, {placeholder: T.hint})} : {});
+  // A reply without options still takes over the keyboard removal from the «⌛».
+  const markup = o.labels ? replyKeyboard(o.labels, {placeholder: T.hint}) : state.keyAck ? {remove_keyboard: true} : undefined;
+  await tg.sendText(state.chatId, o.text, markup ? {reply_markup: markup} : {});
+  if (markup) await dropKeyAck();
   delete state.outbox;
   saveState(state);
 }
