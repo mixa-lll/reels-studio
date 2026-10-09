@@ -374,8 +374,9 @@ async function runWithStatus(prompt, firstLine, {quiet = false} = {}) {
       bin: env.agentBin,
       model: env.agentModel,
       sessionId: state.sessionId,
-      // studio/settings.json `agentGlobalSettings: false` hides the owner's global agent setup.
-      isolated: settings().agentGlobalSettings === false,
+      // The owner's global agent setup (plugins, hooks, MCP servers) only on an explicit
+      // `agentGlobalSettings: true` in studio/settings.json, as /settings and SECURITY.md say.
+      isolated: settings().agentGlobalSettings !== true,
       prompt: state.sessionId ? prompt : openingPrompt(prompt),
       onCall: (call) => {
         const key = classify(call);
