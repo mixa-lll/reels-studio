@@ -23,7 +23,7 @@ const git = async (...args) => (await run('git', args, {cwd: ROOT, timeout: 120_
 // ---------- GitHub API (archive mode) ----------
 
 async function api(path) {
-  const res = await fetch(`https://api.github.com/repos/${REPO}${path}`, {headers: {accept: 'application/vnd.github+json', 'user-agent': 'reels-bot'}});
+  const res = await fetch(`https://api.github.com/repos/${REPO}${path}`, {headers: {accept: 'application/vnd.github+json', 'user-agent': 'reels-bot'}, signal: AbortSignal.timeout(30_000)});
   if (!res.ok) throw new Error(`GitHub API ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return res.json();
 }
@@ -132,7 +132,7 @@ export async function pullUpdates() {
 async function installArchive(sha) {
   const tmp = mkdtempSync(join(tmpdir(), 'reels-update-'));
   try {
-    const res = await fetch(`https://codeload.github.com/${REPO}/tar.gz/${sha}`);
+    const res = await fetch(`https://codeload.github.com/${REPO}/tar.gz/${sha}`, {signal: AbortSignal.timeout(300_000)});
     if (!res.ok) throw new Error(`download ${res.status}`);
     const archive = join(tmp, 'update.tar.gz');
     writeFileSync(archive, Buffer.from(await res.arrayBuffer()));

@@ -4,7 +4,7 @@ Written for the owner and for the agent that installs the bot: everything the co
 
 ## Who controls it
 
-- **Only the owner.** The installer makes a secret link `t.me/<bot>?start=<OWNER_CODE>`; whoever opens it first becomes the owner (`bot/bot.mjs`, `onMessage`). Messages from anyone else are answered with one line and never reach the agent. Private chats only: added to a group, the bot leaves.
+- **Only the owner.** The installer gives the user a link `t.me/<bot>?start=<code>` with a code it made up and stored in `.env`; opening it claims the bot. Without a code, the first person to press Start is only a request until the user confirms «this is me» on the computer the bot runs on (`bot/claim.mjs`). Messages from anyone else are answered with one line and never reach the agent. Private chats only: added to a group, the bot leaves.
 - **The agent acts only on the owner's behalf.** A turn of the agent starts only from: an owner's message or button tap, the daily batch of ideas at the time the owner set (`ideasAt`, can be turned off), or an update the owner approved. Nothing else, no remote commands.
 - **No remote control by the author.** The repo cannot push code to your machine: the bot only *checks* for a new version and installs it after the owner taps «⬆️ Update» (`bot/update.mjs`). Checks can be turned off (`updateChecks: false`).
 - **Stop at any time.** «⏹ Stop» or `/stop` kills the agent with every process it started, including background renders.
@@ -41,9 +41,12 @@ The agent (Claude Code or Codex) talks to its own provider and, while making a r
 | `tar`, `uvx` | unpack `uv` (first use), local speech-to-text | `bot/stt.mjs` |
 | `ffmpeg` / `ffprobe` | fit files into Telegram's limits, loudness | `bot/media.mjs`, `scripts/loudnorm.mjs` |
 | `ps` / `taskkill` | find and stop the agent's processes on «Stop» | `bot/agents.mjs` |
+| `caffeinate -s` (macOS) / `SetThreadExecutionState` via PowerShell (Windows) / `systemd-inhibit` (Linux) | while the agent works on a task: blocks idle sleep, so the task does not freeze; between tasks, only if the owner turned on «stay awake on the charger»: keeps the computer awake while plugged in. No system setting is changed; the request ends with the task or the bot | `bot/awake.mjs` |
 | `node` | the bot, its supervisor, renders | `bot/run.mjs`, `scripts/render.mjs` |
 
 ## Files
+
+- Read outside the folder: with Codex, its own session files in `~/.codex/sessions` — only the plan-limit numbers of the bot's session, for `/usage` and limit warnings.
 
 - Written by the bot: `data/` (state, logs, files the owner sent, menus, render jobs, backups of bot files you edited before an update replaced them), `studio/` (brief, ideas, playbook, reels), `template/node_modules`; on an approved update, the bot's own files in this folder.
 - Caches of the tools it starts (uv's package cache, the Whisper model, npm, Remotion's Chromium) go to the usual per-user cache folders.
@@ -62,4 +65,4 @@ This is a rule set, not an operating-system sandbox: the agent has the permissio
 
 ## Removing it
 
-Delete the autostart entry, then the folder; send `/revoke` to @BotFather to kill the token.
+Ask the agent that installed it — it follows [MANAGE.md](MANAGE.md). By hand: delete the autostart entry, then the folder; send `/revoke` (or `/deletebot`) to @BotFather.

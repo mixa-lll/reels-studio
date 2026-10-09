@@ -48,7 +48,7 @@ function findFile(dir, name) {
 
 async function installUv() {
   const asset = uvAsset();
-  const res = await fetch(`https://github.com/astral-sh/uv/releases/latest/download/${asset}`);
+  const res = await fetch(`https://github.com/astral-sh/uv/releases/latest/download/${asset}`, {signal: AbortSignal.timeout(300_000)});
   if (!res.ok) throw new Error(`download ${asset}: HTTP ${res.status}`);
   const tmp = mkdtempSync(join(tmpdir(), 'reels-uv-'));
   try {

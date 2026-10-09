@@ -4,7 +4,7 @@
 // stdin prompt and cancel, voice transcription. Uses temp folders, never data/ or studio/.
 //   npm test                 everything
 //   npm test -- --quick      skip rendering and speech-to-text
-import {execFileSync, spawnSync} from 'node:child_process';
+import {execFileSync, spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
@@ -109,6 +109,38 @@ await check('settings menu: idea time, days, off, typed time', async () => {
   assert(!ideasDay({ideasDays: 'weekdays'}, new Date('2026-10-04T12:00')) && ideasDay({ideasDays: 'weekdays'}, new Date('2026-10-05T12:00')), 'weekdays');
 });
 
+await check('owner confirmed on the computer, no secret', () => {
+  const req = join(process.env.REELS_DATA, 'owner-request.json');
+  const none = spawnSync(process.execPath, ['bot/claim.mjs', '--wait', '1'], {cwd: ROOT, encoding: 'utf8', env: process.env});
+  assert(none.status === 2, none.stdout);
+  writeFileSync(req, JSON.stringify({id: 7, chatId: 7, name: 'Ann', username: 'ann'}));
+  assert(node(['bot/claim.mjs', '--wait', '5']).includes('Ann (@ann)'), 'who');
+  node(['bot/claim.mjs', '--approve']);
+  assert(JSON.parse(readFileSync(join(process.env.REELS_DATA, 'owner-approved.json'), 'utf8')).id === 7 && !existsSync(req), 'approved');
+});
+
+await check('keep awake on the charger: turns on and off without errors', async () => {
+  const {keepAwake} = await import('../bot/awake.mjs');
+  keepAwake(true);
+  await new Promise((r) => setTimeout(r, 1500));
+  keepAwake(true);
+  keepAwake(false);
+});
+
+await check('limits: per-reel share, warnings at 80% and 95% once', async () => {
+  const {recordTurn, reelSpend, acceptedText, limitWarnings, usageText} = await import('../bot/usage.mjs');
+  const W = Date.now() + 86400e3;
+  recordTurn({startedAt: 0, reel: '01-x', before: {week: {pct: 40, resetsAt: W}}, after: {week: {pct: 44, resetsAt: W}}, cost: 1});
+  recordTurn({startedAt: 0, reel: '01-x', before: {week: {pct: 44, resetsAt: W}}, after: {week: {pct: 47, resetsAt: W}}, cost: 1});
+  assert(reelSpend('01-x').week === 7 && reelSpend('01-x').turns === 2, JSON.stringify(reelSpend('01-x')));
+  assert(acceptedText('01-x', 'en').includes('7%'), acceptedText('01-x', 'en'));
+  const warned = {};
+  assert(limitWarnings({week: {pct: 81, resetsAt: W}}, warned, 'en').length === 1, '80% once');
+  assert(limitWarnings({week: {pct: 85, resetsAt: W}}, warned, 'en').length === 0, 'no repeat');
+  assert(limitWarnings({week: {pct: 95, resetsAt: W}}, warned, 'en')[0]?.loud, '95% loud');
+  assert(usageText({week: {pct: 47, resetsAt: W}}, 'en').includes('47%'), 'usage text');
+});
+
 await check('agent adapter: stdin prompt, session, activity', async () => {
   const bin = fakeAgentBin();
   const calls = [];
@@ -164,6 +196,54 @@ await check('errors: plain-language explanations', async () => {
   for (const [e, k] of kinds) assert(e.kind === k, `${k}: got ${e.kind}`);
   assert(kinds[4][0].text.includes('139') && kinds[4][0].text.includes('Segmentation fault'), 'raw error shown');
   assert(lostSession({text: 'No conversation found with session ID: x'}), 'lost session');
+});
+
+await check('end to end: owner link, reply despite a hung progress line, task survives a crash', async () => {
+  const {fakeTelegram} = await import('./fake-telegram.mjs');
+  const tg = await fakeTelegram();
+  const data = mkdtempSync(join(tmpdir(), 'reels-e2e-'));
+  const env = {
+    ...process.env, TELEGRAM_BOT_TOKEN: '1:test', REELS_TELEGRAM_API: tg.url, REELS_HTTP_TIMEOUT: '1500',
+    AGENT: 'claude', AGENT_BIN: fakeAgentBin(), OWNER_CODE: 'abc', BOT_LANG: 'en',
+    REELS_DATA: join(data, 'data'), REELS_STUDIO: join(data, 'studio'), REELS_BOT_SUPERVISED: '1',
+    REELS_STALL_MS: '6000', REELS_WATCH_MS: '1000',
+  };
+  const start = () => spawn(process.execPath, ['bot/bot.mjs'], {cwd: ROOT, env, stdio: 'ignore'});
+  let bot = start();
+  try {
+    tg.message(9, '/start wrong');
+    await tg.waitFor(/personal bot/);
+    tg.message(5, '/start abc');
+    await tg.waitFor(/I make reels/);
+    // The progress line hangs forever; the agent must still run and the reply arrive.
+    tg.hang((method, params) => /ctl:stop/.test(JSON.stringify(params.reply_markup ?? '')));
+    tg.message(5, 'hello world');
+    await tg.waitFor(/echo:[\s\S]*hello world/);
+    tg.hang(null);
+    // Crash in the middle of a task: after a restart the task is done anyway.
+    tg.message(5, 'slow one');
+    await new Promise((r) => setTimeout(r, 1200));
+    bot.kill('SIGKILL');
+    await new Promise((r) => setTimeout(r, 500));
+    bot = start();
+    await tg.waitFor(/echo:[\s\S]*slow one/, 30_000);
+    // A vertical video goes out with its real size and a preview frame (not a square).
+    // Async: the fake Telegram lives in this process and must keep answering.
+    const code = await new Promise((r) => spawn(process.execPath, ['bot/send.mjs', '--file', join(ROOT, 'test', 'fixtures', 'vertical.mp4'), '--caption', '01 «t» · v1'], {cwd: ROOT, env, stdio: 'ignore'}).on('exit', r));
+    assert(code === 0, `send.mjs exit ${code}`);
+    const video = tg.sent.find((s) => s.method === 'sendVideo');
+    assert(video && /name="width"\r\n\r\n1080/.test(video.raw) && /name="height"\r\n\r\n1920/.test(video.raw) && /name="thumbnail"; filename/.test(video.raw), (video?.raw ?? 'no sendVideo').slice(0, 300));
+    // An agent error is explained, with a Retry button.
+    tg.message(5, 'fail login');
+    const err = await tg.waitFor(/not logged in/);
+    assert(JSON.stringify(err.reply_markup).includes('Retry'), JSON.stringify(err.reply_markup));
+    // A silent agent is stopped by the watchdog and reported.
+    tg.message(5, 'hang quietly');
+    await tg.waitFor(/no sign of life/, 25_000);
+  } finally {
+    bot.kill('SIGTERM');
+    tg.close();
+  }
 });
 
 if (!quick) {

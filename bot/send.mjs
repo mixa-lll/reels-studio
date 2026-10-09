@@ -2,6 +2,7 @@
 // CLI the agent calls to talk to the owner while it works.
 //
 //   --status "🎵 Подбираю музыку"                 update the live progress line
+//   --text "…" --keyboard "A|B|C|D" --ideas       a batch of ideas: the bot adds «🎲 More ideas»
 //   --text "…" --keyboard "A|B" [--menu tune.json]
 //                                                 message + the owner's main options as a keyboard under
 //                                                 the input field; --menu adds «🎛 Настроить подробнее»
@@ -17,7 +18,7 @@ import {join} from 'node:path';
 import {parseArgs} from 'node:util';
 import {DATA, env, loadState} from './config.mjs';
 import {createMenu, customHint, loadMenu, post, tuneLabel} from './menu.mjs';
-import {replyKeyboard} from './keys.mjs';
+import {moreIdeasLabel, replyKeyboard} from './keys.mjs';
 import {keyboard, telegram} from './telegram.mjs';
 
 const {values: o} = parseArgs({
@@ -30,6 +31,7 @@ const {values: o} = parseArgs({
     keyboard: {type: 'string'},
     document: {type: 'boolean'},
     menu: {type: 'string'},
+    ideas: {type: 'boolean'},
     silent: {type: 'boolean'},
     notify: {type: 'boolean'},
   },
@@ -56,7 +58,10 @@ if (o.text) {
   let markup;
   if (keys) {
     if (menuId) keys.push(tuneLabel());
-    markup = replyKeyboard(keys, {menu: menuId, tune: tuneLabel(), placeholder: customHint().replace(/^✍️\s*/, '')});
+    // A batch of ideas always ends with «More ideas», whatever the agent passed.
+    const more = o.ideas ? moreIdeasLabel() : undefined;
+    if (more) keys.splice(0, keys.length, ...keys.filter((k) => !/^🎲/.test(k)), more);
+    markup = replyKeyboard(keys, {menu: menuId, tune: tuneLabel(), more, placeholder: customHint().replace(/^✍️\s*/, '')});
   } else if (buttons || menuId) {
     markup = keyboard(buttons ?? []);
     if (menuId) markup.inline_keyboard.push([{text: tuneLabel(), callback_data: `m:${menuId}:open`}]);

@@ -6,11 +6,14 @@ import {join} from 'node:path';
 import {DATA} from './config.mjs';
 
 const FILE = join(DATA, 'keyboard.json');
+
+/** Always the last button under a batch of ideas; the bot adds it, not the agent. */
+export const moreIdeasLabel = () => (process.env.BOT_LANG === 'en' ? '🎲 More ideas' : '🎲 Другие идеи');
 const KEY_LINE = /\n?\s*⌨️\s*(.+?)\s*$/;
 
 /** Reply-keyboard markup; the labels are remembered so taps can be recognised. */
-export function replyKeyboard(labels, {menu, tune, placeholder, retry, retryLabel} = {}) {
-  writeFileSync(FILE, JSON.stringify({labels, menu, tune, retry, retryLabel}));
+export function replyKeyboard(labels, {menu, tune, placeholder, retry, retryLabel, more} = {}) {
+  writeFileSync(FILE, JSON.stringify({labels, menu, tune, retry, retryLabel, more}));
   return {
     keyboard: labels.map((text) => [{text}]),
     resize_keyboard: true,

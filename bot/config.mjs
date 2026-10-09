@@ -1,5 +1,5 @@
 // Paths, .env and persistent state shared by the bot and the send CLI.
-import {cpSync, existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -47,13 +47,19 @@ export function writeSettings(patch) {
 
 /** Reads data/state.json: owner, chat, current session and its counters. */
 export function loadState() {
-  try {
-    return JSON.parse(readFileSync(STATE, 'utf8'));
-  } catch {
-    return {};
+  // A crash mid-write cannot corrupt it (writes are atomic), but fall back to the
+  // previous copy just in case.
+  for (const file of [STATE, `${STATE}.bak`]) {
+    try {
+      return JSON.parse(readFileSync(file, 'utf8'));
+    } catch {}
   }
+  return {};
 }
 
 export function saveState(state) {
-  writeFileSync(STATE, JSON.stringify(state, null, 2));
+  const tmp = `${STATE}.tmp`;
+  writeFileSync(tmp, JSON.stringify(state, null, 2));
+  if (existsSync(STATE)) copyFileSync(STATE, `${STATE}.bak`);
+  renameSync(tmp, STATE);
 }

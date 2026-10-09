@@ -5,11 +5,14 @@ import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {DATA, INBOX, ROOT, STUDIO, env, loadState, saveState, settings, writeSettings} from './config.mjs';
+import {APPROVED as CLAIM_APPROVED, REQUEST as CLAIM_REQUEST} from './claim.mjs';
 import {killTree, runAgent} from './agents.mjs';
 import {activityLabel, classify} from './activity.mjs';
 import {activeMenu, onMenuButton, onMenuText} from './menu.mjs';
 import {currentKeys, forgetKeys, replyKeyboard, splitKeyLine} from './keys.mjs';
 import {applyProfile} from './profile.mjs';
+import {keepAwake, taskAwake} from './awake.mjs';
+import {acceptedText, codexLimits, limitWarnings, recordTurn, touchedReel, usageText} from './usage.mjs';
 import {badTime, ideasDay, onSettingsButton, parseTime, view as settingsView} from './prefs.mjs';
 import {transcribe} from './stt.mjs';
 import {describe, remember} from './intake.mjs';
@@ -17,6 +20,12 @@ import {explain, lostSession} from './errors.mjs';
 import * as updates from './update.mjs';
 const {botChangedSince, head, pendingUpdates, pullUpdates, remoteUrl, upstreamHead} = updates;
 import {telegram} from './telegram.mjs';
+
+// Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
+for (const level of ['log', 'error']) {
+  const orig = console[level].bind(console);
+  console[level] = (...args) => orig(new Date().toISOString(), ...args.map((a) => (a instanceof Error && a.cause ? `${a.message} (${a.cause.code ?? a.cause.message ?? a.cause})` : a)));
+}
 
 if (!env.token) {
   console.error('TELEGRAM_BOT_TOKEN is not set (see .env.example).');
@@ -39,6 +48,8 @@ const T = {
     unfinished: '🗂 Незаконченные рилсы — выбери, к какому вернуться:',
     hint: 'Или напиши / надиктуй свой вариант',
     private: 'Это личный бот. Свой можно поставить: github.com/fivol/reels-bot',
+    conflict: '⚠️ С этим же ключом Telegram запущен ещё один бот (на другом компьютере?). Пока он работает, я не получаю сообщения. Останови второй или попроси агента выпустить новый ключ.',
+    confirmOnComputer: '👋 Привет! Подтверди на компьютере, в окне установки, что это ты, — и начнём.',
     tooBig: (what, size) => `⚠️ ${what} весит ${size} — Telegram не даёт ботам скачивать файлы больше 20 МБ. Пришли его обычным видео/фото (не «файлом» — Telegram сам сожмёт) или ссылкой на Google Диск / Яндекс Диск.`,
     sttFailed: '⚠️ Не смог распознать голосовое (локальный Whisper не запустился). Агенту передал файл; если он не разберёт — напиши текстом.',
     sttSetup: '🎙 Первое голосовое: ставлю распознавание речи. Это разово, займёт пару минут.',
@@ -49,8 +60,11 @@ const T = {
     updateYes: '⬆️ Обновить',
     updateNo: 'Не сейчас',
     updateLater: 'Обновлюсь, как только закончу текущую задачу.',
+    upToDate: '✅ Стоит последняя версия бота.',
+    updateCheckFailed: (e) => `⚠️ Не смог проверить обновления: ${e}`,
     backedUp: (dir) => `твои правки в файлах бота сохранены в ${dir}`,
     ideasPrompt: 'Пачка идей для рилсов: раздел «1. Ideas» в REELS.md.',
+    morePrompt: '(tapped «🎲 Другие идеи»: pitch a fresh batch of 4 NEW ideas per «1. Ideas» in REELS.md — none of the ones already shown; those stay in ideas.md. Keyboard: only the new ones, via --ideas.)',
   },
   en: {
     hello: '🎬 Hi! I make reels: I pitch ideas, edit the ones you pick and revise them from your replies to the video.\n\n🎙 You can talk to me with voice messages, it is often faster: dictate an idea or edits and I will get it.\n\nFirst tell me what the reels are about: product, link, audience.',
@@ -66,6 +80,8 @@ const T = {
     unfinished: '🗂 Unfinished reels — pick one to get back to:',
     hint: 'Or type / dictate your own',
     private: 'This is a personal bot. Get your own: github.com/fivol/reels-bot',
+    conflict: '⚠️ Another copy of this bot runs with the same Telegram key (another computer?). While it runs I get no messages. Stop it or ask the agent for a new key.',
+    confirmOnComputer: '👋 Hi! Confirm on your computer, in the setup window, that this is you — and we start.',
     tooBig: (what, size) => `⚠️ The ${what} is ${size} — Telegram does not let bots download files over 20 MB. Send it as a regular video/photo (not as a file, Telegram compresses it) or as a Google Drive / Dropbox link.`,
     sttFailed: '⚠️ Could not transcribe the voice message (local Whisper failed). The agent got the file; if it cannot read it, please type it.',
     sttSetup: '🎙 First voice message: setting up speech recognition. One time only, a couple of minutes.',
@@ -76,8 +92,11 @@ const T = {
     updateYes: '⬆️ Update',
     updateNo: 'Not now',
     updateLater: 'I will update as soon as the current task is done.',
+    upToDate: '✅ The bot is up to date.',
+    updateCheckFailed: (e) => `⚠️ Could not check for updates: ${e}`,
     backedUp: (dir) => `your edits to the bot's files are saved in ${dir}`,
     ideasPrompt: 'A batch of reel ideas: section "1. Ideas" in REELS.md.',
+    morePrompt: '(tapped «🎲 More ideas»: pitch a fresh batch of 4 NEW ideas per «1. Ideas» in REELS.md — none of the ones already shown; those stay in ideas.md. Keyboard: only the new ones, via --ideas.)',
   },
 }[LANG];
 
@@ -148,6 +167,26 @@ async function clearKeyboard() {
   const msg = await tg.call('sendMessage', {chat_id: state.chatId, text: '⌛', disable_notification: true, reply_markup: {remove_keyboard: true}}).catch(() => null);
   if (msg) await tg.call('deleteMessage', {chat_id: state.chatId, message_id: msg.message_id}).catch(() => {});
 }
+
+// ---------- owner ----------
+
+async function becomeOwner({id, chatId, name}) {
+  Object.assign(state, {ownerId: id, chatId, ownerName: name});
+  saveState(state);
+  await tg.sendText(state.chatId, T.hello);
+}
+
+// Approval written by `node bot/claim.mjs --approve` on this computer.
+setInterval(() => {
+  if (state.ownerId || !existsSync(CLAIM_APPROVED)) return;
+  const who = JSON.parse(readFileSync(CLAIM_APPROVED, 'utf8'));
+  rmSync(CLAIM_APPROVED, {force: true});
+  becomeOwner(who).catch((e) => console.error('owner', e.message));
+}, 2000);
+
+// Stay awake on the charger if the owner asked; re-applied as settings change.
+keepAwake(settings().keepAwake === true);
+setInterval(() => keepAwake(settings().keepAwake === true), 30_000);
 
 // ---------- /settings ----------
 
@@ -249,14 +288,14 @@ function controls() {
 // The progress message id is persisted, so one left behind by a crash or restart
 // is removed on the next start. Result messages are never deleted.
 async function postStatus(text) {
-  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text, disable_notification: true, reply_markup: controls()});
+  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text, disable_notification: true, reply_markup: controls()}, {retries: 0});
   current.statusId = state.statusId = msg.message_id;
   current.lastText = text;
   saveState(state);
 }
 
 async function deleteStatus(id) {
-  await tg.call('deleteMessage', {chat_id: state.chatId, message_id: id}).catch(() => {});
+  await tg.call('deleteMessage', {chat_id: state.chatId, message_id: id}, {retries: 1}).catch(() => {});
   if (state.statusId === id) {
     delete state.statusId;
     saveState(state);
@@ -282,7 +321,7 @@ async function refreshStatus() {
   const text = statusText();
   if (text === current.lastText) return;
   current.lastText = text;
-  await tg.call('editMessageText', {chat_id: state.chatId, message_id: current.statusId, text, reply_markup: controls()}).catch(() => {});
+  await tg.call('editMessageText', {chat_id: state.chatId, message_id: current.statusId, text, reply_markup: controls()}, {retries: 0}).catch(() => {});
 }
 
 // One refresh at a time; a turn waits for it before removing the line.
@@ -320,29 +359,37 @@ function openingPrompt(prompt) {
 /** Runs one agent call under a live progress line. */
 async function runWithStatus(prompt, firstLine) {
   rmSync(STATUS_FILE, {force: true});
+  taskAwake(true);
   current = {startedAt: Date.now(), activity: 'think', sentMark: mtime(SENT_FILE)};
-  await postStatus(firstLine);
-  const handle = runAgent({
-    agent: env.agent,
-    bin: env.agentBin,
-    model: env.agentModel,
-    sessionId: state.sessionId,
-    // studio/settings.json `agentGlobalSettings: false` hides the owner's global agent setup.
-    isolated: settings().agentGlobalSettings === false,
-    prompt: state.sessionId ? prompt : openingPrompt(prompt),
-    onCall: (call) => {
-      const key = classify(call);
-      if (key) current.activity = key;
-    },
-  });
-  current.handle = handle;
-  const res = await handle.done;
-  res.reason = current.reason;
-  res.startedAt = current.startedAt;
-  await refreshing;
-  await dropStatus();
-  current = null;
+  // The progress line is a nicety: a failed or slow send must never hold up the task.
+  await postStatus(firstLine).catch((e) => console.error('status', e));
+  let res;
+  try {
+    const handle = runAgent({
+      agent: env.agent,
+      bin: env.agentBin,
+      model: env.agentModel,
+      sessionId: state.sessionId,
+      // studio/settings.json `agentGlobalSettings: false` hides the owner's global agent setup.
+      isolated: settings().agentGlobalSettings === false,
+      prompt: state.sessionId ? prompt : openingPrompt(prompt),
+      onCall: (call) => {
+        const key = classify(call);
+        if (key) current.activity = key;
+      },
+    });
+    current.handle = handle;
+    res = await handle.done;
+    res.reason = current.reason;
+    res.startedAt = current.startedAt;
+  } finally {
+    await Promise.race([refreshing, new Promise((r) => setTimeout(r, 5000))]);
+    await dropStatus().catch(() => {});
+    current = null;
+    if (!queue.length) taskAwake(false);
+  }
 
+  await trackUsage(res);
   if (res.sessionId) {
     if (res.sessionId !== state.sessionId) Object.assign(state, {sessionTurns: 0, sessionContext: 0});
     state.sessionId = res.sessionId;
@@ -352,6 +399,23 @@ async function runWithStatus(prompt, firstLine) {
     saveState(state);
   }
   return res;
+}
+
+// Limits and spend: logged per turn, attributed to the reel worked on; warnings only
+// when a window crosses 80% (quiet) or 95% (with sound).
+async function trackUsage(res) {
+  try {
+    const limits = res.limits ?? (env.agent === 'codex' ? codexLimits(res.sessionId) : null);
+    const reel = touchedReel(res.startedAt);
+    recordTurn({startedAt: res.startedAt, reel, before: state.limits, after: limits, cost: res.cost, tokens: res.tokens});
+    if (reel) state.lastReel = reel;
+    if (limits) state.limits = {...state.limits, ...limits};
+    state.warned ??= {};
+    for (const w of limitWarnings(state.limits, state.warned, LANG)) await tg.sendText(state.chatId, w.text, {silent: !w.loud});
+    saveState(state);
+  } catch (e) {
+    console.error('usage', e.message);
+  }
 }
 
 async function rotate() {
@@ -375,6 +439,9 @@ async function runTurn(prompt, retried = false) {
   const res = await runWithStatus(prompt, T.accepted);
   delete state.pending;
   saveState(state);
+  if (res.cancelled && (res.reason === 'stalled' || res.reason === 'overtime')) {
+    return onAgentError({...res, error: true, forcedKind: res.reason}, prompt, true);
+  }
   if (res.error && !res.cancelled) return onAgentError(res, prompt, retried);
   if (res.cancelled) {
     // Tell the next turn why the previous one ended mid-way.
@@ -383,6 +450,13 @@ async function runTurn(prompt, retried = false) {
     saveState(state);
     return;
   }
+  // The reel was accepted: one quiet line on what it took.
+  if (state.acceptedPending) {
+    delete state.acceptedPending;
+    saveState(state);
+    const line = state.lastReel && acceptedText(state.lastReel, LANG);
+    if (line) await tg.sendText(state.chatId, line, {silent: true}).catch(() => {});
+  }
   // A trailing `⌨️ A | B` line becomes the owner's keyboard of next options.
   let {text: body, labels} = splitKeyLine(res.text.trim());
   // Nothing more after the agent already asked its question with a keyboard (e.g. the
@@ -390,9 +464,10 @@ async function runTurn(prompt, retried = false) {
   const askedAlready = mtime(KEYS_FILE) > res.startedAt;
   if (!labels && (askedAlready || /^NO_REPLY\.?$/i.test(body))) body = '';
   if (body || labels) {
-    await tg.call('sendChatAction', {chat_id: state.chatId, action: 'typing'});
-    const extra = labels ? {reply_markup: replyKeyboard(labels, {placeholder: T.hint})} : {};
-    await tg.sendText(state.chatId, labels ? `${body || '👇'}\n\n✍️ ${T.hint}` : body, extra);
+    // Kept in an outbox until delivered, so a restart cannot swallow the answer.
+    state.outbox = {text: labels ? `${body || '👇'}\n\n✍️ ${T.hint}` : body, labels};
+    saveState(state);
+    await flushOutbox();
   }
 }
 
@@ -422,6 +497,7 @@ async function drain() {
   while (!current && queue.length) {
     // Everything that piled up during the last turn goes in as one message.
     let prompt = queue.splice(0).join('\n\n---\n\n');
+    saveQueue();
     if (state.note) {
       prompt = `(${state.note})\n\n${prompt}`;
       delete state.note;
@@ -436,10 +512,29 @@ async function drain() {
   if (!current && !queue.length && state.updateApproved) applyUpdate();
 }
 
+// The queue survives restarts: it is mirrored into state.
+function saveQueue() {
+  state.queue = [...queue];
+  saveState(state);
+}
+
 function enqueue(prompt) {
   clearKeyboard().catch(() => {});
   queue.push(prompt);
+  saveQueue();
   if (!current) drain();
+}
+
+function renderRunning() {
+  const dir = join(DATA, 'renders');
+  if (!existsSync(dir)) return false;
+  return readdirSync(dir).filter((x) => x.endsWith('.json')).some((f) => {
+    try {
+      return JSON.parse(readFileSync(join(dir, f), 'utf8')).status === 'running';
+    } catch {
+      return false;
+    }
+  });
 }
 
 // Background renders run outside the agent's process tree; stop them explicitly.
@@ -459,7 +554,10 @@ function stopRenders() {
 /** Stops the running turn. 'stop' drops the queue, 'now' runs it right away. */
 function interrupt(reason) {
   stopRenders();
-  if (reason === 'stop') queue.length = 0;
+  if (reason === 'stop') {
+    queue.length = 0;
+    saveQueue();
+  }
   if (!current) return false;
   current.reason = reason;
   current.handle?.kill();
@@ -475,14 +573,17 @@ async function onMessage(msg) {
     return;
   }
   if (!state.ownerId) {
-    // With OWNER_CODE set (the installer does it), only the t.me/<bot>?start=<code>
-    // link makes someone the owner; without it, the first person to write does.
-    const code = msg.text?.match(/^\/start\s+(\S+)/)?.[1];
-    if (env.ownerCode && code !== env.ownerCode) return tg.sendText(msg.chat.id, T.private, {silent: true});
-    Object.assign(state, {ownerId: msg.from.id, chatId: msg.chat.id});
-    saveState(state);
-    await tg.sendText(state.chatId, T.hello);
-    return;
+    // No owner yet. With OWNER_CODE set, the t.me/<bot>?start=<code> link claims the
+    // bot; otherwise the person becomes a request the user confirms on the computer
+    // (`node bot/claim.mjs`), so no secret has to be passed around.
+    if (env.ownerCode) {
+      const code = msg.text?.match(/^\/start\s+(\S+)/)?.[1];
+      if (code !== env.ownerCode) return tg.sendText(msg.chat.id, T.private, {silent: true});
+      return becomeOwner({id: msg.from.id, chatId: msg.chat.id, name: [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ')});
+    }
+    const name = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ');
+    writeFileSync(CLAIM_REQUEST, JSON.stringify({id: msg.from.id, chatId: msg.chat.id, name, username: msg.from.username}));
+    return tg.sendText(msg.chat.id, T.confirmOnComputer);
   }
   if (msg.from.id !== state.ownerId) return tg.sendText(msg.chat.id, T.private, {silent: true}).catch(() => {});
 
@@ -498,6 +599,8 @@ async function onMessage(msg) {
   if (cmd === 'ideas') return enqueue(T.ideasPrompt);
   if (cmd === 'unfinished') return showUnfinished();
   if (cmd === 'settings') return showSettings();
+  if (cmd === 'update') return checkUpdates(true);
+  if (cmd === 'usage') return tg.sendText(state.chatId, usageText(state.limits, LANG), {silent: true});
   if (state.awaitingTime && msg.text && !cmd) return onSettingsTime(msg.text);
 
   // 👀 = seen: while the agent is busy (it will be queued) or while a voice note is transcribed.
@@ -516,6 +619,7 @@ async function onMessage(msg) {
   const keys = currentKeys();
   if (msg.text && keys?.labels?.includes(msg.text)) {
     if (keys.retry && msg.text === keys.retryLabel) return enqueue(keys.retry);
+    if (keys.more && msg.text === keys.more) return enqueue(T.morePrompt);
     if (msg.text === keys.tune && keys.menu) {
       await clearKeyboard();
       const result = await onMenuButton(tg, state.chatId, `m:${keys.menu}:open`);
@@ -540,11 +644,18 @@ let batchParts = [];
 let batchTimer = null;
 function batch(prompt) {
   batchParts.push(prompt);
+  // On disk too: Telegram will not resend a message the bot already received.
+  state.batch = [...batchParts];
+  saveState(state);
   clearTimeout(batchTimer);
-  batchTimer = setTimeout(() => {
-    const all = batchParts.splice(0);
-    enqueue(all.length > 1 ? all.map((p, i) => `[message ${i + 1}]\n${p}`).join('\n\n') : all[0]);
-  }, 2000);
+  batchTimer = setTimeout(flushBatch, 2000);
+}
+
+function flushBatch() {
+  const all = batchParts.splice(0);
+  delete state.batch;
+  if (all.length) enqueue(all.length > 1 ? all.map((p, i) => `[message ${i + 1}]\n${p}`).join('\n\n') : all[0]);
+  else saveState(state);
 }
 
 async function onButton(q) {
@@ -587,6 +698,10 @@ async function onButton(q) {
       reply_markup: {inline_keyboard: [[{text: `✅ ${label.replace(/^✅\s*/, '')}`, callback_data: 'ctl:done'}]]},
     }).catch(() => {});
   }
+  if (/Принять|Accept/.test(label)) {
+    state.acceptedPending = true;
+    saveState(state);
+  }
   const about = (msg?.caption ?? msg?.text ?? '').slice(0, 1500);
   enqueue(`(pressed button "${label}" under: "${about}")`);
 }
@@ -624,7 +739,7 @@ async function announceUpdate() {
 }
 
 function restart() {
-  console.log('restarting after update');
+  console.log('restarting');
   if (process.env.REELS_BOT_SUPERVISED !== '1') {
     // Not under launchd/systemd: start the successor ourselves.
     const log = openSync(join(DATA, 'bot.log'), 'a');
@@ -642,12 +757,15 @@ function restart() {
 // `updateChecks: false` stops even asking; `autoUpdate` is the old name of the key.
 const updatesOff = () => settings().updateChecks === false || settings().autoUpdate === false;
 
-async function checkUpdates() {
-  if (updatesOff() || !state.chatId) return;
+// `asked`: the owner ran /update — check even if checks are off, show the offer again
+// and say so when there is nothing new.
+async function checkUpdates(asked = false) {
+  if ((updatesOff() && !asked) || !state.chatId) return;
   try {
     const subjects = await pendingUpdates();
     const upstream = await upstreamHead();
-    if (subjects.length && upstream && state.updateOffered !== upstream) {
+    if (asked && !subjects.length) await tg.sendText(state.chatId, T.upToDate, {silent: true});
+    if (subjects.length && upstream && (asked || state.updateOffered !== upstream)) {
       state.updateOffered = upstream;
       saveState(state);
       await tg.sendText(state.chatId, T.updateAvailable(subjects.slice(0, 10), await remoteUrl()), {
@@ -658,6 +776,7 @@ async function checkUpdates() {
     if (!current && !queue.length && (await botChangedSince(BOOT_HEAD))) restart();
   } catch (e) {
     console.error('update', e.message.split('\n')[0]);
+    if (asked) await tg.sendText(state.chatId, T.updateCheckFailed(e.message.split('\n')[0]), {silent: true});
   }
 }
 
@@ -688,30 +807,100 @@ async function applyUpdate() {
 setTimeout(checkUpdates, 60_000);
 setInterval(checkUpdates, 6 * 3_600_000);
 
+async function flushOutbox() {
+  const o = state.outbox;
+  if (!o || !state.chatId) return;
+  await tg.call('sendChatAction', {chat_id: state.chatId, action: 'typing'}).catch(() => {});
+  await tg.sendText(state.chatId, o.text, o.labels ? {reply_markup: replyKeyboard(o.labels, {placeholder: T.hint})} : {});
+  delete state.outbox;
+  saveState(state);
+}
+
+// ---------- watchdogs ----------
+//
+// After sleep or a network change things can stall in ways a timeout alone won't catch.
+// Anything stuck for minutes restarts the bot; the unfinished message is kept in
+// state.pending and redone after the restart.
+
+let lastPoll = Date.now();
+let lastTick = Date.now();
+// Thresholds can be shortened for tests.
+const STALL_MS = Number(process.env.REELS_STALL_MS || 15 * 60_000);
+const WATCH_MS = Number(process.env.REELS_WATCH_MS || 30_000);
+setInterval(() => {
+  const now = Date.now();
+  const gap = now - lastTick;
+  lastTick = now;
+  if (gap > WATCH_MS + 60_000) {
+    // Timers stood still during sleep: give polling and a starting task a fresh chance.
+    console.log(`woke up after ${Math.round(gap / 60_000)} min of sleep`);
+    lastPoll = now;
+    if (current && !current.handle) current.startedAt = now;
+    return;
+  }
+  // A running agent that went silent (and is not waiting on a render), or a task that
+  // runs far too long: stop it and tell the owner, with a Retry button.
+  if (current?.handle && !current.reason) {
+    const silentFor = now - current.handle.lastActivity();
+    if (silentFor > STALL_MS && !renderRunning()) {
+      console.error('watchdog: agent silent for 15 min, stopping it');
+      current.reason = 'stalled';
+      stopRenders();
+      current.handle.kill();
+    } else if (now - current.startedAt > 120 * 60_000) {
+      console.error('watchdog: task over 2 hours, stopping it');
+      current.reason = 'overtime';
+      stopRenders();
+      current.handle.kill();
+    }
+  }
+  if (current && !current.handle && now - current.startedAt > 3 * 60_000) {
+    console.error('watchdog: a task never reached the agent for 3 min, restarting');
+    return restart();
+  }
+  if (now - lastPoll > 5 * 60_000) {
+    console.error('watchdog: no answer from Telegram for 5 min, restarting');
+    return restart();
+  }
+}, WATCH_MS);
+
 // ---------- long polling ----------
 
 console.log(`reels-bot up: agent=${env.agent}, owner=${state.ownerId ?? 'none yet'}`);
 if (state.statusId) await deleteStatus(state.statusId);
 await announceUpdate();
-if (state.pending) {
-  const prompt = state.pending;
-  delete state.pending;
-  enqueue(prompt);
-}
+await flushOutbox().catch((e) => console.error('outbox', e));
+// Restore work interrupted by a restart: the message in progress first, then the queue.
+const restored = [state.pending, ...(state.queue ?? [])].filter(Boolean);
+const unbatched = state.batch ?? [];
+delete state.pending;
+state.queue = [];
+for (const prompt of restored) enqueue(prompt);
+for (const prompt of unbatched) batch(prompt);
 let offset = state.offset ?? 0;
+let handling = Promise.resolve();
+let conflicts = 0;
 for (;;) {
   try {
     const updates = await tg.call('getUpdates', {offset, timeout: 50, allowed_updates: ['message', 'edited_message', 'callback_query']});
+    lastPoll = Date.now();
+    conflicts = 0;
     for (const u of updates) {
       offset = u.update_id + 1;
       state.offset = offset;
       saveState(state);
+      // Handled in order but off the polling loop: a long voice transcription must not
+      // stop the bot from hearing the next message (or trip the watchdog).
       const m = u.message ?? u.edited_message;
-      if (m) await onMessage(m).catch((e) => console.error('message', e));
-      if (u.callback_query) await onButton(u.callback_query).catch((e) => console.error('button', e));
+      if (m) handling = handling.then(() => onMessage(m)).catch((e) => console.error('message', e));
+      if (u.callback_query) handling = handling.then(() => onButton(u.callback_query)).catch((e) => console.error('button', e));
     }
   } catch (e) {
-    console.error('poll', e.message);
+    console.error('poll', e);
+    // 409: another copy of the bot polls with the same token (another computer?).
+    if (e.status === 409 && ++conflicts === 6 && state.chatId) {
+      tg.sendText(state.chatId, T.conflict).catch(() => {});
+    }
     await new Promise((r) => setTimeout(r, 5000));
   }
 }

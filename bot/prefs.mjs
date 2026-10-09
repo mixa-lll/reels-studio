@@ -12,6 +12,9 @@ const L = {
     ideasOff: '💡 Идеи: выключены',
     updates: (on) => `🔄 Проверка обновлений: ${on ? 'вкл' : 'выкл'}`,
     global: (on) => `🧩 Глобальные настройки Claude: ${on ? 'да' : 'нет'}`,
+    awake: (on) => `☕ Не засыпать на зарядке: ${on ? 'да' : 'нет'}`,
+    awakeOn: '☕ Не давать компьютеру засыпать на зарядке',
+    awakeOff: '☕ Разрешить компьютеру засыпать',
     globalHint: 'Плагины, MCP-подключения и хуки твоего Claude Code. Вступает в силу со следующей задачи.',
     time: (at) => `🕐 Время: ${at}`,
     daysBtn: (d) => `📅 ${L.ru.days[d][0].toUpperCase()}${L.ru.days[d].slice(1)}`,
@@ -34,6 +37,9 @@ const L = {
     ideasOff: '💡 Ideas: off',
     updates: (on) => `🔄 Update checks: ${on ? 'on' : 'off'}`,
     global: (on) => `🧩 Global Claude settings: ${on ? 'yes' : 'no'}`,
+    awake: (on) => `☕ Stay awake on the charger: ${on ? 'yes' : 'no'}`,
+    awakeOn: '☕ Keep the computer awake on the charger',
+    awakeOff: '☕ Let the computer sleep',
     globalHint: 'Your Claude Code plugins, MCP connections and hooks. Applies from the next task.',
     time: (at) => `🕐 Time: ${at}`,
     daysBtn: (d) => `📅 ${L.en.days[d][0].toUpperCase()}${L.en.days[d].slice(1)}`,
@@ -84,11 +90,12 @@ export function view(s, which, {lang, agent}) {
     return {text: t.pickDays, reply_markup: {inline_keyboard: [...DAYS.map((d) => [btn(`${d === days ? '✅ ' : ''}${t.days[d]}`, `days:${d}`)]), [btn(t.back, 'main')]]}};
   }
   const updatesOn = s.updateChecks !== false && s.autoUpdate !== false;
-  const lines = [`**${t.title}**`, '', at ? t.ideasOn(at, days) : t.ideasOff, t.updates(updatesOn)];
+  const lines = [`**${t.title}**`, '', at ? t.ideasOn(at, days) : t.ideasOff, t.awake(s.keepAwake === true), t.updates(updatesOn)];
   if (agent === 'claude') lines.push(t.global(s.agentGlobalSettings === true), `_${t.globalHint}_`);
   const rows = at
     ? [[btn(t.time(at), 'time'), btn(t.daysBtn(days), 'days')], [btn(t.off, 'ideas:off')]]
     : [[btn(t.on, `at:${lastAt}`)]];
+  rows.push([btn(s.keepAwake === true ? t.awakeOff : t.awakeOn, 'awake')]);
   rows.push([btn(updatesOn ? t.updatesOff : t.updatesOn, 'updates')]);
   if (agent === 'claude') rows.push([btn(s.agentGlobalSettings === true ? t.globalHide : t.globalAllow, 'global')]);
   rows.push([btn(t.close, 'close')]);
@@ -107,6 +114,7 @@ export function onSettingsButton(data, s) {
   if (action === 'days') return {patch: {ideasDays: arg}, show: 'main'};
   if (action === 'ideas') return {patch: {ideasAt: '', ideasAtBefore: s.ideasAt || '10:00'}, show: 'main'};
   if (action === 'updates') return {patch: {updateChecks: s.updateChecks === false || s.autoUpdate === false, autoUpdate: undefined}, show: 'main'};
+  if (action === 'awake') return {patch: {keepAwake: s.keepAwake !== true}, show: 'main'};
   if (action === 'global') return {patch: {agentGlobalSettings: s.agentGlobalSettings !== true}, show: 'main'};
   return {patch: {}, close: true};
 }

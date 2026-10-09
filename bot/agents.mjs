@@ -40,6 +40,12 @@ const ADAPTERS = {
     // Returns {sessionId?, call?, context?, text?, error?} for one JSON line of output.
     parse(ev) {
       if (ev.type === 'system' && ev.subtype === 'init') return {sessionId: ev.session_id};
+      // Plan windows after each API call: share used and reset time.
+      if (ev.type === 'rate_limit_event') {
+        const w = ev.rate_limit_info?.unifiedWindows ?? {};
+        const win = (x) => x && {pct: Math.round(x.utilization * 100), resetsAt: x.resetsAt * 1000};
+        return {limits: {fiveHour: win(w.five_hour), week: win(w.seven_day)}};
+      }
       if (ev.type === 'assistant') {
         const u = ev.message?.usage;
         // Per-call usage = how full the context window is right now.
@@ -49,7 +55,9 @@ const ADAPTERS = {
       }
       if (ev.type === 'result') {
         const error = ev.is_error || (ev.subtype && ev.subtype !== 'success');
-        return {sessionId: ev.session_id, text: ev.result ?? (error ? ev.subtype : ''), error};
+        const u = ev.usage ?? {};
+        const tokens = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.output_tokens ?? 0);
+        return {sessionId: ev.session_id, text: ev.result ?? (error ? ev.subtype : ''), error, cost: ev.total_cost_usd, tokens};
       }
       return {};
     },
@@ -74,6 +82,7 @@ const ADAPTERS = {
         if (item.type === 'command_execution') return {call: {tool: 'run', command: item.command}};
       }
       if (ev.type === 'item.completed' && item?.type === 'agent_message') return {text: item.text};
+      if (ev.type === 'turn.completed') return {tokens: (ev.usage?.input_tokens ?? 0) - (ev.usage?.cached_input_tokens ?? 0) + (ev.usage?.output_tokens ?? 0)};
       if (ev.type === 'turn.failed') return {error: true, text: ev.error?.message ?? 'turn failed'};
       if (ev.type === 'error') return {error: true, text: ev.message ?? JSON.stringify(ev)};
       return {};
@@ -132,11 +141,14 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated
   child.stdin.end(prompt);
   let stderr = '';
   let killed = false;
+  let lastActivity = Date.now();
+  child.stderr.on('data', () => (lastActivity = Date.now()));
   child.stderr.on('data', (d) => (stderr = (stderr + d).slice(-4000)));
 
   const done = new Promise((resolve) => {
     const out = {sessionId, text: '', error: false};
     createInterface({input: child.stdout}).on('line', (line) => {
+      lastActivity = Date.now();
       let ev;
       try {
         ev = JSON.parse(line);
@@ -147,6 +159,9 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated
       if (r.sessionId) out.sessionId = r.sessionId;
       if (r.call) onCall?.(r.call);
       if (r.context) out.context = r.context;
+      if (r.limits) out.limits = r.limits;
+      if (r.cost !== undefined) out.cost = r.cost;
+      if (r.tokens) out.tokens = (out.tokens ?? 0) + r.tokens;
       if (r.text !== undefined) out.text = r.text;
       if (r.error) out.error = true;
     });
@@ -169,5 +184,5 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated
     killed = true;
     killTree(child.pid);
   };
-  return {done, kill};
+  return {done, kill, lastActivity: () => lastActivity};
 }

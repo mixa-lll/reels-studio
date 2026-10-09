@@ -11,6 +11,8 @@ const RU = {
   version: 'Версия агента устарела для выбранной модели. Обнови его (`npm i -g @anthropic-ai/claude-code` или `npm i -g @openai/codex`) и нажми «🔁 Повторить».',
   context: 'Разговор с агентом стал слишком длинным. Начинаю новую сессию — нажми «🔁 Повторить».',
   turns: 'Агент упёрся в лимит шагов за один ход. Нажми «🔁 Повторить» — он продолжит с того места.',
+  stalled: 'Агент завис: 15 минут без признаков жизни. Я его остановил. Нажми «🔁 Повторить» — он продолжит с того места.',
+  overtime: 'Задача шла больше 2 часов, я её остановил. Нажми «🔁 Повторить», чтобы продолжить, или напиши, что упростить.',
   unknown: 'Неизвестная ошибка.',
   details: 'Подробности',
   code: 'код',
@@ -26,6 +28,8 @@ const EN = {
   version: 'The agent is too old for the chosen model. Update it (`npm i -g @anthropic-ai/claude-code` or `npm i -g @openai/codex`) and tap «🔁 Retry».',
   context: 'The conversation with the agent got too long. Starting a new session — tap «🔁 Retry».',
   turns: 'The agent hit its step limit for one turn. Tap «🔁 Retry» and it continues from there.',
+  stalled: 'The agent hung: no sign of life for 15 minutes, so I stopped it. Tap «🔁 Retry» and it continues from there.',
+  overtime: 'The task ran for over 2 hours, so I stopped it. Tap «🔁 Retry» to continue, or tell me what to simplify.',
   unknown: 'Unknown error.',
   details: 'Details',
   code: 'code',
@@ -50,7 +54,7 @@ export const lostSession = (res) => /no conversation found|session .*not found|t
 export function explain(res, {lang, bin}) {
   const L = lang === 'en' ? EN : RU;
   const raw = `${res.text ?? ''}\n${res.stderr ?? ''}`.trim();
-  const kind = RULES.find(([, test]) => test(res, raw))?.[0] ?? 'unknown';
+  const kind = res.forcedKind ?? RULES.find(([, test]) => test(res, raw))?.[0] ?? 'unknown';
   // Claude reports «…limit reached|<unix time>» or «resets 5pm»: show the reset time if present.
   const epoch = raw.match(/limit reached\|(\d{10})/)?.[1];
   const when = epoch ? new Date(Number(epoch) * 1000).toLocaleString(lang === 'en' ? 'en-GB' : 'ru-RU', {hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short'})

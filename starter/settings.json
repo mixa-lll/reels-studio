@@ -2,5 +2,6 @@
   "ideasAt": "10:00",
   "updateChecks": true,
   "agentGlobalSettings": false,
+  "keepAwake": false,
   "allowedPaths": []
 }

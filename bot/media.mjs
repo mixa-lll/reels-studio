@@ -24,6 +24,34 @@ function tool(bin, args) {
   return r.stdout;
 }
 
+/**
+ * Display size and length of a video: {width, height, duration}, with phone rotation
+ * applied (a portrait clip stored as 1920×1080 + 90° is 1080×1920). Null if unreadable.
+ */
+export function videoInfo(file) {
+  try {
+    const j = JSON.parse(tool('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:stream_side_data=rotation:stream_tags=rotate:format=duration', '-of', 'json', file]));
+    const s = j.streams?.[0];
+    if (!s?.width) return null;
+    const rot = Math.abs(Number(s.side_data_list?.find((d) => d.rotation !== undefined)?.rotation ?? s.tags?.rotate ?? 0)) % 180;
+    const [width, height] = rot === 90 ? [s.height, s.width] : [s.width, s.height];
+    return {width, height, duration: Math.max(1, Math.round(Number(j.format?.duration) || 0))};
+  } catch {
+    return null;
+  }
+}
+
+/** A preview frame for Telegram: JPEG, at most 320 px on the long side. Null on failure. */
+export function videoThumbnail(file) {
+  const out = join(parse(file).dir, `${parse(file).name}.thumb.jpg`);
+  try {
+    tool('ffmpeg', ['-y', '-loglevel', 'error', '-ss', '0.5', '-i', file, '-frames:v', '1', '-vf', "scale='if(gt(iw,ih),320,-2)':'if(gt(iw,ih),-2,320)'", '-q:v', '4', out]);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 const duration = (file) => Number(tool('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]).trim());
 const mb = (bytes) => `${Math.round(bytes / 1024 / 1024)} MB`;
 
