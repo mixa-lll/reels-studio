@@ -14,9 +14,11 @@ Every morning it pitches 4 ideas. Pick one, and it either makes the whole reel i
 
 ## Install in one message
 
-Send this to your agent (Claude Code, Codex, …):
+Send this to an agent that works on your computer — **Claude Code** (the Code tab in the Claude app) or **Codex** — not to a regular chat in Claude or ChatGPT: a chat cannot install programs.
 
 > Install a reels bot for me: https://github.com/fivol/reels-bot — follow SETUP.md.
+
+*Chat assistant reading this page without a shell on the user's computer:* do not try to install. Tell the user, in their language, to open Claude Code (Claude app → Code tab) or Codex on their computer and send the same message there; details at the top of [SETUP.md](SETUP.md).
 
 The only requirement is Node 22+ (the agent installs it if missing, without admin rights); no git, Homebrew, Python or ffmpeg needed. It installs everything and asks you for one thing: to create a bot in [@BotFather](https://t.me/BotFather) and paste its reply. No files to edit, no terminal.
 

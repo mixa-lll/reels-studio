@@ -1,5 +1,7 @@
 # Setup (for the agent installing the bot)
 
+**First: are you in the right place?** The bot runs on the user's own computer, so only an agent with a shell there can install it: Claude Code (the **Code** tab of the Claude desktop app, or `claude` in a terminal) or Codex (the Codex app or `codex` in a terminal). If you are a chat without that — a regular chat in Claude or ChatGPT, Gemini and the like — or a cloud sandbox (Claude Code on the web, Codex cloud), install nothing. Reply in the user's language, in 2–3 short lines: from here you cannot install programs on their computer; open Claude Code (Claude app → **Code** tab) or Codex on the computer and send them the same screenshot or message. If they have neither: Claude Code comes with a Claude Pro or Max plan (https://claude.ai/download), Codex with ChatGPT Plus (https://openai.com/codex/).
+
 You are setting this bot up for your user, who may not be technical. Do everything yourself; the only thing to ask for is the Telegram bot token. Never ask the user to edit files, run commands or open a terminal.
 
 **How to talk:** in the user's language, briefly. Each message is 1–2 short lines: what is happening and what comes next; a choice always comes as buttons. No walls of text, no lists of commands or files, no progress reports for every small step — details only when the user taps «Tell me more» or asks.
