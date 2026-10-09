@@ -38,7 +38,6 @@ const T = {
     hello: '🎬 Привет! Я делаю рилсы: присылаю идеи, монтирую выбранные, правлю по твоим ответам на видео.\n\n🎙 Со мной можно говорить голосовыми — так даже быстрее: надиктуй идею или правки, я пойму.\n\nДля начала расскажи, о чём будут рилсы: продукт, ссылка, аудитория.',
     queued: (n) => `📥 ещё ${n} в очереди`,
     accepted: '⏳ Принял, начинаю',
-    min: (m) => (m < 1 ? 'меньше минуты' : `${m} мин`),
     cancelled: '⏹ Остановил.',
     stop: '⏹ Стоп',
     now: '⚡ Учесть сейчас',
@@ -53,6 +52,7 @@ const T = {
     tooBig: (what, size) => `⚠️ ${what} весит ${size} — Telegram не даёт ботам скачивать файлы больше 20 МБ. Пришли его обычным видео/фото (не «файлом» — Telegram сам сожмёт) или ссылкой на Google Диск / Яндекс Диск.`,
     sttFailed: '⚠️ Не смог распознать голосовое (локальный Whisper не запустился). Агенту передал файл; если он не разберёт — напиши текстом.',
     sttSetup: '🎙 Первое голосовое: ставлю распознавание речи. Это разово, займёт пару минут.',
+    listening: '🎧 Слушаю голосовое…',
     downloadFailed: (what, err) => `⚠️ Не смог скачать ${what}: ${err}. Попробуй прислать ещё раз.`,
     noUnfinished: 'Незаконченных рилсов нет. /ideas — новые идеи.',
     updated: (subjects) => `🔄 Обновился:\n${subjects.map((x) => `• ${x}`).join('\n')}`,
@@ -61,6 +61,8 @@ const T = {
     updateNo: 'Не сейчас',
     updateLater: 'Обновлюсь, как только закончу текущую задачу.',
     upToDate: '✅ Стоит последняя версия бота.',
+    applying: '⬆️ Новая версия уже скачана — перезапускаюсь на неё.',
+    newCode: 'перезапустился на новой версии',
     updateCheckFailed: (e) => `⚠️ Не смог проверить обновления: ${e}`,
     backedUp: (dir) => `твои правки в файлах бота сохранены в ${dir}`,
     ideasPrompt: 'Пачка идей для рилсов: раздел «1. Ideas» в REELS.md.',
@@ -70,7 +72,6 @@ const T = {
     hello: '🎬 Hi! I make reels: I pitch ideas, edit the ones you pick and revise them from your replies to the video.\n\n🎙 You can talk to me with voice messages, it is often faster: dictate an idea or edits and I will get it.\n\nFirst tell me what the reels are about: product, link, audience.',
     queued: (n) => `📥 ${n} more queued`,
     accepted: '⏳ Got it, starting',
-    min: (m) => (m < 1 ? 'under a minute' : `${m} min`),
     cancelled: '⏹ Stopped.',
     stop: '⏹ Stop',
     now: '⚡ Take it now',
@@ -85,6 +86,7 @@ const T = {
     tooBig: (what, size) => `⚠️ The ${what} is ${size} — Telegram does not let bots download files over 20 MB. Send it as a regular video/photo (not as a file, Telegram compresses it) or as a Google Drive / Dropbox link.`,
     sttFailed: '⚠️ Could not transcribe the voice message (local Whisper failed). The agent got the file; if it cannot read it, please type it.',
     sttSetup: '🎙 First voice message: setting up speech recognition. One time only, a couple of minutes.',
+    listening: '🎧 Listening to the voice message…',
     downloadFailed: (what, err) => `⚠️ Could not download the ${what}: ${err}. Please send it again.`,
     noUnfinished: 'No unfinished reels. /ideas for new ones.',
     updated: (subjects) => `🔄 Updated:\n${subjects.map((x) => `• ${x}`).join('\n')}`,
@@ -93,6 +95,8 @@ const T = {
     updateNo: 'Not now',
     updateLater: 'I will update as soon as the current task is done.',
     upToDate: '✅ The bot is up to date.',
+    applying: '⬆️ A new version is already downloaded — restarting into it.',
+    newCode: 'restarted on the new version',
     updateCheckFailed: (e) => `⚠️ Could not check for updates: ${e}`,
     backedUp: (dir) => `your edits to the bot's files are saved in ${dir}`,
     ideasPrompt: 'A batch of reel ideas: section "1. Ideas" in REELS.md.',
@@ -268,14 +272,13 @@ async function showUnfinished() {
   });
 }
 
-// Progress line: the agent's own stage, what it is doing right now, elapsed time.
+// Progress line: one line — whatever is newest, the agent's own stage or what it is
+// doing right now — plus the queue when there is one.
 function statusText() {
   const stage = existsSync(STATUS_FILE) ? readFileSync(STATUS_FILE, 'utf8').trim() : '';
-  const now = activityLabel(current.activity, LANG);
-  const lines = stage ? [stage, `↳ ${now}`] : [now];
-  lines.push(`⏱ ${T.min(Math.floor((Date.now() - current.startedAt) / 60_000))}`);
-  if (queue.length) lines.push(T.queued(queue.length));
-  return lines.join('\n');
+  const stageAt = mtime(STATUS_FILE);
+  const now = stage && stageAt >= (current.activityAt ?? 0) ? stage : activityLabel(current.activity, LANG);
+  return queue.length ? `${now}\n${T.queued(queue.length)}` : now;
 }
 
 // Controls under the progress line: stop, or stop and take queued messages in right away.
@@ -357,12 +360,13 @@ function openingPrompt(prompt) {
 // ---------- agent turns ----------
 
 /** Runs one agent call under a live progress line. */
-async function runWithStatus(prompt, firstLine) {
+async function runWithStatus(prompt, firstLine, {quiet = false} = {}) {
   rmSync(STATUS_FILE, {force: true});
   taskAwake(true);
-  current = {startedAt: Date.now(), activity: 'think', sentMark: mtime(SENT_FILE)};
+  current = {startedAt: Date.now(), activity: 'think', sentMark: mtime(SENT_FILE), quiet, firstLine};
   // The progress line is a nicety: a failed or slow send must never hold up the task.
-  await postStatus(firstLine).catch((e) => console.error('status', e));
+  // Quiet runs (background housekeeping) show it only once the owner writes meanwhile.
+  if (!quiet) await postStatus(firstLine).catch((e) => console.error('status', e));
   let res;
   try {
     const handle = runAgent({
@@ -375,11 +379,13 @@ async function runWithStatus(prompt, firstLine) {
       prompt: state.sessionId ? prompt : openingPrompt(prompt),
       onCall: (call) => {
         const key = classify(call);
-        if (key) current.activity = key;
+        if (key && key !== current.activity) Object.assign(current, {activity: key, activityAt: Date.now()});
       },
     });
     current.handle = handle;
+    console.log(`turn started${quiet ? ' (housekeeping)' : ''}`);
     res = await handle.done;
+    console.log(`turn done in ${Math.round((Date.now() - current.startedAt) / 1000)} s${res.error ? `, error ${res.code ?? ''}` : ''}${res.cancelled ? ', cancelled' : ''}`);
     res.reason = current.reason;
     res.startedAt = current.startedAt;
   } finally {
@@ -418,9 +424,9 @@ async function trackUsage(res) {
   }
 }
 
-async function rotate() {
+async function rotate({quiet = false} = {}) {
   rmSync(HANDOFF_FILE, {force: true});
-  const res = await runWithStatus(HANDOFF_PROMPT, T.saving);
+  const res = await runWithStatus(HANDOFF_PROMPT, T.saving, {quiet});
   // A failed handoff still rotates: the files remain the memory.
   if (res.reason === 'stop') return false;
   for (const k of ['sessionId', 'sessionTurns', 'sessionContext', 'rotate']) delete state[k];
@@ -493,6 +499,21 @@ async function onAgentError(res, prompt, retried) {
   await tg.sendText(state.chatId, e.text, {reply_markup: replyKeyboard([e.retry], {retry: prompt, retryLabel: e.retry})});
 }
 
+// Rotate a session that grew too big or too long while idle, right after a task, so
+// the next message does not have to wait for the handoff.
+async function rotateIfDue() {
+  if (current || queue.length || !rotationDue()) return;
+  // At most every 10 minutes: a stopped handoff must not start over in a loop.
+  if (Date.now() - (state.rotateTriedAt ?? 0) < 10 * 60_000) return;
+  state.rotateTriedAt = Date.now();
+  saveState(state);
+  console.log('rotating the session while idle');
+  await rotate({quiet: true}).catch((e) => console.error('rotate', e));
+  drain();
+}
+// Stale sessions too: checked hourly, so they rotate before the owner writes.
+setInterval(() => rotateIfDue(), 3_600_000);
+
 async function drain() {
   while (!current && queue.length) {
     // Everything that piled up during the last turn goes in as one message.
@@ -510,6 +531,7 @@ async function drain() {
     }
   }
   if (!current && !queue.length && state.updateApproved) applyUpdate();
+  else if (!current && !queue.length) rotateIfDue();
 }
 
 // The queue survives restarts: it is mirrored into state.
@@ -522,6 +544,8 @@ function enqueue(prompt) {
   clearKeyboard().catch(() => {});
   queue.push(prompt);
   saveQueue();
+  // Housekeeping is running quietly: now the owner should see that the bot is busy.
+  if (current?.quiet && !current.statusId) postStatus(current.firstLine).catch(() => {});
   if (!current) drain();
 }
 
@@ -608,7 +632,13 @@ async function onMessage(msg) {
     await tg.call('setMessageReaction', {chat_id: state.chatId, message_id: msg.message_id, reaction: [{type: 'emoji', emoji: '👀'}]}).catch(() => {});
   }
   const onInstall = () => tg.sendText(state.chatId, T.sttSetup, {silent: true}).catch(() => {});
+  const voice = Boolean(msg.voice || msg.video_note);
+  const got = Date.now();
+  // Speech-to-text takes a few seconds: say so instead of leaving only 👀.
+  const listening = voice ? await tg.call('sendMessage', {chat_id: state.chatId, text: T.listening, disable_notification: true}, {retries: 0}).catch(() => null) : null;
   const {prompt, said, problems} = await describe(tg, msg, {transcribe, lang: LANG, onInstall});
+  if (listening) tg.call('deleteMessage', {chat_id: state.chatId, message_id: listening.message_id}, {retries: 1}).catch(() => {});
+  console.log(`message ${msg.message_id}${voice ? `, voice transcribed in ${((Date.now() - got) / 1000).toFixed(1)} s` : ''}`);
   for (const p of problems) {
     const text = p.kind === 'tooBig' ? T.tooBig(p.what, p.size) : p.kind === 'stt' ? T.sttFailed : T.downloadFailed(p.what, p.error);
     await tg.sendText(state.chatId, text).catch(() => {});
@@ -764,6 +794,14 @@ async function checkUpdates(asked = false) {
   try {
     const subjects = await pendingUpdates();
     const upstream = await upstreamHead();
+    // Newer code is already on disk (an approved merge, a manual pull): switch to it,
+    // and say so after the restart.
+    if (!subjects.length && !current && !queue.length && (await botChangedSince(BOOT_HEAD))) {
+      if (asked) await tg.sendText(state.chatId, T.applying, {silent: true}).catch(() => {});
+      state.updateNote = [T.newCode];
+      saveState(state);
+      return restart();
+    }
     if (asked && !subjects.length) await tg.sendText(state.chatId, T.upToDate, {silent: true});
     if (subjects.length && upstream && (asked || state.updateOffered !== upstream)) {
       state.updateOffered = upstream;
@@ -772,8 +810,6 @@ async function checkUpdates(asked = false) {
         reply_markup: {inline_keyboard: [[{text: T.updateYes, callback_data: 'upd:yes'}, {text: T.updateNo, callback_data: 'upd:no'}]]},
       });
     }
-    // Code the agent merged or edited: restart onto it while idle.
-    if (!current && !queue.length && (await botChangedSince(BOOT_HEAD))) restart();
   } catch (e) {
     console.error('update', e.message.split('\n')[0]);
     if (asked) await tg.sendText(state.chatId, T.updateCheckFailed(e.message.split('\n')[0]), {silent: true});
