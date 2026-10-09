@@ -36,7 +36,9 @@ const LANG = process.env.BOT_LANG === 'en' ? 'en' : 'ru';
 const T = {
   ru: {
     hello: '🎬 Привет! Я делаю рилсы: присылаю идеи, монтирую выбранные, правлю по твоим ответам на видео.\n\n🎙 Со мной можно говорить голосовыми — так даже быстрее: надиктуй идею или правки, я пойму.\n\nДля начала расскажи, о чём будут рилсы: продукт, ссылка, аудитория.',
-    queued: (n) => `📥 ещё ${n} в очереди`,
+    queued: (n) => (n === 1 ? '👂 Услышал, учту сразу после этого шага' : `👂 Услышал ещё ${n} сообщ., учту сразу после этого шага`),
+    heard: '↪️ Получил твоё сообщение, продолжаю ниже',
+    takenNow: '⚡ Прервал, беру твоё сообщение',
     accepted: '⏳ Принял, начинаю',
     cancelled: '⏹ Остановил.',
     stop: '⏹ Стоп',
@@ -70,7 +72,9 @@ const T = {
   },
   en: {
     hello: '🎬 Hi! I make reels: I pitch ideas, edit the ones you pick and revise them from your replies to the video.\n\n🎙 You can talk to me with voice messages, it is often faster: dictate an idea or edits and I will get it.\n\nFirst tell me what the reels are about: product, link, audience.',
-    queued: (n) => `📥 ${n} more queued`,
+    queued: (n) => (n === 1 ? '👂 Got it, I will take it right after this step' : `👂 Got ${n} more, I will take them right after this step`),
+    heard: '↪️ Got your message, continuing below',
+    takenNow: '⚡ Interrupted, taking your message',
     accepted: '⏳ Got it, starting',
     cancelled: '⏹ Stopped.',
     stop: '⏹ Stop',
@@ -325,8 +329,28 @@ async function dropStatus() {
   current.statusId = null;
 }
 
+// Closes the progress message for good instead of deleting it: its last stage plus a
+// note on why it ended, no buttons. It stays in the chat as history.
+async function closeStatus(note) {
+  if (!current?.statusId) return;
+  const id = current.statusId;
+  current.statusId = null;
+  if (state.statusId === id) delete state.statusId;
+  saveState(state);
+  const stage = (current.lastText ?? '').split('\n')[0];
+  await tg.call('editMessageText', {chat_id: state.chatId, message_id: id, text: stage ? `${stage}\n${note}` : note, reply_markup: {inline_keyboard: []}}).catch(() => {});
+}
+
 async function refreshStatus() {
   if (!current?.statusId) return;
+  // The owner wrote meanwhile: that message now sits below the progress line. Close the
+  // old line and start a new one under it, so the latest state is always at the bottom.
+  if (current.ownerWrote) {
+    current.ownerWrote = false;
+    await closeStatus(T.heard);
+    await postStatus(statusText());
+    return;
+  }
   // The agent sent something itself: move the progress line below it.
   const sent = mtime(SENT_FILE);
   if (sent > current.sentMark) {
@@ -405,7 +429,10 @@ async function runWithStatus(prompt, firstLine, {quiet = false} = {}) {
     res.startedAt = current.startedAt;
   } finally {
     await Promise.race([refreshing, new Promise((r) => setTimeout(r, 5000))]);
-    await dropStatus().catch(() => {});
+    // Interrupted by the owner: the line says so and stays; otherwise it gives way to the result.
+    if (current.reason === 'now') await closeStatus(T.takenNow).catch(() => {});
+    else if (current.reason === 'stop') await closeStatus(T.cancelled).catch(() => {});
+    else await dropStatus().catch(() => {});
     current = null;
     if (!queue.length) taskAwake(false);
   }
@@ -566,6 +593,7 @@ function enqueue(prompt) {
   saveQueue();
   // Housekeeping is running quietly: now the owner should see that the bot is busy.
   if (current?.quiet && !current.statusId) postStatus(current.firstLine).catch(() => {});
+  else if (current?.statusId) current.ownerWrote = true;
   if (!current) drain();
 }
 
@@ -633,7 +661,8 @@ async function onMessage(msg) {
 
   const cmd = msg.text?.match(/^\/(\w+)/)?.[1];
   if (cmd === 'start') return tg.sendText(state.chatId, T.hello, {silent: true});
-  if (cmd === 'stop') return tg.sendText(state.chatId, interrupt('stop') ? T.cancelled : T.idle, {silent: true});
+  // A running task's progress line itself turns into «⏹ Stopped».
+  if (cmd === 'stop') return interrupt('stop') ? null : tg.sendText(state.chatId, T.idle, {silent: true});
   if (cmd === 'new') {
     // The handoff runs lazily, right before the next turn.
     state.rotate = true;
@@ -661,12 +690,15 @@ async function onMessage(msg) {
     : null;
   if (listening) forgetKeys();
   const {prompt, said, problems} = await describe(tg, msg, {transcribe, lang: LANG, onInstall});
-  // It then shows what was heard and stays: the chat keeps the answer readable, and
-  // deleting it would bring the old keyboard back.
+  // Then what was heard replaces it, so the chat keeps the answer readable. A message
+  // with keyboard markup cannot be edited, so it is a new one that carries the removal
+  // on (deleting the last one alone would bring the old keyboard back).
   if (listening) {
-    const heard = said ? `🎙 «${said.length > 500 ? `${said.slice(0, 500)}…` : said}»` : null;
-    if (heard) tg.call('editMessageText', {chat_id: state.chatId, message_id: listening.message_id, text: heard}, {retries: 1}).catch(() => {});
-    else tg.call('deleteMessage', {chat_id: state.chatId, message_id: listening.message_id}, {retries: 1}).catch(() => {});
+    if (said) {
+      const heard = `🎙 «${said.length > 500 ? `${said.slice(0, 500)}…` : said}»`;
+      await tg.call('sendMessage', {chat_id: state.chatId, text: heard, disable_notification: true, reply_markup: {remove_keyboard: true}}, {retries: 1}).catch(() => {});
+    }
+    tg.call('deleteMessage', {chat_id: state.chatId, message_id: listening.message_id}, {retries: 1}).catch(() => {});
   }
   console.log(`message ${msg.message_id}${voice ? `, voice transcribed in ${((Date.now() - got) / 1000).toFixed(1)} s` : ''}`);
   for (const p of problems) {
@@ -752,7 +784,6 @@ async function onButton(q) {
   }
   if (q.data === 'ctl:stop' || q.data === 'ctl:now') {
     interrupt(q.data.slice(4));
-    if (q.data === 'ctl:stop') await tg.sendText(state.chatId, T.cancelled, {silent: true});
     return;
   }
   const msg = q.message;
