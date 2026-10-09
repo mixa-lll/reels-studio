@@ -16,6 +16,7 @@ Autostart entry, per OS (from setup step 7):
 | new Telegram key (leaked, new bot) | Ask them to send `/revoke` or `/newbot` to @BotFather and paste the reply; put the new token in `.env`; restart. For a new bot also clear `ownerId` in `data/state.json` and give them the start link as in setup step 8. |
 | change owner | Clear `ownerId`/`chatId` in `data/state.json`, set a new `OWNER_CODE` in `.env`, restart, send the new start link. |
 | switch Claude Code ↔ Codex, another model | Edit `AGENT`, `AGENT_BIN`, `AGENT_MODEL` in `.env`; delete `sessionId` from `data/state.json` (sessions are per agent); restart. |
+| connect the board or file where they keep ideas | Setup step 6c: check the agent can reach it, write `ideasBoard` in `studio/settings.json`. |
 | ideas time, sleep, global settings | Point to `/settings` in the bot, or edit `studio/settings.json` (the bot re-reads it). |
 | move it to another computer | Copy the folder without `template/node_modules`; on the new machine run setup steps 3, 4 and 7; stop the old one first (one bot per token). |
 | remove it | Ask: **«Remove the bot? Your reels in studio/ can be kept.»** — `Remove, keep my reels (recommended)` / `Remove everything` / `Cancel`. Then: stop it; delete the autostart entry; delete the folder (moving `studio/` to their Documents first if they keep it); remind them in one line that the Telegram bot itself can be deleted with `/deletebot` in @BotFather. |
