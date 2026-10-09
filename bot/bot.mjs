@@ -654,10 +654,20 @@ async function onMessage(msg) {
   const onInstall = () => tg.sendText(state.chatId, T.sttSetup, {silent: true}).catch(() => {});
   const voice = Boolean(msg.voice || msg.video_note);
   const got = Date.now();
-  // Speech-to-text takes a few seconds: say so instead of leaving only 👀.
-  const listening = voice ? await tg.call('sendMessage', {chat_id: state.chatId, text: T.listening, disable_notification: true}, {retries: 0}).catch(() => null) : null;
+  // Speech-to-text takes a few seconds: say so instead of leaving only 👀. The voice note
+  // answers whatever was asked, so this message also takes the keyboard away at once.
+  const listening = voice
+    ? await tg.call('sendMessage', {chat_id: state.chatId, text: T.listening, disable_notification: true, reply_markup: {remove_keyboard: true}}, {retries: 0}).catch(() => null)
+    : null;
+  if (listening) forgetKeys();
   const {prompt, said, problems} = await describe(tg, msg, {transcribe, lang: LANG, onInstall});
-  if (listening) tg.call('deleteMessage', {chat_id: state.chatId, message_id: listening.message_id}, {retries: 1}).catch(() => {});
+  // It then shows what was heard and stays: the chat keeps the answer readable, and
+  // deleting it would bring the old keyboard back.
+  if (listening) {
+    const heard = said ? `🎙 «${said.length > 500 ? `${said.slice(0, 500)}…` : said}»` : null;
+    if (heard) tg.call('editMessageText', {chat_id: state.chatId, message_id: listening.message_id, text: heard}, {retries: 1}).catch(() => {});
+    else tg.call('deleteMessage', {chat_id: state.chatId, message_id: listening.message_id}, {retries: 1}).catch(() => {});
+  }
   console.log(`message ${msg.message_id}${voice ? `, voice transcribed in ${((Date.now() - got) / 1000).toFixed(1)} s` : ''}`);
   for (const p of problems) {
     const text = p.kind === 'tooBig' ? T.tooBig(p.what, p.size) : p.kind === 'stt' ? T.sttFailed : T.downloadFailed(p.what, p.error);
