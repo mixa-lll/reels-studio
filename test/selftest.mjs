@@ -158,6 +158,15 @@ await check('agent adapter: stdin prompt, session, activity', async () => {
   assert(r.sessionId === 'fake-session' && r.context === 100 && calls[0]?.tool === 'run', JSON.stringify({r, calls}));
 });
 
+await check('agent adapter: a message mid-turn joins it, one after the turn is refused', async () => {
+  const handle = runAgent({agent: 'claude', bin: fakeAgentBin(), prompt: 'slow first'});
+  await new Promise((r) => setTimeout(r, 800));
+  assert(handle.live && handle.send('and second'), 'send refused mid-turn');
+  const r = await handle.done;
+  assert(r.text === 'echo: slow first\nand second' && !r.earlier.length && !r.error, JSON.stringify(r));
+  assert(!handle.send('too late'), 'send accepted after the turn');
+});
+
 await check('agent adapter: cancel stops the agent and its children', async () => {
   const handle = runAgent({agent: 'claude', bin: fakeAgentBin(), prompt: 'sleep'});
   let child;

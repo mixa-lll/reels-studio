@@ -6,7 +6,10 @@
 //   node scripts/render.mjs <project> <out.mp4> [label] --background [-- …]
 //        start in the background and print a job id at once
 //   node scripts/render.mjs --wait <job> [seconds=540]
-//        wait for that job, at most `seconds`; exit 0 done, 2 still running, 1 failed
+//        wait for that job, at most `seconds`; exit 0 done, 2 still running, 1 failed,
+//        3 the owner wrote meanwhile (the job keeps running)
+//   node scripts/render.mjs --stop <job>
+//        stop that job, e.g. when the owner's new message changes the video
 //
 // Background jobs survive the agent's per-command time limits; the bot stops them on
 // «Stop» and on restart (jobs live in data/renders/<job>.json).
@@ -15,6 +18,7 @@ import {existsSync, mkdirSync, openSync, readFileSync, statSync, writeFileSync} 
 import {randomBytes} from 'node:crypto';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {killTree} from '../bot/agents.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.REELS_DATA || join(ROOT, 'data');
@@ -26,13 +30,25 @@ const writeJob = (job) => writeFileSync(jobFile(job.id), JSON.stringify(job, nul
 
 const argv = process.argv.slice(2);
 
-if (argv[0] === '--wait') {
+if (argv[0] === '--wait' || argv[0] === '--stop') {
   const id = argv[1];
-  const until = Date.now() + Number(argv[2] ?? 540) * 1000;
+  const since = Date.now();
+  const until = since + Number(argv[2] ?? 540) * 1000;
   if (!id || !existsSync(jobFile(id))) {
     console.error(`no render job ${id}`);
     process.exit(1);
   }
+  if (argv[0] === '--stop') {
+    const job = readJob(id);
+    if (job.status === 'running') {
+      killTree(job.pid);
+      writeJob({...job, status: 'failed', code: 'stopped', tail: 'stopped by the agent'});
+    }
+    console.log(`stopped render job ${id}`);
+    process.exit(0);
+  }
+  // The bot touches this file when the owner's message joins the running task.
+  const ownerWrote = join(DATA, 'owner-wrote.txt');
   for (;;) {
     const job = readJob(id);
     if (job.status === 'done') {
@@ -42,6 +58,10 @@ if (argv[0] === '--wait') {
     if (job.status === 'failed') {
       console.log(`failed (exit ${job.code}):\n${job.tail}`);
       process.exit(1);
+    }
+    if (existsSync(ownerWrote) && statSync(ownerWrote).mtimeMs > since) {
+      console.log(`the owner just wrote: read their message. The render keeps running (${job.pct ?? 0}%); --wait ${id} again if it still fits, --stop ${id} if the message changes the video`);
+      process.exit(3);
     }
     if (Date.now() > until) {
       console.log(`running: ${job.pct ?? 0}% — call --wait ${id} again`);

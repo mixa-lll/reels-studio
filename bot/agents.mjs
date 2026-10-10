@@ -26,9 +26,14 @@ function emptyMcp() {
 const ADAPTERS = {
   claude: {
     bin: 'claude',
-    // The prompt goes in on stdin: no quoting issues with .cmd shims on Windows.
+    // Messages go in on stdin as stream-json: no quoting issues with .cmd shims on
+    // Windows, and the owner's new messages can join a turn that is already running.
+    // Each message is echoed back (isReplay) once the agent has taken it in.
+    live: true,
+    encode: (text) => `${JSON.stringify({type: 'user', message: {role: 'user', content: text}})}\n`,
     args: ({sessionId, model, isolated}) => [
       '-p',
+      '--input-format', 'stream-json', '--replay-user-messages',
       '--output-format', 'stream-json', '--verbose',
       '--dangerously-skip-permissions',
       // Without the owner's global settings, plugins, hooks and MCP servers. An empty
@@ -40,6 +45,7 @@ const ADAPTERS = {
     // Returns {sessionId?, call?, context?, text?, error?} for one JSON line of output.
     parse(ev) {
       if (ev.type === 'system' && ev.subtype === 'init') return {sessionId: ev.session_id};
+      if (ev.type === 'user' && ev.isReplay) return {taken: true};
       // Plan windows after each API call: share used and reset time.
       if (ev.type === 'rate_limit_event') {
         const w = ev.rate_limit_info?.unifiedWindows ?? {};
@@ -57,7 +63,7 @@ const ADAPTERS = {
         const error = ev.is_error || (ev.subtype && ev.subtype !== 'success');
         const u = ev.usage ?? {};
         const tokens = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.output_tokens ?? 0);
-        return {sessionId: ev.session_id, text: ev.result ?? (error ? ev.subtype : ''), error, cost: ev.total_cost_usd, tokens};
+        return {sessionId: ev.session_id, text: ev.result ?? (error ? ev.subtype : ''), error, cost: ev.total_cost_usd, tokens, end: true};
       }
       return {};
     },
@@ -123,8 +129,10 @@ export function killTree(pid) {
 
 /**
  * Runs one agent turn. Calls onCall({tool, path?, command?}) on every tool call.
- * Resolves to {sessionId, text, error, cancelled, context, code, stderr, spawnError}; `kill()` on the returned
+ * Resolves to {sessionId, text, earlier, error, cancelled, context, code, stderr, spawnError}; `kill()` on the returned
  * handle stops the agent and everything it spawned. The session survives a kill.
+ * `send(text)` hands the running agent one more message (agents with `live` input only);
+ * it returns false once the turn is over, and replies to earlier messages land in `earlier`.
  */
 export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated = false}) {
   const a = ADAPTERS[agent];
@@ -138,7 +146,12 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated
     env: {...process.env, REELS_BOT: '1'},
   });
 
-  child.stdin.end(prompt);
+  child.stdin.on('error', () => {});
+  let sent = 1;
+  let taken = 0;
+  let open = Boolean(a.live);
+  if (open) child.stdin.write(a.encode(prompt));
+  else child.stdin.end(prompt);
   let stderr = '';
   let killed = false;
   let lastActivity = Date.now();
@@ -146,7 +159,7 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated
   child.stderr.on('data', (d) => (stderr = (stderr + d).slice(-4000)));
 
   const done = new Promise((resolve) => {
-    const out = {sessionId, text: '', error: false};
+    const out = {sessionId, text: '', earlier: [], error: false};
     createInterface({input: child.stdout}).on('line', (line) => {
       lastActivity = Date.now();
       let ev;
@@ -162,6 +175,17 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated
       if (r.limits) out.limits = r.limits;
       if (r.cost !== undefined) out.cost = r.cost;
       if (r.tokens) out.tokens = (out.tokens ?? 0) + r.tokens;
+      if (r.taken) taken++;
+      if (r.end && open) {
+        if (out.text) out.earlier.push(out.text);
+        out.text = '';
+        // Everything sent is taken in (or this CLI does not echo): let the agent exit.
+        // Otherwise it goes on with the messages that came in too late for this reply.
+        if (!taken || taken >= sent) {
+          open = false;
+          child.stdin.end();
+        }
+      }
       if (r.text !== undefined) out.text = r.text;
       if (r.error) out.error = true;
     });
@@ -184,5 +208,11 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated
     killed = true;
     killTree(child.pid);
   };
-  return {done, kill, lastActivity: () => lastActivity};
+  const send = (text) => {
+    if (!open || killed) return false;
+    sent++;
+    child.stdin.write(a.encode(text));
+    return true;
+  };
+  return {done, kill, send, live: Boolean(a.live), lastActivity: () => lastActivity};
 }

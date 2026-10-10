@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Telegram ↔ coding agent bridge for the reels workflow.
-// One owner, one agent turn at a time; messages that arrive mid-turn are queued.
+// One owner, one agent turn at a time; messages that arrive mid-turn join it at once.
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
@@ -36,13 +36,10 @@ const LANG = process.env.BOT_LANG === 'en' ? 'en' : 'ru';
 const T = {
   ru: {
     hello: '🎬 Привет! Я делаю рилсы: присылаю идеи, монтирую выбранные, правлю по твоим ответам на видео.\n\n🎙 Со мной можно говорить голосовыми — так даже быстрее: надиктуй идею или правки, я пойму.\n\nДля начала расскажи, о чём будут рилсы: продукт, ссылка, аудитория.',
-    queued: (n) => (n === 1 ? '👂 Услышал, учту сразу после этого шага' : `👂 Услышал ещё ${n} сообщ., учту сразу после этого шага`),
-    heard: '↪️ Получил твоё сообщение, продолжаю ниже',
-    takenNow: '⚡ Прервал, беру твоё сообщение',
+    heard: '↪️ Получил, учитываю, продолжаю ниже',
     accepted: '⏳ Принял, начинаю',
     cancelled: '⏹ Остановил.',
     stop: '⏹ Стоп',
-    now: '⚡ Учесть сейчас',
     saving: '🧠 Сохраняю контекст перед новой сессией',
     idle: 'Сейчас ничего не делаю.',
     fresh: '🆕 Следующее сообщение начнёт новую сессию. Что важно — сохраню перед этим.',
@@ -72,13 +69,10 @@ const T = {
   },
   en: {
     hello: '🎬 Hi! I make reels: I pitch ideas, edit the ones you pick and revise them from your replies to the video.\n\n🎙 You can talk to me with voice messages, it is often faster: dictate an idea or edits and I will get it.\n\nFirst tell me what the reels are about: product, link, audience.',
-    queued: (n) => (n === 1 ? '👂 Got it, I will take it right after this step' : `👂 Got ${n} more, I will take them right after this step`),
-    heard: '↪️ Got your message, continuing below',
-    takenNow: '⚡ Interrupted, taking your message',
+    heard: '↪️ Got it, taking it in, continuing below',
     accepted: '⏳ Got it, starting',
     cancelled: '⏹ Stopped.',
     stop: '⏹ Stop',
-    now: '⚡ Take it now',
     saving: '🧠 Saving context before a new session',
     idle: 'Nothing is running.',
     fresh: '🆕 The next message starts a new session. What matters is saved first.',
@@ -159,6 +153,8 @@ const state = loadState();
 const STATUS_FILE = join(DATA, 'status.txt');
 const SENT_FILE = join(DATA, 'sent.txt');
 const KEYS_FILE = join(DATA, 'keyboard.json');
+// Touched whenever an owner's message joins a running task.
+const OWNER_WROTE_FILE = join(DATA, 'owner-wrote.txt');
 const queue = [];
 let current = null; // {handle, statusId, startedAt, activity, lastText, sentMark, reason}
 
@@ -291,19 +287,15 @@ async function showUnfinished() {
 }
 
 // Progress line: one line — whatever is newest, the agent's own stage or what it is
-// doing right now — plus the queue when there is one.
+// doing right now.
 function statusText() {
   const stage = existsSync(STATUS_FILE) ? readFileSync(STATUS_FILE, 'utf8').trim() : '';
   const stageAt = mtime(STATUS_FILE);
-  const now = stage && stageAt >= (current.activityAt ?? 0) ? stage : activityLabel(current.activity, LANG);
-  return queue.length ? `${now}\n${T.queued(queue.length)}` : now;
+  return stage && stageAt >= (current.activityAt ?? 0) ? stage : activityLabel(current.activity, LANG);
 }
 
-// Controls under the progress line: stop, or stop and take queued messages in right away.
 function controls() {
-  const row = [{text: T.stop, callback_data: 'ctl:stop'}];
-  if (queue.length) row.push({text: T.now, callback_data: 'ctl:now'});
-  return {inline_keyboard: [row]};
+  return {inline_keyboard: [[{text: T.stop, callback_data: 'ctl:stop'}]]};
 }
 
 // The progress message id is persisted, so one left behind by a crash or restart
@@ -397,11 +389,14 @@ function openingPrompt(prompt) {
 
 // ---------- agent turns ----------
 
-/** Runs one agent call under a live progress line. */
-async function runWithStatus(prompt, firstLine, {quiet = false} = {}) {
+/**
+ * Runs one agent call under a live progress line. An `open` call is the owner's own
+ * task: messages the owner sends meanwhile go into it (see enqueue).
+ */
+async function runWithStatus(prompt, firstLine, {quiet = false, open = false} = {}) {
   rmSync(STATUS_FILE, {force: true});
   taskAwake(true);
-  current = {startedAt: Date.now(), activity: 'think', sentMark: mtime(SENT_FILE), quiet, firstLine};
+  current = {startedAt: Date.now(), activity: 'think', sentMark: mtime(SENT_FILE), quiet, open, firstLine};
   // The progress line is a nicety: a failed or slow send must never hold up the task.
   // Quiet runs (background housekeeping) show it only once the owner writes meanwhile.
   if (!quiet) await postStatus(firstLine).catch((e) => console.error('status', e));
@@ -422,6 +417,12 @@ async function runWithStatus(prompt, firstLine, {quiet = false} = {}) {
       },
     });
     current.handle = handle;
+    // Messages that came in while the agent was starting join it as well.
+    if (open && queue.length) {
+      const early = queue.splice(0);
+      saveQueue();
+      early.forEach(enqueue);
+    }
     console.log(`turn started${quiet ? ' (housekeeping)' : ''}`);
     res = await handle.done;
     console.log(`turn done in ${Math.round((Date.now() - current.startedAt) / 1000)} s${res.error ? `, error ${res.code ?? ''}` : ''}${res.cancelled ? ', cancelled' : ''}`);
@@ -430,7 +431,7 @@ async function runWithStatus(prompt, firstLine, {quiet = false} = {}) {
   } finally {
     await Promise.race([refreshing, new Promise((r) => setTimeout(r, 5000))]);
     // Interrupted by the owner: the line says so and stays; otherwise it gives way to the result.
-    if (current.reason === 'now') await closeStatus(T.takenNow).catch(() => {});
+    if (current.reason === 'now') await closeStatus(T.heard).catch(() => {});
     else if (current.reason === 'stop') await closeStatus(T.cancelled).catch(() => {});
     else await dropStatus().catch(() => {});
     current = null;
@@ -484,7 +485,7 @@ async function runTurn(prompt, retried = false) {
     delete state.pending;
     return saveState(state);
   }
-  const res = await runWithStatus(prompt, T.accepted);
+  const res = await runWithStatus(prompt, T.accepted, {open: true});
   delete state.pending;
   saveState(state);
   if (res.cancelled && (res.reason === 'stalled' || res.reason === 'overtime')) {
@@ -512,7 +513,12 @@ async function runTurn(prompt, retried = false) {
   // Nothing more after the agent already asked its question with a keyboard (e.g. the
   // review after a version), or when it ends with NO_REPLY.
   const askedAlready = mtime(KEYS_FILE) > res.startedAt;
-  if (!labels && (askedAlready || /^NO_REPLY\.?$/i.test(body))) body = '';
+  const noReply = (t) => /^NO_REPLY\.?$/i.test(t);
+  if (!labels && (askedAlready || noReply(body))) body = '';
+  // Replies the agent gave before a late message of the owner came in: those go first,
+  // only the last reply keeps its keyboard.
+  const earlier = (res.earlier ?? []).map((t) => splitKeyLine(t.trim()).text).filter((t) => t && !noReply(t));
+  if (earlier.length) body = [...earlier, body].filter(Boolean).join('\n\n');
   if (body || labels) {
     // Kept in an outbox until delivered, so a restart cannot swallow the answer.
     state.outbox = {text: labels ? `${body || '👇'}\n\n✍️ ${T.hint}` : body, labels};
@@ -587,10 +593,27 @@ function saveQueue() {
   saveState(state);
 }
 
+// The owner never waits for a step to finish: a new message goes straight into the
+// running task, and the agent takes it in after its current tool call. An agent CLI
+// that cannot take messages mid-turn (Codex) is interrupted and resumed with it.
+// Background housekeeping and the handoff are not the owner's task: those finish first.
 function enqueue(prompt) {
   clearKeyboard().catch(() => {});
+  if (current?.open && current.handle?.send(prompt)) {
+    // A restart redoes the task together with what was added to it.
+    state.pending = `${state.pending ?? ''}\n\n---\n\n${prompt}`;
+    saveState(state);
+    // render.mjs --wait returns early on this, so a long wait does not hold the message.
+    writeFileSync(OWNER_WROTE_FILE, String(Date.now()));
+    if (current.statusId) current.ownerWrote = true;
+    return;
+  }
   queue.push(prompt);
   saveQueue();
+  if (current?.open && current.handle && !current.handle.live) {
+    interrupt('now');
+    return;
+  }
   // Housekeeping is running quietly: now the owner should see that the bot is busy.
   if (current?.quiet && !current.statusId) postStatus(current.firstLine).catch(() => {});
   else if (current?.statusId) current.ownerWrote = true;
@@ -676,7 +699,7 @@ async function onMessage(msg) {
   if (cmd === 'usage') return tg.sendText(state.chatId, usageText(state.limits, LANG), {silent: true});
   if (state.awaitingTime && msg.text && !cmd) return onSettingsTime(msg.text);
 
-  // 👀 = seen: while the agent is busy (it will be queued) or while a voice note is transcribed.
+  // 👀 = seen: while the agent is busy (the message joins its task) or while a voice note is transcribed.
   if (current || msg.voice || msg.video_note) {
     await tg.call('setMessageReaction', {chat_id: state.chatId, message_id: msg.message_id, reaction: [{type: 'emoji', emoji: '👀'}]}).catch(() => {});
   }
@@ -782,8 +805,8 @@ async function onButton(q) {
     }
     return;
   }
-  if (q.data === 'ctl:stop' || q.data === 'ctl:now') {
-    interrupt(q.data.slice(4));
+  if (q.data === 'ctl:stop') {
+    interrupt('stop');
     return;
   }
   const msg = q.message;

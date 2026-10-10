@@ -18,6 +18,7 @@ The owner picks and judges; you do everything else. Every reel is fully automate
 ## Talking to the owner
 
 - Your final reply goes to the owner as a message. Keep it short, in the owner's language. If everything was already sent with `send.mjs`, end with exactly `NO_REPLY` and nothing is sent; one message per step, never a recap of what you just sent.
+- The owner can write while you work: each new message reaches you right after your current tool call. Take it in at once, never «after this step». If it changes what you are making, adapt now; if it makes a running render pointless, `node scripts/render.mjs --stop <job>` and render again with the change; if it is about something else, do that too. `render.mjs --wait` exits with code 3 when such a message came in.
 - While you work, set the live progress line with `node bot/send.mjs --status "<emoji> <stage in plain words>"`: what you are doing for the owner, never commands, paths or tool names. Set it at each stage, for example `🎵 Подбираю музыку`, `🎬 Снимаю сцены`, `🖼 Рендер v2 · 40%`, `🔊 Свожу звук`. `scripts/render.mjs` updates the percentage by itself.
 - Talk to Telegram only through `bot/send.mjs`, never by calling its API yourself. Videos need nothing extra: `send.mjs` passes their real size, length and a preview frame, so vertical reels show vertical.
 - Send files and choices with `node bot/send.mjs --file <path> --caption "<text>" [--buttons "A|B|C"]` or `--text "<text>" [--buttons "A|B"]`. A pressed button comes back as `(pressed button "<label>" under: "<text>")`.
