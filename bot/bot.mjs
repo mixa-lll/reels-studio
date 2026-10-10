@@ -39,7 +39,8 @@ const T = {
     hello: '🎬 Привет! Я делаю рилсы: присылаю идеи, монтирую выбранные, правлю по твоим ответам на видео.\n\n🎙 Со мной можно говорить голосовыми — так даже быстрее: надиктуй идею или правки, я пойму.\n\n✍️ Пока я работаю, можно дописывать и поправлять — учту сразу, ждать не нужно.\n\nДля начала расскажи, о чём будут рилсы: продукт, ссылка, аудитория.',
     heard: '↪️ Получил, учитываю, продолжаю ниже',
     writeAnyTime: '✍️ Можно дописывать по ходу — учту сразу',
-    accepted: '⏳ Принял, начинаю',
+    accepted: '⏳ Начинаю',
+    keysGone: '👌 Принял',
     cancelled: '⏹ Остановил.',
     stop: '⏹ Стоп',
     saving: '🧠 Сохраняю контекст перед новой сессией',
@@ -85,7 +86,8 @@ const T = {
     hello: '🎬 Hi! I make reels: I pitch ideas, edit the ones you pick and revise them from your replies to the video.\n\n🎙 You can talk to me with voice messages, it is often faster: dictate an idea or edits and I will get it.\n\n✍️ While I work you can keep writing and correcting: I take it in at once, no need to wait.\n\nFirst tell me what the reels are about: product, link, audience.',
     heard: '↪️ Got it, taking it in, continuing below',
     writeAnyTime: '✍️ Keep writing as I go, I take it in at once',
-    accepted: '⏳ Got it, starting',
+    accepted: '⏳ Starting',
+    keysGone: '👌 Got it',
     cancelled: '⏹ Stopped.',
     stop: '⏹ Stop',
     saving: '🧠 Saving context before a new session',
@@ -193,20 +195,20 @@ if (await applyProfile(tg, env.token, state, LANG).catch((e) => console.error('p
 
 const mtime = (f) => (existsSync(f) ? statSync(f).mtimeMs : 0);
 
-// A stale reply keyboard goes as soon as work moves on; a small «⌛» message carries
+// A stale reply keyboard goes as soon as work moves on; a short «👌 Принял» carries
 // the removal (it can't ride on the progress message, which has inline buttons). It stays
 // until a later message takes over the keyboard: deleting it right away brings the old
 // keyboard back in Telegram clients, which show the last keyboard still in the chat.
 async function clearKeyboard() {
   if (!forgetKeys()) return;
-  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text: '⌛', disable_notification: true, reply_markup: {remove_keyboard: true}}).catch(() => null);
+  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text: T.keysGone, disable_notification: true, reply_markup: {remove_keyboard: true}}).catch(() => null);
   if (!msg) return;
   await dropKeyAck();
   state.keyAck = msg.message_id;
   saveState(state);
 }
 
-/** Deletes the «⌛» once a newer message carries a keyboard or its removal. */
+/** Deletes that message once a newer one carries a keyboard or its removal. */
 async function dropKeyAck() {
   const id = state.keyAck;
   if (!id) return;
@@ -1096,7 +1098,7 @@ async function flushOutbox() {
   const o = state.outbox;
   if (!o || !state.chatId) return;
   await tg.call('sendChatAction', {chat_id: state.chatId, action: 'typing'}).catch(() => {});
-  // A reply without options still takes over the keyboard removal from the «⌛».
+  // A reply without options still takes over the keyboard removal from «👌 Принял».
   const markup = o.labels ? replyKeyboard(o.labels, {placeholder: T.hint}) : state.keyAck ? {remove_keyboard: true} : undefined;
   await tg.sendText(state.chatId, o.text, markup ? {reply_markup: markup} : {});
   if (markup) await dropKeyAck();
