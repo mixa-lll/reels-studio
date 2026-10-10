@@ -131,10 +131,11 @@ export function killTree(pid) {
  * Runs one agent turn. Calls onCall({tool, path?, command?}) on every tool call.
  * Resolves to {sessionId, text, earlier, error, cancelled, context, code, stderr, spawnError}; `kill()` on the returned
  * handle stops the agent and everything it spawned. The session survives a kill.
+ * `studio` is the active project's folder.
  * `send(text)` hands the running agent one more message (agents with `live` input only);
  * it returns false once the turn is over, and replies to earlier messages land in `earlier`.
  */
-export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated = false}) {
+export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated = false, studio}) {
   const a = ADAPTERS[agent];
   if (!a) throw new Error(`Unknown AGENT "${agent}", expected one of: ${AGENTS.join(', ')}`);
   const child = spawn(bin || a.bin, a.args({sessionId, model, isolated}), {
@@ -143,7 +144,8 @@ export function runAgent({agent, bin, model, prompt, sessionId, onCall, isolated
     // npm-installed CLIs are .cmd shims on Windows, which only a shell can start.
     shell: process.platform === 'win32',
     windowsHide: true,
-    env: {...process.env, REELS_BOT: '1'},
+    // REELS_STUDIO: the project this turn works in, for the scripts and send CLI it runs.
+    env: {...process.env, REELS_BOT: '1', ...(studio ? {REELS_STUDIO: studio} : {})},
   });
 
   child.stdin.on('error', () => {});

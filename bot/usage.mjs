@@ -6,7 +6,7 @@
 import {appendFileSync, existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
-import {DATA, STUDIO} from './config.mjs';
+import {DATA, FIRST_PROJECT, loadState, studio} from './config.mjs';
 
 const LOG = join(DATA, 'usage.jsonl');
 
@@ -51,7 +51,7 @@ export function codexLimits(sessionId) {
 
 /** The reel folder the agent changed since `since` (ms), or null. */
 export function touchedReel(since) {
-  const dir = join(STUDIO, 'reels');
+  const dir = join(studio(), 'reels');
   if (!existsSync(dir)) return null;
   let best = null;
   for (const name of readdirSync(dir).filter((d) => /^\d{2}-/.test(d))) {
@@ -63,13 +63,17 @@ export function touchedReel(since) {
 }
 
 const reelTitle = (name) => {
-  const readme = join(STUDIO, 'reels', name, 'README.md');
+  const readme = join(studio(), 'reels', name, 'README.md');
   return (existsSync(readme) && readFileSync(readme, 'utf8').match(/^#\s+(.+)$/m)?.[1]?.trim()) || name;
 };
 
 // ---------- log ----------
 
-const entries = () => (existsSync(LOG) ? readFileSync(LOG, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
+// Reels are numbered per project, so a reel is known by its project and folder.
+// Turns logged before projects existed belong to the first one.
+const all = () => (existsSync(LOG) ? readFileSync(LOG, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
+const project = () => loadState().project || FIRST_PROJECT;
+const entries = () => all().filter((e) => (e.project ?? FIRST_PROJECT) === project());
 
 /**
  * Records a finished turn. `before` is the last known windows, `after` the new ones;
@@ -77,7 +81,7 @@ const entries = () => (existsSync(LOG) ? readFileSync(LOG, 'utf8').trim().split(
  */
 export function recordTurn({startedAt, reel, before, after, cost, tokens}) {
   const delta = (k) => (before?.[k] && after?.[k] && before[k].resetsAt === after[k].resetsAt ? Math.max(0, after[k].pct - before[k].pct) : null);
-  const entry = {at: Date.now(), startedAt, reel, week: delta('week'), fiveHour: delta('fiveHour'), cost, tokens};
+  const entry = {at: Date.now(), startedAt, project: project(), reel, week: delta('week'), fiveHour: delta('fiveHour'), cost, tokens};
   appendFileSync(LOG, JSON.stringify(entry) + '\n');
   return entry;
 }
@@ -92,10 +96,11 @@ export function reelSpend(reel) {
   };
 }
 
-// Average weekly share per reel, over reels other than `except` with at least 2 turns.
+// Average weekly share per reel, over reels of every project other than `except`.
 function averageWeek(except) {
   const byReel = {};
-  for (const e of entries()) if (e.reel && e.reel !== except && e.week !== null) byReel[e.reel] = (byReel[e.reel] ?? 0) + e.week;
+  const key = (e) => `${e.project ?? FIRST_PROJECT}/${e.reel}`;
+  for (const e of all()) if (e.reel && key(e) !== `${project()}/${except}` && e.week !== null) byReel[key(e)] = (byReel[key(e)] ?? 0) + e.week;
   const vals = Object.values(byReel).filter((v) => v > 0);
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
@@ -150,7 +155,7 @@ const reelsLeft = (limits, avg) => (avg && limits?.week ? Math.max(0, Math.floor
 export function usageText(limits, lang) {
   const t = L[lang];
   if (!limits?.week && !limits?.fiveHour) {
-    const cost = entries().reduce((s, e) => s + (e.cost ?? 0), 0);
+    const cost = all().reduce((s, e) => s + (e.cost ?? 0), 0);
     return cost ? t.noWindows(cost) : t.none;
   }
   const line = (name, w) => w && `${name.padEnd(8)} ${bar(w.pct)} ${w.pct}% · ${t.resets(t.in(w.resetsAt - Date.now()))}`;

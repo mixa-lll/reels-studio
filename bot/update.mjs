@@ -3,7 +3,7 @@
 //   git     — the folder is a git clone: fetch, then fast-forward pull;
 //   archive — installed from a downloaded archive (no git needed): the GitHub API tells
 //             what changed, and the new version's archive replaces the bot's own files.
-// Owner material (studio/, data/, .env, node_modules) is never touched in either mode.
+// Owner material (projects/, studio/, data/, .env, node_modules) is never touched in either mode.
 import {execFile} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
@@ -39,7 +39,7 @@ let latest = null; // {sha, subjects, files} from the last check
 export let lastBackup = null;
 
 // The bot's own files: everything except owner material and installed packages.
-const OWN = (rel) => !/^(data|studio|\.git)(\/|$)|(^|\/)node_modules(\/|$)|^\.env$/.test(rel);
+const OWN = (rel) => !/^(data|projects|studio|\.git)(\/|$)|(^|\/)node_modules(\/|$)|^\.env$/.test(rel);
 function walk(dir, base = dir, out = []) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);

@@ -13,7 +13,7 @@
 //   "sections": [{
 //     "title": "🎵 Музыка", "prompt": "Какой трек?",
 //     "current": "funk",                                  // menu mode: value now in the reel
-//     "options": [{"label": "🎵 Фанк, 110 BPM", "value": "funk", "note": "бодрый", "file": "studio/…/funk.mp3"}]
+//     "options": [{"label": "🎵 Фанк, 110 BPM", "value": "funk", "note": "бодрый", "file": "projects/…/funk.mp3"}]
 //   }]
 // }
 import {existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';

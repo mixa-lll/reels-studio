@@ -2,7 +2,7 @@
 //   - while the agent works on a task (or renders): always, on battery too, so a task
 //     never freezes half-way because the machine dozed off;
 //   - while idle: only on the charger and only if the owner asked (`keepAwake` in
-//     studio/settings.json), so messages and morning ideas are not missed.
+//     data/settings.json), so messages and morning ideas are not missed.
 // No system settings change and no admin rights are needed: the bot holds an OS
 // "stay awake" request that disappears with it. A closed laptop lid still sleeps.
 import {spawn} from 'node:child_process';

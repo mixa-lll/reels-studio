@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // End-to-end self-check on this machine (also run in CI on macOS, Linux and Windows):
 // new reel → render → loudness, menus, formatting, activity line, agent adapter with
-// stdin prompt and cancel, voice transcription. Uses temp folders, never data/ or studio/.
+// stdin prompt and cancel, voice transcription. Uses temp folders, never data/ or projects/.
 //   npm test                 everything
 //   npm test -- --quick      skip rendering and speech-to-text
 import {execFileSync, spawn, spawnSync} from 'node:child_process';
@@ -13,7 +13,7 @@ import {fileURLToPath} from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TMP = mkdtempSync(join(tmpdir(), 'reels-selftest-'));
 process.env.REELS_DATA = join(TMP, 'data');
-process.env.REELS_STUDIO = join(TMP, 'studio');
+process.env.REELS_PROJECTS = join(TMP, 'projects');
 const quick = process.argv.includes('--quick');
 const win = process.platform === 'win32';
 
@@ -199,7 +199,7 @@ await check('intake: forwards, hidden links, stickers, oversized files, history'
   const voice = await describe(tg, {message_id: 4, voice: {file_id: 'a', file_size: 10}}, opts);
   assert(voice.said === 'hello' && voice.prompt.includes('transcript'), voice.prompt);
   remember(fwd.prompt);
-  assert(readFileSync(join(process.env.REELS_DATA, 'inbox', 'history.md'), 'utf8').includes('look here'), 'history');
+  assert(readFileSync(join(process.env.REELS_PROJECTS, 'main', 'inbox', 'history.md'), 'utf8').includes('look here'), 'history');
 });
 
 await check('errors: plain-language explanations', async () => {
@@ -223,7 +223,7 @@ await check('end to end: owner link, reply despite a hung progress line, task su
   const env = {
     ...process.env, TELEGRAM_BOT_TOKEN: '1:test', REELS_TELEGRAM_API: tg.url, REELS_HTTP_TIMEOUT: '1500',
     AGENT: 'claude', AGENT_BIN: fakeAgentBin(), OWNER_CODE: 'abc', BOT_LANG: 'en',
-    REELS_DATA: join(data, 'data'), REELS_STUDIO: join(data, 'studio'), REELS_BOT_SUPERVISED: '1',
+    REELS_DATA: join(data, 'data'), REELS_PROJECTS: join(data, 'projects'), REELS_BOT_SUPERVISED: '1',
     REELS_STALL_MS: '6000', REELS_WATCH_MS: '1000',
   };
   const start = () => spawn(process.execPath, ['bot/bot.mjs'], {cwd: ROOT, env, stdio: 'ignore'});

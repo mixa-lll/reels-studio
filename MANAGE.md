@@ -12,13 +12,14 @@ Autostart entry, per OS (from setup step 7):
 |---|---|
 | «the bot is silent», «something broke» | Read the tail of `data/bot.log`; check the process is running (`data/bot.pid`); restart it. Explain the cause in one line. If the log shows an agent error (limit, login), say what to do. |
 | restart / stop / start | The autostart commands above. |
-| update now | Tell them the bot itself offers updates with an «⬆️ Update» button; or apply it here: `git pull` in a git clone, otherwise download and unpack the latest archive as in setup step 1 over the folder — keep `studio/`, `data/`, `.env`, `template/node_modules` — then `npm ci --ignore-scripts` in `template/` if `template/package-lock.json` changed, and restart. |
+| update now | Tell them the bot itself offers updates with an «⬆️ Update» button; or apply it here: `git pull` in a git clone, otherwise download and unpack the latest archive as in setup step 1 over the folder — keep `projects/` (or `studio/` in old versions), `data/`, `.env`, `template/node_modules` — then `npm ci --ignore-scripts` in `template/` if `template/package-lock.json` changed, and restart. |
 | new Telegram key (leaked, new bot) | Ask them to send `/revoke` or `/newbot` to @BotFather and paste the reply; put the new token in `.env`; restart. For a new bot also clear `ownerId` in `data/state.json` and give them the start link as in setup step 8. |
 | change owner | Clear `ownerId`/`chatId` in `data/state.json`, set a new `OWNER_CODE` in `.env`, restart, send the new start link. |
 | switch Claude Code ↔ Codex, another model | Edit `AGENT`, `AGENT_BIN`, `AGENT_MODEL` in `.env`; delete `sessionId` from `data/state.json` (sessions are per agent); restart. |
-| connect the board or file where they keep ideas | Setup step 6c: check the agent can reach it, write `ideasBoard` in `studio/settings.json`. |
-| ideas time, sleep, global settings | Point to `/settings` in the bot, or edit `studio/settings.json` (the bot re-reads it). |
+| connect the board or file where they keep ideas | Setup step 6c: check the agent can reach it, write `ideasBoard` in the active project's `projects/<slug>/settings.json` (`state.project` in `data/state.json`). |
+| ideas time, sleep, global settings | Point to `/settings` in the bot, or edit the files (the bot re-reads them): ideas time in `projects/<slug>/settings.json`, sleep and global settings in `data/settings.json`. |
+| projects (several sets of reels, e.g. for a partner) | Point to `/projects` in the bot; or ask the bot in words, it creates, switches, renames and archives them. Each lives in `projects/<slug>/`. |
 | move it to another computer | Copy the folder without `template/node_modules`; on the new machine run setup steps 3, 4 and 7; stop the old one first (one bot per token). |
-| remove it | Ask: **«Remove the bot? Your reels in studio/ can be kept.»** — `Remove, keep my reels (recommended)` / `Remove everything` / `Cancel`. Then: stop it; delete the autostart entry; delete the folder (moving `studio/` to their Documents first if they keep it); remind them in one line that the Telegram bot itself can be deleted with `/deletebot` in @BotFather. |
+| remove it | Ask: **«Remove the bot? Your reels in projects/ can be kept.»** — `Remove, keep my reels (recommended)` / `Remove everything` / `Cancel`. Then: stop it; delete the autostart entry; delete the folder (moving `projects/` to their Documents first if they keep it); remind them in one line that the Telegram bot itself can be deleted with `/deletebot` in @BotFather. |
 
 Anything else about the bot: read [SECURITY.md](SECURITY.md) and the code, then do it the same way — briefly, with buttons, asking before anything irreversible.

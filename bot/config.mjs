@@ -1,18 +1,21 @@
 // Paths, .env and persistent state shared by the bot and the send CLI.
-import {copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
+import {copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-// REELS_DATA / REELS_STUDIO move state elsewhere (tests use temp folders).
+// REELS_DATA / REELS_PROJECTS move state elsewhere (tests use temp folders).
 export const DATA = process.env.REELS_DATA || join(ROOT, 'data');
-export const INBOX = join(DATA, 'inbox');
-// The owner's own material: brief, ideas, playbook, reels. Seeded from starter/ once.
-export const STUDIO = process.env.REELS_STUDIO || join(ROOT, 'studio');
+// The owner's material, one folder per project: brief, ideas, playbook, reels, inbox.
+// One project is active at a time (state.project); bot/projects.mjs creates and switches them.
+export const PROJECTS = process.env.REELS_PROJECTS || join(ROOT, 'projects');
+export const FIRST_PROJECT = 'main';
 const STATE = join(DATA, 'state.json');
+// Machine-wide switches; everything else in settings belongs to the active project.
+const GLOBAL_SETTINGS = join(DATA, 'settings.json');
+export const GLOBAL_KEYS = ['updateChecks', 'autoUpdate', 'agentGlobalSettings', 'keepAwake'];
 
-mkdirSync(INBOX, {recursive: true});
-if (!existsSync(STUDIO)) cpSync(join(ROOT, 'starter'), STUDIO, {recursive: true});
+mkdirSync(DATA, {recursive: true});
 if (existsSync(join(ROOT, '.env'))) process.loadEnvFile(join(ROOT, '.env'));
 
 export const env = {
@@ -28,21 +31,43 @@ export const env = {
   sessionIdleHours: Number(process.env.SESSION_IDLE_HOURS || 12),
 };
 
-/** Owner-facing settings the agent edits on request; re-read on every use. */
-export function settings() {
+/**
+ * The active project's folder. Agent turns get it as REELS_STUDIO, so the scripts and
+ * send CLI they run stay in the project the turn started in.
+ */
+export function studio() {
+  return process.env.REELS_STUDIO || join(PROJECTS, loadState().project || FIRST_PROJECT);
+}
+
+/** Files the owner sent to the active project, and history.md listing them all. */
+export const inbox = () => join(studio(), 'inbox');
+
+const readJson = (file) => {
   try {
-    return JSON.parse(readFileSync(join(STUDIO, 'settings.json'), 'utf8'));
+    return JSON.parse(readFileSync(file, 'utf8'));
   } catch {
     return {};
   }
+};
+
+/**
+ * Owner-facing settings the agent edits on request; re-read on every use. The active
+ * project's settings.json, with the machine-wide keys from data/settings.json on top.
+ */
+export function settings() {
+  return {...readJson(join(studio(), 'settings.json')), ...readJson(GLOBAL_SETTINGS)};
 }
 
-/** Merges `patch` into studio/settings.json (undefined values remove a key). */
+/** Merges `patch` into the right settings file (undefined values remove a key). */
 export function writeSettings(patch) {
-  const next = {...settings(), ...patch};
-  for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
-  writeFileSync(join(STUDIO, 'settings.json'), JSON.stringify(next, null, 2) + '\n');
-  return next;
+  for (const [file, keys] of [[GLOBAL_SETTINGS, (k) => GLOBAL_KEYS.includes(k)], [join(studio(), 'settings.json'), (k) => !GLOBAL_KEYS.includes(k)]]) {
+    const mine = Object.entries(patch).filter(([k]) => keys(k));
+    if (!mine.length) continue;
+    const next = {...readJson(file), ...Object.fromEntries(mine)};
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+    writeFileSync(file, JSON.stringify(next, null, 2) + '\n');
+  }
+  return settings();
 }
 
 /** Reads data/state.json: owner, chat, current session and its counters. */

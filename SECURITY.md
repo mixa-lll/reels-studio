@@ -48,7 +48,7 @@ The agent (Claude Code or Codex) talks to its own provider and, while making a r
 
 - Read outside the folder: with Codex, its own session files in `~/.codex/sessions` — only the plan-limit numbers of the bot's session, for `/usage` and limit warnings.
 
-- Written by the bot: `data/` (state, logs, files the owner sent, menus, render jobs, backups of bot files you edited before an update replaced them), `studio/` (brief, ideas, playbook, reels), `template/node_modules`; on an approved update, the bot's own files in this folder.
+- Written by the bot: `data/` (state, logs, files the owner sent, menus, render jobs, backups of bot files you edited before an update replaced them), `projects/` (per project: brief, ideas, playbook, reels, files the owner sent), `template/node_modules`; on an approved update, the bot's own files in this folder.
 - Caches of the tools it starts (uv's package cache, the Whisper model, npm, Remotion's Chromium) go to the usual per-user cache folders.
 - Outside the folder, once at setup: one autostart entry — `~/Library/LaunchAgents/com.reels-bot.plist` (macOS), `~/.config/systemd/user/reels-bot.service` (Linux) or `reels-bot.vbs` in the Startup folder (Windows).
 - Secrets: the bot token and `OWNER_CODE` live only in `.env` (gitignored, never printed, never sent anywhere but Telegram).
@@ -57,7 +57,7 @@ The agent (Claude Code or Codex) talks to its own provider and, while making a r
 
 The agent runs headless, so it cannot show permission prompts: it starts with them turned off (`--dangerously-skip-permissions` / `--dangerously-bypass-approvals-and-sandbox`). Its limits are the rules in [REELS.md](REELS.md), which it follows as instructions:
 
-- work inside the bot's folder; read other folders only when the owner named them or approved access with a button (remembered in `studio/settings.json`, `allowedPaths`);
+- work inside the bot's folder; read other folders only when the owner named them or approved access with a button (remembered per project in `projects/<slug>/settings.json`, `allowedPaths`);
 - never publish, post or email anything; never edit the owner's product code;
 - with Claude Code, use the owner's global plugins and MCP connections only if the owner said yes at setup (`agentGlobalSettings`).
 

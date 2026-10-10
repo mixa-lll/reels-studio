@@ -34,12 +34,13 @@ Manual install: the same steps, by hand, are in [SETUP.md](SETUP.md). Later, to 
 - **Keeps working.** Every network call has a deadline and transient Telegram errors are retried; watchdogs restart the bot if it stalls (e.g. after the laptop slept) or stop an agent that hung, and say so. Nothing gets lost on a crash: the message in progress, the queue and an unsent answer are on disk and picked up after the restart. `npm test` runs these scenarios against a fake Telegram.
 - **Clear errors.** Plan limit used up, not logged in, network down, outdated agent — the bot says so in plain words with the raw error and a **🔁 Retry** button. Files over Telegram's limits are compressed to fit (sending) or explained (receiving over 20 MB).
 - **Talk by voice.** Dictate ideas, answers and edits as voice messages; they are transcribed locally with Whisper, no API keys.
-- **Memory in files, not in the chat.** Your brief, ideas backlog, taste playbook and every reel's history live in `studio/`. The agent session is just a cache: when it grows too big, too long or goes stale, the agent writes a handoff note and a fresh session continues from it. `/new` does the same on demand.
+- **Projects.** Keep separate sets of reels — your product, a partner's blog — each with its own brief, ideas, taste, music, reels and sent files, nothing shared. One is open at a time: `/projects` switches or starts a new one (with the same onboarding), and when you ask for something clearly about another topic, the agent offers to move it to a new or existing project. A reply or a tap on an old message from another project asks before acting. Daily ideas come for the open project.
+- **Memory in files, not in the chat.** Each project's brief, ideas backlog, taste playbook and every reel's history live in `projects/<name>/`. The agent session is just a cache: when it grows too big, too long or goes stale, the agent writes a handoff note and a fresh session continues from it. `/new` does the same on demand.
 - **Runs on your computer.** It works while the computer is on; on the charger it can keep the computer from falling asleep (one tap at setup or in `/settings`, no system settings changed).
-- **Updates on your say-so.** Every 6 hours (or on `/update`) the bot checks this repo; when there is a new version it shows what changed and an **⬆️ Update** button. Nothing is installed without the tap. Your material in `studio/` is never touched; if you changed the bot locally, the agent merges.
-- **It learns your taste.** General feedback («hook shorter than 4 s», «no shaking camera») goes into `studio/PLAYBOOK.md` and applies to every next reel.
+- **Updates on your say-so.** Every 6 hours (or on `/update`) the bot checks this repo; when there is a new version it shows what changed and an **⬆️ Update** button. Nothing is installed without the tap. Your material in `projects/` is never touched; if you changed the bot locally, the agent merges.
+- **It learns your taste.** General feedback («hook shorter than 4 s», «no shaking camera») goes into the project's `PLAYBOOK.md` and applies to every next reel.
 
-Commands: `/ideas` — ideas now, `/unfinished` — get back to an unfinished reel, `/settings` — when ideas arrive (time, days, off) and other switches, `/update` — check for a new version now, `/usage` — plan limits and what a reel takes, `/stop` — stop the current task, `/new` — fresh agent session.
+Commands: `/ideas` — ideas now, `/unfinished` — get back to an unfinished reel, `/projects` — switch or start a project, `/settings` — when ideas arrive (time, days, off) and other switches, `/update` — check for a new version now, `/usage` — plan limits and what a reel takes, `/stop` — stop the current task, `/new` — fresh agent session.
 
 ## Layout
 
@@ -49,9 +50,9 @@ REELS.md      the workflow the agent follows
 template/     Remotion starter copied into every reel
 scripts/      new reel, render (foreground or background) with progress, loudness, beat grid
 test/         npm test — self-check, also run in CI on macOS, Linux and Windows
-starter/      seeds studio/ on first run
-studio/       yours: brief, ideas, playbook, reels/  (gitignored)
-data/         bot state, inbox, logs                 (gitignored)
+starter/      seeds every new project
+projects/     yours, one folder per project: brief, ideas, playbook, reels/, inbox/  (gitignored)
+data/         bot state, machine-wide settings, logs                              (gitignored)
 ```
 
 Change settings in `/settings` or just by asking the bot («send ideas at 9», «stop sending ideas»). Technical settings — agent, model, session limits, speech model — are written by the installing agent into `.env` (see [.env.example](.env.example)).

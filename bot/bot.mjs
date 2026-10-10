@@ -3,8 +3,9 @@
 // One owner, one agent turn at a time; messages that arrive mid-turn join it at once.
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
-import {DATA, INBOX, ROOT, STUDIO, env, loadState, saveState, settings, writeSettings} from './config.mjs';
+import {join, relative} from 'node:path';
+import {DATA, FIRST_PROJECT, PROJECTS, ROOT, env, loadState, saveState, settings, studio, writeSettings} from './config.mjs';
+import {createProject, dropRequest, ensureProjects, listProjects, projectAt, projectExists, projectName, removeProject, takeRequest, untouched} from './projects.mjs';
 import {APPROVED as CLAIM_APPROVED, REQUEST as CLAIM_REQUEST} from './claim.mjs';
 import {killTree, runAgent} from './agents.mjs';
 import {activityLabel, classify} from './activity.mjs';
@@ -35,8 +36,9 @@ if (!env.token) {
 const LANG = process.env.BOT_LANG === 'en' ? 'en' : 'ru';
 const T = {
   ru: {
-    hello: '🎬 Привет! Я делаю рилсы: присылаю идеи, монтирую выбранные, правлю по твоим ответам на видео.\n\n🎙 Со мной можно говорить голосовыми — так даже быстрее: надиктуй идею или правки, я пойму.\n\nДля начала расскажи, о чём будут рилсы: продукт, ссылка, аудитория.',
+    hello: '🎬 Привет! Я делаю рилсы: присылаю идеи, монтирую выбранные, правлю по твоим ответам на видео.\n\n🎙 Со мной можно говорить голосовыми — так даже быстрее: надиктуй идею или правки, я пойму.\n\n✍️ Пока я работаю, можно дописывать и поправлять — учту сразу, ждать не нужно.\n\nДля начала расскажи, о чём будут рилсы: продукт, ссылка, аудитория.',
     heard: '↪️ Получил, учитываю, продолжаю ниже',
+    writeAnyTime: '✍️ Можно дописывать по ходу — учту сразу',
     accepted: '⏳ Принял, начинаю',
     cancelled: '⏹ Остановил.',
     stop: '⏹ Стоп',
@@ -66,10 +68,23 @@ const T = {
     backedUp: (dir) => `твои правки в файлах бота сохранены в ${dir}`,
     ideasPrompt: 'Пачка идей для рилсов: раздел «1. Ideas» в REELS.md.',
     morePrompt: '(tapped «🎲 Другие идеи»: pitch a fresh batch of 4 NEW ideas per «1. Ideas» in REELS.md — none of the ones already shown; those stay in ideas.md. Keyboard: only the new ones, via --ideas.)',
+    projects: '📁 **Проекты**\n\nУ каждого проекта свои бриф, идеи, вкус, музыка и рилсы. Открыт один: всё, что ты пишешь, идёт в него.',
+    newProject: '➕ Новый проект',
+    close: '✖️ Закрыть',
+    mainName: 'Основной',
+    unnamed: 'Новый проект',
+    projectNew: (name, from) => `🆕 ${name ? `Проект «${name}»` : 'Новый проект'}\n\nЗдесь всё с чистого листа: свои бриф, идеи, вкус, музыка и рилсы${from ? ` — из «${from}» ничего не переносится` : ''}. Вернуться: /projects`,
+    askAbout: 'Расскажи, о чём будут рилсы в этом проекте: продукт, ссылка, аудитория.',
+    projectOpen: (name) => `📁 Проект «${name}»\n\nВсё, что пишешь, теперь идёт сюда. Сменить: /projects`,
+    switchLater: (name) => `Перейду в «${name}», как только закончу текущий шаг.`,
+    otherProject: (name, cur) => `Это сообщение из проекта «${name}», а сейчас открыт «${cur}».`,
+    goTo: (name) => `📁 Перейти в «${name}»`,
+    stayIn: (name) => `➡️ Остаться в «${name}»`,
   },
   en: {
-    hello: '🎬 Hi! I make reels: I pitch ideas, edit the ones you pick and revise them from your replies to the video.\n\n🎙 You can talk to me with voice messages, it is often faster: dictate an idea or edits and I will get it.\n\nFirst tell me what the reels are about: product, link, audience.',
+    hello: '🎬 Hi! I make reels: I pitch ideas, edit the ones you pick and revise them from your replies to the video.\n\n🎙 You can talk to me with voice messages, it is often faster: dictate an idea or edits and I will get it.\n\n✍️ While I work you can keep writing and correcting: I take it in at once, no need to wait.\n\nFirst tell me what the reels are about: product, link, audience.',
     heard: '↪️ Got it, taking it in, continuing below',
+    writeAnyTime: '✍️ Keep writing as I go, I take it in at once',
     accepted: '⏳ Got it, starting',
     cancelled: '⏹ Stopped.',
     stop: '⏹ Stop',
@@ -99,6 +114,18 @@ const T = {
     backedUp: (dir) => `your edits to the bot's files are saved in ${dir}`,
     ideasPrompt: 'A batch of reel ideas: section "1. Ideas" in REELS.md.',
     morePrompt: '(tapped «🎲 More ideas»: pitch a fresh batch of 4 NEW ideas per «1. Ideas» in REELS.md — none of the ones already shown; those stay in ideas.md. Keyboard: only the new ones, via --ideas.)',
+    projects: '📁 **Projects**\n\nEach project has its own brief, ideas, taste, music and reels. One is open: everything you write goes to it.',
+    newProject: '➕ New project',
+    close: '✖️ Close',
+    mainName: 'Main',
+    unnamed: 'New project',
+    projectNew: (name, from) => `🆕 ${name ? `Project «${name}»` : 'New project'}\n\nA clean slate: its own brief, ideas, taste, music and reels${from ? `; nothing comes over from «${from}»` : ''}. Back: /projects`,
+    askAbout: 'Tell me what the reels in this project are about: product, link, audience.',
+    projectOpen: (name) => `📁 Project «${name}»\n\nEverything you write goes here now. Change: /projects`,
+    switchLater: (name) => `I will move to «${name}» as soon as the current step is done.`,
+    otherProject: (name, cur) => `This message is from the project «${name}», but «${cur}» is open now.`,
+    goTo: (name) => `📁 Go to «${name}»`,
+    stayIn: (name) => `➡️ Stay in «${name}»`,
   },
 }[LANG];
 
@@ -150,6 +177,8 @@ for (const ev of ['uncaughtException', 'unhandledRejection']) {
   });
 }
 const state = loadState();
+// Before anything reads the active project: the old single-folder layout becomes one.
+if (ensureProjects(state)) saveState(state);
 const STATUS_FILE = join(DATA, 'status.txt');
 const SENT_FILE = join(DATA, 'sent.txt');
 const KEYS_FILE = join(DATA, 'keyboard.json');
@@ -208,7 +237,7 @@ setInterval(() => keepAwake(settings().keepAwake === true), 30_000);
 
 // ---------- /settings ----------
 
-const settingsOpts = () => ({lang: LANG, agent: env.agent});
+const settingsOpts = () => ({lang: LANG, agent: env.agent, project: nameOf(state.project)});
 
 async function showSettings() {
   const v = settingsView(settings(), 'main', settingsOpts());
@@ -260,7 +289,7 @@ async function onSettingsTime(text) {
 const FINISHED = /^(done|published|cancelled|готово|опубликовано|отмена)/i;
 
 function unfinishedReels() {
-  const dir = join(STUDIO, 'reels');
+  const dir = join(studio(), 'reels');
   if (!existsSync(dir)) return [];
   return readdirSync(dir).filter((d) => /^\d{2}-/.test(d)).sort().flatMap((d) => {
     const readme = join(dir, d, 'README.md');
@@ -286,12 +315,117 @@ async function showUnfinished() {
   });
 }
 
+// ---------- projects ----------
+//
+// Independent sets of material (bot/projects.mjs), one active. A switch happens between
+// turns: the leaving project's session writes its handoff, the next turn starts a fresh
+// session in the new one. Message ids only grow, so state.projectLog (the first message
+// id of each stretch) tells which project any earlier message belongs to.
+
+const nameOf = (slug) => projectName(slug) || (slug === FIRST_PROJECT ? T.mainName : T.unnamed);
+
+async function showProjects() {
+  const rows = listProjects().map((p) => [{text: `${p.slug === state.project ? '✅ ' : ''}${nameOf(p.slug)}`.slice(0, 60), callback_data: `p:${p.slug}`}]);
+  rows.push([{text: T.newProject, callback_data: 'p:+'}], [{text: T.close, callback_data: 'p:x'}]);
+  await tg.sendText(state.chatId, T.projects, {silent: true, reply_markup: {inline_keyboard: rows}});
+}
+
+// Keeps the pressed choice visible in history and stops double taps.
+const markChosen = (q, label) => tg.call('editMessageReplyMarkup', {chat_id: state.chatId, message_id: q.message.message_id, reply_markup: {inline_keyboard: label ? [[{text: `✅ ${label}`, callback_data: 'ctl:done'}]] : []}}).catch(() => {});
+
+async function onProjectButton(q) {
+  const arg = q.data.slice(2);
+  if (arg === 'x' || arg === state.project) return markChosen(q, arg === 'x' ? null : nameOf(arg));
+  if (arg === '+') {
+    await markChosen(q, T.newProject.replace(/^➕\s*/, ''));
+    return requestSwitch({slug: createProject(''), created: true});
+  }
+  if (!projectExists(arg)) return markChosen(q, null);
+  await markChosen(q, nameOf(arg));
+  return requestSwitch({slug: arg});
+}
+
+/** {slug, created?, carry?, saved?}: moves to that project as soon as no turn runs. */
+function requestSwitch(req) {
+  // A new project replaced by another choice before anyone used it leaves no trace.
+  const prev = state.switchTo;
+  if (prev?.created && prev.slug !== req.slug && untouched(prev.slug)) removeProject(prev.slug);
+  state.switchTo = req;
+  saveState(state);
+  if (current) tg.sendText(state.chatId, T.switchLater(nameOf(req.slug)), {silent: true}).catch(() => {});
+  else drain();
+}
+
+async function switchProject() {
+  const req = state.switchTo;
+  const from = state.project;
+  if (!projectExists(req.slug) || req.slug === from) {
+    delete state.switchTo;
+    return saveState(state);
+  }
+  // The leaving project's session saves what it knows, unless the agent already did.
+  if (state.sessionId && !req.saved) await rotate();
+  // The owner picked another project while the handoff ran: that one goes next.
+  if (state.switchTo !== req) return;
+  delete state.switchTo;
+  for (const k of ['sessionId', 'sessionTurns', 'sessionContext', 'rotate', 'note', 'acceptedPending', 'lastReel', 'awaitingTime']) delete state[k];
+  await postPending(tg, state.chatId, {drop: true});
+  forgetKeys();
+  const fromName = projectExists(from) ? nameOf(from) : '';
+  if (projectExists(from) && untouched(from)) removeProject(from);
+  state.project = req.slug;
+  saveState(state);
+  const text = req.created ? `${T.projectNew(projectName(req.slug), fromName)}${req.carry ? '' : `\n\n${T.askAbout}`}` : T.projectOpen(nameOf(req.slug));
+  // The divider takes the old keyboard away too.
+  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text, reply_markup: {remove_keyboard: true}}).catch(() => null);
+  if (msg) {
+    await dropKeyAck();
+    state.projectLog = [...(state.projectLog ?? []), [msg.message_id, req.slug]].slice(-200);
+  }
+  console.log(`project: ${from} → ${req.slug}`);
+  if (req.carry) {
+    if (req.fromOwner) remember(req.carry);
+    queue.unshift(`(The owner just moved to this project${req.created ? ', created a moment ago' : ''}. What they said that led here, to act on in this project${req.created ? ' (it starts with onboarding)' : ''}:)\n\n${req.carry}`);
+  }
+  saveQueue();
+}
+
+/** The other project a message id belongs to, or null if it is this one's. */
+function otherProject(messageId) {
+  const slug = messageId ? projectAt(state, messageId) : null;
+  return slug && slug !== state.project && projectExists(slug) ? slug : null;
+}
+
+// A reply or a tap on something from another project: ask before acting, so the agent
+// never works on one project's reel inside another.
+async function askOtherProject(slug, prompt) {
+  state.crossPending = {slug, prompt};
+  saveState(state);
+  const markup = {inline_keyboard: [[{text: T.goTo(nameOf(slug)).slice(0, 60), callback_data: 'px:go'}], [{text: T.stayIn(nameOf(state.project)).slice(0, 60), callback_data: 'px:stay'}]]};
+  await tg.sendText(state.chatId, T.otherProject(nameOf(slug), nameOf(state.project)), {reply_markup: markup});
+}
+
+async function onCrossButton(q) {
+  const c = state.crossPending;
+  delete state.crossPending;
+  saveState(state);
+  if (!c) return markChosen(q, null);
+  const go = q.data === 'px:go';
+  await markChosen(q, (go ? T.goTo(nameOf(c.slug)) : T.stayIn(nameOf(state.project))).replace(/^\S+\s/, ''));
+  if (go) return requestSwitch({slug: c.slug, carry: c.prompt ?? '', fromOwner: true});
+  if (c.prompt) {
+    remember(c.prompt);
+    enqueue(`(This answers a message from another project, «${nameOf(c.slug)}»; the owner chose to stay in this one.)\n\n${c.prompt}`);
+  }
+}
+
 // Progress line: one line — whatever is newest, the agent's own stage or what it is
-// doing right now.
+// doing right now — plus, for the owner's first few tasks, a hint that they can write meanwhile.
 function statusText() {
   const stage = existsSync(STATUS_FILE) ? readFileSync(STATUS_FILE, 'utf8').trim() : '';
   const stageAt = mtime(STATUS_FILE);
-  return stage && stageAt >= (current.activityAt ?? 0) ? stage : activityLabel(current.activity, LANG);
+  const now = stage && stageAt >= (current.activityAt ?? 0) ? stage : activityLabel(current.activity, LANG);
+  return current.hint ? `${now}\n${T.writeAnyTime}` : now;
 }
 
 function controls() {
@@ -369,9 +503,11 @@ setInterval(() => {
 // session is only a working cache. It is rotated when it grows too big, too long or
 // goes stale; before that the agent writes a handoff note that seeds the next session.
 
-const HANDOFF_FILE = join(DATA, 'handoff.md');
-const PREAMBLE = 'You are running as the reels Telegram bot. Follow AGENTS.md and REELS.md. Talk to the owner through your final reply and `node bot/send.mjs`; name each stage of your work with `node bot/send.mjs --status "<emoji> <stage>"` (e.g. «💡 Придумываю идеи», «🎬 Монтирую v2»).';
-const HANDOFF_PROMPT = `This session is about to be closed. Bring the files in studio/ up to date first (ideas.md, each touched reel's README.md, PLAYBOOK.md), then write ${HANDOFF_FILE}: what is in progress, what waits for the owner, which version of which reel was sent last, decisions not yet in files. At most 30 lines. Reply with one word: done.`;
+// Each project keeps its own handoff, so coming back to it picks up where it was left.
+const handoffFile = () => join(studio(), 'handoff.md');
+const projectPath = (slug = state.project) => relative(ROOT, join(PROJECTS, slug)).split('\\').join('/');
+const preamble = () => `You are running as the reels Telegram bot. Follow AGENTS.md and REELS.md. Talk to the owner through your final reply and \`node bot/send.mjs\`; name each stage of your work with \`node bot/send.mjs --status "<emoji> <stage>"\` (e.g. «💡 Придумываю идеи», «🎬 Монтирую v2»). The active project is \`${projectPath()}/\` (\`<project>/\` in REELS.md), ${projectName(state.project) ? `named «${projectName(state.project)}»` : 'not named yet'}.`;
+const handoffPrompt = () => `This session is about to be closed. Bring the files in ${projectPath()}/ up to date first (ideas.md, each touched reel's README.md, PLAYBOOK.md), then write ${projectPath()}/handoff.md: what is in progress, what waits for the owner, which version of which reel was sent last, decisions not yet in files. At most 30 lines. Reply with one word: done.`;
 
 function rotationDue() {
   if (!state.sessionId) return false;
@@ -383,8 +519,8 @@ function rotationDue() {
 }
 
 function openingPrompt(prompt) {
-  const handoff = existsSync(HANDOFF_FILE) ? readFileSync(HANDOFF_FILE, 'utf8').trim() : '';
-  return [PREAMBLE, handoff && `Handoff from your previous session:\n${handoff}`, prompt].filter(Boolean).join('\n\n');
+  const handoff = existsSync(handoffFile()) ? readFileSync(handoffFile(), 'utf8').trim() : '';
+  return [preamble(), handoff && `Handoff from your previous session:\n${handoff}`, prompt].filter(Boolean).join('\n\n');
 }
 
 // ---------- agent turns ----------
@@ -397,9 +533,15 @@ async function runWithStatus(prompt, firstLine, {quiet = false, open = false} = 
   rmSync(STATUS_FILE, {force: true});
   taskAwake(true);
   current = {startedAt: Date.now(), activity: 'think', sentMark: mtime(SENT_FILE), quiet, open, firstLine};
+  // Until the owner has seen it on three tasks or written mid-task on their own.
+  if (open && (state.writeHints ?? 0) < 3) {
+    current.hint = true;
+    state.writeHints = (state.writeHints ?? 0) + 1;
+    saveState(state);
+  }
   // The progress line is a nicety: a failed or slow send must never hold up the task.
   // Quiet runs (background housekeeping) show it only once the owner writes meanwhile.
-  if (!quiet) await postStatus(firstLine).catch((e) => console.error('status', e));
+  if (!quiet) await postStatus(current.hint ? `${firstLine}\n${T.writeAnyTime}` : firstLine).catch((e) => console.error('status', e));
   let res;
   try {
     const handle = runAgent({
@@ -408,8 +550,9 @@ async function runWithStatus(prompt, firstLine, {quiet = false, open = false} = 
       model: env.agentModel,
       sessionId: state.sessionId,
       // The owner's global agent setup (plugins, hooks, MCP servers) only on an explicit
-      // `agentGlobalSettings: true` in studio/settings.json, as /settings and SECURITY.md say.
+      // `agentGlobalSettings: true` in data/settings.json, as /settings and SECURITY.md say.
       isolated: settings().agentGlobalSettings !== true,
+      studio: studio(),
       prompt: state.sessionId ? prompt : openingPrompt(prompt),
       onCall: (call) => {
         const key = classify(call);
@@ -468,8 +611,8 @@ async function trackUsage(res) {
 }
 
 async function rotate({quiet = false} = {}) {
-  rmSync(HANDOFF_FILE, {force: true});
-  const res = await runWithStatus(HANDOFF_PROMPT, T.saving, {quiet});
+  rmSync(handoffFile(), {force: true});
+  const res = await runWithStatus(handoffPrompt(), T.saving, {quiet});
   // A failed handoff still rotates: the files remain the memory.
   if (res.reason === 'stop') return false;
   for (const k of ['sessionId', 'sessionTurns', 'sessionContext', 'rotate']) delete state[k];
@@ -481,6 +624,7 @@ async function runTurn(prompt, retried = false) {
   // Kept until the turn ends, so a restart can redo it.
   state.pending = prompt;
   saveState(state);
+  dropRequest();
   if (rotationDue() && !(await rotate())) {
     delete state.pending;
     return saveState(state);
@@ -528,6 +672,9 @@ async function runTurn(prompt, retried = false) {
   // A steps menu the agent opened comes after its reply: status first, question last.
   const asked = (await postPending(tg, state.chatId)) || askedAlready || Boolean(labels);
   if (asked) await dropKeyAck();
+  // The agent asked to move to another project (bot/projects.mjs); it already saved this one.
+  const req = takeRequest();
+  if (req) requestSwitch({...req, saved: true});
 }
 
 // Notifications: only messages that need the owner (questions, versions, results,
@@ -568,7 +715,11 @@ async function rotateIfDue() {
 setInterval(() => rotateIfDue(), 3_600_000);
 
 async function drain() {
-  while (!current && queue.length) {
+  while (!current && (queue.length || state.switchTo)) {
+    if (state.switchTo) {
+      await switchProject().catch((e) => console.error('project', e));
+      continue;
+    }
     // Everything that piled up during the last turn goes in as one message.
     let prompt = queue.splice(0).join('\n\n---\n\n');
     saveQueue();
@@ -599,18 +750,22 @@ function saveQueue() {
 // Background housekeeping and the handoff are not the owner's task: those finish first.
 function enqueue(prompt) {
   clearKeyboard().catch(() => {});
-  if (current?.open && current.handle?.send(prompt)) {
+  // While a move to another project waits, new messages are for that project.
+  if (current?.open && !state.switchTo && current.handle?.send(prompt)) {
     // A restart redoes the task together with what was added to it.
     state.pending = `${state.pending ?? ''}\n\n---\n\n${prompt}`;
     saveState(state);
     // render.mjs --wait returns early on this, so a long wait does not hold the message.
     writeFileSync(OWNER_WROTE_FILE, String(Date.now()));
+    state.writeHints = 3;
+    current.hint = false;
+    saveState(state);
     if (current.statusId) current.ownerWrote = true;
     return;
   }
   queue.push(prompt);
   saveQueue();
-  if (current?.open && current.handle && !current.handle.live) {
+  if (current?.open && !state.switchTo && current.handle && !current.handle.live) {
     interrupt('now');
     return;
   }
@@ -694,6 +849,7 @@ async function onMessage(msg) {
   }
   if (cmd === 'ideas') return enqueue(T.ideasPrompt);
   if (cmd === 'unfinished') return showUnfinished();
+  if (cmd === 'projects') return showProjects();
   if (cmd === 'settings') return showSettings();
   if (cmd === 'update') return checkUpdates(true);
   if (cmd === 'usage') return tg.sendText(state.chatId, usageText(state.limits, LANG), {silent: true});
@@ -728,6 +884,9 @@ async function onMessage(msg) {
     const text = p.kind === 'tooBig' ? T.tooBig(p.what, p.size) : p.kind === 'stt' ? T.sttFailed : T.downloadFailed(p.what, p.error);
     await tg.sendText(state.chatId, text).catch(() => {});
   }
+  // A reply to a message from another project: ask where it belongs first.
+  const other = prompt && otherProject(msg.reply_to_message?.message_id);
+  if (other) return askOtherProject(other, prompt);
   if (prompt) remember(prompt);
 
   // A setup step is a question with a reply keyboard: the tap or a typed answer goes to it.
@@ -784,21 +943,11 @@ async function onButton(q) {
   await tg.call('answerCallbackQuery', {callback_query_id: q.id}).catch(() => {});
   if (q.from.id !== state.ownerId || q.data === 'ctl:done') return;
   if (q.data.startsWith('set:')) return onSettings(q);
-  if (q.data.startsWith('u:')) {
-    const folder = q.data.slice(2);
-    const label = q.message?.reply_markup?.inline_keyboard?.flat().find((b) => b.callback_data === q.data)?.text ?? folder;
-    await tg.call('editMessageReplyMarkup', {chat_id: state.chatId, message_id: q.message.message_id, reply_markup: {inline_keyboard: [[{text: `✅ ${label}`, callback_data: 'ctl:done'}]]}}).catch(() => {});
-    return enqueue(`(the owner wants to continue the unfinished reel studio/reels/${folder} «${label}». Switch to it: send its latest version again exactly as in hand-over — the video with the accept button, then your review with the edit keyboard and the settings menu — and wait for edits.)`);
-  }
-  if (q.data.startsWith('m:')) {
-    await clearKeyboard();
-    const result = await onMenuButton(tg, state.chatId, q.data);
-    if (result) enqueue(result);
-    return;
-  }
+  if (q.data.startsWith('p:')) return onProjectButton(q);
+  if (q.data.startsWith('px:')) return onCrossButton(q);
   if (q.data === 'upd:yes' || q.data === 'upd:no') {
     const label = q.data === 'upd:yes' ? T.updateYes : T.updateNo;
-    await tg.call('editMessageReplyMarkup', {chat_id: state.chatId, message_id: q.message.message_id, reply_markup: {inline_keyboard: [[{text: `✅ ${label}`, callback_data: 'ctl:done'}]]}}).catch(() => {});
+    await markChosen(q, label);
     if (q.data === 'upd:yes') {
       if (current || queue.length) await tg.sendText(state.chatId, T.updateLater, {silent: true});
       await applyUpdate();
@@ -809,22 +958,31 @@ async function onButton(q) {
     interrupt('stop');
     return;
   }
+  // Buttons under a message from another project act there, after the owner agrees.
+  const other = otherProject(q.message?.message_id);
+  const send = (prompt) => (other ? askOtherProject(other, prompt) : enqueue(prompt));
+  if (q.data.startsWith('u:')) {
+    const folder = q.data.slice(2);
+    const label = q.message?.reply_markup?.inline_keyboard?.flat().find((b) => b.callback_data === q.data)?.text ?? folder;
+    await markChosen(q, label);
+    return send(`(the owner wants to continue the unfinished reel ${projectPath(other ?? state.project)}/reels/${folder} «${label}». Switch to it: send its latest version again exactly as in hand-over — the video with the accept button, then your review with the edit keyboard and the settings menu — and wait for edits.)`);
+  }
+  if (q.data.startsWith('m:')) {
+    if (other) return askOtherProject(other, null);
+    await clearKeyboard();
+    const result = await onMenuButton(tg, state.chatId, q.data);
+    if (result) enqueue(result);
+    return;
+  }
   const msg = q.message;
   const label = msg?.reply_markup?.inline_keyboard?.flat()[Number(q.data.slice(2))]?.text ?? q.data;
-  // Keep the choice visible in history and stop double taps.
-  if (msg) {
-    await tg.call('editMessageReplyMarkup', {
-      chat_id: state.chatId,
-      message_id: msg.message_id,
-      reply_markup: {inline_keyboard: [[{text: `✅ ${label.replace(/^✅\s*/, '')}`, callback_data: 'ctl:done'}]]},
-    }).catch(() => {});
-  }
-  if (/Принять|Accept/.test(label)) {
+  if (msg) await markChosen(q, label.replace(/^✅\s*/, ''));
+  if (/Принять|Accept/.test(label) && !other) {
     state.acceptedPending = true;
     saveState(state);
   }
   const about = (msg?.caption ?? msg?.text ?? '').slice(0, 1500);
-  enqueue(`(pressed button "${label}" under: "${about}")`);
+  send(`(pressed button "${label}" under: "${about}")`);
 }
 
 // ---------- daily ideas ----------
@@ -850,7 +1008,7 @@ setInterval(() => {
 // button. A failed fast-forward (local edits, diverged history) goes to the agent.
 
 const BOOT_HEAD = await head();
-const MERGE_PROMPT = (err) => `The owner approved updating the bot itself, but \`git pull --ff-only\` failed:\n${err}\nMerge the upstream changes, keeping the owner's local changes; run \`node --check\` on every file in bot/. Do not touch studio/ or data/. Then tell the owner in one line what is new.`;
+const MERGE_PROMPT = (err) => `The owner approved updating the bot itself, but \`git pull --ff-only\` failed:\n${err}\nMerge the upstream changes, keeping the owner's local changes; run \`node --check\` on every file in bot/. Do not touch projects/ or data/. Then tell the owner in one line what is new.`;
 
 async function announceUpdate() {
   if (!state.updateNote || !state.chatId) return;

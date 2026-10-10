@@ -1,6 +1,6 @@
 // /settings: the owner's switches as a button menu the bot handles itself (instant,
-// no agent turn). Values live in studio/settings.json, the same file the agent edits
-// when asked in words.
+// no agent turn). Ideas settings live in the active project's settings.json, the
+// machine-wide ones in data/settings.json; the agent edits the same files when asked.
 
 const TIMES = ['07:00', '08:00', '09:00', '10:00', '12:00', '15:00', '18:00', '21:00'];
 const DAYS = ['daily', 'weekdays', 'weekends'];
@@ -8,6 +8,7 @@ const DAYS = ['daily', 'weekdays', 'weekends'];
 const L = {
   ru: {
     title: '⚙️ Настройки',
+    project: (name) => `📁 Проект «${name}»: идеи — по его расписанию`,
     ideasOn: (at, days) => `💡 Идеи: ${L.ru.days[days]} в ${at}`,
     ideasOff: '💡 Идеи: выключены',
     updates: (on) => `🔄 Проверка обновлений: ${on ? 'вкл' : 'выкл'}`,
@@ -33,6 +34,7 @@ const L = {
   },
   en: {
     title: '⚙️ Settings',
+    project: (name) => `📁 Project «${name}»: ideas on its own schedule`,
     ideasOn: (at, days) => `💡 Ideas: ${L.en.days[days]} at ${at}`,
     ideasOff: '💡 Ideas: off',
     updates: (on) => `🔄 Update checks: ${on ? 'on' : 'off'}`,
@@ -75,7 +77,7 @@ export function ideasDay(s, date) {
 }
 
 /** Text and keyboard of a settings view: 'main' | 'time' | 'days'. */
-export function view(s, which, {lang, agent}) {
+export function view(s, which, {lang, agent, project}) {
   const t = L[lang];
   const at = s.ideasAt ?? '10:00';
   const days = s.ideasDays ?? 'daily';
@@ -90,7 +92,7 @@ export function view(s, which, {lang, agent}) {
     return {text: t.pickDays, reply_markup: {inline_keyboard: [...DAYS.map((d) => [btn(`${d === days ? '✅ ' : ''}${t.days[d]}`, `days:${d}`)]), [btn(t.back, 'main')]]}};
   }
   const updatesOn = s.updateChecks !== false && s.autoUpdate !== false;
-  const lines = [`**${t.title}**`, '', at ? t.ideasOn(at, days) : t.ideasOff, t.awake(s.keepAwake === true), t.updates(updatesOn)];
+  const lines = [`**${t.title}**`, '', ...(project ? [t.project(project)] : []), at ? t.ideasOn(at, days) : t.ideasOff, t.awake(s.keepAwake === true), t.updates(updatesOn)];
   if (agent === 'claude') lines.push(t.global(s.agentGlobalSettings === true), `_${t.globalHint}_`);
   const rows = at
     ? [[btn(t.time(at), 'time'), btn(t.daysBtn(days), 'days')], [btn(t.off, 'ideas:off')]]

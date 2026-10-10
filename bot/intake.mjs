@@ -1,10 +1,10 @@
 // Turns any Telegram message into text the agent can act on: every kind of content,
-// forwards, replies and hidden links. Files land in data/inbox/<day>/, and every
-// message is appended to data/inbox/history.md so earlier material stays reachable
-// after a session change.
+// forwards, replies and hidden links. Files land in the active project's inbox/<day>/,
+// and every message is appended to its inbox/history.md so earlier material stays
+// reachable after a session change.
 import {appendFileSync, mkdirSync} from 'node:fs';
 import {join} from 'node:path';
-import {INBOX} from './config.mjs';
+import {inbox} from './config.mjs';
 
 /** Telegram does not let bots download files bigger than this. */
 export const DOWNLOAD_LIMIT = 20 * 1024 * 1024;
@@ -86,8 +86,8 @@ export async function describe(tg, msg, {transcribe, lang, onInstall}) {
       parts.push(`(attached ${file.kind}, ${mb(file.size)}: too big for the bot to download (Telegram limit 20 MB); the owner was told)`);
     } else {
       const day = new Date().toLocaleDateString('sv');
-      mkdirSync(join(INBOX, day), {recursive: true});
-      const dest = join(INBOX, day, `${msg.message_id}-${safe(file.name)}`);
+      mkdirSync(join(inbox(), day), {recursive: true});
+      const dest = join(inbox(), day, `${msg.message_id}-${safe(file.name)}`);
       try {
         await tg.download(file.id, dest);
         parts.push(`(attached ${file.kind}${file.note ? `: ${file.note}` : ''} → ${dest})`);
@@ -116,8 +116,9 @@ export async function describe(tg, msg, {transcribe, lang, onInstall}) {
   return {prompt: parts.join('\n'), said: text ?? said, problems};
 }
 
-/** Appends what the owner sent to data/inbox/history.md (newest last). */
+/** Appends what the owner sent to the project's inbox/history.md (newest last). */
 export function remember(prompt, when = new Date()) {
   const stamp = when.toISOString().slice(0, 16).replace('T', ' ');
-  appendFileSync(join(INBOX, 'history.md'), `\n## ${stamp}\n${prompt}\n`);
+  mkdirSync(inbox(), {recursive: true});
+  appendFileSync(join(inbox(), 'history.md'), `\n## ${stamp}\n${prompt}\n`);
 }

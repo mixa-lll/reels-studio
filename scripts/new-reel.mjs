@@ -1,13 +1,19 @@
 #!/usr/bin/env node
-// Creates studio/reels/<NN>-<slug>/ with sources/, versions/ and project/ (a copy of
-// template/ whose node_modules is linked, not copied: it is ~700 MB).
+// Creates <project>/reels/<NN>-<slug>/ in the active project with sources/, versions/
+// and project/ (a copy of template/ whose node_modules is linked, not copied: ~700 MB).
 // Usage: node scripts/new-reel.mjs <slug>     → prints the new folder
-import {cpSync, existsSync, mkdirSync, readdirSync, symlinkSync} from 'node:fs';
+import {cpSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const REELS = join(process.env.REELS_STUDIO || join(ROOT, 'studio'), 'reels');
+// Agent turns get the active project as REELS_STUDIO; run by hand, ask the bot's state.
+const active = () => {
+  try {
+    return JSON.parse(readFileSync(join(process.env.REELS_DATA || join(ROOT, 'data'), 'state.json'), 'utf8')).project;
+  } catch {}
+};
+const REELS = join(process.env.REELS_STUDIO || join(process.env.REELS_PROJECTS || join(ROOT, 'projects'), active() || 'main'), 'reels');
 const slug = (process.argv[2] ?? '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
 if (!slug) {
   console.error('Usage: node scripts/new-reel.mjs <latin-slug>');
