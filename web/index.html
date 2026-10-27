@@ -109,6 +109,17 @@
   .md ul { padding-left: 18px; margin: 6px 0; } .md li { margin: 4px 0; } .md code { font-family: 'Geist Mono', monospace; font-size: 13px; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
   .md p { margin: 6px 0; }
   #tabHost h1, #tabHost .row > div > .small.muted:first-child { display: none; } /* tab title is the settings header */
+  .rmain { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
+  .rbody { display: flex; gap: 32px; padding: 26px 32px; align-items: flex-start; }
+  .rvid { width: 300px; flex: none; display: flex; flex-direction: column; gap: 10px; position: sticky; top: 0; }
+  .rvid video, .vph { width: 100%; aspect-ratio: 9 / 16; border-radius: 18px; background: #000; object-fit: contain; }
+  .vph { background: var(--soft); color: var(--muted); display: grid; place-items: center; text-align: center; padding: 24px; font-size: 13px; }
+  .rinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+  .blk { display: flex; flex-direction: column; gap: 6px; }
+  .lbl { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .02em; text-transform: uppercase; }
+  aside.chatcol { width: 380px; flex: none; border-left: 1px solid var(--line); display: flex; flex-direction: column; height: 100vh; }
+  aside.chatcol .log, aside.chatcol form.send, aside.chatcol .keys, aside.chatcol .status, aside.chatcol .ctx { padding-left: 16px; padding-right: 16px; }
+  aside.chatcol .msg { max-width: 92%; }
   .utabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
   .utabs a { padding: 0 0 10px; color: var(--muted); text-decoration: none; }
   .utabs a.on { color: var(--ink); border-bottom: 2px solid var(--ink); font-weight: 500; }
@@ -143,7 +154,7 @@
   .fcard .meta b { font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fcard .acts { display: flex; gap: 10px; }
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 9; }
-  @media (max-width: 1100px) { aside.vers { width: 300px; } }
+  @media (max-width: 1100px) { aside.vers { width: 300px; } aside.chatcol { width: 320px; } .rvid { width: 240px; } }
   @media (max-width: 860px) {
     .app { display: block; }
     nav.side { position: fixed; inset: 0 auto 0 0; z-index: 5; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 0 40px rgba(0,0,0,.2); }
@@ -154,6 +165,12 @@
     .work { flex-direction: column; }
     .chat { height: auto; min-height: calc(100vh - 61px); }
     aside.vers { width: auto; height: auto; border-left: 0; border-top: 1px solid var(--line); }
+    .rmain { height: auto; }
+    .wl .small { display: none; }
+    .rbody { flex-direction: column; padding: 16px; gap: 18px; }
+    .rvid { width: 100%; max-width: 340px; margin: 0 auto; position: static; }
+    aside.chatcol { width: auto; height: 80vh; border-left: 0; border-top: 1px solid var(--line); }
+    .chead .stg { order: 5; overflow-x: auto; max-width: 100%; }
     .chead, .ctx, .log, form.send, .keys, .status { padding-left: 14px; padding-right: 14px; }
     iframe.dsf { height: 60vh; }
     .ctx { display: none; }
@@ -479,30 +496,31 @@ async function vReel(id, tab) {
   const isNew = id.startsWith('new-');
   const data = isNew ? null : await api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null);
   const r = data?.reel;
-  title(r ? `${r.num} ${r.title}` : 'Новый рилс');
-  view.innerHTML = `<div class="work"><div class="chat">
-    <div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Все выпуски</a> › ${esc(projName())}</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
+  title(r ? `${r.num} ${r.title}` : 'Новый выпуск');
+  const head = `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Все выпуски</a> › ${esc(projName())}</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
       ${stages(r)}
-      ${r?.version ? `<a class="btn mob" href="#vers" onclick="event.preventDefault(); document.getElementById('vers').scrollIntoView({behavior: 'smooth'})">Версии и скачать ↓</a>` : ''}
-      ${r ? `<div class="tabs" role="tablist"><a href="#/reel/${esc(id)}" class="${tab !== 'files' ? 'on' : ''}">Чат</a><a href="#/reel/${esc(id)}/files" class="${tab === 'files' ? 'on' : ''}">Файлы</a></div>` : ''}
-      ${canEdit() && tab !== 'files' ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>
-    <div class="ctx">Claude знает: <span class="chip">бриф проекта</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и историю рилса ${esc(r.num)}</span>` : ''}</div>
-    <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div>
-  </div>${isNew ? '' : '<aside class="vers" id="vers" aria-label="Версии"></aside>'}</div>`;
-  if (tab === 'files' && r) { $('.ctx').remove(); renderVersions(id, data); return reelFiles(id); }
+      ${r ? `<div class="tabs" role="tablist"><a href="#/reel/${esc(id)}" class="${tab !== 'files' ? 'on' : ''}">Выпуск</a><a href="#/reel/${esc(id)}/files" class="${tab === 'files' ? 'on' : ''}">Файлы</a></div>` : ''}
+      <span id="dlTop"></span></div>`;
+  const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
+  // A reel that exists: video, versions and script in the middle, its chat as a column on the right (CleanReel).
+  view.innerHTML = isNew || !r
+    ? `<div class="work"><div class="chat">${head}${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`
+    : `<div class="work"><div class="rmain">${head}<div id="reelHost" style="flex: 1; overflow-y: auto"><div class="rbody" id="vers" aria-label="Версии"></div></div></div>
+      <aside class="chatcol" aria-label="Чат выпуска"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат выпуска</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   const box = chatBox(id, {
     onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
-    onDone: (k) => { sidebar(); if (!k.startsWith('new-')) { if (isNew) vReel(k); else renderVersions(k); } },
+    onDone: (k) => { sidebar(); if (!k.startsWith('new-')) { if (isNew) vReel(k); else if (tab !== 'files') renderVersions(k); } },
   });
   $('#chatHost').append(box);
-  $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат рилса заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id); } });
-  if (!isNew) renderVersions(id, data);
+  $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id); } });
+  if (r && tab === 'files') reelFiles(id);
+  else if (r) renderVersions(id, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
   if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
 
 async function reelFiles(id) {
-  const host = $('#chatHost');
+  const host = $('#reelHost');
   host.style.overflowY = 'auto';
   host.innerHTML = `<div class="page" style="max-width: 1000px">
     ${canEdit() ? `<label class="drop" id="drop"><input type="file" multiple hidden id="up"><b style="color: var(--ink); font-weight: 600">Перетащи сюда референсы, исходники, музыку</b><br><span class="small">или нажми, чтобы выбрать файлы · они попадут в материалы этого рилса, Claude их увидит</span></label>` : ''}
@@ -538,27 +556,41 @@ async function reelFiles(id) {
   load();
 }
 
+// What the README says about one version: its line under «## Версии», first sentence.
+const versionNote = (readme, v) => {
+  const line = String(readme || '').split('\n').find((l) => new RegExp(`^\\s*[-*]\\s*${v}\\b`).test(l));
+  return line ? line.replace(/^\s*[-*]\s*\S+\s*(\([^)]*\))?:?\s*/, '').split(/(?<=\.)\s/)[0] : '';
+};
+const section = (readme, name) => (new RegExp(`^## ${name}[^\\n]*\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`, 'm').exec(String(readme || '')) || [])[1] || '';
+
 async function renderVersions(id, data) {
   data ||= await api('/api/reel?reel=' + encodeURIComponent(id));
   const el = $('#vers');
   if (!el) return;
   const vs = data.versions;
-  const kindName = {master: 'Мастер', copy: 'Для Instagram', cover: 'Обложка', thumb: 'Кадр', other: 'Файл'};
-  const fileLinks = (v) => v.files.filter((f) => f.kind !== 'thumb' && f.kind !== 'other').sort((a, b) => ['copy', 'master', 'cover'].indexOf(a.kind) - ['copy', 'master', 'cover'].indexOf(b.kind))
-    .map((f) => `<a class="dl" href="${f.url}&dl=1"><span>${kindName[f.kind]}</span><span class="small muted">${mb(f.size)} ↓</span></a>`).join('');
+  const kindName = {master: 'Мастер', copy: 'Instagram', cover: 'Обложка', thumb: 'Кадр', other: 'Файл'};
+  const files = (v) => v.files.filter((f) => f.kind !== 'thumb' && f.kind !== 'other').sort((a, b) => ['copy', 'master', 'cover'].indexOf(a.kind) - ['copy', 'master', 'cover'].indexOf(b.kind));
+  const fileLinks = (v) => files(v).map((f) => `<a class="chip" href="${f.url}&dl=1">${kindName[f.kind]} · ${mb(f.size)} ↓</a>`).join('');
   const video = (v) => v.files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
   const thumb = (v) => v.files.find((f) => f.kind === 'thumb' || f.kind === 'cover');
   const cur = vs[0], prev = vs.find((v) => v.state === 'previous' && video(v)), old = vs.filter((v) => v !== cur && v !== prev);
-  el.innerHTML = `<div class="row" style="justify-content: space-between"><h2>Версии · ${vs.length}</h2><a class="small" href="#/settings/files">Место</a></div>
-    ${!cur ? '<p class="small muted">Версий пока нет. Когда Claude смонтирует первую, она появится здесь.</p>' : `
-    <div class="ver cur"><div class="row" style="justify-content: space-between"><b>${esc(cur.v)} · текущая</b><span class="small muted">${ago(cur.at)}</span></div>
-      ${video(cur) ? `<video src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video>` : ''}
-      ${fileLinks(cur)}</div>`}
-    ${prev ? `<div class="ver"><div class="row" style="justify-content: space-between"><b>${esc(prev.v)} · предыдущая</b><span class="small muted">${ago(prev.at)}</span></div>
-      <details><summary class="small">Смотреть для сравнения</summary><video src="${video(prev).url}" controls playsinline preload="none" style="margin-top: 8px"></video></details>${fileLinks(prev)}
-      <span class="small muted">Мастер уже удалён ради места</span></div>` : ''}
-    ${old.length ? `<div style="display: flex; flex-direction: column; gap: 8px"><span class="small muted">Архив — кадр и снимок проекта</span>
-      ${old.map((v) => `<div class="arch"><div class="th" ${thumb(v) ? `style="background-image: url('${thumb(v).url}')"` : ''}></div><span style="flex: 1"><b>${esc(v.v)}</b> · ${ago(v.at)}${v.archived ? ` · освобождено ${mb(v.archived.freed)}` : ''}</span>${canEdit() ? `<button type="button" class="btn" data-rebuild="${esc(v.v)}" style="min-height: 34px; font-size: 13px">Пересобрать</button>` : ''}</div>`).join('')}</div>` : ''}`;
+  const note = cur && versionNote(data.readme, cur.v);
+  const script = section(data.readme, 'Сценарий');
+  const dl = cur && files(cur).find((f) => f.kind === 'copy') || cur && files(cur)[0];
+  $('#dlTop').innerHTML = dl ? `<a class="btn primary" href="${dl.url}&dl=1">Скачать ${esc(cur.v)}</a>` : '';
+  el.innerHTML = `<div class="rvid">${cur && video(cur)
+      ? `<video src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video><span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`
+      : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}</div>
+    <div class="rinfo">
+      ${note ? `<div class="blk"><span class="lbl">Что в ${esc(cur.v)}</span><span style="font-size: 15px; line-height: 1.55">${esc(note)}</span></div>` : ''}
+      <div class="blk"><span class="lbl">Версии · ${vs.length}</span>
+        ${!cur ? '<p class="small muted">Версий пока нет. Напиши в чате справа, что снять или смонтировать.</p>' : `
+        <div class="li" style="border-top: 0"><b style="font-weight: 600">${esc(cur.v)} · текущая</b><span class="small muted">${ago(cur.at)}</span><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(cur)}</div></div>`}
+        ${prev ? `<div class="li"><b style="font-weight: 600">${esc(prev.v)}</b><span class="small muted">${ago(prev.at)} · лёгкая копия, мастер удалён ради места</span><details style="flex-basis: 100%"><summary class="small">Смотреть для сравнения</summary><video src="${video(prev).url}" controls playsinline preload="none" style="width: 220px; border-radius: 10px; margin-top: 8px; background: #000"></video></details><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(prev)}</div></div>` : ''}
+        ${old.map((v) => `<div class="li"><div class="th" style="width: 28px; height: 50px; ${thumb(v) ? `background-image: url('${thumb(v).url}')` : ''}"></div><span style="flex: 1"><b style="font-weight: 600">${esc(v.v)}</b> <span class="small muted">· ${ago(v.at)} · кадр и снимок проекта${v.archived ? ` · освобождено ${mb(v.archived.freed)}` : ''}</span></span>${canEdit() ? `<button type="button" class="btn" data-rebuild="${esc(v.v)}">Пересобрать</button>` : ''}</div>`).join('')}
+        <a class="small muted" href="#/settings/files" style="padding-top: 8px">Место на сервере →</a></div>
+      ${script.trim() ? `<div class="blk"><span class="lbl">Сценарий</span><div class="md" style="font-size: 14px">${md(script)}</div></div>` : ''}
+    </div>`;
   el.querySelectorAll('[data-rebuild]').forEach((b) => (b.onclick = () => {
     const box = $('#chatHost > div');
     box.say(`Пересобери версию ${b.dataset.rebuild} этого рилса из её снимка versions/${b.dataset.rebuild}/project-snapshot/ и пришли её.`, `Пересобрать ${b.dataset.rebuild}`);
