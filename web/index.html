@@ -438,7 +438,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
   async function load() {
     const h = await api('/api/chat?key=' + encodeURIComponent(key));
     log.innerHTML = '';
-    if (!h.messages.length) log.innerHTML = `<p class="hint">${key === '_ds' ? 'Опиши, какой должна быть дизайн-система, или попроси собрать её из того, что уже есть в рилсах.' : key === '_project' ? 'Общий чат проекта: идеи, бриф, правила, настройки. Сами рилсы делаются в своих чатах.' : 'Напиши, что сделать с этим рилсом.'}</p>`;
+    if (!h.messages.length) log.innerHTML = `<p class="hint">${key === '_ds' ? 'Опиши, какой должна быть дизайн-система, или попроси собрать её из того, что уже есть в рилсах.' : key === '_project' ? 'Общий чат проекта: идеи, бриф, правила, настройки. Сами рилсы делаются в своих чатах.' : key.startsWith('post-') ? 'Напиши, что сделать с этим постом.' : 'Напиши, что сделать с этим рилсом.'}</p>`;
     h.messages.forEach(render);
     if (h.busy) {
       setBusy(true, h.status || 'Работаю… обновлю, когда закончу');
