@@ -124,9 +124,20 @@
   .utabs a { padding: 0 0 10px; color: var(--muted); text-decoration: none; }
   .utabs a.on { color: var(--ink); border-bottom: 2px solid var(--ink); font-weight: 500; }
   .stg { display: inline-flex; gap: 4px; background: var(--soft); border-radius: 10px; padding: 3px; }
-  .stg span { padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); }
-  .stg span.done { color: var(--ink2); }
-  .stg span.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .stg span, .stg a { padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); text-decoration: none; white-space: nowrap; }
+  .stg a:hover { color: var(--ink); }
+  .stg .done { color: var(--ink2); }
+  .stg .on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .scn { display: flex; gap: 10px; padding: 8px 10px; border-radius: 8px; text-decoration: none; color: var(--ink2); font-size: 14px; }
+  .scn:hover, .scn.on { background: var(--soft); color: var(--ink); }
+  .scn span { color: var(--muted); width: 34px; flex: none; }
+  .scard { padding: 18px 22px; border-radius: 14px; border: 1px solid var(--hov); display: flex; flex-direction: column; }
+  .scard .f { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 16px; padding: 7px 0; font-size: 15px; line-height: 1.5; }
+  .grid4 { display: grid; grid-template-columns: 150px minmax(0, 1.1fr) minmax(0, 1fr) 110px; gap: 16px; align-items: center; padding: 12px 0; border-top: 1px solid var(--hov); font-size: 14px; line-height: 1.4; }
+  .st { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px; } .st::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .cmp { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; } .cmp video { width: 300px; aspect-ratio: 9 / 16; border-radius: 16px; background: #000; }
+  .cap { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+  textarea.f { min-height: 120px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; resize: vertical; }
   .box { border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 8px 24px rgba(0,0,0,.04); }
   .lh { display: flex; align-items: baseline; font-size: 12px; color: var(--muted); padding: 0 2px 6px; border-bottom: 1px solid var(--line); }
   .lh a { margin-left: auto; color: var(--muted); text-decoration: none; }
@@ -486,43 +497,146 @@ async function vAll() {
     </section>`).join('')}</div></div>`;
 }
 
-// Reel stages from the canvas (Сценарий · Материалы · Монтаж · Выкладка), derived from what the reel already has.
-function stages(r) {
-  const at = !r?.version ? 0 : ['done', 'published'].includes(r.status) ? 3 : 2;
-  return `<span class="stg" aria-label="Этап">${['Сценарий', 'Материалы', 'Монтаж', 'Выкладка'].map((t, i) => `<span class="${i === at ? 'on' : i < at ? 'done' : ''}">${t}</span>`).join('')}</span>`;
+// Reel stages from the canvas (Сценарий · Материалы · Монтаж · Выкладка): each is a tab of the reel;
+// the one the reel is at is marked by what it already has.
+const STAGES = [['script', 'Сценарий'], ['materials', 'Материалы'], ['edit', 'Монтаж'], ['publish', 'Выкладка']];
+const stageAt = (r) => !r?.version ? 'script' : ['done', 'published'].includes(r.status) ? 'publish' : 'edit';
+function stages(r, tab) {
+  if (!r) return `<span class="stg" aria-label="Этап">${STAGES.map(([, t], i) => `<span class="${i ? '' : 'on'}">${t}</span>`).join('')}</span>`;
+  const at = STAGES.findIndex(([k]) => k === stageAt(r));
+  return `<nav class="stg" aria-label="Этапы">${STAGES.map(([k, t], i) => `<a href="#/reel/${esc(r.id)}/${k}" class="${k === tab ? 'on' : i < at ? 'done' : ''}" ${k === tab ? 'aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
 }
 
 async function vReel(id, tab) {
   const isNew = id.startsWith('new-');
   const data = isNew ? null : await api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null);
   const r = data?.reel;
+  if (r && (!tab || tab === 'files')) tab = tab === 'files' ? 'materials' : stageAt(r);
   title(r ? `${r.num} ${r.title}` : 'Новый выпуск');
   const head = `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Все выпуски</a> › ${esc(projName())}</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
-      ${stages(r)}
-      ${r ? `<div class="tabs" role="tablist"><a href="#/reel/${esc(id)}" class="${tab !== 'files' ? 'on' : ''}">Выпуск</a><a href="#/reel/${esc(id)}/files" class="${tab === 'files' ? 'on' : ''}">Файлы</a></div>` : ''}
-      <span id="dlTop"></span></div>`;
+      ${stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>`;
   const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
-  // A reel that exists: video, versions and script in the middle, its chat as a column on the right (CleanReel).
+  const chatName = {script: 'Чат сценария', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
+  // A reel that exists: its stage in the middle, its chat as a column on the right (CleanReel, CleanText…).
   view.innerHTML = isNew || !r
     ? `<div class="work"><div class="chat">${head}${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`
-    : `<div class="work"><div class="rmain">${head}<div id="reelHost" style="flex: 1; overflow-y: auto"><div class="rbody" id="vers" aria-label="Версии"></div></div></div>
-      <aside class="chatcol" aria-label="Чат выпуска"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат выпуска</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+    : `<div class="work"><div class="rmain">${head}<div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
+      <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   const box = chatBox(id, {
     onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
-    onDone: (k) => { sidebar(); if (!k.startsWith('new-')) { if (isNew) vReel(k); else if (tab !== 'files') renderVersions(k); } },
+    onDone: (k) => { sidebar(); if (!k.startsWith('new-')) { if (isNew) vReel(k); else if (['edit', 'script', 'publish'].includes(tab)) drawStage(k, tab); } },
   });
   $('#chatHost').append(box);
-  $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id); } });
-  if (r && tab === 'files') reelFiles(id);
-  else if (r) renderVersions(id, data);
+  $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id, tab); } });
+  if (r) drawStage(id, tab, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
   if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
 
-async function reelFiles(id) {
+const chatOf = () => $('#chatHost > div');
+// Puts text into the reel chat's input (a timecode, a scene) without sending it.
+function draft(text) {
+  const ta = $('#chatHost textarea');
+  if (!ta) return;
+  ta.value = text + (ta.value ? ' ' + ta.value : '');
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  ta.dispatchEvent(new Event('input'));
+}
+const tc = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+async function drawStage(id, tab, data) {
+  data ||= await api('/api/reel?reel=' + encodeURIComponent(id));
+  if (tab === 'script') return stageScript(id, data);
+  if (tab === 'materials') return reelFiles(id, data);
+  if (tab === 'compare') return stageCompare(id, data);
+  if (tab === 'publish') return stagePublish(id, data);
+  $('#reelHost').innerHTML = '<div class="rbody" id="vers" aria-label="Версии"></div>';
+  return renderVersions(id, data);
+}
+
+// Сценарий (CleanText): scenes on the left, each scene as a card; clicking a scene drafts a note about it.
+function stageScript(id, data) {
+  const sc = Array.isArray(data.scenes) ? data.scenes : null;
   const host = $('#reelHost');
-  host.style.overflowY = 'auto';
+  const script = section(data.readme, 'Сценарий'), look = section(data.readme, 'Вид');
+  const field = (t, v) => v ? `<div class="f"><span class="small muted" style="padding-top: 2px">${t}</span><span>${esc(v)}</span></div>` : '';
+  host.innerHTML = `<div style="display: flex; min-height: 100%">
+    ${sc ? `<nav style="flex: 0 0 190px; padding: 26px 12px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--hov)" aria-label="Сцены"><span class="lbl" style="padding: 0 10px 8px">Сцены · ${sc.length}</span>
+      ${sc.map((x, i) => `<a class="scn" href="#sc${i}" data-sc="${i}"><span>${esc(x.t || '')}</span>${esc(x.name || 'Сцена ' + (i + 1))}</a>`).join('')}</nav>` : ''}
+    <div style="flex: 1; min-width: 0; padding: 26px 32px; display: flex; flex-direction: column; gap: 14px">
+      ${sc ? sc.map((x, i) => `<section class="scard" id="sc${i}"><div class="row" style="gap: 10px; padding-bottom: 4px"><b style="font-size: 16px; font-weight: 600">${i + 1} · ${esc(x.name || '')}</b><span class="small muted">${esc(x.t || '')}</span>${canEdit() ? `<button type="button" class="btn" style="margin-left: auto" data-edit="${i}">Правка сцены</button>` : ''}</div>
+          ${field('На экране', x.screen)}${field('Текст на экране', x.text)}${field('Звук', x.sound)}</section>`).join('')
+        : `<div class="md" style="max-width: 820px">${md(script) || '<p class="muted">Сценария пока нет. Опиши идею в чате справа — Claude напишет сценарий.</p>'}</div>
+           ${look.trim() ? `<div class="blk"><span class="lbl">Как выглядит</span><div class="md" style="font-size: 14px">${md(look)}</div></div>` : ''}
+           ${canEdit() && script.trim() ? '<div><button type="button" class="btn" id="toScenes">Разложить по сценам</button> <span class="small muted">Claude разобьёт сценарий на сцены с таймкодами — их можно править по одной</span></div>' : ''}`}
+    </div></div>`;
+  host.querySelectorAll('[data-sc]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); $('#sc' + a.dataset.sc).scrollIntoView({behavior: 'smooth', block: 'start'}); }));
+  host.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => { const x = sc[b.dataset.edit]; draft(`Сцена ${Number(b.dataset.edit) + 1} «${x.name}» (${x.t}) —`); }));
+  $('#toScenes')?.addEventListener('click', () => chatOf().say('Разложи сценарий этого рилса по сценам в scenes.json: таймкод, название, что на экране, текст на экране, звук, какой материал нужен и есть ли он.', 'Разложить сценарий по сценам'));
+}
+
+// Сравнение (CleanCompare): two versions side by side, playing in sync.
+function stageCompare(id, data) {
+  const vid = (v) => v?.files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
+  const withVideo = data.versions.filter((v) => vid(v));
+  const [b, a] = withVideo;
+  const host = $('#reelHost');
+  if (!a) { host.innerHTML = '<div class="page"><p class="muted">Сравнивать пока нечего: нужна ещё одна версия с видео. Старые версии хранятся кадром — их можно пересобрать на вкладке «Монтаж».</p></div>'; return; }
+  host.innerHTML = `<div class="page" style="gap: 20px"><div class="row" style="justify-content: space-between"><div><b>Сравнение ${esc(a.v)} ↔ ${esc(b.v)}</b> <span class="small muted">играют синхронно: пауза и перемотка на одной — на обеих</span></div>
+      <div class="row" style="gap: 8px"><a class="btn" href="#/reel/${esc(id)}/edit">Закрыть сравнение</a>${canEdit() ? `<button type="button" class="btn" id="keepOld">Вернуть ${esc(a.v)}</button><button type="button" class="btn primary" id="keepNew">Оставить ${esc(b.v)}</button>` : ''}</div></div>
+    <div class="cmp">${[a, b].map((v, i) => `<div style="display: flex; flex-direction: column; gap: 8px; align-items: center"><video id="cv${i}" src="${vid(v).url}" playsinline preload="metadata" ${i ? 'controls' : 'muted'}></video><span class="small muted">${esc(v.v)}${i ? ' · текущая' : ''} · ${ago(v.at)}</span></div>`).join('')}</div>
+    ${versionNote(data.readme, b.v) ? `<div class="blk" style="max-width: 640px; margin: 0 auto"><span class="lbl">Что поменялось в ${esc(b.v)}</span><span>${esc(versionNote(data.readme, b.v))}</span></div>` : ''}</div>`;
+  const [v0, v1] = [$('#cv0'), $('#cv1')];
+  v1.onplay = () => { v0.currentTime = v1.currentTime; v0.play(); };
+  v1.onpause = () => v0.pause();
+  v1.onseeked = () => { v0.currentTime = v1.currentTime; };
+  $('#keepOld')?.addEventListener('click', () => chatOf().say(`Верни ${a.v} как текущую версию: пересобери её и пришли.`, `Вернуть ${a.v}`));
+  $('#keepNew')?.addEventListener('click', () => chatOf().say(`Оставляем ${b.v}. Прошлые версии можно сжать по правилам хранения.`, `Оставить ${b.v}`));
+}
+
+// Выкладка (CleanPublish): captions per platform, checks, and a package the bot sends to Telegram on time.
+function stagePublish(id, data) {
+  const pub = data.publish || {};
+  const caps = Array.isArray(pub.captions) && pub.captions.length ? pub.captions : [{platform: 'Instagram', text: section(data.readme, 'Подпись').trim() || section(data.readme, 'Caption').trim()}];
+  const cur = data.versions[0];
+  const host = $('#reelHost');
+  const d = new Date(Date.now() + 3600e3); d.setMinutes(0, 0, 0);
+  const local = new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+  host.innerHTML = `<div class="page" style="gap: 22px; max-width: 980px">
+    ${!cur ? '<p class="muted">Выкладывать пока нечего — сначала смонтируйте первую версию.</p>' : ''}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px">
+      ${caps.map((c, i) => `<div class="cap"><div class="row" style="gap: 8px"><b>${esc(c.platform || 'Площадка')}</b><span class="small muted">${esc(c.account || '')}</span></div>
+        <label class="lbl" for="cap${i}">Подпись · <span data-len="${i}">${(c.text || '').length}</span> знаков</label><textarea class="f" id="cap${i}" ${canEdit() ? '' : 'readonly'}>${esc(c.text || '')}</textarea></div>`).join('')}
+    </div>
+    ${!pub.captions ? `<p class="small muted">Подписи Claude пишет в publish.json — попроси в чате справа: «напиши подписи для RU и EN».${canEdit() ? ' <button type="button" class="btn" id="mkCaps" style="margin-left: 6px">Написать подписи</button>' : ''}</p>` : ''}
+    ${Array.isArray(pub.checks) && pub.checks.length ? `<div class="blk"><span class="lbl">Перед выкладкой</span>${pub.checks.map((c) => `<div class="row" style="gap: 10px"><span style="color: ${c.ok ? 'var(--green)' : 'var(--amber)'}; font-weight: 700">${c.ok ? '✓' : '!'}</span><span>${esc(c.text)}</span></div>`).join('')}</div>` : ''}
+    ${cur && canEdit() ? `<div class="card" style="display: flex; flex-direction: column; gap: 12px"><b>Прислать пакет в Телеграм</b>
+      <span class="small muted">В нужное время бот пришлёт тебе подпись, видео ${esc(cur.v)} и обложку — выложишь с телефона за минуту.</span>
+      <div class="row" style="gap: 10px"><label class="small muted" for="pubAt">Когда</label><input class="f" type="datetime-local" id="pubAt" value="${local}" style="width: auto"><select class="f" id="pubCap" style="width: auto">${caps.map((c, i) => `<option value="${i}">${esc(c.platform || 'Подпись ' + (i + 1))}</option>`).join('')}</select><button type="button" class="btn primary" id="pubGo">Запланировать</button></div></div>` : ''}
+    ${data.outbox?.length ? `<div class="blk"><span class="lbl">Запланировано</span>${data.outbox.map((o) => `<div class="li"><span style="flex: 1">${new Date(o.at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})} · ${esc(o.version)}${o.platform ? ' · ' + esc(o.platform) : ''}</span><span class="small muted">${o.sent ? (o.error ? 'не ушло: ' + esc(o.error) : 'отправлено в Телеграм') : 'ждёт · ' + esc(o.by)}</span>${!o.sent && canEdit() ? `<button type="button" class="btn" data-cancel="${esc(o.id)}">Отменить</button>` : ''}</div>`).join('')}</div>` : ''}
+  </div>`;
+  if (cur) $('#dlTop').innerHTML = cur.files.filter((f) => ['copy', 'cover'].includes(f.kind)).map((f) => `<a class="btn" href="${f.url}&dl=1">${f.kind === 'cover' ? 'Обложка' : 'Видео ' + esc(cur.v)} ↓</a>`).join('');
+  host.querySelectorAll('textarea.f').forEach((t, i) => (t.oninput = () => { host.querySelector(`[data-len="${i}"]`).textContent = t.value.length; }));
+  $('#mkCaps')?.addEventListener('click', () => chatOf().say('Напиши подписи к этому рилсу для каждой площадки и проверку перед выкладкой в publish.json.', 'Написать подписи'));
+  $('#pubGo')?.addEventListener('click', async () => {
+    const i = Number($('#pubCap').value);
+    const it = await post('/api/publish', {reel: id, at: new Date($('#pubAt').value).toISOString(), caption: $('#cap' + i).value, platform: caps[i].platform}).catch(() => null);
+    toast(it ? 'Запланировано — бот пришлёт пакет в Телеграм' : 'Не получилось запланировать');
+    drawStage(id, 'publish');
+  });
+  host.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = async () => { await post('/api/publish/cancel', {id: b.dataset.cancel}); drawStage(id, 'publish'); }));
+}
+
+async function reelFiles(id, data) {
+  const host = $('#reelHost');
+  const sc = Array.isArray(data?.scenes) ? data.scenes : null;
+  const stColor = (t) => /готов/i.test(t || '') ? 'var(--green)' : /пересн/i.test(t || '') ? 'var(--amber)' : 'var(--blue)';
   host.innerHTML = `<div class="page" style="max-width: 1000px">
+    ${sc ? `<section><div class="row" style="justify-content: space-between; margin-bottom: 6px"><h2>Готовность · ${sc.filter((x) => /готов/i.test(x.status || '')).length} из ${sc.length}</h2>${canEdit() ? '<button type="button" class="btn" id="shotList">Шот-лист в Телеграм</button>' : ''}</div>
+      <div class="grid4 lbl" style="border-top: 0"><span>Сцена</span><span>Что нужно</span><span>Что есть</span><span>Статус</span></div>
+      ${sc.map((x, i) => `<div class="grid4"><b style="font-weight: 600">${i + 1} · ${esc(x.name || '')}</b><span class="muted">${esc(x.need || x.screen || '')}</span><span class="small muted">${esc(x.have || '—')}</span><span class="st" style="color: ${stColor(x.status)}">${esc(x.status || 'нужно')}</span></div>`).join('')}</section>`
+      : canEdit() ? '<p class="small muted">Что снять по сценам, Claude соберёт в шот-лист. <button type="button" class="btn" id="shotList" style="margin-left: 6px">Составить шот-лист</button></p>' : ''}
     ${canEdit() ? `<label class="drop" id="drop"><input type="file" multiple hidden id="up"><b style="color: var(--ink); font-weight: 600">Перетащи сюда референсы, исходники, музыку</b><br><span class="small">или нажми, чтобы выбрать файлы · они попадут в материалы этого рилса, Claude их увидит</span></label>` : ''}
     <section><div class="row" style="justify-content: space-between; margin-bottom: 10px"><h2>Материалы</h2><span class="small muted" id="srcInfo"></span></div><div class="fgrid" id="src"></div></section>
     <section><div class="row" style="justify-content: space-between; margin-bottom: 10px"><h2>Итог и версии</h2><span class="small muted">старые версии сжимаются по правилам хранения</span></div><div class="fgrid" id="res"></div></section>
@@ -546,6 +660,7 @@ async function reelFiles(id) {
     toast(`Загружено: ${files.length}`);
     load();
   }
+  $('#shotList')?.addEventListener('click', () => chatOf().say('Составь шот-лист по сценам: что снять, как держать телефон, сколько секунд; отметь, что уже есть в материалах. Обнови scenes.json и пришли шот-лист сюда.', 'Шот-лист'));
   const drop = $('#drop');
   if (drop) {
     $('#up').onchange = (e) => e.target.files.length && upload(e.target.files);
@@ -579,7 +694,9 @@ async function renderVersions(id, data) {
   const dl = cur && files(cur).find((f) => f.kind === 'copy') || cur && files(cur)[0];
   $('#dlTop').innerHTML = dl ? `<a class="btn primary" href="${dl.url}&dl=1">Скачать ${esc(cur.v)}</a>` : '';
   el.innerHTML = `<div class="rvid">${cur && video(cur)
-      ? `<video src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video><span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`
+      ? `<video id="rv" src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video>
+        ${canEdit() ? '<button type="button" class="btn" id="tcBtn">⏱ Правка на 0:00</button><span class="small muted" style="text-align: center">Останови видео в нужный момент — правка привяжется к секунде</span>' : `<span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`}
+        ${prev ? `<a class="btn" href="#/reel/${esc(id)}/compare">Сравнить с ${esc(prev.v)}</a>` : ''}`
       : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}</div>
     <div class="rinfo">
       ${note ? `<div class="blk"><span class="lbl">Что в ${esc(cur.v)}</span><span style="font-size: 15px; line-height: 1.55">${esc(note)}</span></div>` : ''}
@@ -591,6 +708,15 @@ async function renderVersions(id, data) {
         <a class="small muted" href="#/settings/files" style="padding-top: 8px">Место на сервере →</a></div>
       ${script.trim() ? `<div class="blk"><span class="lbl">Сценарий</span><div class="md" style="font-size: 14px">${md(script)}</div></div>` : ''}
     </div>`;
+  const rv = $('#rv'), tcb = $('#tcBtn');
+  if (rv && tcb) {
+    const upd = () => { tcb.textContent = `⏱ Правка на ${tc(rv.currentTime)}`; };
+    rv.addEventListener('timeupdate', upd);
+    rv.addEventListener('seeked', upd);
+    rv.addEventListener('pause', () => { upd(); tcb.classList.add('primary'); });
+    rv.addEventListener('play', () => tcb.classList.remove('primary'));
+    tcb.onclick = () => { rv.pause(); draft(`${tc(rv.currentTime)} —`); };
+  }
   el.querySelectorAll('[data-rebuild]').forEach((b) => (b.onclick = () => {
     const box = $('#chatHost > div');
     box.say(`Пересобери версию ${b.dataset.rebuild} этого рилса из её снимка versions/${b.dataset.rebuild}/project-snapshot/ и пришли её.`, `Пересобрать ${b.dataset.rebuild}`);
@@ -780,7 +906,7 @@ async function route() {
     await sidebar();
     let m;
     view = $('#view');
-    if ((m = /^#\/reel\/([\w-]+)(?:\/(files))?/.exec(h))) await vReel(m[1], m[2]);
+    if ((m = /^#\/reel\/([\w-]+)(?:\/(\w+))?/.exec(h))) await vReel(m[1], m[2]);
     else if ((m = /^#\/chat\/(_project)/.exec(h))) await vChat(m[1]);
     else if (h === '#/new') await vNew();
     else if ((m = /^#\/knowledge(?:\/(\w+))?/.exec(h))) await vKnowledge(m[1]);
