@@ -17,7 +17,7 @@
 | Задачи и этапы | [Issues](https://github.com/mixa-lll/reels-studio/issues) и [вехи](https://github.com/mixa-lll/reels-studio/milestones) | соавторы |
 | Макеты и концепции | холст «Рилсы · веб-версия бота» на claude.ai | по приглашению владельца (Share) |
 | Работающий бот и студия | сервер владельца | только владелец |
-| Общий стенд (свежий `main`, демо-данные) | тот же сервер, ссылка от владельца | соавторы |
+| Общий стенд (свежий `main`, демо-данные) | https://stage-reels.mygudauri.org, ключ от владельца | соавторы |
 | Сайт установки | `docs/` → https://mixa-lll.github.io/reels-studio/ | все |
 
 ## Главное правило
