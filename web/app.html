@@ -199,9 +199,10 @@ function drawTask(id) {
     ${t.why ? `<div class="quote"><i></i><span>${esc(t.why)}</span></div>` : ''}
   </div><div class="foot"><button class="bb" data-act="shoot">${ic('video', 22)}${t.status === 'redo' ? 'Переснять' : 'Перейти к съёмке'}</button></div>`;
   root.querySelectorAll('[data-rw]').forEach((b) => b.onclick = async () => {
-    b.disabled = true;
+    const label = b.innerHTML;
+    b.disabled = true; b.textContent = 'Claude пишет…';
     try { const r = await api('/api/app/rewrite', {method: 'POST', json: {id, mode: b.dataset.rw}}); go('edit', {id, text: r.text}); } catch (e) { alert(e.message); }
-    b.disabled = false;
+    b.disabled = false; b.innerHTML = label;
   });
   root.querySelectorAll('[data-act=own]').forEach((b) => b.onclick = () => go('edit', {id, text: taskText(t), own: true}));
   root.querySelectorAll('.w').forEach((w) => w.onclick = () => wordSheet(t, Number(w.dataset.w)));
@@ -231,20 +232,38 @@ function wordSheet(t, k) {
 }
 
 // ---------- Правка ----------
-function drawEdit({id, text, own}) {
+function drawEdit({id, text, own, mode}) {
   const t = S.tasks.find((x) => x.id === id);
   root.innerHTML = `<div class="scr">
     <h1 class="t2" style="margin-top:10px">${own ? 'Своими словами' : 'Новый вариант'}</h1>
-    <p class="sub">Проверьте и поправьте, если нужно. Читать вы будете именно это.</p>
+    <p class="sub">${own ? 'Напишите, как сказали бы сами. Можно оставить как есть или попросить сделать из этого текст.' : 'Не нравится — попросите ещё. Можно поправить руками.'}</p>
     <textarea id="txt" style="margin-top:14px" aria-label="Текст">${esc(text)}</textarea>
+    <p class="cap" id="busy" hidden>Claude пишет…</p>
+    <div class="tools" style="margin-top:12px">
+      ${own ? `<button class="tool" data-rw="mine">${ic('spark', 18)}Сделать текст из моего</button><button class="tool" data-rw="fix">${ic('check', 16)}Исправить ошибки</button>`
+        : `<button class="tool" data-rw="more">${ic('spark', 18)}Ещё вариант</button><button class="tool" data-own="1">${ic('pen', 16)}Написать своё</button>`}
+      <button class="tool" data-rw="simpler">Проще</button><button class="tool" data-rw="shorter">Короче</button><button class="tool" data-rw="warmer">Теплее</button>
+    </div>
     <div class="lh">Было</div>
     <div class="box" style="box-shadow:none;border:1px dashed var(--line);background:transparent"><span style="font-size:16px;line-height:23px;color:var(--mut)">${esc(t.text)}</span></div>
     <div class="flag">${ic('clock', 20, 'var(--warn)')}<span>Редактор получит правку на согласование. Снимать можно сразу.</span></div>
-  </div><div class="foot"><button class="bb" id="save">${ic('check', 22)}Сохранить</button><button class="sb2" id="undo">${ic('x', 22)}Вернуть как было</button></div>`;
+  </div><div class="foot"><button class="bb" id="save">${ic('check', 22)}${own ? 'Оставить мой текст' : 'Сохранить'}</button><button class="sb2" id="undo">${ic('x', 22)}Вернуть как было</button></div>`;
   const save = async (val) => {
     try { const r = await api('/api/app/text', {method: 'POST', json: {id, text: val}}); Object.assign(t, r.task); if (!r.task.edit) delete t.edit; haptic('ok'); stack.pop(); draw(); }
     catch (e) { alert(e.message); }
   };
+  // Every tool works on what is in the box now: the host's own words or the last variant.
+  root.querySelectorAll('[data-rw]').forEach((b) => b.onclick = async () => {
+    const all = root.querySelectorAll('[data-rw],[data-own]');
+    all.forEach((x) => x.disabled = true); $('#busy').hidden = false;
+    try {
+      const r = await api('/api/app/rewrite', {method: 'POST', json: {id, mode: b.dataset.rw, text: $('#txt').value}});
+      $('#txt').value = r.text; haptic('ok');
+      $('#busy').textContent = r.stub ? 'Claude сейчас недоступен — сделал по простым правилам.' : b.dataset.rw === 'fix' ? 'Исправил ошибки, слова не менял.' : 'Готово. Не нравится — нажмите ещё раз.';
+    } catch (e) { $('#busy').textContent = e.message; }
+    all.forEach((x) => x.disabled = false);
+  });
+  root.querySelector('[data-own]')?.addEventListener('click', () => { stack.pop(); go('edit', {id, text: $('#txt').value, own: true}); });
   $('#save').onclick = () => save($('#txt').value);
   $('#undo').onclick = () => save(t.text);
 }
