@@ -12,6 +12,7 @@ import {randomBytes} from 'node:crypto';
 import {appendFileSync, closeSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {makeApp} from './app.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BOT = process.env.REELS_BOT_ROOT || join(HERE, '..');
@@ -409,6 +410,9 @@ async function body(req) {
   try { return JSON.parse(s || '{}'); } catch { return {}; }
 }
 
+const APP_PAGE = join(HERE, 'app.html');
+const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, reels, log});
+
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const json = (code, b) => { res.writeHead(code, {'content-type': 'application/json', 'cache-control': 'no-store'}); res.end(JSON.stringify(b)); };
@@ -442,6 +446,9 @@ createServer(async (req, res) => {
     log(person.name, 'подключился к веб-версии по приглашению');
     return go('/', cookie(req, newSession(person.id, req)));
   }
+
+  // The Telegram mini app signs its own requests (web/app.mjs), no session needed.
+  if (url.pathname === '/app' || url.pathname.startsWith('/api/app/')) return miniApp(req, res, url);
 
   const me = whoIs(req);
   if (!me) { res.writeHead(404, {'content-type': 'text/plain; charset=utf-8'}); return res.end('Not found'); }
