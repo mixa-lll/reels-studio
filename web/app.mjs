@@ -67,12 +67,35 @@ const DEMO = [
   {title: 'Знакомьтесь: повар Нина', text: 'Это Нина, наш повар. Она знает, кто из детей не ест лук, и всё равно делает вкусно.', seconds: 15, place: 'столовая', lang: 'ru', status: 'redo', note: 'Всё хорошо, кроме темпа. Говорите медленнее, а в начале 2 секунды просто улыбнитесь.', why: 'Рубрика «Знакомьтесь».'},
 ];
 
-// Rewrites until the editor side drives them through Claude: plain rules, marked stub.
+// What each rewrite asks Claude for; the plain rules below stand in when it is unavailable.
+const ASK = {
+  other: 'Напиши другой вариант этого текста: тот же смысл и длина, другие слова и заход.',
+  more: 'Напиши ещё один, заметно другой вариант этого текста: тот же смысл и длина.',
+  simpler: 'Сделай текст проще: короткие фразы, обычные слова, тот же смысл.',
+  shorter: 'Сделай текст короче примерно на треть, сохрани главное.',
+  warmer: 'Сделай текст теплее и дружелюбнее, как будто встречаешь человека у входа.',
+  mine: 'Это текст ведущего его словами. Сделай на его основе гладкий текст для чтения в камеру: сохрани его мысль, интонацию и ключевые слова, убери лишнее.',
+  fix: 'Исправь только орфографию, пунктуацию и опечатки. Ничего не перефразируй и не меняй слова.',
+};
+function claudeRewrite(mode, text, task) {
+  const prompt = `${ASK[mode]}\nТекст читают в камеру за ${task.seconds || 20} секунд, язык — ${task.lang === 'en' ? 'английский' : 'русский'}. Тема ролика: «${task.title}».\nОтветь только новым текстом, без кавычек и пояснений.\n\nТекст:\n${text}`;
+  return new Promise((resolve) => {
+    let out = '';
+    const child = spawn(process.env.AGENT_BIN || 'claude', ['-p', prompt, '--output-format', 'text', '--allowedTools', '', '--max-turns', '1'], {stdio: ['ignore', 'pipe', 'ignore']});
+    const timer = setTimeout(() => { child.kill(); resolve(null); }, 45_000);
+    child.stdout.on('data', (d) => { out += d; });
+    child.on('error', () => { clearTimeout(timer); resolve(null); });
+    child.on('close', (code) => { clearTimeout(timer); const t = out.trim().replace(/^[«"]|[»"]$/g, ''); resolve(code === 0 && t && t.length < 2000 ? t : null); });
+  });
+}
 const REWRITES = {
   shorter: (t) => t.split(/(?<=[.!?])\s+/).slice(0, 2).join(' '),
   simpler: (t) => t.replace(/,\s*(который|которая|которые)[^,.]*[,.]/g, '.').replace(/\s+/g, ' '),
   warmer: (t) => (/^(Здравствуйте|Привет)/.test(t) ? t : `Здравствуйте! ${t}`),
   other: (t) => { const s = t.split(/(?<=[.!?])\s+/); return s.length > 1 ? [s.at(-1), ...s.slice(0, -1)].join(' ') : t; },
+  more: (t) => REWRITES.other(t),
+  mine: (t) => t,
+  fix: (t) => t.replace(/\s+/g, ' ').replace(/\s+([,.!?])/g, '$1').replace(/(^|[.!?]\s+)([а-яёa-z])/g, (m, a, b) => a + b.toUpperCase()).trim(),
 };
 
 export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
@@ -167,7 +190,10 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
       const x = task(b.id);
       const f = REWRITES[b.mode];
       if (!x || !f) return json(400, {});
-      return json(200, {text: f(x.edit?.text || x.text), stub: true});
+      // The text on screen (what the host typed or the last variant), else the task's.
+      const src = typeof b.text === 'string' && b.text.trim() ? b.text.trim().slice(0, 2000) : x.edit?.text || x.text;
+      const out = await claudeRewrite(b.mode, src, x);
+      return json(200, out ? {text: out} : {text: f(src), stub: true});
     }
     if (req.method === 'POST' && url.pathname === '/api/app/text') {
       const x = task(b.id);
