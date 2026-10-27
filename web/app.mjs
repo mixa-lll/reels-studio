@@ -6,14 +6,45 @@
 // Data per project: projects/<p>/host/tasks.json (tasks), host/profiles.json (per person),
 // takes go to the project's inbox like anything else sent to the bot. Until the editor
 // side exists, a project without tasks.json gets demo tasks (seeded: true).
+import {spawn} from 'node:child_process';
 import {createHmac, randomBytes} from 'node:crypto';
-import {appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
+import {appendFileSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
+import {ffCommand} from '../bot/media.mjs';
+import {transcribe} from '../bot/stt.mjs';
 
 const MAX_TAKE = 300 * 1024 * 1024;
 const readJson = (f, fallback) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return fallback; } };
 const writeJson = (f, v) => { writeFileSync(`${f}.tmp`, JSON.stringify(v, null, 2)); renameSync(`${f}.tmp`, f); };
 const id = () => randomBytes(9).toString('base64url');
+
+// The take is shot as clips (one per phrase, or one for the whole text, cut where the
+// host restarted a phrase); the server trims, joins and evens them out into one
+// vertical 1080×1920 mp4 and then checks the speech against the text.
+export const phrasesOf = (text) => String(text || '').split(/(?<=[.!?…])\s+/).map((x) => x.trim()).filter(Boolean);
+const norm = (w) => w.toLowerCase().replace(/ё/g, 'е').replace(/[^a-zа-я0-9]/gi, '');
+
+function joinClips(clips, out) {
+  const args = ['-y', '-loglevel', 'error'];
+  clips.forEach((c) => { if (c.keep) args.push('-t', String(c.keep)); args.push('-i', c.file); });
+  const f = clips.map((_, i) => `[${i}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30[v${i}];[${i}:a]aresample=48000,aformat=channel_layouts=mono[a${i}]`).join(';');
+  const cat = clips.map((_, i) => `[v${i}][a${i}]`).join('') + `concat=n=${clips.length}:v=1:a=1[v][a]`;
+  args.push('-filter_complex', `${f};${cat}`, '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', out);
+  const [cmd, full] = ffCommand('ffmpeg', args);
+  return new Promise((ok, fail) => {
+    const p = spawn(cmd, full, {stdio: ['ignore', 'ignore', 'pipe']});
+    let err = '';
+    p.stderr.on('data', (d) => { err += d; });
+    p.on('close', (code) => (code === 0 && existsSync(out) ? ok(out) : fail(new Error(err.trim().split('\n').slice(-2).join(' ') || 'ffmpeg failed'))));
+  });
+}
+
+/** Words of each phrase that the transcript does not have (fuzzy: by their first five letters). */
+export function missingWords(text, heard) {
+  const got = new Set(String(heard || '').split(/\s+/).map(norm).filter(Boolean).map((w) => w.slice(0, 5)));
+  return phrasesOf(text).map((ph, i) => ({phrase: i, words: ph.split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}-]/gu, '')).filter((w) => norm(w).length > 3 && !got.has(norm(w).slice(0, 5)))}))
+    .filter((x) => x.words.length);
+}
 
 /** The Telegram user from a valid, fresh initData string, or null. */
 export function verifyInitData(initData, token, maxAgeSec = 24 * 3600) {
@@ -92,6 +123,22 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
 
   return async function app(req, res, url) {
     const json = (code, b) => { res.writeHead(code, {'content-type': 'application/json', 'cache-control': 'no-store'}); res.end(JSON.stringify(b)); };
+    // The joined take for the page's <video>: an unguessable key from /api/app/join.
+    const tk = /^\/app\/take\/([\w-]+)\/([\w-]+)\.mp4$/.exec(url.pathname);
+    if (req.method === 'GET' && tk) {
+      const d = join(PROJECTS, project(), 'host', 'takes', tk[1]);
+      const meta = readJson(join(d, 'meta.json'), {});
+      const f = join(d, 'take.mp4');
+      if (!meta.key || meta.key !== tk[2] || !existsSync(f)) { res.writeHead(404); return res.end(); }
+      const size = statSync(f).size, range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+      if (range) {
+        const a = range[1] ? Number(range[1]) : 0, z = range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+        res.writeHead(206, {'content-type': 'video/mp4', 'content-range': `bytes ${a}-${z}/${size}`, 'accept-ranges': 'bytes', 'content-length': z - a + 1, 'cache-control': 'no-store'});
+        return createReadStream(f, {start: a, end: z}).pipe(res);
+      }
+      res.writeHead(200, {'content-type': 'video/mp4', 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store'});
+      return createReadStream(f).pipe(res);
+    }
     if (req.method === 'GET' && url.pathname === '/app') {
       res.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store'});
       return res.end(PAGE());
@@ -111,7 +158,7 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
         profile: {langs: 'русский, английский', when: 'вт и чт после 15:00', where: 'кабинет 204, у окна', speed: 1, size: 'large', consent: true, ...prof}});
     }
     let b = {};
-    if (req.method === 'POST' && url.pathname !== '/api/app/take') {
+    if (req.method === 'POST' && !['/api/app/take', '/api/app/clip'].includes(url.pathname)) {
       let s = '';
       for await (const chunk of req) s += chunk;
       try { b = JSON.parse(s || '{}'); } catch {}
@@ -154,6 +201,69 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
       saveTasks(p, t);
       log?.(me.name, `прислал запись «${x.title}»`);
       notify(`🎬 ${me.name} прислал(а) запись: «${x.title}»${x.edit?.status === 'pending' ? '\n✏️ Со своим текстом — он ждёт вашего согласования.' : ''}`, size < 48 * 1024 * 1024 ? file : null);
+      return json(200, {task: x});
+    }
+    // ---------- prompter takes: clips → join → speech check → send ----------
+    const takeDir = (tid) => { const d = join(hostDir(p), 'takes', tid.replace(/[^\w-]/g, '')); mkdirSync(d, {recursive: true}); return d; };
+    if (req.method === 'POST' && url.pathname === '/api/app/clip') {
+      const x = task(url.searchParams.get('id'));
+      const n = Number(url.searchParams.get('n'));
+      if (!x || !Number.isInteger(n) || n < 0 || n > 40) return json(400, {});
+      const d = takeDir(x.id);
+      if (n === 0) for (const f of readdirSync(d)) rmSync(join(d, f), {force: true});
+      const ext = /mp4/.test(req.headers['content-type'] || '') ? 'mp4' : 'webm';
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of req) { size += chunk.length; if (size > MAX_TAKE) return json(413, {error: 'Видео слишком большое'}); chunks.push(chunk); }
+      writeFileSync(join(d, `clip-${String(n).padStart(2, '0')}.${ext}`), Buffer.concat(chunks));
+      const meta = readJson(join(d, 'meta.json'), {clips: {}});
+      const keep = Number(url.searchParams.get('keep'));
+      meta.clips[n] = {ext, keep: keep > 0 ? keep : null};
+      writeJson(join(d, 'meta.json'), meta);
+      return json(200, {n});
+    }
+    if (req.method === 'POST' && url.pathname === '/api/app/join') {
+      const x = task(b.id);
+      if (!x) return json(400, {});
+      const d = takeDir(x.id);
+      const meta = readJson(join(d, 'meta.json'), {clips: {}});
+      const clips = Object.keys(meta.clips).map(Number).sort((a, c) => a - c).slice(0, Number(b.count) || 40)
+        .map((n) => ({file: join(d, `clip-${String(n).padStart(2, '0')}.${meta.clips[n].ext}`), keep: meta.clips[n].keep}));
+      if (!clips.length) return json(400, {error: 'Нет записи'});
+      try { await joinClips(clips, join(d, 'take.mp4')); } catch (e) { return json(500, {error: 'Не получилось склеить: ' + e.message}); }
+      meta.key = randomBytes(9).toString('base64url');
+      meta.check = {state: 'running'};
+      writeJson(join(d, 'meta.json'), meta);
+      // The speech check runs on in the background; the page asks for it.
+      transcribe(join(d, 'take.mp4'), x.lang === 'en' ? 'en' : 'ru').then((heard) => {
+        const m = readJson(join(d, 'meta.json'), {});
+        m.check = heard == null ? {state: 'none'} : {state: 'done', missing: missingWords(x.edit?.text || x.text, heard)};
+        writeJson(join(d, 'meta.json'), m);
+      }).catch(() => {});
+      return json(200, {url: `/app/take/${encodeURIComponent(x.id)}/${meta.key}.mp4`, size: statSync(join(d, 'take.mp4')).size});
+    }
+    if (req.method === 'GET' && url.pathname === '/api/app/check') {
+      const x = task(url.searchParams.get('id'));
+      if (!x) return json(400, {});
+      return json(200, readJson(join(takeDir(x.id), 'meta.json'), {}).check || {state: 'none'});
+    }
+    if (req.method === 'POST' && url.pathname === '/api/app/send') {
+      const x = task(b.id);
+      const src = x && join(takeDir(x.id), 'take.mp4');
+      if (!src || !existsSync(src)) return json(400, {error: 'Сначала нужна запись'});
+      const dir = join(PROJECTS, p, 'inbox', new Date().toISOString().slice(0, 10));
+      mkdirSync(dir, {recursive: true});
+      const file = join(dir, `host-${Date.now()}-${x.id}.mp4`);
+      copyFileSync(src, file);
+      appendFileSync(join(PROJECTS, p, 'inbox', 'history.md'), `- ${new Date().toISOString()} (mini app, ${me.name}, задание «${x.title}») ${file}\n`);
+      x.status = 'sent';
+      x.sentAt = Date.now();
+      x.take = file.slice(PROJECTS.length + 1);
+      delete x.note;
+      saveTasks(p, t);
+      log?.(me.name, `прислал запись «${x.title}»`);
+      const miss = readJson(join(takeDir(x.id), 'meta.json'), {}).check?.missing || [];
+      notify(`🎬 ${me.name} прислал(а) запись: «${x.title}»${miss.length ? `\n◐ Не прозвучало: ${miss.flatMap((m) => m.words).join(', ')}` : ''}${x.edit?.status === 'pending' ? '\n✏️ Со своим текстом — он ждёт вашего согласования.' : ''}`, statSync(file).size < 48 * 1024 * 1024 ? file : null);
       return json(200, {task: x});
     }
     if (req.method === 'POST' && url.pathname === '/api/app/profile') {
