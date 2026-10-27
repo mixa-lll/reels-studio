@@ -122,8 +122,8 @@ export function chromeBin(bot) {
   if (process.env.CHROME && existsSync(process.env.CHROME)) return process.env.CHROME;
   const base = join(bot, 'template', 'node_modules', '.remotion', 'chrome-headless-shell');
   if (existsSync(base)) {
-    for (const plat of readdirSync(base)) {
-      for (const sub of readdirSync(join(base, plat))) {
+    for (const plat of readdirSync(base).filter((d) => statSync(join(base, d)).isDirectory())) {
+      for (const sub of readdirSync(join(base, plat)).filter((d) => statSync(join(base, plat, d)).isDirectory())) {
         const f = join(base, plat, sub, 'chrome-headless-shell');
         if (existsSync(f)) return f;
       }
