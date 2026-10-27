@@ -11,7 +11,10 @@ shot() { # name width height route
     --screenshot="$OUT/$1.png" "$BASE/?k=$KEY$4" >/dev/null 2>&1
   echo "$OUT/$1.png"
 }
-for v in "today:#/" "all:#/all" "reel:#/reel/$REEL" "reel-files:#/reel/$REEL/files" "new:#/new" "strategy:#/knowledge" "settings-ds:#/settings/ds" "settings-files:#/settings/files" "settings-access:#/settings/access"; do
+POST=${POST:-$(curl -s -b /tmp/studio-shots.jar "$BASE/api/overview" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).posts||[];console.log((p.find(x=>x.kind==="carousel")||{}).id||"")})')}
+PHOTO=${PHOTO:-$(curl -s -b /tmp/studio-shots.jar "$BASE/api/overview" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s).posts||[];console.log((p.find(x=>x.kind!=="carousel")||{}).id||"")})')}
+for v in "today:#/" "all:#/all" "all-reels:#/all/reels" "all-posts:#/all/posts" "reel-script:#/reel/$REEL/script" "reel-materials:#/reel/$REEL/materials" "reel:#/reel/$REEL/edit" "reel-publish:#/reel/$REEL/publish" "new:#/new" "strategy:#/knowledge" "settings-ds:#/settings/ds" "settings-files:#/settings/files" "settings-access:#/settings/access" \
+  ${PHOTO:+"post-text:#/post/$PHOTO/text"} ${POST:+"carousel-struct:#/post/$POST/struct"} ${POST:+"carousel-slides:#/post/$POST/slides"} ${POST:+"carousel-publish:#/post/$POST/publish"}; do
   shot "desk-${v%%:*}" 1440 900 "${v#*:}"
 done
 for v in "today:#/" "all:#/all" "reel:#/reel/$REEL"; do

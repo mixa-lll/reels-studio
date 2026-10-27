@@ -265,7 +265,7 @@ setInterval(async () => {
       const ru = LANG !== 'en';
       const head = ru ? `📤 Пора выкладывать: ${o.reel} ${o.version}${o.platform ? ` · ${o.platform}` : ''}` : `📤 Time to post: ${o.reel} ${o.version}${o.platform ? ` · ${o.platform}` : ''}`;
       await tg.sendText(chat, o.caption ? `${head}\n\n${o.caption}` : head);
-      for (const f of filesThere(o.files)) await tg.sendFile(chat, f, {asDocument: f.endsWith('.png')});
+      for (const f of filesThere(o.files)) await tg.sendFile(chat, f, {asDocument: !o.post && f.endsWith('.png')});
     } catch (e) {
       outboxMark(o.id, {error: String(e?.message ?? e).slice(0, 300)});
     }
