@@ -251,7 +251,7 @@ const isOwner = () => ME?.role === 'owner';
 const canEdit = () => ME && ME.role !== 'viewer';
 
 const projName = () => (PROJECTS.find((x) => x.slug === P) || {}).name || P;
-const ROLE = {owner: 'владелец', editor: 'монтажёр', viewer: 'зритель'};
+const ROLE = {owner: 'владелец', editor: 'монтажёр', viewer: 'зритель', author: 'автор'};
 
 async function sidebar() {
   OV = await api('/api/overview');
@@ -844,7 +844,14 @@ async function vFiles() {
         ${sw('finalOnly', pol.finalOnly, 'Рилс принят (в «Done») — остаётся только финальная версия')}
         <p class="small muted">Правила применяются сами после каждой новой версии. Снимок проекта — код рилса без медиа, обычно меньше мегабайта.</p></section>
     </div>
-    <section><div class="row" style="justify-content: space-between; margin-bottom: 10px"><h2>Входящие — всё, что присылали боту и в общий чат</h2><span class="small muted">материалы рилса — во вкладке «Файлы» у рилса</span></div><div class="fgrid" id="inbox"></div></section></div>`;
+    <section id="fromAuthors" style="margin-bottom: 18px"></section><section><div class="row" style="justify-content: space-between; margin-bottom: 10px"><h2>Входящие — всё, что присылали боту и в общий чат</h2><span class="small muted">материалы рилса — во вкладке «Файлы» у рилса</span></div><div class="fgrid" id="inbox"></div></section></div>`;
+  api('/api/authors').then(({authors}) => {
+    const box = $('#fromAuthors');
+    if (!box || !authors.length) return;
+    const ST = {new: 'ждёт подтверждения', sent: 'у редактора', private: 'не публикуем', idea: 'идея', published: 'вышло', declined: 'не взяли'};
+    const what = (e) => { const n = (k) => (e.items || []).filter((i) => i.kind === k).length; return [n('photo') && n('photo') + ' фото', n('video') && n('video') + ' видео', n('voice') && 'голосовое'].filter(Boolean).join(', ') || 'текст'; };
+    box.innerHTML = `<h2 style="margin-bottom: 10px">От авторов</h2>` + authors.slice(0, 30).map((e) => `<div class="li"><span style="flex: 1; min-width: 200px"><b>${esc(e.who || 'Автор')}</b> · ${e.kind === 'idea' ? 'идея' : esc(e.cls || '') + ' · ' + what(e)}${e.rubric ? ` <span class="chip">${esc(e.rubric)}</span>` : ''}<br><span class="small muted">${esc(((e.items || []).map((i) => i.text || i.said).filter(Boolean).join(' ') || e.text || '').slice(0, 140))}</span></span><span class="small muted">${ST[e.status] || ''} · ${ago(e.at)}</span>${(e.items || []).filter((i) => i.url).slice(0, 4).map((i) => `<a class="btn" href="${i.url}" target="_blank" rel="noopener">${i.kind === 'video' ? 'видео' : i.kind === 'voice' ? 'голос' : 'фото'}</a>`).join('')}</div>`).join('');
+  }).catch(() => {});
   api('/api/files').then(({inbox}) => {
     $('#inbox').innerHTML = inbox.slice(0, 60).map((f) => `<div class="fcard"><a class="pv" href="${f.url}" target="_blank" rel="noopener" ${f.kind === 'image' ? `style="background-image: url('${f.url}')"` : ''}>${f.kind === 'video' ? `<video src="${f.url}#t=0.5" preload="metadata" muted playsinline></video>` : f.kind === 'image' ? '' : esc((f.name.split('.').pop() || '').toUpperCase())}</a><div class="meta"><b title="${esc(f.name)}">${esc(f.name.split('/').pop())}</b><span class="muted">${mb(f.size)} · ${ago(f.at)}</span><a href="${f.url}&dl=1">Скачать</a></div></div>`).join('') || '<p class="small muted">Пусто.</p>';
   });
@@ -863,7 +870,7 @@ async function vAccess() {
       <div class="grow" style="display: flex; flex-direction: column; gap: 18px">
         <section class="card"><h2>Люди · ${a.people.length}</h2>
           ${a.people.map((x) => `<div class="li"><span style="flex: 1; min-width: 180px"><b>${esc(x.name)}</b>${(x.role === 'owner' && a.telegram.owner) || x.telegram ? ` <span class="chip">Telegram${x.telegram?.username ? ' · @' + esc(x.telegram.username) : ''}</span>` : ''} ${x.sessions ? `<span class="chip">веб · ${x.sessions} устр.</span>` : ''}</span>
-            ${x.role === 'owner' ? `<span class="pill cur">Владелец</span>` : `<select class="f" style="width: auto" data-role="${esc(x.id)}" aria-label="Роль ${esc(x.name)}"><option value="editor" ${x.role === 'editor' ? 'selected' : ''}>Монтажёр</option><option value="viewer" ${x.role === 'viewer' ? 'selected' : ''}>Зритель</option></select><button type="button" class="btn danger" data-remove="${esc(x.id)}">Убрать</button>`}</div>`).join('')}
+            ${x.role === 'owner' ? `<span class="pill cur">Владелец</span>` : `<select class="f" style="width: auto" data-role="${esc(x.id)}" aria-label="Роль ${esc(x.name)}"><option value="editor" ${x.role === 'editor' ? 'selected' : ''}>Монтажёр</option><option value="viewer" ${x.role === 'viewer' ? 'selected' : ''}>Зритель</option><option value="author" ${x.role === 'author' ? 'selected' : ''}>Автор</option></select><button type="button" class="btn danger" data-remove="${esc(x.id)}">Убрать</button>`}</div>`).join('')}
           ${a.invites.map((x) => `<div class="li" style="opacity: .85"><span style="flex: 1"><b>${esc(x.name)}</b> · приглашение не открыто<br><span class="small muted">${role[x.role]} · ${[x.telegram && !x.claimed?.includes('telegram') ? 'Telegram' : '', x.web && !x.claimed?.includes('web') ? 'веб' : ''].filter(Boolean).join(' + ')} · истекает ${new Date(x.expires).toLocaleString('ru', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}</span></span><button type="button" class="btn" data-cancel="${esc(x.code)}">Отменить</button></div>`).join('')}
           <p class="small muted">В Телеграм-боте ${a.telegram.bot ? '@' + esc(a.telegram.bot) + ' ' : ''}владелец — ${esc(a.telegram.owner || '—')}. Монтажёры пишут боту из своего Телеграма; бот работает с одним человеком за раз, остальным говорит подождать.</p></section>
         <section class="card"><div class="row" style="justify-content: space-between"><h2>Активные сессии · ${a.sessions.length}</h2><button type="button" class="btn" id="endOthers">Завершить все, кроме этой</button></div>
@@ -874,7 +881,7 @@ async function vAccess() {
       <div class="side2" style="display: flex; flex-direction: column; gap: 18px">
         <section class="card" style="display: flex; flex-direction: column; gap: 12px"><h2>Пригласить</h2>
           <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Как зовут<input class="f" id="invName" placeholder="Имя"></label>
-          <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Что можно<select class="f" id="invRole"><option value="editor">Монтажёр — делает и правит рилсы</option><option value="viewer">Зритель — смотрит и скачивает</option></select></label>
+          <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Что можно<select class="f" id="invRole"><option value="editor">Монтажёр — делает и правит рилсы</option><option value="viewer">Зритель — смотрит и скачивает</option><option value="author">Автор — присылает материалы в Телеграм-бот</option></select></label>
           <div class="small muted">Куда подключить</div>
           <div class="row"><label class="btn" style="cursor: pointer"><input type="checkbox" id="invTg" checked ${a.telegram.bot ? '' : 'disabled'}> Телеграм-бот</label><label class="btn" style="cursor: pointer"><input type="checkbox" id="invWeb" checked> Веб-версия</label></div>
           <button type="button" class="btn primary" id="invGo" style="min-height: 46px">Создать ссылку-приглашение</button>
@@ -893,9 +900,9 @@ async function vAccess() {
     const name = $('#invName').value.trim();
     if (!name) return $('#invName').focus();
     const role = $('#invRole').value;
-    const r = await post('/api/access', {action: 'invite', name, role, telegram: $('#invTg').checked && role === 'editor', web: $('#invWeb').checked});
+    const r = await post('/api/access', {action: 'invite', name, role, telegram: role === 'author' || ($('#invTg').checked && role === 'editor'), web: role !== 'author' && $('#invWeb').checked});
     const links = [r.telegram && ['Телеграм-бот', r.telegram], r.web && ['Веб-версия', location.origin + r.web]].filter(Boolean);
-    $('#invOut').innerHTML = `<div class="card" style="padding: 12px; background: var(--soft); display: flex; flex-direction: column; gap: 8px"><div class="small muted">Ссылки для ${esc(name)} — отправь их ему${role === 'viewer' ? ' (зрителю — только веб)' : ''}</div>
+    $('#invOut').innerHTML = `<div class="card" style="padding: 12px; background: var(--soft); display: flex; flex-direction: column; gap: 8px"><div class="small muted">Ссылки для ${esc(name)} — отправь их ему${role === 'viewer' ? ' (зрителю — только веб)' : role === 'author' ? ' (автору — только Телеграм-бот)' : ''}</div>
       ${links.map(([t, l], i) => `<div><div class="small">${t}</div><div class="row" style="flex-wrap: nowrap"><input class="f" readonly value="${esc(l)}"><button type="button" class="btn dark" data-copy="${i}">Скопировать</button></div></div>`).join('')}</div>`;
     $('#invOut').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => navigator.clipboard.writeText(links[b.dataset.copy][1]).then(() => toast('Скопировано'))));
   };

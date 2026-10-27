@@ -21,6 +21,7 @@ import {explain, lostSession} from './errors.mjs';
 import * as updates from './update.mjs';
 const {botChangedSince, head, pendingUpdates, pullUpdates, remoteUrl, upstreamHead} = updates;
 import {telegram} from './telegram.mjs';
+import {authors} from './author.mjs';
 import {claim as claimInvite, member, publishBot, touch} from './members.mjs';
 import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
 
@@ -170,6 +171,8 @@ process.on('exit', () => {
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
 
 const tg = telegram(env.token);
+// Authors get their own button-driven dialog (bot/author.mjs), never the agent.
+const author = authors({tg, transcribe, notify: (text) => state.chatId && tg.sendText(state.chatId, text, {silent: true}).catch(() => {})});
 
 // A crash of the bot itself is reported too; the service manager then restarts it.
 for (const ev of ['uncaughtException', 'unhandledRejection']) {
@@ -910,9 +913,19 @@ async function onMessage(msg) {
   if (msg.from.id !== state.ownerId && !who) {
     const code = msg.text?.match(/^\/start\s+inv_(\S+)/)?.[1];
     const joined = code && claimInvite(code, msg.from, msg.chat.id);
+    if (joined?.role === 'author') return author.welcome(msg.chat.id, msg.from, joined.name, state.ownerName).catch((e) => console.error('author', e));
     if (joined) return tg.sendText(msg.chat.id, joined.role === 'editor' ? TEAM.welcome(joined.name) : TEAM.viewer).catch(() => {});
     return tg.sendText(msg.chat.id, T.private, {silent: true}).catch(() => {});
   }
+  if (who?.role === 'author') { touch(msg.from.id); return author.onMessage(msg, who).catch((e) => console.error('author', e)); }
+  // The owner can try the author's side: /as_author, and /as_owner to come back.
+  if (!who && (msg.text === '/as_author' || msg.text === '/as_owner')) {
+    state.asAuthor = msg.text === '/as_author';
+    saveState(state);
+    if (state.asAuthor) return author.welcome(msg.chat.id, msg.from, state.ownerName || msg.from.first_name, 'Вы');
+    return tg.sendText(msg.chat.id, 'Снова владелец: сообщения идут Claude.', {reply_markup: {remove_keyboard: true}});
+  }
+  if (!who && state.asAuthor) return author.onMessage(msg, {name: state.ownerName || msg.from.first_name, role: 'author'}).catch((e) => console.error('author', e));
   if (who && who.role !== 'editor') return tg.sendText(msg.chat.id, TEAM.viewer, {silent: true}).catch(() => {});
   if (who) touch(msg.from.id);
   if (!takeTurn(msg.chat.id, who)) return;
@@ -1029,6 +1042,7 @@ async function onButton(q) {
   await tg.call('answerCallbackQuery', {callback_query_id: q.id}).catch(() => {});
   if (q.data === 'ctl:done') return;
   const who = q.from.id === state.ownerId ? null : member(q.from.id);
+  if (q.data.startsWith('a:')) return who?.role === 'author' || (q.from.id === state.ownerId && state.asAuthor) ? author.onButton(q).catch((e) => console.error('author', e)) : null;
   if (q.from.id !== state.ownerId && who?.role !== 'editor') return;
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
