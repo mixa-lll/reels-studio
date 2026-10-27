@@ -60,7 +60,7 @@ const projectDir = (p) => (safe(p) && existsSync(join(PROJECTS, p)) ? join(PROJE
 function projects() {
   if (!existsSync(PROJECTS)) return [];
   return readdirSync(PROJECTS).filter((p) => safe(p) && statSync(join(PROJECTS, p)).isDirectory())
-    .map((p) => ({slug: p, name: readJson(join(PROJECTS, p, 'settings.json'), {}).name || (p === 'main' ? 'My Gudauri' : p)}));
+    .map((p) => ({slug: p, name: readJson(join(PROJECTS, p, 'settings.json'), {}).name || (p === 'main' ? 'Школа' : p)}));
 }
 // ideas.md: «## Section» then «### Title» entries with Format:/Hook: lines.
 function parseIdeas(p) {
