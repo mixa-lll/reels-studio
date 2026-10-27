@@ -36,6 +36,8 @@ const ALLOWED = [
 ];
 // People, invites and the log are shared with the Telegram bot (bot/members.mjs).
 const SHARED = process.env.REELS_MEMBERS ? dirname(process.env.REELS_MEMBERS) : join(BOT, 'data', 'shared');
+// Scheduled publishing packages; the bot sends them (bot/outbox.mjs).
+const OUTBOX = join(SHARED, 'outbox.json');
 const DENIED = [`Edit(/${HERE}/**)`, `Read(/${join(HERE, 'data')}/**)`, `Edit(/${SHARED}/**)`, `Read(/${SHARED}/**)`];
 const ROLES = {owner: 3, editor: 2, viewer: 1};
 const SECTION_STATUS = {'In work': 'work', 'In review': 'review', Done: 'done', Published: 'published'};
@@ -224,7 +226,11 @@ function preamble(p, k) {
   if (k === '_ds') lines.push(`THIS CHAT develops the project's design system for its reels. The result is ONE self-contained HTML page, \`${relative(BOT, studio)}/design-system/index.html\` (inline CSS/JS, Google Fonts allowed, images as relative files next to it): a small landing page with the system's name and idea, color and type tokens, spacing and motion rules, and a library of the components (plates, price receipts, titles, subtitles, phone mockup…) drawn in HTML/CSS as they look in the reels, each with its name, when to use it and its Remotion component name if there is one. Read the brief, PLAYBOOK.md, \`template/src\` and the reels' code to stay true to what is really used. After each change, rewrite the page and tell the owner in one or two lines what changed; the page reloads by itself. Keep \`design-system/tokens.json\` in sync with the tokens on the page.`);
   else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules and settings. Reels themselves are made in their own chats; if the owner asks to make a reel here, say that the «Новый рилс» button starts it in its own chat.');
   else if (k.startsWith('new-')) lines.push('THIS CHAT starts a NEW reel. Create its folder with `node scripts/new-reel.mjs <latin-slug>` as soon as the idea is clear, before anything else; the page then moves this chat to that reel. One reel per chat.');
-  else lines.push(`THIS CHAT is about reel \`${relative(BOT, join(studio, 'reels', k))}/\` only; read its README.md first. Other reels have their own chats: if the owner asks about another one, tell them to open it on the page.`);
+  else lines.push(`THIS CHAT is about reel \`${relative(BOT, join(studio, 'reels', k))}/\` only; read its README.md first. Other reels have their own chats: if the owner asks about another one, tell them to open it on the page.`,
+    'The page shows the reel in four stages (Сценарий, Материалы, Монтаж, Выкладка) from two optional files in the reel folder; keep them current when the script, materials or captions change. ' +
+    '`scenes.json`: [{"t":"0:00","name":"Хук","screen":"what is on screen","text":"text on screen","sound":"…","need":"what material it needs","have":"what file covers it","status":"готово|нужно|переснять"}]. ' +
+    '`publish.json`: {"captions":[{"platform":"Instagram RU","account":"@…","text":"caption"}],"checks":[{"ok":true,"text":"…"}]}. ' +
+    'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version.');
   return lines.join('\n');
 }
 
@@ -485,7 +491,40 @@ createServer(async (req, res) => {
     const r = url.searchParams.get('reel');
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
-    return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md'))});
+    return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
+      scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null),
+      outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10)});
+  }
+  // Publishing = a package (video, cover, caption) the bot sends to Telegram at the chosen time
+  // (bot/outbox.mjs); the person then posts it from the phone.
+  if (req.method === 'POST' && url.pathname === '/api/publish') {
+    if (!can('editor')) return json(403, {});
+    const {reel, at, caption, platform} = await body(req);
+    const dir = reelDir(p, reel);
+    const when = Date.parse(at);
+    const cur = dir && versions(p, reel)[0];
+    if (!cur || !Number.isFinite(when)) return json(400, {error: 'нет версии или времени'});
+    const pick = (k) => cur.files.find((f) => f.kind === k)?.name;
+    const video = pick('copy') || pick('master');
+    const items = readJson(OUTBOX, []);
+    const item = {id: randomBytes(6).toString('hex'), project: p, reel, version: cur.v, at: when, platform: String(platform || '').slice(0, 60),
+      caption: String(caption || '').slice(0, 2200), files: [video, pick('cover')].filter(Boolean).map((f) => join(dir, 'versions', cur.v, f)),
+      by: me.name, person: me.id, created: Date.now()};
+    items.push(item);
+    writeJson(OUTBOX, items.slice(-200));
+    log(me.name, `запланировал выкладку ${reel} ${cur.v} на ${new Date(when).toISOString()}`);
+    return json(200, item);
+  }
+  if (req.method === 'POST' && url.pathname === '/api/publish/cancel') {
+    if (!can('editor')) return json(403, {});
+    const {id} = await body(req);
+    const items = readJson(OUTBOX, []);
+    const it = items.find((o) => o.id === id && o.project === p && !o.sent);
+    if (!it) return json(404, {});
+    it.cancelled = Date.now();
+    writeJson(OUTBOX, items);
+    log(me.name, `отменил выкладку ${it.reel}`);
+    return json(200, {});
   }
   if (req.method === 'GET' && url.pathname === '/api/chat') {
     const k = url.searchParams.get('key');

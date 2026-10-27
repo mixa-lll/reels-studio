@@ -22,6 +22,7 @@ import * as updates from './update.mjs';
 const {botChangedSince, head, pendingUpdates, pullUpdates, remoteUrl, upstreamHead} = updates;
 import {telegram} from './telegram.mjs';
 import {claim as claimInvite, member, publishBot, touch} from './members.mjs';
+import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
 
 // Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
 for (const level of ['log', 'error']) {
@@ -250,6 +251,23 @@ setInterval(() => {
   rmSync(CLAIM_APPROVED, {force: true});
   becomeOwner(who).catch((e) => console.error('owner', e.message));
 }, 2000);
+
+// Publishing packages from the web studio: sent when their time comes (bot/outbox.mjs).
+setInterval(async () => {
+  for (const o of outboxDue()) {
+    const chat = chatOf(o.person) || state.ownerId;
+    if (!chat) continue;
+    outboxMark(o.id, {sent: Date.now()});
+    try {
+      const ru = LANG !== 'en';
+      const head = ru ? `📤 Пора выкладывать: ${o.reel} ${o.version}${o.platform ? ` · ${o.platform}` : ''}` : `📤 Time to post: ${o.reel} ${o.version}${o.platform ? ` · ${o.platform}` : ''}`;
+      await tg.sendText(chat, o.caption ? `${head}\n\n${o.caption}` : head);
+      for (const f of filesThere(o.files)) await tg.sendFile(chat, f, {asDocument: f.endsWith('.png')});
+    } catch (e) {
+      outboxMark(o.id, {error: String(e?.message ?? e).slice(0, 300)});
+    }
+  }
+}, 30_000);
 
 // Stay awake on the charger if the owner asked; re-applied as settings change.
 keepAwake(settings().keepAwake === true);
