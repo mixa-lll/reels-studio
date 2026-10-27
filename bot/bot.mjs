@@ -21,6 +21,7 @@ import {explain, lostSession} from './errors.mjs';
 import * as updates from './update.mjs';
 const {botChangedSince, head, pendingUpdates, pullUpdates, remoteUrl, upstreamHead} = updates;
 import {telegram} from './telegram.mjs';
+import {authors} from './author.mjs';
 import {claim as claimInvite, member, publishBot, touch} from './members.mjs';
 import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
 
@@ -170,6 +171,8 @@ process.on('exit', () => {
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
 
 const tg = telegram(env.token);
+// Authors get their own button-driven dialog (bot/author.mjs), never the agent.
+const author = authors({tg, transcribe, notify: (text) => state.chatId && tg.sendText(state.chatId, text, {silent: true}).catch(() => {})});
 
 // A crash of the bot itself is reported too; the service manager then restarts it.
 for (const ev of ['uncaughtException', 'unhandledRejection']) {
@@ -220,7 +223,7 @@ const mtime = (f) => (existsSync(f) ? statSync(f).mtimeMs : 0);
 // keyboard back in Telegram clients, which show the last keyboard still in the chat.
 async function clearKeyboard() {
   if (!forgetKeys()) return;
-  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text: T.keysGone, disable_notification: true, reply_markup: {remove_keyboard: true}}).catch(() => null);
+  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text: T.keysGone, disable_notification: true, reply_markup: HOME_KEYS}).catch(() => null);
   if (!msg) return;
   await dropKeyAck();
   state.keyAck = msg.message_id;
@@ -415,7 +418,7 @@ async function switchProject() {
   saveState(state);
   const text = req.created ? `${T.projectNew(projectName(req.slug), fromName)}${req.carry ? '' : `\n\n${T.askAbout}`}` : T.projectOpen(nameOf(req.slug));
   // The divider takes the old keyboard away too.
-  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text, reply_markup: {remove_keyboard: true}}).catch(() => null);
+  const msg = await tg.call('sendMessage', {chat_id: state.chatId, text, reply_markup: HOME_KEYS}).catch(() => null);
   if (msg) {
     await dropKeyAck();
     state.projectLog = [...(state.projectLog ?? []), [msg.message_id, req.slug]].slice(-200);
@@ -886,6 +889,41 @@ function interrupt(reason) {
 
 // ---------- incoming updates ----------
 
+// ---------- role preview for the owner (/role) ----------
+// The owner's own keyboard whenever no reply-specific one is shown: the main commands,
+// so nothing has to be typed or found in the menu.
+const HOME_LABELS = {'💡 Идеи': 'ideas', '📂 Незаконченные': 'unfinished', '🎭 Роль': 'role', '⚙️ Настройки': 'settings'};
+const HOME_KEYS = {keyboard: [[{text: '💡 Идеи'}, {text: '📂 Незаконченные'}], [{text: '🎭 Роль'}, {text: '⚙️ Настройки'}]], resize_keyboard: true, is_persistent: true};
+const ROLE_NAMES = {owner: 'Владелец / редактор', author: 'Автор (учитель)', host: 'Ведущий', approver: 'Согласующий (директор)'};
+const ROLE_PICK = {
+  text: (cur) => `Чьими глазами посмотреть на бота? Сейчас: ${ROLE_NAMES[cur || 'owner']}.\n\nАвтор присылает материалы, ведущий снимает по заданиям, согласующий одобряет неделю. Вернуться — /role.`,
+  kb: {inline_keyboard: Object.entries(ROLE_NAMES).map(([k, v]) => [{text: v, callback_data: `role:${k}`}])},
+};
+const appButton = (text, hash = '') => (process.env.MINIAPP_URL ? {text, web_app: {url: process.env.MINIAPP_URL + hash}} : {text});
+async function switchRole(chatId, from, role) {
+  state.actAs = role === 'owner' ? null : role;
+  delete state.asAuthor;
+  saveState(state);
+  if (role === 'author') return author.welcome(chatId, from, state.ownerName || from.first_name, 'Вы');
+  if (role === 'host') return hostChat(chatId, true);
+  if (role === 'approver') return approverChat(chatId, true);
+  return tg.call('sendMessage', {chat_id: chatId, text: 'Вы снова владелец: сообщения идут Claude. Кнопки — внизу, сменить роль — «🎭 Роль».', reply_markup: HOME_KEYS});
+}
+// The host lives in the mini app; the chat only brings the week's tasks and a button.
+function hostChat(chatId, first) {
+  const ok = !!process.env.MINIAPP_URL;
+  return tg.call('sendMessage', {chat_id: chatId, parse_mode: 'HTML',
+    text: `${first ? 'Вы — ведущий.\n\n' : ''}<b>Задания на неделю готовы</b>\n3 коротких ролика · около 10 минут. Снять до пятницы.${ok ? '' : '\n\n⚠️ Мини-приложение «Съёмка» не подключено: нет адреса MINIAPP_URL.'}`,
+    reply_markup: ok ? {keyboard: [[appButton('📋 Задания'), appButton('🎬 Мои ролики', '#reels')], [appButton('👤 Профиль', '#profile')]], resize_keyboard: true, is_persistent: true} : {remove_keyboard: true}})
+    .then(() => ok && tg.call('sendMessage', {chat_id: chatId, text: 'Съёмка — в приложении: текст у камеры, запись, отправка.', reply_markup: {inline_keyboard: [[{text: 'Открыть задания', web_app: {url: process.env.MINIAPP_URL}}], [{text: 'Не могу на этой неделе', callback_data: 'hs:skip'}]]}}));
+}
+// The approver has no account: a week comes as one message with buttons (stub until the link page).
+function approverChat(chatId, first) {
+  return tg.call('sendMessage', {chat_id: chatId, parse_mode: 'HTML',
+    text: `${first ? 'Вы — согласующий (директор).\n\n' : ''}<b>Анна прислала неделю 3–9 ноября на согласование</b>\n\n1. Медь 7Б · карусель — пн 10:00 · Инстаграм\n2. Робототехника · рилс — вт 18:00 · Инстаграм\n3. День открытых дверей · рилс — ср 9:00 · Инстаграм\n4. Индикатор 8В · пост — пт 18:00 · Телеграм\n\nСсылка действует до 10 ноября.`,
+    reply_markup: {inline_keyboard: [[{text: '✓ Одобрить всё', callback_data: 'ap:all'}], [{text: 'Замечание к публикации', callback_data: 'ap:note'}]]}});
+}
+
 async function onMessage(msg) {
   // Private chats only: a bot added to a group leaves it.
   if (msg.chat.type !== 'private') {
@@ -910,16 +948,29 @@ async function onMessage(msg) {
   if (msg.from.id !== state.ownerId && !who) {
     const code = msg.text?.match(/^\/start\s+inv_(\S+)/)?.[1];
     const joined = code && claimInvite(code, msg.from, msg.chat.id);
+    if (joined?.role === 'author') return author.welcome(msg.chat.id, msg.from, joined.name, state.ownerName).catch((e) => console.error('author', e));
     if (joined) return tg.sendText(msg.chat.id, joined.role === 'editor' ? TEAM.welcome(joined.name) : TEAM.viewer).catch(() => {});
     return tg.sendText(msg.chat.id, T.private, {silent: true}).catch(() => {});
   }
+  if (who?.role === 'author') { touch(msg.from.id); return author.onMessage(msg, who).catch((e) => console.error('author', e)); }
+  // The owner can see the bot as any role (/role): author, host, approver; owner = normal.
+  if (!who && ['/role', '/as_author', '/as_owner', '🎭 Роль'].includes(msg.text)) {
+    if (msg.text === '/role' || msg.text === '🎭 Роль') return tg.call('sendMessage', {chat_id: msg.chat.id, text: ROLE_PICK.text(state.actAs), reply_markup: ROLE_PICK.kb});
+    return switchRole(msg.chat.id, msg.from, msg.text === '/as_author' ? 'author' : 'owner');
+  }
+  if (!who && state.actAs === 'author') return author.onMessage(msg, {name: state.ownerName || msg.from.first_name, role: 'author'}).catch((e) => console.error('author', e));
+  if (!who && state.actAs === 'host') return hostChat(msg.chat.id);
+  if (!who && state.actAs === 'approver') return approverChat(msg.chat.id);
   if (who && who.role !== 'editor') return tg.sendText(msg.chat.id, TEAM.viewer, {silent: true}).catch(() => {});
   if (who) touch(msg.from.id);
   if (!takeTurn(msg.chat.id, who)) return;
 
-  const cmd = msg.text?.match(/^\/(\w+)/)?.[1];
+  const cmd = msg.text?.match(/^\/(\w+)/)?.[1] ?? HOME_LABELS[msg.text?.trim()];
   if (who && ['settings', 'update', 'projects'].includes(cmd)) return tg.sendText(state.chatId, TEAM.ownerOnly, {silent: true});
-  if (cmd === 'start') return tg.sendText(state.chatId, T.hello, {silent: true});
+  if (cmd === 'start') {
+    await tg.sendText(state.chatId, T.hello, {silent: true, reply_markup: HOME_KEYS});
+    return tg.call('sendMessage', {chat_id: state.chatId, text: ROLE_PICK.text(state.actAs), reply_markup: ROLE_PICK.kb, disable_notification: true}).catch(() => {});
+  }
   // A running task's progress line itself turns into «⏹ Stopped».
   if (cmd === 'stop') return interrupt('stop') ? null : tg.sendText(state.chatId, T.idle, {silent: true});
   if (cmd === 'new') {
@@ -951,7 +1002,7 @@ async function onMessage(msg) {
   // Speech-to-text takes a few seconds: say so instead of leaving only 👀. The voice note
   // answers whatever was asked, so this message also takes the keyboard away at once.
   const listening = voice
-    ? await tg.call('sendMessage', {chat_id: state.chatId, text: T.listening, disable_notification: true, reply_markup: {remove_keyboard: true}}, {retries: 0}).catch(() => null)
+    ? await tg.call('sendMessage', {chat_id: state.chatId, text: T.listening, disable_notification: true, reply_markup: HOME_KEYS}, {retries: 0}).catch(() => null)
     : null;
   if (listening) forgetKeys();
   const {prompt, said, problems} = await describe(tg, msg, {transcribe, lang: LANG, onInstall});
@@ -961,7 +1012,7 @@ async function onMessage(msg) {
   if (listening) {
     if (said) {
       const heard = `🎙 «${said.length > 500 ? `${said.slice(0, 500)}…` : said}»`;
-      await tg.call('sendMessage', {chat_id: state.chatId, text: heard, disable_notification: true, reply_markup: {remove_keyboard: true}}, {retries: 1}).catch(() => {});
+      await tg.call('sendMessage', {chat_id: state.chatId, text: heard, disable_notification: true, reply_markup: HOME_KEYS}, {retries: 1}).catch(() => {});
     }
     tg.call('deleteMessage', {chat_id: state.chatId, message_id: listening.message_id}, {retries: 1}).catch(() => {});
   }
@@ -1029,6 +1080,16 @@ async function onButton(q) {
   await tg.call('answerCallbackQuery', {callback_query_id: q.id}).catch(() => {});
   if (q.data === 'ctl:done') return;
   const who = q.from.id === state.ownerId ? null : member(q.from.id);
+  if (q.data.startsWith('a:')) return who?.role === 'author' || (q.from.id === state.ownerId && state.actAs === 'author') ? author.onButton(q).catch((e) => console.error('author', e)) : null;
+  if (q.from.id === state.ownerId && q.data.startsWith('role:')) {
+    await tg.call('editMessageReplyMarkup', {chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: {inline_keyboard: []}}).catch(() => {});
+    return switchRole(q.message.chat.id, q.from, q.data.slice(5));
+  }
+  if (q.from.id === state.ownerId && q.data === 'hs:skip') return tg.call('editMessageText', {chat_id: q.message.chat.id, message_id: q.message.message_id, text: 'Понял, вернул задания редактору — она решит, кому их отдать.'}).catch(() => {});
+  if (q.from.id === state.ownerId && q.data.startsWith('ap:')) {
+    const text = q.data === 'ap:all' ? `${q.message.text}\n\n✓ Одобрено. Анна получит ответ.` : `${q.message.text}\n\nНапишите замечание одним сообщением — передам Анне. (Пока заглушка: страница недели по ссылке — следующий шаг.)`;
+    return tg.call('editMessageText', {chat_id: q.message.chat.id, message_id: q.message.message_id, text}).catch(() => {});
+  }
   if (q.from.id !== state.ownerId && who?.role !== 'editor') return;
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
@@ -1187,7 +1248,7 @@ async function flushOutbox() {
   if (!o || !state.chatId) return;
   await tg.call('sendChatAction', {chat_id: state.chatId, action: 'typing'}).catch(() => {});
   // A reply without options still takes over the keyboard removal from «👌 Принял».
-  const markup = o.labels ? replyKeyboard(o.labels, {placeholder: T.hint}) : state.keyAck ? {remove_keyboard: true} : undefined;
+  const markup = o.labels ? replyKeyboard(o.labels, {placeholder: T.hint}) : HOME_KEYS;
   await tg.sendText(state.chatId, o.text, markup ? {reply_markup: markup} : {});
   if (markup) await dropKeyAck();
   delete state.outbox;

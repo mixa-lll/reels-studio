@@ -685,6 +685,16 @@ createServer(async (req, res) => {
     log(me.name, `загрузил ${basename(path)}${rdir ? ` в рилс ${reel}` : ''}`);
     return json(200, {path, url: mediaUrl(path)});
   }
+  // What authors sent through the bot (bot/author.mjs): one line per update, merged by id.
+  if (req.method === 'GET' && url.pathname === '/api/authors') {
+    const byId = new Map();
+    for (const line of read(join(studio, 'inbox', 'authors.jsonl')).split('\n')) {
+      try { const e = JSON.parse(line); byId.set(e.id, {...byId.get(e.id), ...e}); } catch {}
+    }
+    const list = [...byId.values()].sort((x, y) => y.at - x.at).slice(0, 100)
+      .map((e) => ({...e, items: (e.items || []).map((i) => ({...i, url: i.path ? mediaUrl(join(studio, i.path)) : null}))}));
+    return json(200, {authors: list});
+  }
   if (req.method === 'GET' && url.pathname === '/api/files') {
     const reel = url.searchParams.get('reel');
     if (reel) {
@@ -744,18 +754,21 @@ createServer(async (req, res) => {
     if (!can('owner')) return json(403, {});
     const b = await body(req);
     const a = access();
-    if (b.action === 'invite' && b.name?.trim() && ['editor', 'viewer'].includes(b.role)) {
-      // Telegram only for editors: in the bot everything is a conversation with the agent.
-      const telegram = b.telegram === true && b.role === 'editor' && !!botUsername();
-      const web = b.web !== false || !telegram;
+    if (b.action === 'invite' && b.name?.trim() && ['editor', 'viewer', 'author'].includes(b.role)) {
+      // Telegram for editors (a conversation with the agent) and for authors, who live
+      // only in the bot (bot/author.mjs) and have no web version.
+      const author = b.role === 'author';
+      if (author && !botUsername()) return json(400, {error: 'Сначала запустите Телеграм-бота'});
+      const telegram = author || (b.telegram === true && b.role === 'editor' && !!botUsername());
+      const web = !author && (b.web !== false || !telegram);
       const inv = {code: id(), name: b.name.trim().slice(0, 60), role: b.role, expires: Date.now() + 24 * 3600_000, web, telegram, claimed: []};
       a.invites.push(inv);
-      log(me.name, `пригласил ${inv.name} (${inv.role === 'editor' ? 'монтажёр' : 'зритель'}${telegram ? ', Telegram' : ''}${web ? ', веб' : ''})`);
+      log(me.name, `пригласил ${inv.name} (${({editor: 'монтажёр', viewer: 'зритель', author: 'автор'})[inv.role]}${telegram ? ', Telegram' : ''}${web ? ', веб' : ''})`);
       saveAccess(a);
       return json(200, {web: web ? `/invite/${inv.code}` : null, telegram: telegram ? `https://t.me/${botUsername()}?start=inv_${inv.code}` : null});
     }
     if (b.action === 'cancel') a.invites = a.invites.filter((x) => x.code !== b.code);
-    if (b.action === 'role' && ['editor', 'viewer'].includes(b.role)) {
+    if (b.action === 'role' && ['editor', 'viewer', 'author'].includes(b.role)) {
       const x = a.people.find((y) => y.id === b.id && y.role !== 'owner');
       if (x) { x.role = b.role; log(me.name, `сменил роль ${x.name}`); }
     }

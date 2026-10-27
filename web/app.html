@@ -164,7 +164,7 @@ const $ = (s) => document.querySelector(s);
 const haptic = (k = 'light') => { try { k === 'ok' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred(k); } catch {} };
 const root = $('#root');
 
-let S = null, tab = 'tasks', stack = [];
+let S = null, tab = ['reels', 'profile'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tasks', stack = [];
 async function api(path, opts = {}) {
   const r = await fetch(path, {...opts, headers: {'x-tg-init': tg?.initData || '', ...(opts.json ? {'content-type': 'application/json'} : {}), ...(opts.headers || {})}, body: opts.json ? JSON.stringify(opts.json) : opts.body});
   const b = await r.json().catch(() => ({}));
