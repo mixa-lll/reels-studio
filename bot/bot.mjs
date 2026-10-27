@@ -933,6 +933,11 @@ async function onMessage(msg) {
   if (cmd === 'projects') return showProjects();
   if (cmd === 'settings') return showSettings();
   if (cmd === 'update') return checkUpdates(true);
+  if (cmd === 'app') {
+    if (!process.env.MINIAPP_URL) return tg.sendText(state.chatId, LANG === 'ru' ? 'Мини-приложение «Съёмка» ещё не включено: нужен адрес MINIAPP_URL.' : 'The filming mini app is not on yet: MINIAPP_URL is missing.', {silent: true});
+    return tg.call('sendMessage', {chat_id: state.chatId, text: LANG === 'ru' ? '🎬 Задания на неделю и запись с суфлёром — в приложении «Съёмка».' : '🎬 This week\'s tasks and teleprompter recording are in the Filming app.',
+      reply_markup: {inline_keyboard: [[{text: LANG === 'ru' ? 'Открыть задания' : 'Open tasks', web_app: {url: process.env.MINIAPP_URL}}]]}});
+  }
   if (cmd === 'usage') return tg.sendText(state.chatId, usageText(state.limits, LANG), {silent: true});
   if (state.awaitingTime && msg.text && !cmd) return onSettingsTime(msg.text);
 

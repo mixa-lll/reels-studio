@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Съёмка</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--page:#F3F3F5;--card:#fff;--ink:#171717;--soft:#525252;--mut:#6B6B6B;--line:#EBEBEB;--sec2:#F1F1F2;--acc:#2F6FEB;--tint:#EEF3FE;--ok:#2E8A4F;--warn:#8F5C12;--bad:#C2362B;
+--g:#22A55B;--v:#8B5CF6;--a:#F59E0B;--b:#2F6FEB;--r:#EF4444;--btnbg:linear-gradient(180deg,#2B2B2B,#171717);--btnt:#fff;--shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.06)}
+.dark{--page:#1C1C1F;--card:#26262A;--ink:#E4E4E7;--soft:#C2C2C7;--mut:#9A9AA1;--line:#38383D;--sec2:#323237;--acc:#86A9EE;--tint:#24304A;--ok:#79C493;--warn:#D8AE6A;--bad:#E4948B;
+--g:#5FC48A;--v:#A78BFA;--a:#E5B062;--b:#86A9EE;--r:#E4948B;--btnbg:linear-gradient(180deg,#4A7BE6,#3A68D0);--btnt:#fff;--shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25)}
+html,body{margin:0;background:var(--page);color:var(--ink);font-family:Manrope,system-ui,sans-serif;letter-spacing:-0.005em;-webkit-font-smoothing:antialiased}
+body{min-height:100vh}
+button{font-family:inherit;cursor:pointer}
+.scr{padding:12px 20px 140px;max-width:560px;margin:0 auto}
+.greet{display:flex;align-items:center;gap:12px;margin:4px 0 2px}
+.av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#C7D2FE,#A5B4FC);display:grid;place-items:center;font-weight:700;font-size:17px;color:#1E2A5A;flex:none}
+.d{font-size:15px;color:var(--mut);font-weight:600}
+h1{font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.025em;margin:6px 0 8px}
+h1.t2{font-size:25px;line-height:31px}
+.sub{font-size:16px;line-height:23px;color:var(--mut);font-weight:500;margin:0}
+.lab{font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--mut)}
+.lh{display:flex;align-items:baseline;margin-top:26px;padding:0 4px 10px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.main,.box,.note{background:var(--card);box-shadow:var(--shadow);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:6px}
+.main{margin-top:20px}
+.main .t{font-size:19px;line-height:25px;font-weight:700;letter-spacing:-0.015em}
+.main .s{font-size:16px;line-height:22px;color:var(--soft)}
+.hrow{display:flex;align-items:center;gap:16px}
+.ring{width:76px;height:76px;flex:none;position:relative;display:grid;place-items:center}
+.ring b{position:absolute;font-size:21px;font-weight:700;letter-spacing:-0.03em}
+.grp{background:var(--card);border-radius:18px;box-shadow:var(--shadow);padding:0 14px}
+.li{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none;width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;font-size:inherit}
+.li:first-child{border-top:0}
+.ti{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none}
+.tx{flex:1;min-width:0}.tx b{display:block;font-size:17px;line-height:23px;font-weight:600}.tx span{font-size:15px;line-height:21px;color:var(--mut)}
+.st{font-size:15px;font-weight:600;white-space:nowrap}.st.w{color:var(--warn)}.st.o{color:var(--ok)}.st.b{color:var(--bad)}.st.m{color:var(--mut)}
+.bb{height:56px;border:0;border-radius:16px;background:var(--btnbg);box-shadow:0 1px 0 rgba(255,255,255,.12) inset,0 3px 8px rgba(0,0,0,.18);color:var(--btnt);font-size:17px;font-weight:600;width:100%;display:flex;align-items:center;justify-content:center;gap:10px}
+.sb2{height:56px;border:1px solid var(--line);border-radius:16px;background:var(--sec2);color:var(--ink);font-size:17px;font-weight:600;width:100%;display:flex;align-items:center;justify-content:center;gap:10px}
+.lk{height:48px;border:0;background:transparent;color:var(--acc);font-size:17px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.bb:disabled{opacity:.5}
+.foot{position:fixed;left:0;right:0;bottom:0;padding:12px 20px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(180deg,transparent,var(--page) 22%);display:flex;flex-direction:column;gap:8px;max-width:560px;margin:0 auto;z-index:5}
+.foot.tabbed{bottom:calc(64px + env(safe-area-inset-bottom))}
+.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);box-shadow:0 -1px 0 var(--line),0 -6px 18px rgba(0,0,0,.04);padding:8px 6px calc(10px + env(safe-area-inset-bottom));z-index:6}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--mut);background:none;border:0}
+.tab .ib{width:56px;height:32px;border-radius:999px;display:grid;place-items:center}
+.tab.on{color:var(--ink)}.tab.on .ib{background:var(--ink);color:var(--card)}
+.dark .tab.on .ib{background:#3A68D0;color:#fff}
+.big{font-size:20px;line-height:29px;font-weight:500;letter-spacing:-0.01em;margin:0}
+.big b{font-weight:700}
+.cap{font-size:14px;color:var(--mut);line-height:1.5}
+.eb2{width:40px;height:40px;border-radius:50%;border:0;background:var(--sec2);color:var(--ink);display:grid;place-items:center;flex:none}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.tool{height:40px;border-radius:999px;border:1px solid var(--line);background:var(--card);padding:0 14px;font-size:15px;font-weight:600;color:var(--ink);display:inline-flex;align-items:center;gap:7px}
+.w{border-radius:5px;padding:0 1px}
+.w.sel{background:color-mix(in srgb,var(--b) 14%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--b) 40%,transparent)}
+.flag{display:flex;gap:10px;align-items:flex-start;background:color-mix(in srgb,var(--a) 14%,transparent);border-radius:14px;padding:12px 14px;font-size:15px;line-height:21px;margin-top:12px}
+.quote{margin-top:14px;font-size:15px;line-height:21px;color:var(--soft);display:flex;gap:10px}
+.quote i{width:3px;border-radius:2px;background:var(--b);flex:none}
+textarea{width:100%;min-height:150px;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);font:500 18px/27px Manrope,sans-serif;padding:12px;resize:vertical}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;z-index:20}
+.sheet>div{background:var(--card);border-radius:20px 20px 0 0;width:100%;padding:8px 18px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px}
+.grab{width:36px;height:5px;border-radius:3px;background:var(--line);align-self:center}
+.opt{display:flex;gap:8px;flex-wrap:wrap}.opt button{height:44px;border-radius:12px;border:0;background:var(--sec2);color:var(--ink);padding:0 14px;font-size:16px;font-weight:600}
+.opt button.on{background:var(--ink);color:var(--card)}
+.kv{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
+.kv:first-child{border-top:0}
+input.f{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:500 16px Manrope,sans-serif;padding:0 12px}
+.center{text-align:center;display:flex;flex-direction:column;align-items:center}
+.badge{width:96px;height:96px;border-radius:50%;display:grid;place-items:center}
+.demo{font-size:13px;color:var(--warn);background:color-mix(in srgb,var(--a) 14%,transparent);border-radius:10px;padding:6px 10px;margin-bottom:6px;display:inline-block}
+.err{padding:40px 24px;text-align:center}
+/* camera */
+.cam{position:fixed;inset:0;background:#000;z-index:30;color:#fff;overflow:hidden}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam video.mirror{transform:scaleX(-1)}
+.ctop{position:absolute;top:0;left:0;right:0;padding:calc(12px + env(safe-area-inset-top)) 14px 0;display:flex;align-items:center;justify-content:space-between;z-index:3}
+.cb{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;border:0}
+.timer{background:rgba(0,0,0,.4);border-radius:999px;padding:7px 14px;font-size:15px;font-weight:700}
+.timer.rec{background:#E5484D}
+.tp{position:absolute;top:calc(70px + env(safe-area-inset-top));left:12px;right:70px;height:34vh;background:rgba(0,0,0,.5);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:18px;overflow:hidden;z-index:2}
+.tp .in{padding:14px 16px 40vh;font-weight:600;line-height:1.4;will-change:transform}
+.side{position:absolute;right:10px;top:calc(70px + env(safe-area-inset-top));display:flex;flex-direction:column;gap:14px;align-items:center;z-index:3}
+.side button{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#fff;background:none;border:0;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.side button span{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.4);display:grid;place-items:center}
+.speed{position:absolute;left:20px;right:20px;bottom:calc(150px + env(safe-area-inset-bottom));display:flex;background:rgba(0,0,0,.45);border-radius:999px;padding:4px;z-index:3}
+.speed button{flex:1;padding:9px 0;border-radius:999px;font-size:14px;font-weight:700;color:#fff;background:none;border:0}
+.speed button.on{background:#fff;color:#171717}
+.recrow{position:absolute;left:0;right:0;bottom:calc(36px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-around;z-index:3}
+.rbtn{width:86px;height:86px;border-radius:50%;border:6px solid rgba(255,255,255,.9);background:none;display:grid;place-items:center}
+.rbtn i{width:64px;height:64px;border-radius:50%;background:#E5484D;transition:all .2s}
+.rbtn.on i{width:30px;height:30px;border-radius:8px}
+.sm{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#fff;background:none;border:0;width:70px}
+.sm span{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.count{position:absolute;inset:0;display:grid;place-items:center;font-size:120px;font-weight:700;z-index:4;text-shadow:0 4px 20px rgba(0,0,0,.5)}
+.vid{width:100%;border-radius:20px;background:#000;max-height:56vh;display:block;box-shadow:var(--shadow)}
+.prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:var(--ok);width:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const tg = window.Telegram?.WebApp;
+const I = {
+  list:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/>',
+  film:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M10 8.5v7l6-3.5z"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  video:'<path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"/><rect x="2" y="6" width="14" height="12" rx="3"/>',
+  chev:'<path d="m9 18 6-6-6-6"/>', check:'<path d="M20 6 9 17l-5-5"/>', x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  pen:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  spark:'<path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4z"/>',
+  flip:'<path d="M3 7h13l-3-3M21 17H8l3 3"/>', timer:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M10 2h4"/>',
+  type:'<path d="M4 7V5h16v2M9 19h6M12 5v14"/>', gauge:'<path d="M12 14l4-4"/><path d="M3.3 18a10 10 0 1 1 17.4 0"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', pin:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>', upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/>',
+};
+const ic = (n, s = 24, c = 'currentColor', w = 2.25) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $ = (s) => document.querySelector(s);
+const haptic = (k = 'light') => { try { k === 'ok' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred(k); } catch {} };
+const root = $('#root');
+
+let S = null, tab = 'tasks', stack = [];
+async function api(path, opts = {}) {
+  const r = await fetch(path, {...opts, headers: {'x-tg-init': tg?.initData || '', ...(opts.json ? {'content-type': 'application/json'} : {}), ...(opts.headers || {})}, body: opts.json ? JSON.stringify(opts.json) : opts.body});
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(b.error || 'Что-то пошло не так. Попробуйте ещё раз.');
+  return b;
+}
+function theme() {
+  const dark = tg?.colorScheme === 'dark';
+  document.documentElement.classList.toggle('dark', dark);
+  const page = dark ? '#1C1C1F' : '#F3F3F5';
+  try { tg.setHeaderColor(page); tg.setBackgroundColor(page); tg.setBottomBarColor?.(page); } catch {}
+}
+const backBtn = () => { try { stack.length ? tg.BackButton.show() : tg.BackButton.hide(); } catch {} };
+function go(screen, arg) { stack.push({screen, arg}); haptic(); draw(); }
+function back() { stack.pop(); draw(); }
+function tabs() {
+  const T = [['tasks','list','Задания'],['reels','film','Мои ролики'],['profile','user','Профиль']];
+  return `<nav class="tabs" aria-label="Разделы">${T.map(([k, i, l]) => `<button class="tab${tab === k ? ' on' : ''}" data-tab="${k}"><span class="ib">${ic(i)}</span>${l}</button>`).join('')}</nav>`;
+}
+const tint = (v) => `background:color-mix(in srgb,var(${v}) 14%,transparent);color:var(${v})`;
+const taskText = (t) => t.edit?.text || t.text;
+const left = () => S.tasks.filter((t) => t.status !== 'sent');
+
+function draw() {
+  backBtn();
+  window.scrollTo(0, 0);
+  const top = stack.at(-1);
+  if (!top) return ({tasks: drawTasks, reels: drawReels, profile: drawProfile})[tab]();
+  return ({task: drawTask, edit: drawEdit, review: drawReview, done: drawDone})[top.screen](top.arg);
+}
+
+// ---------- Задания ----------
+function drawTasks() {
+  const all = S.tasks, todo = all.filter((t) => t.status === 'todo'), redo = all.filter((t) => t.status === 'redo'), done = all.length - left().length;
+  const dash = all.length ? Math.round(201 * done / all.length) : 0;
+  const hour = new Date().getHours(), hi = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
+  const day = new Date().toLocaleDateString('ru-RU', {weekday: 'long', day: 'numeric', month: 'long'});
+  const next = redo[0] || todo[0];
+  const row = (t, st) => `<button class="li" data-task="${t.id}"><span class="ti" style="${tint(t.status === 'redo' ? '--r' : t.lang !== 'ru' ? '--g' : '--b')}">${ic(t.lang !== 'ru' ? 'globe' : 'video', 22)}</span><span class="tx"><b>${esc(t.title)}</b><span>${t.seconds} секунд${t.lang !== 'ru' ? ' · на английском' : ''}${t.status === 'redo' ? ' · ' + esc(t.note || '') : ''}</span></span>${st}${ic('chev', 20, 'var(--mut)', 2.5)}</button>`;
+  root.innerHTML = `<div class="scr">
+    ${S.demo ? '<span class="demo">Демо-задания — пока редактор не задал свои</span>' : ''}
+    <div class="greet"><span class="av">${esc(S.me.name[0] || '·')}</span><span class="d">${day[0].toUpperCase() + day.slice(1)}</span></div>
+    <h1>${hi}, ${esc(S.me.name.split(' ')[0])}</h1>
+    <p class="sub">${left().length ? `На эту ${esc(S.week?.replace('неделя ', 'неделю ') || 'неделю')} — ${left().length} ${plural(left().length, 'ролик', 'ролика', 'роликов')}, около ${Math.max(3, left().length * 3)} минут.` : 'Всё снято. Новые задания придут в понедельник.'}</p>
+    ${next ? `<div class="main"><div class="hrow"><span class="ring" role="img" aria-label="Снято ${done} из ${all.length}"><svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="32" fill="none" stroke="var(--line)" stroke-width="7"/><circle cx="38" cy="38" r="32" fill="none" stroke="var(--g)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${dash} 201" transform="rotate(-90 38 38)"/></svg><b>${done}/${all.length}</b></span>
+      <div style="display:flex;flex-direction:column;gap:4px"><span class="t">${redo.length ? 'Переснять: ' + esc(next.title) : `Снять ${todo.length} ${plural(todo.length, 'ролик', 'ролика', 'роликов')}`}</span><span class="s">${esc(next.place || '')}. Текст будет на экране.</span></div></div>
+      <div style="height:12px"></div><button class="bb" data-task="${next.id}">${ic('video', 22)}${redo.length ? 'Переснять' : 'Начать съёмку'}</button></div>` : ''}
+    ${todo.length ? `<div class="lh">Надо снять · до ${esc(S.due || 'пятницы')}</div><div class="grp">${todo.map((t) => row(t, '')).join('')}</div>` : ''}
+    ${redo.length ? `<div class="lh">Попросили переснять</div><div class="grp">${redo.map((t) => row(t, '<span class="st b">переснять</span>')).join('')}</div>` : ''}
+    ${all.some((t) => t.status === 'sent') ? `<div class="lh">Отправлено</div><div class="grp">${all.filter((t) => t.status === 'sent').map((t) => row(t, '<span class="st o">отправлено</span>')).join('')}</div>` : ''}
+  </div>${tabs()}`;
+}
+const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+
+// ---------- Задание ----------
+function drawTask(id) {
+  const t = S.tasks.find((x) => x.id === id);
+  const i = S.tasks.indexOf(t) + 1;
+  const words = taskText(t).split(/(\s+)/).map((w, k) => (/\S/.test(w) ? `<span class="w" data-w="${k}">${esc(w)}</span>` : w)).join('');
+  root.innerHTML = `<div class="scr">
+    <div class="lab" style="margin-top:6px;${t.status === 'redo' ? 'color:var(--bad)' : ''}">${t.status === 'redo' ? 'Редактор просит переснять' : `Задание ${i} из ${S.tasks.length} · до ${esc(S.due || 'пятницы')}`}</div>
+    <h1 class="t2">${esc(t.title)}</h1>
+    ${t.lang !== 'ru' ? '<span class="lab" style="color:var(--acc)">Ролик на английском</span>' : ''}
+    ${t.status === 'redo' && t.note ? `<div class="note" style="margin-top:12px"><span class="lab">Редактор</span><span style="font-size:17px;line-height:25px">«${esc(t.note)}»</span></div>` : ''}
+    <div class="box" style="margin-top:12px"><div style="display:flex;align-items:center"><span class="lab" style="flex:1">Текст · ${t.seconds} секунд</span><button class="eb2" data-act="own" aria-label="Изменить текст">${ic('pen', 18)}</button></div>
+      <p class="big" id="words">${words}</p>${t.translation ? `<span class="cap">${esc(t.translation)} · перевод только для вас</span>` : ''}</div>
+    ${t.edit?.status === 'pending' ? `<div class="flag">${ic('clock', 20, 'var(--warn)')}<span>Ваш вариант текста ждёт согласования. Снимать можно — если редактор не согласится, попросит переснять.</span></div>` : ''}
+    <div class="lh">Хотите сказать по-своему?</div>
+    <div class="tools"><button class="tool" data-rw="other">${ic('spark', 18)}Другой вариант</button><button class="tool" data-rw="simpler">Проще</button><button class="tool" data-rw="shorter">Короче</button><button class="tool" data-rw="warmer">Теплее</button><button class="tool" data-act="own">${ic('pen', 16)}Своими словами</button></div>
+    <p class="cap" style="margin-top:10px">Нажмите на слово, чтобы заменить его. Правка уйдёт редактору на согласование.</p>
+    <div class="lh">Как снять</div>
+    <div class="box" style="font-size:17px;line-height:28px">1. Телефон вертикально<br>2. ${esc(t.place ? 'Место: ' + t.place : 'У окна, свет сбоку')}<br>3. Смотрите в камеру, текст будет прямо под ней</div>
+    ${t.why ? `<div class="quote"><i></i><span>${esc(t.why)}</span></div>` : ''}
+  </div><div class="foot"><button class="bb" data-act="shoot">${ic('video', 22)}${t.status === 'redo' ? 'Переснять' : 'Перейти к съёмке'}</button></div>`;
+  root.querySelectorAll('[data-rw]').forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    try { const r = await api('/api/app/rewrite', {method: 'POST', json: {id, mode: b.dataset.rw}}); go('edit', {id, text: r.text}); } catch (e) { alert(e.message); }
+    b.disabled = false;
+  });
+  root.querySelectorAll('[data-act=own]').forEach((b) => b.onclick = () => go('edit', {id, text: taskText(t), own: true}));
+  root.querySelectorAll('.w').forEach((w) => w.onclick = () => wordSheet(t, Number(w.dataset.w)));
+  root.querySelector('[data-act=shoot]').onclick = () => camera(t);
+}
+function wordSheet(t, k) {
+  const parts = taskText(t).split(/(\s+)/);
+  const word = parts[k];
+  const el = document.createElement('div');
+  el.className = 'sheet';
+  el.innerHTML = `<div><span class="grab"></span><span class="lab">Заменить слово</span><div style="font-size:22px;font-weight:700">«${esc(word)}»</div>
+    <input class="f" id="nw" value="${esc(word.replace(/[.,!?]+$/, ''))}" aria-label="Новое слово">
+    <div class="opt"><button data-o="del">Убрать слово</button></div>
+    <button class="bb" id="ok">${ic('check', 22)}Заменить</button><button class="lk" id="cn">Отмена</button></div>`;
+  document.body.append(el);
+  const close = () => el.remove();
+  el.onclick = (e) => { if (e.target === el) close(); };
+  el.querySelector('#cn').onclick = close;
+  const apply = (nw) => {
+    const tail = /[.,!?]+$/.exec(word)?.[0] || '';
+    parts[k] = nw ? nw + (/[.,!?]$/.test(nw) ? '' : tail) : '';
+    close();
+    go('edit', {id: t.id, text: parts.join('').replace(/\s{2,}/g, ' ').trim()});
+  };
+  el.querySelector('[data-o=del]').onclick = () => apply('');
+  el.querySelector('#ok').onclick = () => apply(el.querySelector('#nw').value.trim());
+}
+
+// ---------- Правка ----------
+function drawEdit({id, text, own}) {
+  const t = S.tasks.find((x) => x.id === id);
+  root.innerHTML = `<div class="scr">
+    <h1 class="t2" style="margin-top:10px">${own ? 'Своими словами' : 'Новый вариант'}</h1>
+    <p class="sub">Проверьте и поправьте, если нужно. Читать вы будете именно это.</p>
+    <textarea id="txt" style="margin-top:14px" aria-label="Текст">${esc(text)}</textarea>
+    <div class="lh">Было</div>
+    <div class="box" style="box-shadow:none;border:1px dashed var(--line);background:transparent"><span style="font-size:16px;line-height:23px;color:var(--mut)">${esc(t.text)}</span></div>
+    <div class="flag">${ic('clock', 20, 'var(--warn)')}<span>Редактор получит правку на согласование. Снимать можно сразу.</span></div>
+  </div><div class="foot"><button class="bb" id="save">${ic('check', 22)}Сохранить</button><button class="sb2" id="undo">${ic('x', 22)}Вернуть как было</button></div>`;
+  const save = async (val) => {
+    try { const r = await api('/api/app/text', {method: 'POST', json: {id, text: val}}); Object.assign(t, r.task); if (!r.task.edit) delete t.edit; haptic('ok'); stack.pop(); draw(); }
+    catch (e) { alert(e.message); }
+  };
+  $('#save').onclick = () => save($('#txt').value);
+  $('#undo').onclick = () => save(t.text);
+}
+
+// ---------- Камера ----------
+let cam = null;
+async function camera(t) {
+  const el = document.createElement('div');
+  el.className = 'cam';
+  const speeds = [0.5, 0.75, 1, 1.25, 1.5];
+  let speed = S.profile.speed || 1, size = S.profile.size === 'normal' ? 22 : 28, facing = 'user', countdown = 0, rec = null, chunks = [], started = 0, raf = 0, offset = 0, last = 0, tries = 0;
+  el.innerHTML = `<video playsinline muted autoplay class="mirror"></video>
+    <div class="ctop"><button class="cb" id="cx" aria-label="Закрыть">${ic('x', 22)}</button><span class="timer" id="tm">0:00 / 0:${String(t.seconds).padStart(2, '0')}</span><button class="cb" id="cf" aria-label="Повернуть камеру">${ic('flip', 22)}</button></div>
+    <div class="tp"><div class="in" id="tp" style="font-size:${size}px">${esc(taskText(t))}</div></div>
+    <div class="side"><button id="bs"><span>${ic('type', 22)}</span>Размер</button><button id="bt"><span>${ic('timer', 22)}</span>3 сек</button><button id="be"><span>${ic('pen', 20)}</span>Текст</button></div>
+    <div class="speed" role="group" aria-label="Скорость текста">${speeds.map((s) => `<button data-s="${s}" class="${s === speed ? 'on' : ''}">${s}×</button>`).join('')}</div>
+    <div class="recrow"><span class="sm" style="opacity:.0"></span><button class="rbtn" id="rb" aria-label="Начать запись"><i></i></button><span class="sm"><span>${ic('gauge', 22)}</span>Скорость</span></div>`;
+  document.body.append(el);
+  const video = el.querySelector('video'), tp = el.querySelector('#tp'), tm = el.querySelector('#tm');
+  let stream;
+  const open = async () => {
+    stream?.getTracks().forEach((x) => x.stop());
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: facing, width: {ideal: 1080}, height: {ideal: 1920}}, audio: true});
+      video.srcObject = stream;
+      video.classList.toggle('mirror', facing === 'user');
+    } catch (e) { close(); noCamera(t); }
+  };
+  const close = () => { cancelAnimationFrame(raf); stream?.getTracks().forEach((x) => x.stop()); el.remove(); cam = null; };
+  cam = close;
+  await open();
+  el.querySelector('#cx').onclick = () => { if (!rec || confirm('Остановить запись и выйти?')) close(); };
+  el.querySelector('#cf').onclick = () => { if (rec) return; facing = facing === 'user' ? 'environment' : 'user'; open(); };
+  el.querySelector('#bs').onclick = () => { size = size === 28 ? 34 : size === 34 ? 22 : 28; tp.style.fontSize = size + 'px'; haptic(); };
+  el.querySelector('#bt').onclick = (e) => { countdown = countdown ? 0 : 3; e.currentTarget.style.opacity = countdown ? 1 : .6; haptic(); };
+  el.querySelector('#bt').style.opacity = .6;
+  el.querySelector('#be').onclick = () => { if (rec) return; close(); go('task', t.id); };
+  el.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => { speed = Number(b.dataset.s); el.querySelectorAll('[data-s]').forEach((x) => x.classList.toggle('on', x === b)); haptic(); });
+  // Text speed: 1× scrolls the whole text in the task's length; the host can change it live.
+  const scroll = (now) => {
+    const dt = last ? (now - last) / 1000 : 0; last = now;
+    const total = Math.max(1, tp.scrollHeight - tp.parentElement.clientHeight);
+    offset = Math.min(total, offset + dt * speed * total / t.seconds);
+    tp.style.transform = `translateY(${-offset}px)`;
+    const s = Math.floor((Date.now() - started) / 1000);
+    tm.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} / 0:${String(t.seconds).padStart(2, '0')}`;
+    raf = requestAnimationFrame(scroll);
+  };
+  const start = () => {
+    const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || '';
+    chunks = [];
+    rec = new MediaRecorder(stream, type ? {mimeType: type} : undefined);
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      const blob = new Blob(chunks, {type: rec.mimeType || 'video/mp4'});
+      rec = null; tries++;
+      close();
+      go('review', {id: t.id, blob, tries});
+    };
+    rec.start(500);
+    started = Date.now(); offset = 0; last = 0; tp.style.transform = '';
+    raf = requestAnimationFrame(scroll);
+    tm.classList.add('rec');
+    el.querySelector('#rb').classList.add('on');
+    el.querySelector('#rb').setAttribute('aria-label', 'Остановить запись');
+    haptic('medium');
+  };
+  el.querySelector('#rb').onclick = async () => {
+    if (rec) { rec.stop(); return; }
+    if (countdown) {
+      const c = document.createElement('div'); c.className = 'count'; el.append(c);
+      for (let n = countdown; n > 0; n--) { c.textContent = n; haptic(); await new Promise((r) => setTimeout(r, 1000)); }
+      c.remove();
+    }
+    start();
+  };
+}
+function noCamera(t) {
+  root.innerHTML = `<div class="scr"><div style="margin-top:30px;width:80px;height:80px;border-radius:24px;display:grid;place-items:center;${tint('--a')}">${ic('video', 38)}</div>
+    <h1 class="t2" style="margin-top:18px">Телеграм не дал доступ к камере</h1><p class="sub">Так бывает на некоторых телефонах. Есть два простых способа.</p>
+    <div class="note" style="margin-top:18px"><span class="lab">Способ 1 · рекомендуем</span><span style="font-size:17px;line-height:24px">Открыть эту страницу в браузере телефона и разрешить камеру.</span></div>
+    <div class="note" style="margin-top:10px"><span class="lab">Способ 2</span><span style="font-size:17px;line-height:24px">Снять обычной камерой и выбрать видео здесь.</span></div>
+  </div><div class="foot"><button class="bb" id="pick">${ic('upload', 22)}Выбрать видео из галереи</button><button class="sb2" id="again">Попробовать снова</button></div>`;
+  $('#again').onclick = () => camera(t);
+  $('#pick').onclick = () => {
+    const f = document.createElement('input'); f.type = 'file'; f.accept = 'video/*';
+    f.onchange = () => f.files[0] && go('review', {id: t.id, blob: f.files[0], tries: 1});
+    f.click();
+  };
+}
+
+// ---------- Проверка записи ----------
+function drawReview({id, blob}) {
+  const t = S.tasks.find((x) => x.id === id);
+  const src = URL.createObjectURL(blob);
+  root.innerHTML = `<div class="scr">
+    <h1 class="t2" style="margin-top:10px">Посмотрите запись</h1>
+    <p class="sub">Если всё хорошо — отправьте. Ошибки не страшны: редактор поправит.</p>
+    <video class="vid" style="margin-top:16px" src="${src}" controls playsinline></video>
+    <div class="prog" id="pg" hidden><i></i></div><p class="cap" id="pt"></p>
+  </div><div class="foot"><button class="bb" id="send">${ic('check', 22)}Отправить</button><button class="sb2" id="again">${ic('video', 22)}Снять ещё раз</button></div>`;
+  $('#again').onclick = () => { stack.pop(); camera(t); };
+  $('#send').onclick = () => {
+    $('#send').disabled = true; $('#again').disabled = true; $('#pg').hidden = false;
+    const x = new XMLHttpRequest();
+    x.open('POST', `/api/app/take?id=${encodeURIComponent(id)}`);
+    x.setRequestHeader('x-tg-init', tg?.initData || '');
+    x.setRequestHeader('content-type', blob.type || 'video/mp4');
+    x.upload.onprogress = (e) => { if (e.lengthComputable) { const p = Math.round(100 * e.loaded / e.total); $('#pg i').style.width = p + '%'; $('#pt').textContent = `Загружено ${p} % · не закрывайте страницу`; } };
+    x.onload = () => {
+      if (x.status !== 200) { $('#pt').textContent = 'Не получилось отправить. Попробуйте ещё раз.'; $('#send').disabled = false; $('#again').disabled = false; return; }
+      Object.assign(t, JSON.parse(x.responseText).task);
+      haptic('ok');
+      stack = [];
+      go('done');
+    };
+    x.onerror = () => { $('#pt').textContent = 'Нет связи. Попробуйте ещё раз.'; $('#send').disabled = false; $('#again').disabled = false; };
+    x.send(blob);
+  };
+}
+function drawDone() {
+  const n = left().length, next = S.tasks.find((t) => t.status !== 'sent');
+  root.innerHTML = `<div class="scr center">
+    <div class="badge" style="margin-top:60px;${tint('--g')}">${ic('check', 48, 'currentColor', 3)}</div>
+    <h1 style="margin-top:22px">${n ? 'Отправлено' : 'Спасибо, всё отправлено'}</h1>
+    <p class="sub" style="max-width:320px">${n ? `Осталось ${n} ${plural(n, 'ролик', 'ролика', 'роликов')}.` : 'Редактор соберёт ролики. Когда каждый выйдет — напишем в Телеграм.'}</p>
+    ${n ? '' : `<div class="note" style="margin-top:28px;width:100%;text-align:left;flex-direction:row;align-items:center;gap:12px"><span class="ti" style="${tint('--b')}">${ic('cal', 22)}</span><span style="font-size:16px;line-height:22px">Новые задания придут <b>в понедельник утром</b></span></div>`}
+  </div><div class="foot">${next ? `<button class="bb" id="nx">${ic('video', 22)}Следующий: ${esc(next.title.slice(0, 28))}</button>` : ''}<button class="sb2" id="home">${ic('list', 22)}К заданиям</button></div>`;
+  if (next) $('#nx').onclick = () => { stack = []; go('task', next.id); };
+  $('#home').onclick = () => { stack = []; tab = 'tasks'; draw(); };
+}
+
+// ---------- Мои ролики ----------
+function drawReels() {
+  const ST = {published: ['вышел', 'o'], done: ['готов', 'o'], review: ['у редактора', 'm'], work: ['готовится', 'm'], none: ['готовится', 'm']};
+  const sent = S.tasks.filter((t) => t.status === 'sent');
+  const row = (title, sub, [st, c], icon, v) => `<div class="li"><span class="ti" style="${tint(v)}">${ic(icon, 22)}</span><span class="tx"><b>${esc(title)}</b><span>${esc(sub)}</span></span><span class="st ${c}">${st}</span></div>`;
+  root.innerHTML = `<div class="scr">
+    <h1 style="margin-top:10px">Мои ролики</h1><p class="sub">Записи, которые вы отправили, и ролики проекта</p>
+    ${sent.length ? `<div class="lh">Отправлены редактору</div><div class="grp">${sent.map((t) => row(t.title, new Date(t.sentAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}), ['отправлено', 'm'], 'upload', '--b')).join('')}</div>` : ''}
+    <div class="lh">Ролики проекта</div>
+    ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 8).map((r) => row(r.title, r.version ? `версия ${r.version.slice(1)}` : 'в работе', ST[r.status] || ST.none, r.status === 'published' || r.status === 'done' ? 'check' : 'film', r.status === 'published' || r.status === 'done' ? '--g' : '--v')).join('')}</div>` : '<p class="sub">Пока пусто — первые ролики появятся здесь.</p>'}
+    <p class="cap" style="margin-top:14px">Скачать ролик или попросить убрать — скоро здесь. Пока — напишите редактору в чате.</p>
+  </div>${tabs()}`;
+}
+
+// ---------- Профиль ----------
+function drawProfile() {
+  const p = S.profile;
+  const kv = (k, icon, v, title, val) => `<div class="kv"><span class="ti" style="${tint(v)}">${ic(icon, 22)}</span><span class="tx"><b>${title}</b><span>${esc(val)}</span></span><button class="eb2" data-k="${k}" aria-label="Изменить: ${title}">${ic('pen', 18)}</button></div>`;
+  root.innerHTML = `<div class="scr">
+    <div class="greet" style="margin-top:10px"><span class="av" style="width:56px;height:56px;font-size:21px">${esc(S.me.name[0] || '·')}</span><div><div style="font-size:22px;font-weight:700;letter-spacing:-0.02em">${esc(S.me.name)}</div><div class="d">${S.me.role === 'owner' ? 'владелец · ведёте сами' : 'ведущий'}</div></div></div>
+    <div class="note" style="margin-top:18px"><span class="lab">Лицо в кадре</span><span style="font-size:17px;line-height:24px">${p.consent === false ? 'Разрешение отозвано. Новые ролики с вами не собираем.' : 'Разрешено: Инстаграм и Телеграм проекта'}</span><span class="cap">Можно отозвать в любой момент — редактор узнает сразу.</span>
+      <div style="display:flex;gap:8px;margin-top:4px"><button class="sb2" id="cons" style="height:44px;font-size:15px;${p.consent === false ? '' : 'color:var(--bad)'}">${p.consent === false ? 'Разрешить снова' : 'Отозвать'}</button></div></div>
+    <div class="grp" style="margin-top:16px">
+      ${kv('langs', 'globe', '--b', 'Языки', p.langs)}${kv('when', 'clock', '--a', 'Когда удобно снимать', p.when)}${kv('where', 'pin', '--g', 'Где снимаю', p.where)}
+      <div class="kv"><span class="ti" style="${tint('--v')}">${ic('gauge', 22)}</span><span class="tx"><b>Скорость текста</b><span>${p.speed}× · можно менять во время съёмки</span></span><button class="eb2" data-k="speed" aria-label="Изменить скорость">${ic('pen', 18)}</button></div>
+    </div>
+    ${S.demo ? '<p class="cap" style="margin-top:14px">Это пробная версия: задания демонстрационные, записи приходят редактору в Телеграм.</p>' : ''}
+  </div>${tabs()}`;
+  $('#cons').onclick = async () => {
+    if (p.consent !== false && !confirm('Отозвать разрешение на лицо в кадре? Редактор получит сообщение.')) return;
+    const r = await api('/api/app/profile', {method: 'POST', json: {consent: p.consent === false}}); Object.assign(S.profile, r.profile); haptic('ok'); draw();
+  };
+  root.querySelectorAll('[data-k]').forEach((b) => b.onclick = () => editField(b.dataset.k));
+}
+function editField(k) {
+  const p = S.profile;
+  const el = document.createElement('div');
+  el.className = 'sheet';
+  const titles = {langs: 'Языки съёмки', when: 'Когда удобно снимать', where: 'Где обычно снимаете', speed: 'Скорость текста'};
+  el.innerHTML = `<div><span class="grab"></span><div style="font-size:22px;font-weight:700">${titles[k]}</div>
+    ${k === 'speed' ? `<div class="opt">${[0.5, 0.75, 1, 1.25, 1.5].map((s) => `<button data-s="${s}" class="${s === p.speed ? 'on' : ''}">${s}×</button>`).join('')}</div>` : `<input class="f" id="v" value="${esc(p[k])}">`}
+    <button class="bb" id="ok">${ic('check', 22)}Сохранить</button><button class="lk" id="cn">Отмена</button></div>`;
+  document.body.append(el);
+  let speed = p.speed;
+  el.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => { speed = Number(b.dataset.s); el.querySelectorAll('[data-s]').forEach((x) => x.classList.toggle('on', x === b)); });
+  const close = () => el.remove();
+  el.onclick = (e) => { if (e.target === el) close(); };
+  el.querySelector('#cn').onclick = close;
+  el.querySelector('#ok').onclick = async () => {
+    const r = await api('/api/app/profile', {method: 'POST', json: k === 'speed' ? {speed} : {[k]: el.querySelector('#v').value}});
+    Object.assign(S.profile, r.profile); close(); haptic('ok'); draw();
+  };
+}
+
+root.addEventListener('click', (e) => {
+  const tb = e.target.closest('[data-tab]');
+  if (tb) { tab = tb.dataset.tab; stack = []; haptic(); return draw(); }
+  const tk = e.target.closest('[data-task]');
+  if (tk && !stack.length) return go('task', tk.dataset.task);
+});
+
+(async () => {
+  try { tg.ready(); tg.expand(); tg.BackButton.onClick(() => (cam ? cam() : back())); tg.onEvent('themeChanged', () => { theme(); draw(); }); } catch {}
+  theme();
+  if (!tg?.initData) { root.innerHTML = '<div class="err"><h1 class="t2">Откройте из Телеграма</h1><p class="sub">Это приложение работает внутри бота: нажмите «Съёмка» в чате с ботом.</p></div>'; return; }
+  try { S = await api('/api/app/state'); draw(); }
+  catch (e) { root.innerHTML = `<div class="err"><h1 class="t2">Не получилось открыть</h1><p class="sub">${esc(e.message)}</p></div>`; }
+})();
+</script>
+</body>
+</html>
