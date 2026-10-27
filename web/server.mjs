@@ -9,6 +9,7 @@
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
+import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -227,6 +228,11 @@ function preamble(p, k) {
   if (k === '_ds') lines.push(`THIS CHAT develops the project's design system for its reels. The result is ONE self-contained HTML page, \`${relative(BOT, studio)}/design-system/index.html\` (inline CSS/JS, Google Fonts allowed, images as relative files next to it): a small landing page with the system's name and idea, color and type tokens, spacing and motion rules, and a library of the components (plates, price receipts, titles, subtitles, phone mockup…) drawn in HTML/CSS as they look in the reels, each with its name, when to use it and its Remotion component name if there is one. Read the brief, PLAYBOOK.md, \`template/src\` and the reels' code to stay true to what is really used. After each change, rewrite the page and tell the owner in one or two lines what changed; the page reloads by itself. Keep \`design-system/tokens.json\` in sync with the tokens on the page.`);
   else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules and settings. Reels themselves are made in their own chats; if the owner asks to make a reel here, say that the «Новый рилс» button starts it in its own chat.');
   else if (k.startsWith('new-')) lines.push('THIS CHAT starts a NEW reel. Create its folder with `node scripts/new-reel.mjs <latin-slug>` as soon as the idea is clear, before anything else; the page then moves this chat to that reel. One reel per chat.');
+  else if (k.startsWith('post-')) {
+    const dir = join(studio, 'posts', k.slice(5));
+    const post = readPost(dir);
+    lines.push(`THIS CHAT is about post \`${relative(BOT, dir)}/\` only (a ${post.kind === 'carousel' ? 'carousel' : post.kind === 'photo' ? 'post with a photo' : 'text post'}); follow POSTS.md. Everything the page shows lives in its \`post.json\` — edit that file (keep its other fields) and the page redraws. Photos people brought are in \`sources/\`; the page crops them and draws the slides itself.`);
+  }
   else lines.push(`THIS CHAT is about reel \`${relative(BOT, join(studio, 'reels', k))}/\` only; read its README.md first. Other reels have their own chats: if the owner asks about another one, tell them to open it on the page.`,
     'The page shows the reel in four stages (Сценарий, Материалы, Монтаж, Выкладка) from two optional files in the reel folder; keep them current when the script, materials or captions change. ' +
     '`scenes.json`: [{"t":"0:00","name":"Хук","screen":"what is on screen","text":"text on screen","sound":"…","need":"what material it needs","have":"what file covers it","status":"готово|нужно|переснять"}]. ' +
@@ -311,7 +317,7 @@ function startTurn(p, k, text, send) {
       record(p, key, msg); send({msg});
     }
     setChatMeta(p, key, {status: '', updated: Date.now()});
-    if (!key.startsWith('_') && !key.startsWith('new-')) {
+    if (!key.startsWith('_') && !key.startsWith('new-') && !key.startsWith('post-')) {
       const freed = retain(p, key);
       if (freed) send({freed});
     }
@@ -469,7 +475,7 @@ createServer(async (req, res) => {
     const list = reels(p);
     const ideas = parseIdeas(p).filter((x) => /Owner's ideas|My ideas/.test(x.section));
     const chats = existsSync(join(CHATS, p)) ? readdirSync(join(CHATS, p)).filter((f) => f.endsWith('.jsonl')).map((f) => f.slice(0, -6)) : [];
-    return json(200, {reels: list, ideasCount: ideas.length, chats, busy: job ? {project: job.p, key: job.key} : null,
+    return json(200, {reels: list, posts: listPosts(studio, mediaUrl), ideasCount: ideas.length, chats, busy: job ? {project: job.p, key: job.key} : null,
       disk: disk()});
   }
   if (req.method === 'GET' && url.pathname === '/api/ideas') {
@@ -502,24 +508,87 @@ createServer(async (req, res) => {
       scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10)});
   }
+  // ---------- posts (web/posts.mjs) ----------
+  if (req.method === 'GET' && url.pathname === '/api/post') {
+    const id = url.searchParams.get('post');
+    const dir = postDir(studio, id);
+    if (!dir) return json(404, {});
+    const ls = (d) => (existsSync(d) ? readdirSync(d).filter((f) => statSync(join(d, f)).isFile()).map((f) => ({name: f, url: mediaUrl(join(d, f)), size: statSync(join(d, f)).size})) : []);
+    return json(200, {id, post: readPost(dir), sources: ls(join(dir, 'sources')), images: ls(join(dir, 'images')), imagesEn: ls(join(dir, 'images', 'en')),
+      base: mediaUrl(dir).replace(/%2F?$/, ''), templates: TEMPLATES, summary: listPosts(studio, mediaUrl).find((x) => x.id === id),
+      outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.post === id && !o.cancelled).slice(-10)});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/post/new') {
+    if (!can('editor')) return json(403, {});
+    const {kind, title} = await body(req);
+    const id = newPost(studio, {kind, title, by: me.name});
+    log(me.name, `начал пост ${id}`);
+    return json(200, {id});
+  }
+  // Fields the page edits by hand: chosen text, slide texts and order, captions, kind.
+  if (req.method === 'POST' && url.pathname === '/api/post/save') {
+    if (!can('editor')) return json(403, {});
+    const {post: id, patch} = await body(req);
+    const dir = postDir(studio, id);
+    if (!dir || !patch || typeof patch !== 'object') return json(400, {});
+    const cur = readPost(dir);
+    for (const k of ['kind', 'title', 'chosen', 'texts', 'slides', 'slidesEn', 'slideCount', 'captions', 'after', 'photos', 'published']) if (k in patch) cur[k] = patch[k];
+    savePost(dir, cur);
+    return json(200, {post: cur});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/post/photo') {
+    if (!can('editor')) return json(403, {});
+    const {post: id, file, crop, bright} = await body(req);
+    const dir = postDir(studio, id);
+    const src = dir && mediaPath(join(dir, 'sources', basename(file || '')));
+    if (!src) return json(404, {});
+    try {
+      const out = processPhoto(dir, src, {crop, bright: !!bright});
+      const cur = readPost(dir);
+      cur.photos = (cur.photos || []).map((x) => ({...x, chosen: false})).filter((x) => x.file !== basename(src));
+      cur.photos.unshift({file: basename(src), crop, bright: !!bright, out: relative(dir, out), chosen: true});
+      savePost(dir, cur);
+      return json(200, {post: cur, url: mediaUrl(out)});
+    } catch (e) { return json(500, {error: e.message}); }
+  }
+  if (req.method === 'POST' && url.pathname === '/api/post/slides') {
+    if (!can('editor')) return json(403, {});
+    const {post: id, lang} = await body(req);
+    const dir = postDir(studio, id);
+    if (!dir) return json(404, {});
+    try {
+      const files = renderSlides(dir, studio, BOT, lang === 'en' ? 'en' : 'ru');
+      log(me.name, `собрал слайды поста ${id}`);
+      return json(200, {files: files.map((f) => mediaUrl(f))});
+    } catch (e) { return json(500, {error: e.message}); }
+  }
   // Publishing = a package (video, cover, caption) the bot sends to Telegram at the chosen time
   // (bot/outbox.mjs); the person then posts it from the phone.
   if (req.method === 'POST' && url.pathname === '/api/publish') {
     if (!can('editor')) return json(403, {});
-    const {reel, at, caption, platform} = await body(req);
-    const dir = reelDir(p, reel);
+    const {reel, post, at, caption, platform, lang} = await body(req);
     const when = Date.parse(at);
-    const cur = dir && versions(p, reel)[0];
-    if (!cur || !Number.isFinite(when)) return json(400, {error: 'нет версии или времени'});
-    const pick = (k) => cur.files.find((f) => f.kind === k)?.name;
-    const video = pick('copy') || pick('master');
+    if (!Number.isFinite(when)) return json(400, {error: 'нет времени'});
+    let files, version = '', what = reel;
+    if (post) {
+      const pdir = postDir(studio, post);
+      files = pdir ? postFiles(pdir, lang) : [];
+      what = post;
+      if (!pdir) return json(404, {});
+    } else {
+      const dir = reelDir(p, reel);
+      const cur = dir && versions(p, reel)[0];
+      if (!cur) return json(400, {error: 'нет версии'});
+      const pick = (k) => cur.files.find((f) => f.kind === k)?.name;
+      files = [pick('copy') || pick('master'), pick('cover')].filter(Boolean).map((f) => join(dir, 'versions', cur.v, f));
+      version = cur.v;
+    }
     const items = readJson(OUTBOX, []);
-    const item = {id: randomBytes(6).toString('hex'), project: p, reel, version: cur.v, at: when, platform: String(platform || '').slice(0, 60),
-      caption: String(caption || '').slice(0, 2200), files: [video, pick('cover')].filter(Boolean).map((f) => join(dir, 'versions', cur.v, f)),
-      by: me.name, person: me.id, created: Date.now()};
+    const item = {id: randomBytes(6).toString('hex'), project: p, reel: what, post: post || undefined, version, at: when, platform: String(platform || '').slice(0, 60),
+      caption: String(caption || '').slice(0, 4000), files, by: me.name, person: me.id, created: Date.now()};
     items.push(item);
     writeJson(OUTBOX, items.slice(-200));
-    log(me.name, `запланировал выкладку ${reel} ${cur.v} на ${new Date(when).toISOString()}`);
+    log(me.name, `запланировал выкладку ${what} на ${new Date(when).toISOString()}`);
     return json(200, item);
   }
   if (req.method === 'POST' && url.pathname === '/api/publish/cancel') {
@@ -571,13 +640,15 @@ createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/upload') {
     if (!can('editor')) return json(403, {});
     const reel = url.searchParams.get('reel');
-    const rdir = reel && reelDir(p, reel);
+    const pdir = postDir(studio, url.searchParams.get('post'));
+    const rdir = (reel && reelDir(p, reel)) || pdir;
     const dir = rdir ? join(rdir, 'sources') : join(studio, 'inbox', new Date().toISOString().slice(0, 10));
     mkdirSync(dir, {recursive: true});
     const path = uniquePath(dir, rdir ? cleanName(url.searchParams.get('name')) : `web-${Date.now()}-${cleanName(url.searchParams.get('name'))}`);
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     writeFileSync(path, Buffer.concat(chunks));
+    mkdirSync(join(studio, 'inbox'), {recursive: true});
     appendFileSync(join(studio, 'inbox', 'history.md'), `- ${new Date().toISOString()} (web, ${me.name}${rdir ? `, reel ${reel}` : ''}) ${path}\n`);
     log(me.name, `загрузил ${basename(path)}${rdir ? ` в рилс ${reel}` : ''}`);
     return json(200, {path, url: mediaUrl(path)});
