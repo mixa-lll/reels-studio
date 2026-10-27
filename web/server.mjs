@@ -226,7 +226,8 @@ function preamble(p, k) {
     `The active project is \`${relative(BOT, studio)}/\` (\`<project>/\` in REELS.md). The Telegram bot works on the same project, so re-read ideas.md and PLAYBOOK.md before changing them.`,
   ];
   if (k === '_ds') lines.push(`THIS CHAT develops the project's design system for its reels. The result is ONE self-contained HTML page, \`${relative(BOT, studio)}/design-system/index.html\` (inline CSS/JS, Google Fonts allowed, images as relative files next to it): a small landing page with the system's name and idea, color and type tokens, spacing and motion rules, and a library of the components (plates, price receipts, titles, subtitles, phone mockup…) drawn in HTML/CSS as they look in the reels, each with its name, when to use it and its Remotion component name if there is one. Read the brief, PLAYBOOK.md, \`template/src\` and the reels' code to stay true to what is really used. After each change, rewrite the page and tell the owner in one or two lines what changed; the page reloads by itself. Keep \`design-system/tokens.json\` in sync with the tokens on the page.`);
-  else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules and settings. Reels themselves are made in their own chats; if the owner asks to make a reel here, say that the «Новый рилс» button starts it in its own chat.');
+  else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules, settings, strategy and plan. Reels and posts themselves are made in their own chats; if the owner asks to make one here, say that «+ Новый выпуск» starts it in its own chat.',
+    `Strategy and plan follow STRATEGY.md: \`${relative(BOT, studio)}/strategy.json\` (platforms, rubrics, weekly rhythm, events) and \`${relative(BOT, studio)}/plan.json\` (dates and rubrics of reels and posts); the page draws Strategy and the Calendar from them.`);
   else if (k.startsWith('new-')) lines.push('THIS CHAT starts a NEW reel. Create its folder with `node scripts/new-reel.mjs <latin-slug>` as soon as the idea is clear, before anything else; the page then moves this chat to that reel. One reel per chat.');
   else if (k.startsWith('post-')) {
     const dir = join(studio, 'posts', k.slice(5));
@@ -475,7 +476,14 @@ createServer(async (req, res) => {
     const list = reels(p);
     const ideas = parseIdeas(p).filter((x) => /Owner's ideas|My ideas/.test(x.section));
     const chats = existsSync(join(CHATS, p)) ? readdirSync(join(CHATS, p)).filter((f) => f.endsWith('.jsonl')).map((f) => f.slice(0, -6)) : [];
-    return json(200, {reels: list, posts: listPosts(studio, mediaUrl), ideasCount: ideas.length, chats, busy: job ? {project: job.p, key: job.key} : null,
+    const posts = listPosts(studio, mediaUrl);
+    const plan = readJson(join(studio, 'plan.json'), {});
+    const rubricOf = (key, own) => plan.rubric?.[key] || own || null;
+    const tally = {};
+    for (const r of list) { const x = rubricOf('reel:' + r.id); if (x) tally[x] = (tally[x] || 0) + 1; }
+    for (const x of posts) { const y = rubricOf('post:' + x.id, x.rubric); if (y) tally[y] = (tally[y] || 0) + 1; }
+    const rubrics = (readJson(join(studio, 'strategy.json'), {}).rubrics || []).map((r) => ({id: r.id, name: r.name, color: r.color, n: (tally[r.id] || 0) + (tally[r.name] || 0)}));
+    return json(200, {reels: list, posts, rubrics, ideasCount: ideas.length, chats, busy: job ? {project: job.p, key: job.key} : null,
       disk: disk()});
   }
   if (req.method === 'GET' && url.pathname === '/api/ideas') {
@@ -485,6 +493,30 @@ createServer(async (req, res) => {
       hook: x.lines.find((l) => /^Hook:/.test(l))?.replace(/^Hook:\s*/, '') || '',
       plot: x.lines.find((l) => /^Plot:/.test(l))?.replace(/^Plot:\s*/, '') || '',
     }))});
+  }
+  // Strategy and plan (STRATEGY.md): what the Strategy tabs and the Calendar draw.
+  if (req.method === 'GET' && url.pathname === '/api/plan') {
+    const plan = readJson(join(studio, 'plan.json'), {});
+    const at = plan.at || {}, rubric = plan.rubric || {};
+    const posts = listPosts(studio, mediaUrl);
+    const items = [
+      ...reels(p).map((r) => ({key: 'reel:' + r.id, kind: 'reel', id: r.id, title: `${r.num} ${r.title}`, status: r.status, thumb: r.thumb})),
+      ...posts.map((x) => ({key: 'post:' + x.id, kind: x.kind, id: x.id, title: x.title, status: x.stage, thumb: x.thumb, at: x.at ? new Date(x.at).toISOString() : null, rubric: x.rubric})),
+    ].map((x) => ({...x, at: at[x.key] || x.at || null, rubric: rubric[x.key] || x.rubric || null}));
+    return json(200, {strategy: readJson(join(studio, 'strategy.json'), {}), items, events: plan.events || []});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/plan/set') {
+    if (!can('editor')) return json(403, {});
+    const {key, at, rubric} = await body(req);
+    if (!/^(reel|post):[\w-]{1,80}$/.test(key || '')) return json(400, {});
+    const f = join(studio, 'plan.json');
+    const plan = readJson(f, {});
+    plan.at ||= {}; plan.rubric ||= {};
+    if (at !== undefined) { if (at) plan.at[key] = String(at).slice(0, 25); else delete plan.at[key]; }
+    if (rubric !== undefined) { if (rubric) plan.rubric[key] = String(rubric).slice(0, 60); else delete plan.rubric[key]; }
+    writeJson(f, plan);
+    log(me.name, `поставил ${key} на ${at ?? '—'}`);
+    return json(200, {});
   }
   if (req.method === 'GET' && url.pathname === '/api/knowledge') {
     const ds = join(studio, 'design-system', 'index.html');
