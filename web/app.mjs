@@ -48,11 +48,14 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
   const token = () => process.env.TELEGRAM_BOT_TOKEN;
   const botState = () => readJson(join(BOT, 'data', 'state.json'), {});
   const project = () => (botState().project && existsSync(join(PROJECTS, botState().project)) ? botState().project : 'main');
+  // Where the studio runs without the bot (the shared stage), MINIAPP_OWNERS lists the
+  // Telegram ids treated as the owner; the first one also gets the notifications.
+  const owners = () => (process.env.MINIAPP_OWNERS || '').split(',').map((x) => Number(x.trim())).filter(Boolean);
   const hostDir = (p) => { const d = join(PROJECTS, p, 'host'); mkdirSync(d, {recursive: true}); return d; };
 
   function person(user) {
     const st = botState();
-    if (user.id === st.ownerId) return {key: 'owner', name: st.ownerName || user.first_name, role: 'owner'};
+    if (user.id === st.ownerId || owners().includes(user.id)) return {key: 'owner', name: st.ownerName || user.first_name, role: 'owner'};
     const x = access().people.find((y) => y.telegram?.id === user.id);
     return x ? {key: x.id, name: x.name, role: x.role} : null;
   }
@@ -71,17 +74,18 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
   // Tells the owner in the bot chat; a take goes as a video.
   async function notify(text, file) {
     const st = botState();
-    if (!st.chatId || !token()) return;
+    const chat = st.chatId || owners()[0];
+    if (!chat || !token()) return;
     const api = `${process.env.REELS_TELEGRAM_API || 'https://api.telegram.org'}/bot${token()}`;
     try {
       if (file) {
         const form = new FormData();
-        form.append('chat_id', String(st.chatId));
+        form.append('chat_id', String(chat));
         form.append('caption', text);
         form.append('video', new Blob([readFileSync(file)]), file.split('/').pop());
         await fetch(`${api}/sendVideo`, {method: 'POST', body: form, signal: AbortSignal.timeout(120_000)});
       } else {
-        await fetch(`${api}/sendMessage`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({chat_id: st.chatId, text}), signal: AbortSignal.timeout(30_000)});
+        await fetch(`${api}/sendMessage`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({chat_id: chat, text}), signal: AbortSignal.timeout(30_000)});
       }
     } catch (e) { console.error('mini app notify:', e.message); }
   }
