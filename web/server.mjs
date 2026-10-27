@@ -125,7 +125,7 @@ function versions(p, r) {
     const vdir = join(dir, 'versions', v);
     const files = readdirSync(vdir).filter((f) => statSync(join(vdir, f)).isFile()).map((f) => {
       const full = join(vdir, f);
-      const kind = /\.(mp4|mov|webm)$/i.test(f) ? (/1080p50|master/i.test(f) ? 'master' : 'copy') : /cover\.png$/i.test(f) ? 'cover' : /thumb\.jpg$/i.test(f) ? 'thumb' : 'other';
+      const kind = /\.(mp4|mov|webm)$/i.test(f) ? (/1080p|master/i.test(f) ? 'master' : 'copy') : /cover\.png$/i.test(f) ? 'cover' : /thumb\.jpg$/i.test(f) ? 'thumb' : 'other';
       return {name: f, kind, size: statSync(full).size, url: mediaUrl(full)};
     });
     const archived = readJson(join(vdir, 'ARCHIVED.json'), null);
