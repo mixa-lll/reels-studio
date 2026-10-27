@@ -5,6 +5,8 @@
 //        render in the foreground (short reels)
 //   node scripts/render.mjs <project> <out.mp4> [label] --background [-- …]
 //        start in the background and print a job id at once
+//   --draft  a quick review copy: 720p instead of 1080p (about twice as fast); the
+//            full-size master is rendered once the owner accepts the version
 //   node scripts/render.mjs --wait <job> [seconds=540]
 //        wait for that job, at most `seconds`; exit 0 done, 2 still running, 1 failed,
 //        3 the owner wrote meanwhile (the job keeps running)
@@ -75,6 +77,7 @@ const dash = argv.indexOf('--');
 const extra = dash >= 0 ? argv.slice(dash + 1) : [];
 const own = dash >= 0 ? argv.slice(0, dash) : argv;
 const background = own.includes('--background');
+const draft = own.includes('--draft');
 const jobArg = own.find((a) => a.startsWith('--job='))?.slice(6);
 const [projectArg, outArg, label = '🎬 Рендер'] = own.filter((a) => !a.startsWith('--'));
 if (!projectArg || !outArg) {
@@ -89,7 +92,7 @@ if (background) {
   // Re-run this script detached, as the job's own process.
   const id = randomBytes(3).toString('hex');
   const log = openSync(join(JOBS, `${id}.log`), 'a');
-  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), project, out, label, `--job=${id}`, '--', ...extra], {
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.url), project, out, label, `--job=${id}`, ...(draft ? ['--draft'] : []), '--', ...extra], {
     detached: true,
     stdio: ['ignore', log, log],
     windowsHide: true,
@@ -103,25 +106,35 @@ if (background) {
 
 // Same as `npx remotion render`, without depending on npx or a shell.
 const cli = join(project, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
-const child = spawn(process.execPath, [cli, 'render', 'src/index.ts', 'Reel', out, '--audio-bitrate=256k', ...extra], {
+const child = spawn(process.execPath, [cli, 'render', 'src/index.ts', 'Reel', out, '--audio-bitrate=256k', ...(draft ? ['--scale=0.6667'] : []), ...extra], {
   cwd: project,
   stdio: ['ignore', 'pipe', 'pipe'],
   windowsHide: true,
 });
 
-let lastStep = -1;
+let lastPct = -1, lastWrite = 0, left = '';
 let tail = '';
+// "time remaining: 23m 40s" → "~24 мин"; under a minute → "<1 мин".
+const minutes = (s) => {
+  const m = /(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?/.exec(s);
+  const total = (Number(m[1] || 0) * 60) + Number(m[2] || 0) + Number(m[3] || 0) / 60;
+  return total < 1 ? '<1 мин' : `~${Math.round(total)} мин`;
+};
 const onData = (chunk) => {
   process.stdout.write(chunk);
   tail = (tail + chunk).slice(-2000);
-  // Remotion prints progress like "Rendered 120/1200".
-  for (const [, done, total] of String(chunk).matchAll(/(\d+)\/(\d+)/g)) {
+  const text = String(chunk);
+  const rem = [...text.matchAll(/time remaining:\s*([\dhms ]+)/g)].at(-1);
+  if (rem) left = minutes(rem[1].trim());
+  // Remotion prints progress like "Rendered 120/1200"; every new percent shows, at most
+  // once a second and a half, with the time left once Remotion knows it.
+  for (const [, done, total] of text.matchAll(/(\d+)\/(\d+)/g)) {
     const pct = Math.floor((Number(done) * 100) / Number(total));
-    if (Math.floor(pct / 10) !== lastStep) {
-      lastStep = Math.floor(pct / 10);
-      writeFileSync(join(DATA, 'status.txt'), `${label} · ${pct}%`);
-      if (jobArg) writeJob({...readJob(jobArg), pct});
-    }
+    if (pct === lastPct || Date.now() - lastWrite < 1500) continue;
+    lastPct = pct;
+    lastWrite = Date.now();
+    writeFileSync(join(DATA, 'status.txt'), `${label} · ${pct} %${left ? ` · осталось ${left}` : ''}`);
+    if (jobArg) writeJob({...readJob(jobArg), pct, left});
   }
 };
 child.stdout.on('data', onData);

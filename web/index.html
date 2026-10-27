@@ -309,7 +309,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
   const el = document.createElement('div');
   el.style.cssText = 'display: flex; flex-direction: column; flex: 1; min-height: 0';
   el.innerHTML = `<div class="log"><div class="in"></div></div>
-    <div class="status"><i class="spin"></i><span class="stext">Думаю…</span><button class="btn" type="button" style="margin-left: auto; min-height: 32px">Стоп</button></div>
+    <div class="status"><i class="spin"></i><span style="display: flex; flex-direction: column; min-width: 0"><span class="stext">Думаю…</span><span class="shint small"></span></span><button class="btn" type="button" style="margin-left: auto; min-height: 32px">Стоп</button></div>
     <div class="keys"></div>
     ${canEdit() ? `<form class="send"><div class="in">
       <button type="button" class="icon clip" aria-label="Прикрепить файл"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"></path></svg></button>
@@ -322,7 +322,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
   let busy = false;
   const setBusy = (on, text) => {
     busy = on; st.classList.toggle('on', on);
-    if (text) $('.stext', st).textContent = text;
+    if (text) { $('.stext', st).textContent = text; $('.shint', st).textContent = /рендер/i.test(text) ? 'Это нормально: монтаж идёт на сервере. Страницу можно закрыть — версия появится сама.' : ''; }
     el.querySelectorAll('.btns button, .keys button, .go').forEach((b) => (b.disabled = on));
   };
   $('button', st).onclick = () => post('/api/stop');
@@ -398,7 +398,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
         let i;
         while ((i = buf.indexOf('\n\n')) >= 0) {
           const ev = JSON.parse(buf.slice(6, i)); buf = buf.slice(i + 2);
-          if (ev.status) $('.stext', st).textContent = ev.status;
+          if (ev.status) setBusy(true, ev.status);
           if (ev.msg) render(ev.msg);
           if (ev.rebind) { key = ev.rebind; onRebind?.(key); }
           if (ev.freed) toast(`Освобождено ${mb(ev.freed)}: старые версии ушли в архив`);
@@ -696,7 +696,8 @@ async function renderVersions(id, data) {
   el.innerHTML = `<div class="rvid">${cur && video(cur)
       ? `<video id="rv" src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video>
         ${canEdit() ? '<button type="button" class="btn" id="tcBtn">⏱ Правка на 0:00</button><span class="small muted" style="text-align: center">Останови видео в нужный момент — правка привяжется к секунде</span>' : `<span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`}
-        ${prev ? `<a class="btn" href="#/reel/${esc(id)}/compare">Сравнить с ${esc(prev.v)}</a>` : ''}`
+        ${prev ? `<a class="btn" href="#/reel/${esc(id)}/compare">Сравнить с ${esc(prev.v)}</a>` : ''}
+        ${canEdit() && !cur.files.some((f) => f.kind === 'master') ? `<button type="button" class="btn primary" id="acceptV">Принять ${esc(cur.v)} — собрать мастер 1080p</button>` : ''}`
       : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}</div>
     <div class="rinfo">
       ${note ? `<div class="blk"><span class="lbl">Что в ${esc(cur.v)}</span><span style="font-size: 15px; line-height: 1.55">${esc(note)}</span></div>` : ''}
@@ -708,6 +709,7 @@ async function renderVersions(id, data) {
         <a class="small muted" href="#/settings/files" style="padding-top: 8px">Место на сервере →</a></div>
       ${script.trim() ? `<div class="blk"><span class="lbl">Сценарий</span><div class="md" style="font-size: 14px">${md(script)}</div></div>` : ''}
     </div>`;
+  $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1080p этой версии (без --draft) и скажи, когда будет готов.`, `Принять ${cur.v}`));
   const rv = $('#rv'), tcb = $('#tcBtn');
   if (rv && tcb) {
     const upd = () => { tcb.textContent = `⏱ Правка на ${tc(rv.currentTime)}`; };
