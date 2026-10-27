@@ -72,29 +72,70 @@ input.f{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);b
 .badge{width:96px;height:96px;border-radius:50%;display:grid;place-items:center}
 .demo{font-size:13px;color:var(--warn);background:color-mix(in srgb,var(--a) 14%,transparent);border-radius:10px;padding:6px 10px;margin-bottom:6px;display:inline-block}
 .err{padding:40px 24px;text-align:center}
-/* camera */
-.cam{position:fixed;inset:0;background:#000;z-index:30;color:#fff;overflow:hidden}
-.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* camera with a prompter (doski PR1–PR5, animations PRAnim 1–10) */
+.cam{position:fixed;inset:0;background:#000;z-index:30;color:#fff;overflow:hidden;font-family:Manrope,system-ui,sans-serif}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:camIn .4s cubic-bezier(.2,.8,.2,1) both}
+@keyframes camIn{from{opacity:0;filter:blur(10px)}to{opacity:1;filter:none}}
 .cam video.mirror{transform:scaleX(-1)}
-.ctop{position:absolute;top:0;left:0;right:0;padding:calc(12px + env(safe-area-inset-top)) 14px 0;display:flex;align-items:center;justify-content:space-between;z-index:3}
+.cam [hidden]{display:none !important}
+.ctop{position:absolute;top:0;left:0;right:0;padding:calc(10px + env(safe-area-inset-top)) 14px 0;display:flex;align-items:center;justify-content:space-between;z-index:4}
 .cb{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;border:0}
-.timer{background:rgba(0,0,0,.4);border-radius:999px;padding:7px 14px;font-size:15px;font-weight:700}
+.timer{background:rgba(0,0,0,.45);border-radius:999px;padding:7px 14px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
 .timer.rec{background:#E5484D}
-.tp{position:absolute;top:calc(70px + env(safe-area-inset-top));left:12px;right:70px;height:34vh;background:rgba(0,0,0,.5);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-radius:18px;overflow:hidden;z-index:2}
-.tp .in{padding:14px 16px 40vh;font-weight:600;line-height:1.4;will-change:transform}
-.side{position:absolute;right:10px;top:calc(70px + env(safe-area-inset-top));display:flex;flex-direction:column;gap:14px;align-items:center;z-index:3}
-.side button{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#fff;background:none;border:0;text-shadow:0 1px 3px rgba(0,0,0,.6)}
-.side button span{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.4);display:grid;place-items:center}
-.speed{position:absolute;left:20px;right:20px;bottom:calc(150px + env(safe-area-inset-bottom));display:flex;background:rgba(0,0,0,.45);border-radius:999px;padding:4px;z-index:3}
-.speed button{flex:1;padding:9px 0;border-radius:999px;font-size:14px;font-weight:700;color:#fff;background:none;border:0}
-.speed button.on{background:#fff;color:#171717}
-.recrow{position:absolute;left:0;right:0;bottom:calc(36px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-around;z-index:3}
-.rbtn{width:86px;height:86px;border-radius:50%;border:6px solid rgba(255,255,255,.9);background:none;display:grid;place-items:center}
-.rbtn i{width:64px;height:64px;border-radius:50%;background:#E5484D;transition:all .2s}
-.rbtn.on i{width:30px;height:30px;border-radius:8px}
-.sm{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#fff;background:none;border:0;width:70px}
-.sm span{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.18);display:grid;place-items:center}
-.count{position:absolute;inset:0;display:grid;place-items:center;font-size:120px;font-weight:700;z-index:4;text-shadow:0 4px 20px rgba(0,0,0,.5)}
+.bars{position:absolute;top:calc(64px + env(safe-area-inset-top));left:18px;right:18px;display:flex;gap:4px;z-index:4}
+.bars i{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.28);overflow:hidden;position:relative}
+.bars i b{position:absolute;inset:0;width:0;background:#fff;border-radius:2px}
+.bars i.done b{width:100%}
+/* text right under the lens: three lines, past fades, current bright, next half-seen */
+.pt{position:absolute;top:calc(84px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);width:min(86vw,420px);height:calc(3 * 1.35em);overflow:hidden;text-align:center;font-weight:700;line-height:1.35;z-index:3;text-shadow:0 1px 8px rgba(0,0,0,.55);-webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.35) 0%,#000 34%,#000 66%,rgba(0,0,0,.55) 100%);mask-image:linear-gradient(180deg,rgba(0,0,0,.35) 0%,#000 34%,#000 66%,rgba(0,0,0,.55) 100%)}
+.pt .lines{transition:transform .35s cubic-bezier(.45,0,.2,1);will-change:transform}
+.pt .ln{height:1.35em;white-space:nowrap;opacity:.45;transition:opacity .35s}
+.pt .ln.cur{opacity:1}
+.pt .w{position:relative;padding:0 2px;border-radius:5px;transition:background .18s ease-in-out,box-shadow .18s ease-in-out}
+.pt .w.on{background:rgba(255,214,107,.32);box-shadow:0 0 0 1.5px rgba(255,214,107,.5)}
+.pt.prev{height:auto;max-height:28vh;white-space:normal;-webkit-mask-image:none;mask-image:none;background:rgba(0,0,0,.35);border-radius:16px;padding:10px 12px}
+.pt.prev .ln{white-space:normal;height:auto;opacity:1}
+.oval{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:58vw;max-width:300px;aspect-ratio:3/4;border-radius:50%;border:2px dashed rgba(255,255,255,.7);z-index:2;transition:border-color .3s}
+.oval.ok{border:2px solid #5FD08A;animation:breathe .3s cubic-bezier(.2,.9,.3,1.6)}
+@keyframes breathe{50%{transform:translate(-50%,-50%) scale(1.06)}}
+.checks{position:absolute;left:0;right:0;bottom:calc(250px + env(safe-area-inset-bottom));display:flex;gap:6px;justify-content:center;flex-wrap:wrap;z-index:3;padding:0 14px}
+.ck{display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,.55);border-radius:999px;padding:6px 11px;font-size:13px;font-weight:700;opacity:0;transform:translateY(8px) scale(.9);transition:opacity .2s,transform .2s cubic-bezier(.2,.9,.3,1.3)}
+.ck.in{opacity:1;transform:none}
+.ck i{font-style:normal;color:#FFD66B}.ck.ok i{color:#5FD08A}
+.eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px}.eq u{width:2px;height:3px;background:#fff;transition:height .08s}
+.panel{position:absolute;left:0;right:0;bottom:0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;z-index:4;background:linear-gradient(180deg,transparent,rgba(0,0,0,.55) 30%)}
+.seg{display:flex;background:rgba(255,255,255,.16);border-radius:12px;padding:3px;gap:3px}
+.seg button{flex:1;height:38px;border-radius:9px;border:0;background:none;color:#fff;font-size:14px;font-weight:700}
+.seg button.on{background:#fff;color:#171717}
+.go{height:56px;border:0;border-radius:16px;background:#fff;color:#171717;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px}
+.note2{font-size:12.5px;color:rgba(255,255,255,.75);text-align:center}
+.count{position:absolute;left:50%;top:46%;font-size:120px;font-weight:700;z-index:5;text-shadow:0 4px 20px rgba(0,0,0,.5);transform:translate(-50%,-50%)}
+.count.tick{animation:tick 1s ease-out both}
+@keyframes tick{0%{opacity:0;transform:translate(-50%,-50%) scale(1.5)}12%{opacity:1;transform:translate(-50%,-50%) scale(1)}80%,100%{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
+.stop{position:absolute;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);width:76px;height:76px;border-radius:50%;border:5px solid rgba(255,255,255,.9);background:none;display:grid;place-items:center;z-index:4}
+.stop i{width:56px;height:56px;border-radius:50%;background:#FF4D4F;transition:all .25s cubic-bezier(.3,.8,.2,1)}
+.stop.on i{width:26px;height:26px;border-radius:7px}
+.hint{position:absolute;left:0;right:0;bottom:calc(118px + env(safe-area-inset-bottom));text-align:center;font-size:13px;color:rgba(255,255,255,.75);z-index:3}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:6;animation:fadeIn .2s ease both}
+@keyframes fadeIn{from{opacity:0}}
+.psheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);color:var(--ink);border-radius:20px 20px 0 0;padding:10px 18px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;z-index:7;animation:sheetUp .35s cubic-bezier(.2,.9,.3,1) both}
+@keyframes sheetUp{from{transform:translateY(100%)}70%{transform:translateY(-4%)}to{transform:none}}
+.fly{position:absolute;z-index:8;width:60px;height:106px;border-radius:10px;background:rgba(255,255,255,.85);left:50%;top:50%;animation:fly .45s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes fly{to{transform:translate(40vw,-45vh) scale(.25);opacity:0}}
+.wavy{background:linear-gradient(currentColor,currentColor) 0 100%/0 2px no-repeat;text-decoration:underline wavy var(--bad);text-underline-offset:4px;animation:wave .5s ease both}
+@keyframes wave{from{text-decoration-color:transparent}}
+.chipm{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:6px 11px;font-size:14px;font-weight:700;background:var(--sec2)}
+.chipm.ok{color:var(--ok)}.chipm.warn{color:var(--warn);animation:fadeUp .3s .2s ease both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}}
+.sendok{transition:all .25s ease;overflow:hidden}
+.sendok.shrink{width:56px !important;border-radius:50% !important;margin:0 auto}
+.sendok svg.chk path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw .3s .25s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.scr.tall{padding-bottom:250px}
+.part{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.part:first-child{border-top:0}
+.part .th{width:44px;height:78px;border-radius:8px;background:#000;object-fit:cover;flex:none}
+@media (prefers-reduced-motion: reduce){.cam *,.cam,.psheet,.dim,.fly,.wavy,.chipm,.sendok,.ck,.oval{animation:none !important;transition:none !important}}
 .vid{width:100%;border-radius:20px;background:#000;max-height:56vh;display:block;box-shadow:var(--shadow)}
 .prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:var(--ok);width:0}
 </style>
@@ -152,7 +193,7 @@ function draw() {
   window.scrollTo(0, 0);
   const top = stack.at(-1);
   if (!top) return ({tasks: drawTasks, reels: drawReels, profile: drawProfile})[tab]();
-  return ({task: drawTask, edit: drawEdit, review: drawReview, done: drawDone})[top.screen](top.arg);
+  return ({task: drawTask, edit: drawEdit, parts: drawParts, review: drawReview, done: drawDone})[top.screen](top.arg);
 }
 
 // ---------- Задания ----------
@@ -249,96 +290,254 @@ function drawEdit({id, text, own}) {
   $('#undo').onclick = () => save(t.text);
 }
 
-// ---------- Камера ----------
+// ---------- Камера с суфлёром (PR1 готовность → PR2 запись → PR3 пауза → PR4 фразы → PR5 отправка) ----------
 let cam = null;
-async function camera(t) {
+const SPEEDS = {slow: [0.75, 'Медленно', 1.9], normal: [1, 'Обычно', 2.4], fast: [1.25, 'Быстро', 3]};
+const speedKey = () => { const v = S.profile.speed; return v <= 0.8 ? 'slow' : v >= 1.2 ? 'fast' : 'normal'; };
+const phrasesOf = (text) => String(text || '').split(/(?<=[.!?…])\s+/).map((x) => x.trim()).filter(Boolean);
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+let shot = null; // {id, mode, segs: [{blob, from, to, keep}]}
+
+async function camera(t, opts = {}) {
+  const phrases = phrasesOf(taskText(t));
+  const store = (() => { try { return localStorage; } catch { return null; } })();
+  let mode = opts.mode || store?.getItem('shootMode') || 'whole', speed = speedKey();
   const el = document.createElement('div');
   el.className = 'cam';
-  const speeds = [0.5, 0.75, 1, 1.25, 1.5];
-  let drawRaf = 0, speed = S.profile.speed || 1, size = S.profile.size === 'normal' ? 22 : 28, facing = 'user', countdown = 0, rec = null, chunks = [], started = 0, raf = 0, offset = 0, last = 0, tries = 0;
   el.innerHTML = `<video playsinline muted autoplay class="mirror"></video>
-    <div class="ctop"><button class="cb" id="cx" aria-label="Закрыть">${ic('x', 22)}</button><span class="timer" id="tm">0:00 / 0:${String(t.seconds).padStart(2, '0')}</span><button class="cb" id="cf" aria-label="Повернуть камеру">${ic('flip', 22)}</button></div>
-    <div class="tp"><div class="in" id="tp" style="font-size:${size}px">${esc(taskText(t))}</div></div>
-    <div class="side"><button id="bs"><span>${ic('type', 22)}</span>Размер</button><button id="bt"><span>${ic('timer', 22)}</span>3 сек</button><button id="be"><span>${ic('pen', 20)}</span>Текст</button></div>
-    <div class="speed" role="group" aria-label="Скорость текста">${speeds.map((s) => `<button data-s="${s}" class="${s === speed ? 'on' : ''}">${s}×</button>`).join('')}</div>
-    <div class="recrow"><span class="sm" style="opacity:.0"></span><button class="rbtn" id="rb" aria-label="Начать запись"><i></i></button><span class="sm"><span>${ic('gauge', 22)}</span>Скорость</span></div>`;
+    <div class="ctop"><button class="cb" id="cx" aria-label="Закрыть">${ic('x', 22)}</button><span class="timer" id="tm">${opts.only != null ? 'Фраза ' + (opts.only + 1) : 'Ролик · ' + t.seconds + ' секунд'}</span><span style="width:44px"></span></div>
+    <div class="bars" id="bars" hidden>${phrases.map(() => '<i><b></b></i>').join('')}</div>
+    <div class="pt prev" id="pt"><div class="lines" id="lines"></div><div id="pv"></div></div>
+    <div class="oval" id="ov" aria-hidden="true"></div>
+    <div class="checks" id="cks"><span class="ck" data-c="face"><i>○</i>Лицо в рамке</span><span class="ck" data-c="light"><i>○</i>Света хватает</span><span class="ck" data-c="sound"><i>○</i>Звук есть <span class="eq">${'<u></u>'.repeat(4)}</span></span></div>
+    <div class="panel" id="pn">
+      ${opts.only == null ? `<div class="seg" role="group" aria-label="Как снимать"><button data-m="whole">Целиком</button><button data-m="parts">По фразам · ${phrases.length}</button></div>` : ''}
+      <div class="seg" role="group" aria-label="Скорость текста">${Object.entries(SPEEDS).map(([k, [, l]]) => `<button data-sp="${k}">${l}</button>`).join('')}</div>
+      <button class="go" id="go">${ic('video', 22)}Начать · отсчёт 3 секунды</button>
+      <span class="note2">Настройки запомнятся для следующих роликов</span></div>`;
   document.body.append(el);
-  const video = el.querySelector('video'), tp = el.querySelector('#tp'), tm = el.querySelector('#tm');
-  let stream;
-  const open = async () => {
-    stream?.getTracks().forEach((x) => x.stop());
-    try {
-      // Ask for a portrait picture; phones then give the sensor's full height instead of
-      // a landscape frame (a fixed 1080×1920 makes some of them pick landscape and crop).
-      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: facing, aspectRatio: {ideal: 9 / 16}, height: {ideal: 1920}}, audio: true});
-      video.srcObject = stream;
-      video.classList.toggle('mirror', facing === 'user');
-    } catch (e) { close(); noCamera(t); }
-  };
-  const close = () => { cancelAnimationFrame(raf); cancelAnimationFrame(drawRaf); stream?.getTracks().forEach((x) => x.stop()); el.remove(); cam = null; };
+  const video = el.querySelector('video'), lines = el.querySelector('#lines'), pt = el.querySelector('#pt'), tm = el.querySelector('#tm');
+  lines.hidden = true;
+  let stream, rec = null, chunks = [], raf = 0, drawRaf = 0, checkRaf = 0, closed = false, audioCtx = null;
+  const segs = opts.only != null && shot?.id === t.id ? shot.segs : [];
+  const close = () => { closed = true; cancelAnimationFrame(raf); cancelAnimationFrame(drawRaf); cancelAnimationFrame(checkRaf); stream?.getTracks().forEach((x) => x.stop()); audioCtx?.close().catch(() => {}); el.remove(); cam = null; };
   cam = close;
-  await open();
-  el.querySelector('#cx').onclick = () => { if (!rec || confirm('Остановить запись и выйти?')) close(); };
-  el.querySelector('#cf').onclick = () => { if (rec) return; facing = facing === 'user' ? 'environment' : 'user'; open(); };
-  el.querySelector('#bs').onclick = () => { size = size === 28 ? 34 : size === 34 ? 22 : 28; tp.style.fontSize = size + 'px'; haptic(); };
-  el.querySelector('#bt').onclick = (e) => { countdown = countdown ? 0 : 3; e.currentTarget.style.opacity = countdown ? 1 : .6; haptic(); };
-  el.querySelector('#bt').style.opacity = .6;
-  el.querySelector('#be').onclick = () => { if (rec) return; close(); go('task', t.id); };
-  el.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => { speed = Number(b.dataset.s); el.querySelectorAll('[data-s]').forEach((x) => x.classList.toggle('on', x === b)); haptic(); });
-  // Text speed: 1× scrolls the whole text in the task's length; the host can change it live.
-  const scroll = (now) => {
-    const dt = last ? (now - last) / 1000 : 0; last = now;
-    const total = Math.max(1, tp.scrollHeight - tp.parentElement.clientHeight);
-    offset = Math.min(total, offset + dt * speed * total / t.seconds);
-    tp.style.transform = `translateY(${-offset}px)`;
-    const s = Math.floor((Date.now() - started) / 1000);
-    tm.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} / 0:${String(t.seconds).padStart(2, '0')}`;
-    raf = requestAnimationFrame(scroll);
+  const setSeg = () => {
+    el.querySelectorAll('[data-m]').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
+    el.querySelectorAll('[data-sp]').forEach((b) => b.classList.toggle('on', b.dataset.sp === speed));
   };
-  const start = () => {
-    const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || '';
-    chunks = [];
-    // The take is always vertical 9:16: frames are drawn into a portrait canvas with the
-    // same centre crop the screen shows, whatever way the camera delivers them.
-    const W = 1080, H = 1920, cv = document.createElement('canvas');
-    cv.width = W; cv.height = H;
-    const ctx = cv.getContext('2d');
-    const draw = () => {
-      const vw = video.videoWidth, vh = video.videoHeight;
-      if (vw && vh) {
-        const k = Math.max(W / vw, H / vh), dw = vw * k, dh = vh * k;
-        ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  setSeg();
+  el.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => { mode = b.dataset.m; store?.setItem('shootMode', mode); setSeg(); haptic(); });
+  el.querySelectorAll('[data-sp]').forEach((b) => b.onclick = () => { speed = b.dataset.sp; setSeg(); haptic(); api('/api/app/profile', {method: 'POST', json: {speed: SPEEDS[speed][0]}}).then((r) => Object.assign(S.profile, r.profile)).catch(() => {}); });
+  // Lines of the prompter: words wrapped in spans so the highlight can walk them.
+  // Screen lines of ~24 letters: a phrase spans one or more; each word knows its line.
+  const rows = [], where = phrases.map(() => []);
+  phrases.forEach((ph, i) => {
+    let row = null;
+    ph.split(/\s+/).forEach((w, k) => {
+      if (!row || row.len + w.length > 24) { row = {p: i, words: [], len: 0}; rows.push(row); }
+      row.words.push([k, w]); row.len += w.length + 1;
+      where[i][k] = rows.length - 1;
+    });
+  });
+  el.querySelector('#pv').textContent = phrases.join(' ');
+  lines.innerHTML = rows.map((row, n) => `<div class="ln" data-l="${n}" data-p="${row.p}">${row.words.map(([k, w]) => `<span class="w" data-k="${row.p}-${k}">${esc(w)}</span>`).join(' ')}</div>`).join('');
+  el.querySelector('#cx').onclick = () => { if (!rec || confirm('Остановить запись и выйти?')) close(); };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'user', aspectRatio: {ideal: 9 / 16}, height: {ideal: 1920}}, audio: true});
+    video.srcObject = stream;
+  } catch (e) { close(); return noCamera(t); }
+  // Checks: face (FaceDetector where the browser has it, else the oval alone), light (mean
+  // brightness of a small frame), sound (level from an AnalyserNode). Chips appear one by one.
+  const probe = document.createElement('canvas'); probe.width = 48; probe.height = 64;
+  const pctx = probe.getContext('2d', {willReadFrequently: true});
+  const fd = 'FaceDetector' in window ? new window.FaceDetector({fastMode: true, maxDetectedFaces: 1}) : null;
+  let analyser = null, faceSince = 0, faceOk = !fd, lastFace = 0;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); analyser = audioCtx.createAnalyser(); analyser.fftSize = 512; audioCtx.createMediaStreamSource(stream).connect(analyser); } catch {}
+  const buf = new Uint8Array(256);
+  const ck = (c) => el.querySelector(`[data-c=${c}]`);
+  ['face', 'light', 'sound'].forEach((c, i) => setTimeout(() => ck(c)?.classList.add('in'), 200 + i * 150));
+  const mark = (c, ok) => { const x = ck(c); if (!x) return; x.classList.toggle('ok', ok); x.querySelector('i').textContent = ok ? '✓' : '○'; };
+  const check = async (now) => {
+    if (closed || rec) return;
+    if (video.videoWidth) {
+      pctx.drawImage(video, 0, 0, 48, 64);
+      const px = pctx.getImageData(0, 0, 48, 64).data;
+      let sum = 0; for (let i = 0; i < px.length; i += 4) sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+      mark('light', sum / (px.length / 4) > 70);
+      if (fd && now - lastFace > 400) {
+        lastFace = now;
+        try {
+          const f = (await fd.detect(video))[0];
+          const cx = f ? (f.boundingBox.x + f.boundingBox.width / 2) / video.videoWidth : -1;
+          const inside = f && cx > 0.3 && cx < 0.7;
+          faceSince = inside ? faceSince || now : 0;
+          faceOk = inside && now - faceSince >= 500;
+        } catch { faceOk = true; }
       }
-      if (rec) drawRaf = requestAnimationFrame(draw);
-    };
+      mark('face', faceOk);
+      const ov = el.querySelector('#ov'); if (ov && faceOk !== ov.classList.contains('ok')) ov.classList.toggle('ok', faceOk);
+    }
+    if (analyser) {
+      analyser.getByteTimeDomainData(buf);
+      let peak = 0; for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
+      el.querySelectorAll('.eq u').forEach((u, i) => { u.style.height = `${3 + Math.min(9, peak / (6 + i * 3))}px`; });
+      if (peak > 6) mark('sound', true);
+    } else mark('sound', true);
+    checkRaf = requestAnimationFrame(check);
+  };
+  checkRaf = requestAnimationFrame(check);
+
+  // ---- recording ----
+  const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const paint = () => { const vw = video.videoWidth, vh = video.videoHeight; if (vw && vh) { const k = Math.max(W / vw, H / vh); ctx.drawImage(video, (W - vw * k) / 2, (H - vh * k) / 2, vw * k, vh * k); } if (rec) drawRaf = requestAnimationFrame(paint); };
+  const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || '';
+  let cur = 0, t0 = 0, paused = 0, pausedAt = 0, segStart = 0, phraseAt = [], from = 0, onlyEnd = false;
+  const wps = () => SPEEDS[speed][2];
+  const wordsOf = (i) => phrases[i].split(/\s+/).length;
+  const show = (i, k) => {
+    const n = where[i][Math.max(0, k)] ?? 0;
+    lines.style.transform = `translateY(${(1 - n) * 1.35}em)`;
+    lines.querySelectorAll('.ln').forEach((l) => l.classList.toggle('cur', Number(l.dataset.l) === n));
+    lines.querySelectorAll('.w.on').forEach((w) => w.classList.remove('on'));
+    if (k >= 0) lines.querySelector(`.w[data-k="${i}-${k}"]`)?.classList.add('on');
+  };
+  const bars = el.querySelectorAll('#bars i');
+  const elapsed = () => (Date.now() - t0 - paused) / 1000;
+  const tick = () => {
+    if (!rec || rec.state !== 'recording') { raf = requestAnimationFrame(tick); return; }
+    const s = elapsed();
+    tm.textContent = `${mmss(s)} / ${mmss(t.seconds)}`;
+    const into = (Date.now() - phraseAt[cur] - (paused - (phraseAt.pausedBase?.[cur] || 0))) / 1000;
+    const k = Math.floor(into * wps());
+    bars.forEach((b, i) => { b.classList.toggle('done', i < cur); b.querySelector('b').style.width = i === cur ? `${Math.min(100, 100 * into * wps() / wordsOf(i))}%` : ''; });
+    if (k >= wordsOf(cur) + 1) {
+      if (mode === 'parts' || onlyEnd || cur === phrases.length - 1) { stopSeg(true); return; }
+      cur++; phraseAt[cur] = Date.now(); phraseAt.pausedBase = {...phraseAt.pausedBase, [cur]: paused}; segStartAt[cur] = (Date.now() - segStart - (paused - segPausedBase)) / 1000;
+    }
+    show(cur, Math.min(k, wordsOf(cur) - 1));
+    raf = requestAnimationFrame(tick);
+  };
+  let segStartAt = {}, segPausedBase = 0;
+  const startSeg = async (i) => {
+    el.querySelector('#pn')?.remove(); el.querySelector('#cks')?.remove(); el.querySelector('#ov')?.remove();
+    pt.classList.remove('prev'); lines.hidden = false; el.querySelector('#pv').hidden = true;
+    el.querySelector('#bars').hidden = false;
+    cur = i; from = i; show(cur, -1);
+    const c = document.createElement('div'); el.append(c);
+    for (let n = 3; n > 0; n--) { c.className = 'count'; c.textContent = n; void c.offsetWidth; c.className = 'count tick'; haptic(); await new Promise((r) => setTimeout(r, 1000)); if (closed) return; }
+    c.remove();
+    chunks = [];
     const out = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...stream.getAudioTracks()]);
     rec = new MediaRecorder(out, type ? {mimeType: type, videoBitsPerSecond: 8_000_000} : {videoBitsPerSecond: 8_000_000});
-    drawRaf = requestAnimationFrame(draw);
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-    rec.onstop = () => {
-      const blob = new Blob(chunks, {type: rec.mimeType || 'video/mp4'});
-      rec = null; tries++;
-      close();
-      go('review', {id: t.id, blob, tries});
-    };
+    drawRaf = requestAnimationFrame(paint);
     rec.start(500);
-    started = Date.now(); offset = 0; last = 0; tp.style.transform = '';
-    raf = requestAnimationFrame(scroll);
+    if (!t0) t0 = Date.now();
+    segStart = Date.now(); segPausedBase = paused; segStartAt = {[i]: 0};
+    phraseAt[cur] = Date.now(); phraseAt.pausedBase = {...phraseAt.pausedBase, [cur]: paused};
     tm.classList.add('rec');
-    el.querySelector('#rb').classList.add('on');
-    el.querySelector('#rb').setAttribute('aria-label', 'Остановить запись');
+    stopBtn.hidden = false; stopBtn.classList.add('on');
+    el.querySelector('.hint').hidden = false;
     haptic('medium');
+    raf = requestAnimationFrame(tick);
   };
-  el.querySelector('#rb').onclick = async () => {
-    if (rec) { rec.stop(); return; }
-    if (countdown) {
-      const c = document.createElement('div'); c.className = 'count'; el.append(c);
-      for (let n = countdown; n > 0; n--) { c.textContent = n; haptic(); await new Promise((r) => setTimeout(r, 1000)); }
-      c.remove();
-    }
-    start();
+  // A finished segment: whole text, one phrase, or the part before a restarted phrase (keep).
+  const stopSeg = (natural, keepTo) => new Promise((ok) => {
+    if (!rec) return ok();
+    cancelAnimationFrame(raf);
+    const r = rec; rec = null;
+    r.onstop = () => {
+      const blob = new Blob(chunks, {type: r.mimeType || type || 'video/mp4'});
+      const keep = keepTo != null ? segStartAt[keepTo] : null;
+      const seg = {blob, from, to: natural ? cur : Math.max(from, (keepTo ?? cur) - 1), keep, secs: keep ?? (Date.now() - segStart - (paused - segPausedBase)) / 1000};
+      if (seg.keep != null && seg.keep < 0.3) { ok(); return; }
+      if (opts.only != null) segs.splice(segs.findIndex((x) => x.from === opts.only), 1, seg);
+      else segs.push(seg);
+      // PRAnim 8: the frame flies into the list of phrases.
+      const f = document.createElement('div'); f.className = 'fly'; el.append(f); setTimeout(() => f.remove(), 460);
+      ok();
+      if (natural || keepTo == null) next();
+    };
+    r.stop();
+    tm.classList.remove('rec');
+  });
+  const next = () => {
+    const done = segs.length ? Math.max(...segs.map((x) => x.to)) : -1;
+    if (opts.only == null && mode === 'parts' && done < phrases.length - 1) return startSeg(done + 1);
+    shot = {id: t.id, mode: opts.only != null ? shot.mode : mode, segs: [...segs].sort((a, b) => a.from - b.from)};
+    close();
+    if (shot.mode === 'parts') { stack = stack.filter((x) => x.screen !== 'parts'); go('parts', {id: t.id}); } else upload(t);
   };
+  // PRAnim 7: tap on the text pauses; the sheet offers to redo the phrase, continue or restart.
+  const pause = () => {
+    if (!rec || rec.state !== 'recording') return;
+    rec.pause(); pausedAt = Date.now(); haptic('medium');
+    const words = phrases[cur].split(/\s+/);
+    const k = Math.max(0, Math.min(words.length - 1, Math.floor(((Date.now() - phraseAt[cur]) / 1000) * wps())));
+    const dim = document.createElement('div'); dim.className = 'dim';
+    const sh = document.createElement('div'); sh.className = 'psheet';
+    sh.innerHTML = `<span class="grab"></span><b style="font-size:20px">Сбились — это нормально</b><span class="cap">${cur > from ? `Фраза ${cur} уже сохранена. ` : ''}Перепишем только то, что нужно.</span>
+      <button class="bb" data-p="redo">${ic('video', 22)}Фразу ${cur + 1} заново · отсчёт 3 с</button>
+      <button class="sb2" data-p="go">Продолжить с «${esc(words.slice(k, k + 3).join(' '))}»</button>
+      <button class="lk" data-p="all">Всё сначала</button>`;
+    el.append(dim, sh);
+    const shut = () => { dim.remove(); sh.remove(); };
+    sh.querySelector('[data-p=go]').onclick = () => { shut(); paused += Date.now() - pausedAt; rec.resume(); haptic(); };
+    sh.querySelector('[data-p=redo]').onclick = async () => { shut(); paused += Date.now() - pausedAt; const i = cur; rec.resume(); await stopSeg(false, i); startSeg(i); };
+    sh.querySelector('[data-p=all]').onclick = async () => { shut(); paused += Date.now() - pausedAt; rec.resume(); const r = rec; rec = null; r.onstop = () => {}; r.stop(); segs.length = 0; t0 = 0; paused = 0; tm.classList.remove('rec'); startSeg(opts.only ?? 0); };
+  };
+  pt.onclick = pause;
+  const stopBtn = document.createElement('button'); stopBtn.className = 'stop'; stopBtn.hidden = true; stopBtn.setAttribute('aria-label', 'Остановить запись'); stopBtn.innerHTML = '<i></i>';
+  const hint = document.createElement('span'); hint.className = 'hint'; hint.hidden = true; hint.textContent = 'Нажмите на текст — пауза';
+  el.append(stopBtn, hint);
+  stopBtn.onclick = () => stopSeg(true);
+  el.querySelector('#go').onclick = () => { cancelAnimationFrame(checkRaf); startSeg(opts.only ?? 0); };
 }
+
+// Uploads the clips, the server joins them, then the review screen (PR5).
+async function upload(t) {
+  root.innerHTML = `<div class="scr center"><div class="badge" style="margin-top:80px;${tint('--b')}">${ic('upload', 40)}</div><h1 class="t2" style="margin-top:18px">Склеиваем запись</h1><p class="sub" id="up">Загружаем…</p><div class="prog" style="width:100%"><i id="upb"></i></div></div>`;
+  const total = shot.segs.reduce((n, x) => n + x.blob.size, 0);
+  let sent = 0;
+  try {
+    for (const [n, x] of shot.segs.entries()) {
+      await new Promise((ok, fail) => {
+        const q = new XMLHttpRequest();
+        q.open('POST', `/api/app/clip?id=${encodeURIComponent(t.id)}&n=${n}${x.keep ? '&keep=' + x.keep.toFixed(2) : ''}`);
+        q.setRequestHeader('x-tg-init', tg?.initData || '');
+        q.setRequestHeader('content-type', x.blob.type || 'video/mp4');
+        q.upload.onprogress = (e) => { if (e.lengthComputable) { const p = Math.round(100 * (sent + e.loaded) / total); $('#upb').style.width = p + '%'; $('#up').textContent = `Загружено ${p} % · не закрывайте страницу`; } };
+        q.onload = () => (q.status === 200 ? ok() : fail(new Error('upload')));
+        q.onerror = () => fail(new Error('Нет связи'));
+        q.send(x.blob);
+      });
+      sent += x.blob.size;
+    }
+    $('#up').textContent = 'Склеиваем на сервере…';
+    const j = await api('/api/app/join', {method: 'POST', json: {id: t.id, count: shot.segs.length}});
+    stack = stack.filter((x) => x.screen !== 'review');
+    go('review', {id: t.id, url: j.url});
+  } catch (e) {
+    root.innerHTML = `<div class="scr center"><h1 class="t2" style="margin-top:80px">Не получилось отправить</h1><p class="sub">${esc(e.message)}</p></div><div class="foot"><button class="bb" id="rt">Попробовать ещё раз</button></div>`;
+    $('#rt').onclick = () => upload(t);
+  }
+}
+
+// По фразам (PR4): each phrase a clip with its length and «переснять».
+function drawParts({id}) {
+  const t = S.tasks.find((x) => x.id === id);
+  const phrases = phrasesOf(taskText(t));
+  const dur = (seg) => new Promise((ok) => { const v = document.createElement('video'); v.preload = 'metadata'; v.onloadedmetadata = () => ok(isFinite(v.duration) ? v.duration : 0); v.onerror = () => ok(0); v.src = URL.createObjectURL(seg.blob); });
+  root.innerHTML = `<div class="scr"><h1 class="t2" style="margin-top:10px">${phrases.length} ${plural(phrases.length, 'фраза снята', 'фразы сняты', 'фраз снято')}</h1><p class="sub">Склеим сами. Любую фразу можно переснять отдельно.</p>
+    <div class="grp" style="margin-top:16px">${shot.segs.map((x, i) => `<div class="part"><video class="th" src="${URL.createObjectURL(x.blob)}#t=0.3" muted playsinline preload="metadata"></video><span class="tx"><span data-d="${i}">…</span><b style="font-size:16px;line-height:22px">${x.from + 1} · ${esc(phrases.slice(x.from, x.to + 1).join(' '))}</b></span><button class="eb2" data-re="${x.from}" aria-label="Переснять фразу ${x.from + 1}">↺</button></div>`).join('')}</div>
+  </div><div class="foot"><button class="bb" id="all">${ic('film', 22)}Склеить и посмотреть</button></div>`;
+  shot.segs.forEach((x, i) => (x.secs ? Promise.resolve(x.secs) : dur(x)).then((d) => { const e = root.querySelector(`[data-d="${i}"]`); if (e) e.textContent = mmss(d); }));
+  root.querySelectorAll('[data-re]').forEach((b) => b.onclick = () => camera(t, {only: Number(b.dataset.re), mode: 'parts'}));
+  $('#all').onclick = () => upload(t);
+}
+
 function noCamera(t) {
   root.innerHTML = `<div class="scr"><div style="margin-top:30px;width:80px;height:80px;border-radius:24px;display:grid;place-items:center;${tint('--a')}">${ic('video', 38)}</div>
     <h1 class="t2" style="margin-top:18px">Телеграм не дал доступ к камере</h1><p class="sub">Так бывает на некоторых телефонах. Есть два простых способа.</p>
@@ -348,38 +547,58 @@ function noCamera(t) {
   $('#again').onclick = () => camera(t);
   $('#pick').onclick = () => {
     const f = document.createElement('input'); f.type = 'file'; f.accept = 'video/*';
-    f.onchange = () => f.files[0] && go('review', {id: t.id, blob: f.files[0], tries: 1});
+    f.onchange = () => { if (!f.files[0]) return; shot = {id: t.id, mode: 'whole', segs: [{blob: f.files[0], from: 0, to: 0, keep: null}]}; upload(t); };
     f.click();
   };
 }
 
-// ---------- Проверка записи ----------
-function drawReview({id, blob}) {
+// ---------- Посмотреть и отправить (PR5) ----------
+function drawReview({id, url}) {
   const t = S.tasks.find((x) => x.id === id);
-  const src = URL.createObjectURL(blob);
-  root.innerHTML = `<div class="scr">
-    <h1 class="t2" style="margin-top:10px">Посмотрите запись</h1>
-    <p class="sub">Если всё хорошо — отправьте. Ошибки не страшны: редактор поправит.</p>
-    <video class="vid" style="margin-top:16px" src="${src}" controls playsinline></video>
-    <div class="prog" id="pg" hidden><i></i></div><p class="cap" id="pt"></p>
-  </div><div class="foot"><button class="bb" id="send">${ic('check', 22)}Отправить</button><button class="sb2" id="again">${ic('video', 22)}Снять ещё раз</button></div>`;
-  $('#again').onclick = () => { stack.pop(); camera(t); };
-  $('#send').onclick = () => {
-    $('#send').disabled = true; $('#again').disabled = true; $('#pg').hidden = false;
-    const x = new XMLHttpRequest();
-    x.open('POST', `/api/app/take?id=${encodeURIComponent(id)}`);
-    x.setRequestHeader('x-tg-init', tg?.initData || '');
-    x.setRequestHeader('content-type', blob.type || 'video/mp4');
-    x.upload.onprogress = (e) => { if (e.lengthComputable) { const p = Math.round(100 * e.loaded / e.total); $('#pg i').style.width = p + '%'; $('#pt').textContent = `Загружено ${p} % · не закрывайте страницу`; } };
-    x.onload = () => {
-      if (x.status !== 200) { $('#pt').textContent = 'Не получилось отправить. Попробуйте ещё раз.'; $('#send').disabled = false; $('#again').disabled = false; return; }
-      Object.assign(t, JSON.parse(x.responseText).task);
-      haptic('ok');
-      stack = [];
-      go('done');
+  const phrases = phrasesOf(taskText(t));
+  const who = 'редактору';
+  root.innerHTML = `<div class="scr tall">
+    <div class="lab" style="margin-top:6px">${esc(t.title)}</div>
+    <video class="vid" style="margin-top:12px" src="${url}" controls playsinline></video>
+    <div class="tools" style="margin-top:12px" id="chips"><span class="chipm ok">✓ Склеено</span><span class="chipm" id="sp">◌ Сверяем речь с текстом…</span></div>
+    <div class="box" style="margin-top:12px"><span class="lab">Текст</span><p class="big" id="txt" style="font-size:17px;line-height:26px">${phrases.map((ph, i) => `<span data-ph="${i}">${ph.split(/\s+/).map((w) => `<span class="ww">${esc(w)}</span>`).join(' ')}</span>`).join(' ')}</p></div>
+  </div><div class="foot"><button class="bb sendok" id="send">${ic('check', 22)}Отправить ${esc(who)}</button><div id="redo"></div><button class="lk" id="again">Снять заново</button></div>`;
+  $('#again').onclick = () => { stack = stack.filter((x) => x.screen !== 'review' && x.screen !== 'parts'); camera(t); };
+  // PRAnim 9: what the server did not hear gets a wavy line and a chip.
+  let tries = 0;
+  const poll = async () => {
+    const c = await api('/api/app/check?id=' + encodeURIComponent(id)).catch(() => ({state: 'none'}));
+    if (!$('#sp')) return;
+    if (c.state === 'running' && tries++ < 60) return setTimeout(poll, 3000);
+    if (c.state !== 'done') { $('#sp').textContent = '◌ Речь не проверили — редактор послушает сам'; return; }
+    const miss = c.missing || [];
+    if (!miss.length) { $('#sp').className = 'chipm ok'; $('#sp').textContent = '✓ Всё прозвучало'; return; }
+    const n = miss.reduce((k, m) => k + m.words.length, 0);
+    $('#sp').className = 'chipm warn'; $('#sp').textContent = `◐ ${n} ${plural(n, 'слово пропущено', 'слова пропущено', 'слов пропущено')}`;
+    for (const m of miss) {
+      const ph = root.querySelector(`[data-ph="${m.phrase}"]`);
+      ph?.querySelectorAll('.ww').forEach((w) => { if (m.words.some((x) => w.textContent.replace(/[^\p{L}\p{N}-]/gu, '') === x)) w.classList.add('wavy'); });
+    }
+    const first = miss[0].phrase;
+    $('#redo').innerHTML = `<button class="sb2" id="rp">${ic('video', 22)}Переснять фразу ${first + 1}</button>`;
+    $('#rp').onclick = () => {
+      if (shot?.id === id && shot.mode === 'parts') camera(t, {only: first, mode: 'parts'});
+      else { stack = stack.filter((x) => x.screen !== 'review'); camera(t, {mode: 'parts'}); }
     };
-    x.onerror = () => { $('#pt').textContent = 'Нет связи. Попробуйте ещё раз.'; $('#send').disabled = false; $('#again').disabled = false; };
-    x.send(blob);
+  };
+  poll();
+  $('#send').onclick = async () => {
+    const b = $('#send'); b.disabled = true;
+    try {
+      const r = await api('/api/app/send', {method: 'POST', json: {id}});
+      Object.assign(t, r.task);
+      // PRAnim 10: the button shrinks into a circle and draws a tick.
+      b.classList.add('shrink'); b.innerHTML = `<svg class="chk" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`;
+      haptic('ok');
+      const m = document.createElement('p'); m.className = 'cap'; m.style.textAlign = 'center'; m.textContent = 'Редактор получит в бот'; b.after(m);
+      shot = null;
+      setTimeout(() => { stack = []; go('done'); }, 1500);
+    } catch (e) { b.disabled = false; alert(e.message); }
   };
 }
 function drawDone() {

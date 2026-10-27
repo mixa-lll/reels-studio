@@ -455,7 +455,7 @@ createServer(async (req, res) => {
   }
 
   // The Telegram mini app signs its own requests (web/app.mjs), no session needed.
-  if (url.pathname === '/app' || url.pathname.startsWith('/api/app/')) return miniApp(req, res, url);
+  if (url.pathname === '/app' || url.pathname.startsWith('/api/app/') || url.pathname.startsWith('/app/take/')) return miniApp(req, res, url);
 
   const me = whoIs(req);
   if (!me) { res.writeHead(404, {'content-type': 'text/plain; charset=utf-8'}); return res.end('Not found'); }
