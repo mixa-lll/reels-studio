@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Рилсы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#F6F6F4; --card:#fff; --ink:#141414; --ink2:#3A3936; --muted:#6B6A66; --line:#E4E3DF; --soft:#EFEEEA; --accent:#D7261A; --blue:#1F5FD1; --blueBg:#E8EFFC; --amber:#C27A00; --green:#1E7A3D; --me:#141414; --meInk:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161615; --card:#201F1D; --ink:#EDECE8; --ink2:#CFCDC7; --muted:#9A978F; --line:#33312E; --soft:#2A2926; --blueBg:#1C2A44; --blue:#7FA8F5; --me:#EDECE8; --meInk:#161615; } }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.5 Geist, -apple-system, system-ui, sans-serif; }
+  a { color: inherit; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .app { display: flex; min-height: 100%; }
+  nav.side { width: 264px; flex: none; border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 16px; height: 100vh; position: sticky; top: 0; overflow-y: auto; background: var(--bg); }
+  .proj { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 8px 10px; }
+  .proj .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: none; }
+  .proj select { border: 0; background: none; font-weight: 600; width: 100%; padding: 0; appearance: none; }
+  .nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; text-decoration: none; color: var(--ink2); font-size: 14px; min-height: 38px; }
+  .nav:hover { background: var(--soft); }
+  .nav.on { background: var(--card); border: 1px solid var(--line); color: var(--ink); }
+  .nav svg { flex: none; }
+  .nav .n { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .label { font-size: 12px; color: var(--muted); padding: 0 10px 4px; display: flex; justify-content: space-between; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+  .s-work { background: var(--amber); } .s-review { background: var(--blue); } .s-done { background: var(--green); } .s-published { background: var(--ink); } .s-none { background: #B9B7B1; }
+  .meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; } .meter i { display: block; height: 100%; background: var(--ink); }
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .top { display: none; }
+  .page { padding: 24px 32px; display: flex; flex-direction: column; gap: 18px; max-width: 1400px; width: 100%; }
+  h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+  h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; text-decoration: none; font-size: 14px; }
+  .btn:hover { border-color: var(--ink); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .btn.dark { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.danger { color: #B4231A; }
+  .pill { border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 500; white-space: nowrap; background: var(--soft); color: var(--ink2); }
+  .pill.review { background: var(--blueBg); color: var(--blue); } .pill.cur { background: var(--ink); color: var(--bg); }
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; } .stats .card { flex: 1 1 200px; padding: 14px 16px; } .stats b { display: block; font-size: 24px; font-weight: 600; }
+  .board { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  .col { flex: 1 1 250px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .colh { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+  .rc { display: flex; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-decoration: none; }
+  .rc:hover { border-color: var(--ink); }
+  .th { width: 48px; height: 84px; border-radius: 7px; background: #2A3640 center/cover no-repeat; flex: none; }
+  /* chat */
+  .work { display: flex; flex: 1; min-height: 0; }
+  .chat { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
+  .chead { padding: 12px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .ctx { padding: 8px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
+  .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--ink2); }
+  .log { flex: 1; overflow-y: auto; padding: 20px 24px; }
+  .log .in { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 86%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.me { align-self: flex-end; background: var(--me); color: var(--meInk); }
+  .msg.bot { align-self: flex-start; background: var(--card); border: 1px solid var(--line); }
+  .msg.err { align-self: flex-start; color: #C0392B; font-size: 14px; }
+  .msg .by { font-size: 11px; opacity: .7; display: block; }
+  .msg video, .msg img.media { display: block; width: 100%; max-width: 300px; border-radius: 10px; background: #000; margin-bottom: 6px; }
+  .msg audio { width: 100%; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; white-space: normal; }
+  .btns button, .keys button { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 7px 11px; font-size: 14px; text-align: left; }
+  .btns button:hover, .keys button:hover { border-color: var(--ink); }
+  .cur-opt { border-color: var(--accent) !important; }
+  .status { display: none; max-width: 760px; margin: 0 auto 6px; padding: 0 24px; width: 100%; color: var(--muted); font-size: 14px; align-items: center; gap: 10px; }
+  .status.on { display: flex; }
+  .spin { width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: s 1s linear infinite; flex: none; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .keys { max-width: 760px; margin: 0 auto; padding: 0 24px 6px; width: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+  .keys:empty { display: none; }
+  form.send { border-top: 1px solid var(--line); padding: 10px 24px calc(10px + env(safe-area-inset-bottom)); }
+  form.send .in { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
+  form.send textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); max-height: 160px; min-height: 44px; }
+  .icon { width: 44px; height: 44px; border: 1px solid var(--line); background: var(--card); border-radius: 12px; display: grid; place-items: center; flex: none; }
+  .icon.go { background: var(--accent); border-color: var(--accent); }
+  .hint { color: var(--muted); text-align: center; margin: 12vh auto 0; max-width: 420px; }
+  aside.vers { width: 360px; flex: none; border-left: 1px solid var(--line); background: var(--card); padding: 16px; display: flex; flex-direction: column; gap: 14px; height: 100vh; overflow-y: auto; }
+  .ver { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ver.cur { border-color: var(--ink); }
+  .ver video { width: 100%; max-height: 360px; border-radius: 8px; background: #000; }
+  .dl { display: flex; justify-content: space-between; align-items: center; min-height: 42px; border: 1px solid var(--line); border-radius: 9px; padding: 0 12px; text-decoration: none; font-size: 14px; }
+  .dl:hover { border-color: var(--ink); }
+  .arch { display: flex; gap: 10px; align-items: center; font-size: 13px; }
+  .arch .th { width: 28px; height: 50px; }
+  /* misc */
+  .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: var(--card); flex-wrap: wrap; }
+  .tabs a { border-radius: 7px; padding: 6px 12px; font-size: 14px; text-decoration: none; color: var(--ink2); }
+  .tabs a.on { background: var(--ink); color: var(--bg); }
+  .md h1 { font-size: 20px; margin: 4px 0 8px; } .md h2 { font-size: 16px; margin: 18px 0 6px; } .md h3 { font-size: 14px; margin: 14px 0 4px; color: var(--muted); }
+  .md ul { padding-left: 18px; margin: 6px 0; } .md li { margin: 4px 0; } .md code { font-family: 'Geist Mono', monospace; font-size: 13px; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
+  .md p { margin: 6px 0; }
+  .li { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--soft); font-size: 14px; flex-wrap: wrap; }
+  .sw { width: 40px; height: 24px; border-radius: 12px; border: 0; background: #C9C7C1; position: relative; flex: none; padding: 0; }
+  .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .sw[aria-checked="true"] { background: var(--ink); } .sw[aria-checked="true"]::after { left: 19px; }
+  .idea { display: block; text-align: left; width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; }
+  .idea.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); }
+  .split { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .grow { flex: 999 1 520px; min-width: 0; } .side2 { flex: 1 1 340px; min-width: 0; }
+  input.f, select.f { min-height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; background: var(--card); width: 100%; }
+  iframe.dsf { width: 100%; height: calc(100vh - 140px); border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .drop { border: 1.5px dashed var(--line); border-radius: 14px; padding: 22px; text-align: center; color: var(--muted); background: var(--card); }
+  .drop.over { border-color: var(--accent); background: var(--soft); }
+  .fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .fcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .fcard .pv { aspect-ratio: 1; background: var(--soft) center/cover no-repeat; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+  .fcard .pv video { width: 100%; height: 100%; object-fit: cover; }
+  .fcard .meta { padding: 8px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .fcard .meta b { font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fcard .acts { display: flex; gap: 10px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 9; }
+  @media (max-width: 1100px) { aside.vers { width: 300px; } }
+  @media (max-width: 860px) {
+    .app { display: block; }
+    nav.side { position: fixed; inset: 0 auto 0 0; z-index: 5; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 0 40px rgba(0,0,0,.2); }
+    body.menu nav.side { transform: none; }
+    .top { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 3; }
+    .top b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .page { padding: 16px; }
+    .work { flex-direction: column; }
+    .chat { height: auto; min-height: calc(100vh - 61px); }
+    aside.vers { width: auto; height: auto; border-left: 0; border-top: 1px solid var(--line); }
+    .chead, .ctx, .log, form.send, .keys, .status { padding-left: 14px; padding-right: 14px; }
+    iframe.dsf { height: 60vh; }
+    .ctx { display: none; }
+    .chat { min-height: calc(100vh - 61px - 72px); }
+    .mob { display: inline-flex !important; }
+  }
+  .mob { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side" id="side" aria-label="Проект"></nav>
+  <main>
+    <div class="top"><button class="icon" id="menuBtn" aria-label="Меню" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button><b id="topTitle">Рилсы</b></div>
+    <div id="view" style="flex: 1; display: flex; flex-direction: column; min-height: 0"></div>
+  </main>
+</div>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const mb = (n) => n >= 1e9 ? (n / 1e9).toFixed(1).replace('.', ',') + ' ГБ' : Math.max(1, Math.round(n / 1e6)) + ' МБ';
+const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'сейчас' : m < 60 ? m + ' мин назад' : m < 1440 ? Math.round(m / 60) + ' ч назад' : new Date(t).toLocaleDateString('ru', {day: 'numeric', month: 'short'}); };
+const short = (s) => String(s ?? '').replace(/\s+/g, ' ').slice(0, 80);
+const md = (s) => {
+  const out = [];
+  let list = false;
+  for (const raw of String(s ?? '').replace(/<!--[\s\S]*?-->/g, '').split('\n')) {
+    let l = esc(raw).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    const li = /^\s*[-*] (.*)/.exec(l);
+    if (li) { if (!list) { out.push('<ul>'); list = true; } out.push('<li>' + li[1] + '</li>'); continue; }
+    if (list) { out.push('</ul>'); list = false; }
+    const h = /^(#{1,3}) (.*)/.exec(l);
+    if (h) out.push(`<h${h[1].length}>${h[2]}</h${h[1].length}>`);
+    else if (l.trim()) out.push('<p>' + l + '</p>');
+  }
+  if (list) out.push('</ul>');
+  return out.join('');
+};
+const chatMd = (s) => esc(s).replace(/```\w*\n?([\s\S]*?)```/g, '<pre>$1</pre>').replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+const STATUS = {work: 'В работе', review: 'На ревью', none: 'Без статуса', done: 'Готовы', published: 'Опубликованы'};
+const ICON = {
+  board: '<rect x="3" y="3" width="7" height="18" rx="2"></rect><rect x="14" y="3" width="7" height="11" rx="2"></rect>',
+  chat: '<path d="M4 5h16v11H8l-4 4Z"></path>',
+  idea: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3Z"></path>',
+  rules: '<path d="M4 5h16M4 12h16M4 19h10"></path>',
+  ds: '<circle cx="8" cy="8" r="4"></circle><rect x="13" y="13" width="8" height="8" rx="1"></rect><path d="M4 20l4-6 4 6Z"></path>',
+  files: '<path d="M3 7h6l2 2h10v10H3Z"></path>',
+  people: '<circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"></path>',
+};
+const svg = (k, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ICON[k]}</svg>`;
+
+let ME = null, PROJECTS = [], P = localStorage.getItem('project') || 'main', OV = null;
+const api = async (path, opts) => {
+  const r = await fetch(path + (path.includes('?') ? '&' : '?') + 'project=' + encodeURIComponent(P), opts);
+  if (!r.ok) throw Object.assign(new Error('Ошибка ' + r.status), {status: r.status});
+  return r.json();
+};
+const post = (path, b) => api(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(b || {})});
+const toast = (t) => { const el = document.createElement('div'); el.className = 'toast'; el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 3500); };
+const isOwner = () => ME?.role === 'owner';
+const canEdit = () => ME && ME.role !== 'viewer';
+
+async function sidebar() {
+  OV = await api('/api/overview');
+  const route = location.hash || '#/';
+  const proj = PROJECTS.find((x) => x.slug === P) || {name: P};
+  const review = OV.reels.filter((r) => r.status === 'review').length;
+  const navs = [
+    ['#/', 'board', 'Все рилсы', OV.reels.length],
+    ['#/chat/_project', 'chat', 'Общий чат', ''],
+    ['#/new', 'idea', 'Новый рилс', OV.ideasCount + ' идей'],
+    ['#/knowledge', 'rules', 'Правила и бриф', ''],
+    ['#/ds', 'ds', 'Дизайн-система', ''],
+    ['#/files', 'files', 'Файлы и место', ''],
+    ...(isOwner() ? [['#/access', 'people', 'Доступ', '']] : []),
+  ];
+  const used = OV.disk.total - OV.disk.free;
+  $('#side').innerHTML = `
+    <div class="proj"><span class="logo">${esc(proj.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase())}</span>
+      <label style="flex: 1; min-width: 0"><span class="small muted" style="display: block">Проект · ${OV.reels.length} рилсов${review ? ' · ' + review + ' на ревью' : ''}</span>
+      <select id="projSel" aria-label="Проект">${PROJECTS.map((x) => `<option value="${esc(x.slug)}" ${x.slug === P ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label></div>
+    <div style="display: flex; flex-direction: column; gap: 2px">${navs.map(([h, i, t, n]) => `<a class="nav ${route === h || (h !== '#/' && route.startsWith(h)) ? 'on' : ''}" href="${h}">${svg(i)}${t}<span class="n">${n}</span></a>`).join('')}</div>
+    <div style="display: flex; flex-direction: column; gap: 2px">
+      <div class="label"><span>Рилсы</span>${canEdit() ? '<a href="#/new" style="text-decoration: none; font-weight: 600; color: var(--ink)">+ Новый</a>' : ''}</div>
+      ${OV.reels.slice(0, 12).map((r) => `<a class="nav ${route === '#/reel/' + r.id ? 'on' : ''}" href="#/reel/${r.id}"><i class="dot s-${r.status}"></i><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><b style="font-weight: 600">${esc(r.num)}</b> ${esc(r.title)}</span><span class="n">${OV.busy?.key === r.id ? '<i class="spin" style="display: inline-block"></i>' : esc(r.version || '')}</span></a>`).join('')}
+    </div>
+    <div style="margin-top: auto; border-top: 1px solid var(--line); padding: 12px 10px 0; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 6px">
+      <div style="display: flex; justify-content: space-between"><span>Диск сервера</span><span style="color: var(--ink)">${mb(used)} из ${mb(OV.disk.total)}</span></div>
+      <div class="meter"><i style="width: ${Math.round(used / OV.disk.total * 100)}%"></i></div>
+      <div>${esc(ME.name)} · ${ME.role === 'owner' ? 'владелец' : ME.role === 'editor' ? 'монтажёр' : 'зритель'}</div>
+    </div>`;
+  $('#projSel').onchange = (e) => { P = e.target.value; localStorage.setItem('project', P); location.hash = '#/'; route(); };
+}
+
+// ---------- chat ----------
+function chatBox(key, {onDone, onRebind} = {}) {
+  const el = document.createElement('div');
+  el.style.cssText = 'display: flex; flex-direction: column; flex: 1; min-height: 0';
+  el.innerHTML = `<div class="log"><div class="in"></div></div>
+    <div class="status"><i class="spin"></i><span class="stext">Думаю…</span><button class="btn" type="button" style="margin-left: auto; min-height: 32px">Стоп</button></div>
+    <div class="keys"></div>
+    ${canEdit() ? `<form class="send"><div class="in">
+      <button type="button" class="icon clip" aria-label="Прикрепить файл"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"></path></svg></button>
+      <input type="file" multiple hidden>
+      <label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)" for="ta-${esc(key)}">Сообщение</label>
+      <textarea id="ta-${esc(key)}" rows="1" placeholder="Сообщение или правка…"></textarea>
+      <button class="icon go" aria-label="Отправить"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+    </div></form>` : '<p class="small muted" style="text-align: center; padding: 12px">У тебя доступ только на просмотр.</p>'}`;
+  const log = $('.log .in', el), keysEl = $('.keys', el), st = $('.status', el), ta = $('textarea', el);
+  let busy = false;
+  const setBusy = (on, text) => {
+    busy = on; st.classList.toggle('on', on);
+    if (text) $('.stext', st).textContent = text;
+    el.querySelectorAll('.btns button, .keys button, .go').forEach((b) => (b.disabled = on));
+  };
+  $('button', st).onclick = () => post('/api/stop');
+  const buttons = (list, under) => {
+    const box = document.createElement('div'); box.className = 'btns';
+    for (const label of list) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = () => say(`(pressed button "${label}" under: "${short(under)}")`, label); box.append(b); }
+    return box;
+  };
+  const menuEl = (menu) => {
+    const box = document.createElement('div');
+    if (menu.title) box.innerHTML = `<b>${esc(menu.title)}</b>`;
+    for (const s of menu.sections || []) {
+      const sec = document.createElement('div'); sec.style.marginTop = '10px'; sec.style.whiteSpace = 'normal';
+      sec.innerHTML = `${esc(s.title)}${s.prompt ? `<div class="small muted">${esc(s.prompt)}</div>` : ''}`;
+      const row = document.createElement('div'); row.className = 'btns';
+      for (const o of s.options || []) {
+        const b = document.createElement('button'); b.type = 'button';
+        b.innerHTML = esc(o.label) + (o.note ? ` <span class="small muted">${esc(o.note)}</span>` : '');
+        if (o.value !== undefined && o.value === s.current) b.className = 'cur-opt';
+        b.onclick = () => say(`(menu «${menu.title}»: ${s.title} → «${o.label}»)`, `${s.title}: ${o.label}`);
+        row.append(b);
+      }
+      sec.append(row); box.append(sec);
+    }
+    return box;
+  };
+  const showKeys = (keys) => {
+    keysEl.innerHTML = '';
+    for (const k of keys) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = k; b.disabled = busy;
+      b.onclick = () => say(/^🎲/.test(k) ? '(tapped «🎲 Другие идеи»: pitch a fresh batch of 4 NEW ideas per «1. Ideas» in REELS.md — none of the ones already shown; those stay in ideas.md. Keyboard: only the new ones, via --ideas.)' : `(tapped keyboard button "${k}")`, k);
+      keysEl.append(b);
+    }
+  };
+  const render = (m) => {
+    $('.hint', log)?.remove();
+    const d = document.createElement('div');
+    if (m.from === 'me') { d.className = 'msg me'; d.innerHTML = (m.by && m.by !== ME.name ? `<span class="by">${esc(m.by)}</span>` : '') + esc(m.text); }
+    else if (m.kind === 'error') { d.className = 'msg err'; d.textContent = '⚠️ ' + m.text; }
+    else {
+      d.className = 'msg bot';
+      if (m.kind === 'file') {
+        const dl = m.url ? m.url + '&dl=1' : null;
+        if (!m.url) d.insertAdjacentHTML('beforeend', `<div>📄 ${esc(m.name)}</div>`);
+        else if (/\.(mp4|mov|webm)$/.test(m.ext) && !m.document) d.insertAdjacentHTML('beforeend', `<video src="${m.url}" controls playsinline preload="metadata"></video><a href="${dl}" class="small">Скачать</a>`);
+        else if (/\.(png|jpe?g|webp|gif)$/.test(m.ext)) d.insertAdjacentHTML('beforeend', `<img class="media" src="${m.url}" alt="">`);
+        else if (/\.(mp3|m4a|wav|ogg)$/.test(m.ext)) d.insertAdjacentHTML('beforeend', `<audio src="${m.url}" controls></audio>`);
+        else d.insertAdjacentHTML('beforeend', `<a href="${dl}">📄 ${esc(m.name)}</a>`);
+        if (m.caption) d.insertAdjacentHTML('beforeend', `<div>${chatMd(m.caption)}</div>`);
+      } else if (m.text) d.innerHTML = chatMd(m.text);
+      if (m.buttons?.length && canEdit()) d.append(buttons(m.buttons, m.caption || m.text));
+      if (m.menu && canEdit()) d.append(menuEl(m.menu));
+    }
+    log.append(d);
+    d.scrollIntoView({block: 'end'});
+    if (m.from === 'bot' && canEdit()) showKeys(m.keys || []);
+  };
+  async function say(text, shown) {
+    if (busy || !text.trim()) return;
+    showKeys([]);
+    render({from: 'me', text: shown || text});
+    setBusy(true, 'Думаю…');
+    try {
+      const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown})});
+      if (r.status === 429) throw new Error('Claude сейчас занят в другом чате — дождись, пока он закончит');
+      if (!r.ok) throw new Error('Ошибка ' + r.status);
+      const reader = r.body.getReader(), dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const {value, done} = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, {stream: true});
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const ev = JSON.parse(buf.slice(6, i)); buf = buf.slice(i + 2);
+          if (ev.status) $('.stext', st).textContent = ev.status;
+          if (ev.msg) render(ev.msg);
+          if (ev.rebind) { key = ev.rebind; onRebind?.(key); }
+          if (ev.freed) toast(`Освобождено ${mb(ev.freed)}: старые версии ушли в архив`);
+        }
+      }
+    } catch (err) { render({from: 'bot', kind: 'error', text: err.message}); }
+    setBusy(false);
+    onDone?.(key);
+    ta?.focus();
+  }
+  async function load() {
+    const h = await api('/api/chat?key=' + encodeURIComponent(key));
+    log.innerHTML = '';
+    if (!h.messages.length) log.innerHTML = `<p class="hint">${key === '_ds' ? 'Опиши, какой должна быть дизайн-система, или попроси собрать её из того, что уже есть в рилсах.' : key === '_project' ? 'Общий чат проекта: идеи, бриф, правила, настройки. Сами рилсы делаются в своих чатах.' : 'Напиши, что сделать с этим рилсом.'}</p>`;
+    h.messages.forEach(render);
+    if (h.busy) {
+      setBusy(true, h.status || 'Работаю… обновлю, когда закончу');
+      setTimeout(() => location.hash.includes(key) && load().then(() => sidebar()), 4000);
+    } else if (busy) setBusy(false);
+  }
+  if (ta) {
+    const form = $('form', el), file = $('input[type=file]', el), clip = $('.clip', el);
+    ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+    ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; });
+    clip.onclick = () => file.click();
+    file.onchange = () => { clip.style.borderColor = file.files.length ? 'var(--accent)' : ''; clip.title = [...file.files].map((f) => f.name).join(', '); };
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const files = [...file.files], text = ta.value.trim();
+      if ((!text && !files.length) || busy) return;
+      ta.value = ''; ta.style.height = 'auto';
+      const parts = [];
+      for (const f of files) {
+        setBusy(true, `Загружаю ${f.name}…`);
+        const toReel = !key.startsWith('_') && !key.startsWith('new-') ? `&reel=${encodeURIComponent(key)}` : '';
+        const r = await fetch(`/api/upload?project=${encodeURIComponent(P)}${toReel}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f});
+        if (r.ok) parts.push(`(attached file → ${(await r.json()).path})`);
+      }
+      setBusy(false);
+      file.value = ''; clip.style.borderColor = ''; clip.title = '';
+      say([text, ...parts].filter(Boolean).join('\n'), [text, ...files.map((f) => '📎 ' + f.name)].filter(Boolean).join('\n'));
+    };
+  }
+  el.say = say;
+  el.ready = load();
+  return el;
+}
+
+// ---------- views ----------
+const view = $('#view');
+const title = (t) => { $('#topTitle').textContent = t; document.title = t + ' · Рилсы'; };
+
+async function vBoard() {
+  title('Все рилсы');
+  const groups = ['work', 'review', 'none', 'done', 'published'];
+  const by = Object.fromEntries(groups.map((g) => [g, OV.reels.filter((r) => r.status === g)]));
+  const used = OV.disk.total - OV.disk.free;
+  view.innerHTML = `<div class="page">
+    <div class="row" style="justify-content: space-between"><div><div class="small muted">Проект</div><h1>${esc((PROJECTS.find((x) => x.slug === P) || {}).name || P)} · рилсы</h1></div>
+      <div class="row"><a class="btn" href="#/knowledge">Правила и дизайн-система</a>${canEdit() ? `<a class="btn primary" href="#/new">+ Новый рилс</a>` : ''}</div></div>
+    <div class="stats">
+      <div class="card"><span class="small muted">Ждут твоего решения</span><b>${by.review.length}</b></div>
+      <div class="card"><span class="small muted">Идей в запасе</span><b>${OV.ideasCount}</b></div>
+      <div class="card" style="flex: 2 1 320px"><div class="row small muted" style="justify-content: space-between"><span>Место на сервере</span><a href="#/files">Разобрать</a></div><b>${mb(used)} <span class="small muted" style="font-weight: 400">из ${mb(OV.disk.total)}</span></b><div class="meter" style="margin-top: 8px"><i style="width: ${Math.round(used / OV.disk.total * 100)}%"></i></div></div>
+    </div>
+    <div class="board">${groups.filter((g) => by[g].length || g === 'work').map((g) => `<section class="col" aria-label="${STATUS[g]}">
+      <div class="colh"><i class="dot s-${g}"></i>${STATUS[g]} <span class="muted" style="font-weight: 400">${by[g].length}</span></div>
+      ${by[g].map((r) => `<a class="rc" href="#/reel/${r.id}"><div class="th" ${r.thumb ? `style="background-image: url('${r.thumb}')"` : ''}></div><div style="min-width: 0"><b style="font-weight: 600; font-size: 14px">${esc(r.num)} ${esc(r.title)}</b><div class="small muted">${r.version ? esc(r.version) + ' · ' : 'версий нет · '}${ago(r.updated)}</div>${OV.busy?.key === r.id ? '<div class="small" style="color: var(--accent)">Claude работает…</div>' : ''}</div></a>`).join('') || '<p class="small muted">Пусто. Начни новый рилс.</p>'}
+    </section>`).join('')}</div></div>`;
+}
+
+async function vReel(id, tab) {
+  const isNew = id.startsWith('new-');
+  const data = isNew ? null : await api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null);
+  const r = data?.reel;
+  title(r ? `${r.num} ${r.title}` : 'Новый рилс');
+  view.innerHTML = `<div class="work"><div class="chat">
+    <div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/">${esc((PROJECTS.find((x) => x.slug === P) || {}).name)}</a> / Рилсы</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} «${esc(r.title)}»` : 'Новый рилс'}</h1></div>
+      ${r ? `<span class="pill ${r.status === 'review' ? 'review' : ''}">${STATUS[r.status]}${r.version ? ' · ' + r.version : ''}</span>` : ''}
+      ${r?.version ? `<a class="btn mob" href="#vers" onclick="event.preventDefault(); document.getElementById('vers').scrollIntoView({behavior: 'smooth'})">Версии и скачать ↓</a>` : ''}
+      ${r ? `<div class="tabs" role="tablist"><a href="#/reel/${esc(id)}" class="${tab !== 'files' ? 'on' : ''}">Чат</a><a href="#/reel/${esc(id)}/files" class="${tab === 'files' ? 'on' : ''}">Файлы</a></div>` : ''}
+      ${canEdit() && tab !== 'files' ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>
+    <div class="ctx">Claude знает: <span class="chip">бриф проекта</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и историю рилса ${esc(r.num)}</span>` : ''}</div>
+    <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div>
+  </div>${isNew ? '' : '<aside class="vers" id="vers" aria-label="Версии"></aside>'}</div>`;
+  if (tab === 'files' && r) { $('.ctx').remove(); renderVersions(id, data); return reelFiles(id); }
+  const box = chatBox(id, {
+    onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
+    onDone: (k) => { sidebar(); if (!k.startsWith('new-')) { if (isNew) vReel(k); else renderVersions(k); } },
+  });
+  $('#chatHost').append(box);
+  $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат рилса заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id); } });
+  if (!isNew) renderVersions(id, data);
+  const pending = sessionStorage.getItem('firstMsg:' + id);
+  if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
+}
+
+async function reelFiles(id) {
+  const host = $('#chatHost');
+  host.style.overflowY = 'auto';
+  host.innerHTML = `<div class="page" style="max-width: 1000px">
+    ${canEdit() ? `<label class="drop" id="drop"><input type="file" multiple hidden id="up"><b style="color: var(--ink); font-weight: 600">Перетащи сюда референсы, исходники, музыку</b><br><span class="small">или нажми, чтобы выбрать файлы · они попадут в материалы этого рилса, Claude их увидит</span></label>` : ''}
+    <section><div class="row" style="justify-content: space-between; margin-bottom: 10px"><h2>Материалы</h2><span class="small muted" id="srcInfo"></span></div><div class="fgrid" id="src"></div></section>
+    <section><div class="row" style="justify-content: space-between; margin-bottom: 10px"><h2>Итог и версии</h2><span class="small muted">старые версии сжимаются по правилам хранения</span></div><div class="fgrid" id="res"></div></section>
+  </div>`;
+  const card = (f, del) => `<div class="fcard"><a class="pv" href="${f.url}" target="_blank" rel="noopener" ${f.kind === 'image' ? `style="background-image: url('${f.url}')"` : ''}>${f.kind === 'video' ? `<video src="${f.url}#t=0.5" preload="metadata" muted playsinline></video>` : f.kind === 'image' ? '' : esc((f.name.split('.').pop() || 'файл').toUpperCase())}</a>
+    <div class="meta"><b title="${esc(f.name)}">${esc(f.name)}</b><span class="muted">${mb(f.size)} · ${ago(f.at)}</span><span class="acts"><a href="${f.url}&dl=1">Скачать</a>${del ? `<a href="#" data-del="${esc(f.name)}" style="color: #B4231A">Удалить</a>` : ''}</span></div></div>`;
+  async function load() {
+    const f = await api('/api/files?reel=' + encodeURIComponent(id));
+    $('#src').innerHTML = f.sources.map((x) => card(x, canEdit())).join('') || '<p class="small muted">Пока пусто. Загрузи референсы или исходники — или прикрепи их в чате рилса.</p>';
+    $('#srcInfo').textContent = f.sources.length ? `${f.sources.length} файлов · ${mb(f.sources.reduce((a, x) => a + x.size, 0))}` : '';
+    $('#res').innerHTML = f.results.map((x) => card(x, false)).join('') || '<p class="small muted">Готовых файлов пока нет.</p>';
+    host.querySelectorAll('[data-del]').forEach((a) => (a.onclick = async (e) => { e.preventDefault(); if (!confirm(`Удалить ${a.dataset.del}?`)) return; await post('/api/files/delete', {reel: id, name: a.dataset.del}); load(); }));
+  }
+  async function upload(files) {
+    const drop = $('#drop');
+    for (const [i, f] of [...files].entries()) {
+      drop.querySelector('b').textContent = `Загружаю ${i + 1} из ${files.length}: ${f.name}…`;
+      await fetch(`/api/upload?project=${encodeURIComponent(P)}&reel=${encodeURIComponent(id)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f});
+    }
+    drop.querySelector('b').textContent = 'Перетащи сюда референсы, исходники, музыку';
+    toast(`Загружено: ${files.length}`);
+    load();
+  }
+  const drop = $('#drop');
+  if (drop) {
+    $('#up').onchange = (e) => e.target.files.length && upload(e.target.files);
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files.length) upload(e.dataTransfer.files); };
+  }
+  load();
+}
+
+async function renderVersions(id, data) {
+  data ||= await api('/api/reel?reel=' + encodeURIComponent(id));
+  const el = $('#vers');
+  if (!el) return;
+  const vs = data.versions;
+  const kindName = {master: 'Мастер', copy: 'Для Instagram', cover: 'Обложка', thumb: 'Кадр', other: 'Файл'};
+  const fileLinks = (v) => v.files.filter((f) => f.kind !== 'thumb' && f.kind !== 'other').sort((a, b) => ['copy', 'master', 'cover'].indexOf(a.kind) - ['copy', 'master', 'cover'].indexOf(b.kind))
+    .map((f) => `<a class="dl" href="${f.url}&dl=1"><span>${kindName[f.kind]}</span><span class="small muted">${mb(f.size)} ↓</span></a>`).join('');
+  const video = (v) => v.files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
+  const thumb = (v) => v.files.find((f) => f.kind === 'thumb' || f.kind === 'cover');
+  const cur = vs[0], prev = vs.find((v) => v.state === 'previous' && video(v)), old = vs.filter((v) => v !== cur && v !== prev);
+  el.innerHTML = `<div class="row" style="justify-content: space-between"><h2>Версии · ${vs.length}</h2><a class="small" href="#/files">Место</a></div>
+    ${!cur ? '<p class="small muted">Версий пока нет. Когда Claude смонтирует первую, она появится здесь.</p>' : `
+    <div class="ver cur"><div class="row" style="justify-content: space-between"><b>${esc(cur.v)} · текущая</b><span class="small muted">${ago(cur.at)}</span></div>
+      ${video(cur) ? `<video src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video>` : ''}
+      ${fileLinks(cur)}</div>`}
+    ${prev ? `<div class="ver"><div class="row" style="justify-content: space-between"><b>${esc(prev.v)} · предыдущая</b><span class="small muted">${ago(prev.at)}</span></div>
+      <details><summary class="small">Смотреть для сравнения</summary><video src="${video(prev).url}" controls playsinline preload="none" style="margin-top: 8px"></video></details>${fileLinks(prev)}
+      <span class="small muted">Мастер уже удалён ради места</span></div>` : ''}
+    ${old.length ? `<div style="display: flex; flex-direction: column; gap: 8px"><span class="small muted">Архив — кадр и снимок проекта</span>
+      ${old.map((v) => `<div class="arch"><div class="th" ${thumb(v) ? `style="background-image: url('${thumb(v).url}')"` : ''}></div><span style="flex: 1"><b>${esc(v.v)}</b> · ${ago(v.at)}${v.archived ? ` · освобождено ${mb(v.archived.freed)}` : ''}</span>${canEdit() ? `<button type="button" class="btn" data-rebuild="${esc(v.v)}" style="min-height: 34px; font-size: 13px">Пересобрать</button>` : ''}</div>`).join('')}</div>` : ''}`;
+  el.querySelectorAll('[data-rebuild]').forEach((b) => (b.onclick = () => {
+    const box = $('#chatHost > div');
+    box.say(`Пересобери версию ${b.dataset.rebuild} этого рилса из её снимка versions/${b.dataset.rebuild}/project-snapshot/ и пришли её.`, `Пересобрать ${b.dataset.rebuild}`);
+  }));
+}
+
+async function vChat(key) {
+  title(key === '_project' ? 'Общий чат' : 'Чат');
+  view.innerHTML = `<div class="work"><div class="chat"><div class="chead"><div style="flex: 1"><div class="small muted">${esc((PROJECTS.find((x) => x.slug === P) || {}).name)}</div><h1 style="font-size: 20px">Общий чат проекта</h1></div>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
+    <div class="ctx">Идеи, бриф, правила, настройки. <a href="#/new">Новый рилс</a> начинается в своём чате.</div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`;
+  $('#chatHost').append(chatBox(key, {onDone: () => sidebar()}));
+  $('#resetChat')?.addEventListener('click', async () => { if (confirm('Очистить общий чат?')) { await post('/api/chat/reset', {key}); vChat(key); } });
+}
+
+async function vNew() {
+  title('Новый рилс');
+  const {ideas} = await api('/api/ideas');
+  let pick = null;
+  view.innerHTML = `<div class="page">
+    <div class="row" style="justify-content: space-between"><div><div class="small muted"><a href="#/">${esc((PROJECTS.find((x) => x.slug === P) || {}).name)}</a> / Новый рилс</div><h1>С чего начнём?</h1></div>
+      <a class="btn" href="#/chat/_project" id="more">Попросить новые идеи</a></div>
+    <div class="split">
+      <section class="side2" style="display: flex; flex-direction: column; gap: 10px" aria-label="Идеи">
+        <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Своя идея<input class="f" id="own" placeholder="Опиши в двух словах или вставь ссылку"></label>
+        <div class="small muted" style="margin-top: 6px">Из бэклога · ${ideas.length}</div>
+        <div id="ideas" style="display: flex; flex-direction: column; gap: 8px; max-height: 64vh; overflow-y: auto"></div>
+      </section>
+      <section class="grow card" id="detail" style="display: flex; flex-direction: column; gap: 14px"></section>
+    </div></div>`;
+  const list = $('#ideas');
+  ideas.forEach((x, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'idea';
+    b.innerHTML = `<b style="font-weight: 600">${esc(x.title.replace(/^[^\p{L}\d«"]+/u, ''))}</b><div class="small muted">${esc(x.format || x.section)}</div>`;
+    b.onclick = () => { pick = x; list.querySelectorAll('.idea').forEach((y) => y.classList.remove('on')); b.classList.add('on'); $('#own').value = ''; detail(); };
+    list.append(b);
+    if (i === 0) { pick = x; b.classList.add('on'); }
+  });
+  $('#own').oninput = () => { if ($('#own').value.trim()) { pick = null; list.querySelectorAll('.idea').forEach((y) => y.classList.remove('on')); } detail(); };
+  function detail() {
+    const own = $('#own').value.trim();
+    const t = own || pick?.title.replace(/^[^\p{L}\d«"]+/u, '') || '';
+    $('#detail').innerHTML = !t ? '<p class="muted">Выбери идею слева или напиши свою.</p>' : `
+      <div><div class="small muted">Рилс ${String(Math.max(0, ...OV.reels.map((r) => Number(r.num))) + 1).padStart(2, '0')} · новый чат</div><h2 style="font-size: 22px; margin-top: 4px">${esc(t)}</h2></div>
+      ${pick && !own ? `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; font-size: 14px">
+        ${pick.hook ? `<div><div class="small muted">Хук</div>${esc(pick.hook)}</div>` : ''}${pick.plot ? `<div><div class="small muted">Сюжет</div>${esc(pick.plot.slice(0, 320))}${pick.plot.length > 320 ? '…' : ''}</div>` : ''}</div>` : ''}
+      <div style="border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px">
+        <div class="small muted" style="padding: 8px 0 2px">Новый чат начнётся с</div>
+        <div class="li"><span style="flex: 1">Бриф, правила и дизайн-система проекта</span><span class="small muted">всегда</span></div>
+        <label class="li"><span style="flex: 1">Взять вид рилса</span><select class="f" id="like" style="max-width: 260px"><option value="">— не нужно —</option>${OV.reels.map((r) => `<option value="${esc(r.id)}">${esc(r.num)} ${esc(r.title)}</option>`).join('')}</select></label>
+      </div>
+      <div class="row"><button type="button" class="btn primary" data-mode="now" style="min-height: 46px">Сделать сразу</button><button type="button" class="btn" data-mode="steps" style="min-height: 46px">Настроить по шагам: вид, музыка</button></div>
+      <p class="small muted" style="margin: 0">У рилса будет свой чат. Общее — правила, вкус, использованные треки — Claude записывает в проект, это видят все чаты.</p>`;
+    $('#detail').querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => start(b.dataset.mode, t, own)));
+  }
+  function start(mode, t, own) {
+    const key = 'new-' + Date.now();
+    const like = $('#like').value;
+    const text = [own ? `Новый рилс по моей идее: ${own}` : `Новый рилс по идее «${t}» из ideas.md.`,
+      like ? `Возьми вид (палитру, шрифты, плашки, переходы) рилса reels/${like}/.` : '',
+      mode === 'now' ? '(tapped keyboard button "🚀 Сделать сразу")' : '(tapped keyboard button "🎛 Настроить по шагам")'].filter(Boolean).join('\n');
+    sessionStorage.setItem('firstMsg:' + key, JSON.stringify({text, shown: `${t}\n${mode === 'now' ? 'Сделать сразу' : 'Настроить по шагам'}${like ? ' · вид как у ' + like.slice(0, 2) : ''}`}));
+    location.hash = '#/reel/' + key;
+  }
+  detail();
+}
+
+async function vKnowledge(tab = 'brief') {
+  title('Правила и бриф');
+  const k = await api('/api/knowledge');
+  const rules = (k.playbook.match(/^\s*- /gm) || []).length;
+  view.innerHTML = `<div class="page">
+    <div class="row" style="justify-content: space-between; align-items: flex-end"><div><div class="small muted">Проект</div><h1>Что Claude знает о проекте</h1></div>
+      <div class="tabs" role="tablist"><a href="#/knowledge/brief" class="${tab === 'brief' ? 'on' : ''}">Бриф</a><a href="#/knowledge/rules" class="${tab === 'rules' ? 'on' : ''}">Правила · ${rules}</a><a href="#/ds">Дизайн-система</a></div></div>
+    <div class="card md" style="max-width: 900px">${md(tab === 'rules' ? k.playbook : k.brief) || '<p class="muted">Пусто.</p>'}</div>
+    <p class="small muted">Правила Claude дописывает сам из твоих правок. Поменять — напиши в <a href="#/chat/_project">общий чат</a>.</p></div>`;
+}
+
+async function vDs() {
+  title('Дизайн-система');
+  const k = await api('/api/knowledge');
+  view.innerHTML = `<div class="work"><div style="flex: 999 1 560px; min-width: 0; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+      <div class="row" style="justify-content: space-between"><div><div class="small muted">Проект</div><h1 style="font-size: 22px">Дизайн-система рилсов</h1></div>
+        ${k.ds ? `<a class="btn" href="${k.ds.url}" target="_blank" rel="noopener">Открыть отдельно</a>` : ''}</div>
+      ${k.ds ? `<iframe class="dsf" src="${k.ds.url}" sandbox="allow-scripts" title="Дизайн-система"></iframe><span class="small muted">Обновлена ${ago(k.ds.updated)}</span>`
+        : `<div class="card" style="padding: 32px"><h2>Страницы дизайн-системы ещё нет</h2><p class="muted">Попроси в чате справа — например, «собери дизайн-систему из того, что уже есть в рилсах». Claude соберёт одну HTML-страницу: идея, цвета, шрифты, движение и библиотека компонентов с примерами.</p>
+          ${canEdit() ? '<button type="button" class="btn primary" id="dsStart">Собрать из рилсов</button>' : ''}</div>`}
+    </div>
+    <aside class="vers" style="width: 400px; padding: 0" aria-label="Чат дизайн-системы"><div class="chead"><h2 style="flex: 1">Чат дизайн-системы</h2></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+  const box = chatBox('_ds', {onDone: () => vDsRefresh()});
+  $('#chatHost').append(box);
+  $('#dsStart')?.addEventListener('click', () => box.say('Собери дизайн-систему рилсов из того, что уже есть: бриф, PLAYBOOK, template/src и код последних рилсов. Сделай страницу design-system/index.html.', 'Собрать дизайн-систему из рилсов'));
+  async function vDsRefresh() { const k2 = await api('/api/knowledge'); if (k2.ds && !$('iframe.dsf')) return vDs(); if (k2.ds) $('iframe.dsf').src = k2.ds.url; }
+}
+
+async function vFiles() {
+  title('Файлы и место');
+  const s = await api('/api/storage');
+  const pol = s.policy;
+  const used = OV.disk.total - OV.disk.free;
+  const sw = (k, on, text) => `<div class="li"><button type="button" class="sw" role="switch" aria-checked="${on}" data-pol="${k}" ${isOwner() ? '' : 'disabled'} aria-label="${esc(text)}"></button><span style="flex: 1">${text}</span></div>`;
+  view.innerHTML = `<div class="page">
+    <div class="row" style="justify-content: space-between"><div><div class="small muted">Проект</div><h1>Файлы и место</h1></div>${isOwner() ? '<button type="button" class="btn dark" id="freeAll">Применить правила ко всем рилсам</button>' : ''}</div>
+    <div class="split">
+      <section class="grow card"><div class="row" style="justify-content: space-between"><h2>Больше всего места</h2><span class="small muted">проект ${mb(s.total)} · диск ${mb(used)} из ${mb(OV.disk.total)}</span></div>
+        ${s.reels.map((r) => `<div class="li"><a href="#/reel/${r.id}" style="flex: 1; min-width: 180px; text-decoration: none"><b>${esc(r.num)}</b> ${esc(r.title)}</a><span class="small muted">версии ${mb(r.versions)} · исходники ${mb(r.sources)}</span>${isOwner() ? `<button type="button" class="btn" data-free="${esc(r.id)}" style="min-height: 34px; font-size: 13px">Освободить</button>` : ''}</div>`).join('')}
+        <div class="li"><span style="flex: 1">Входящие файлы</span><span class="small muted">${mb(s.inbox)}</span></div></section>
+      <section class="side2 card"><h2>Как экономим место</h2>
+        ${sw('keepPrevious', pol.keepPrevious, 'Новая версия готова — у прошлой стираем мастер, оставляем лёгкую копию для сравнения')}
+        ${sw('archiveOlder', pol.archiveOlder, 'Старше прошлой — только кадр и снимок проекта: пересобирается по кнопке')}
+        ${sw('finalOnly', pol.finalOnly, 'Рилс принят (в «Done») — остаётся только финальная версия')}
+        <p class="small muted">Правила применяются сами после каждой новой версии. Снимок проекта — код рилса без медиа, обычно меньше мегабайта.</p></section>
+    </div>
+    <section><div class="row" style="justify-content: space-between; margin-bottom: 10px"><h2>Входящие — всё, что присылали боту и в общий чат</h2><span class="small muted">материалы рилса — во вкладке «Файлы» у рилса</span></div><div class="fgrid" id="inbox"></div></section></div>`;
+  api('/api/files').then(({inbox}) => {
+    $('#inbox').innerHTML = inbox.slice(0, 60).map((f) => `<div class="fcard"><a class="pv" href="${f.url}" target="_blank" rel="noopener" ${f.kind === 'image' ? `style="background-image: url('${f.url}')"` : ''}>${f.kind === 'video' ? `<video src="${f.url}#t=0.5" preload="metadata" muted playsinline></video>` : f.kind === 'image' ? '' : esc((f.name.split('.').pop() || '').toUpperCase())}</a><div class="meta"><b title="${esc(f.name)}">${esc(f.name.split('/').pop())}</b><span class="muted">${mb(f.size)} · ${ago(f.at)}</span><a href="${f.url}&dl=1">Скачать</a></div></div>`).join('') || '<p class="small muted">Пусто.</p>';
+  });
+  view.querySelectorAll('[data-pol]').forEach((b) => (b.onclick = async () => { await post('/api/policy', {[b.dataset.pol]: b.getAttribute('aria-checked') !== 'true'}); vFiles(); }));
+  view.querySelectorAll('[data-free]').forEach((b) => (b.onclick = async () => { b.disabled = true; const {freed} = await post('/api/free', {reel: b.dataset.free}); toast(freed ? `Освобождено ${mb(freed)}` : 'Здесь уже нечего освобождать'); sidebar(); vFiles(); }));
+  $('#freeAll')?.addEventListener('click', async () => { if (!confirm('Применить правила хранения ко всем рилсам? Старые версии уйдут в архив.')) return; const {freed} = await post('/api/free', {}); toast(freed ? `Освобождено ${mb(freed)}` : 'Нечего освобождать'); sidebar(); vFiles(); });
+}
+
+async function vAccess() {
+  title('Доступ');
+  const a = await api('/api/access');
+  const role = {owner: 'Владелец', editor: 'Монтажёр', viewer: 'Зритель'};
+  view.innerHTML = `<div class="page">
+    <div class="row" style="justify-content: space-between; align-items: flex-end"><div><div class="small muted">Проект</div><h1>Кто работает с ботом</h1></div><span class="small muted">Веб-версия: свой вход у каждого человека и устройства</span></div>
+    <div class="split">
+      <div class="grow" style="display: flex; flex-direction: column; gap: 18px">
+        <section class="card"><h2>Люди · ${a.people.length}</h2>
+          ${a.people.map((x) => `<div class="li"><span style="flex: 1; min-width: 180px"><b>${esc(x.name)}</b>${(x.role === 'owner' && a.telegram.owner) || x.telegram ? ` <span class="chip">Telegram${x.telegram?.username ? ' · @' + esc(x.telegram.username) : ''}</span>` : ''} ${x.sessions ? `<span class="chip">веб · ${x.sessions} устр.</span>` : ''}</span>
+            ${x.role === 'owner' ? `<span class="pill cur">Владелец</span>` : `<select class="f" style="width: auto" data-role="${esc(x.id)}" aria-label="Роль ${esc(x.name)}"><option value="editor" ${x.role === 'editor' ? 'selected' : ''}>Монтажёр</option><option value="viewer" ${x.role === 'viewer' ? 'selected' : ''}>Зритель</option></select><button type="button" class="btn danger" data-remove="${esc(x.id)}">Убрать</button>`}</div>`).join('')}
+          ${a.invites.map((x) => `<div class="li" style="opacity: .85"><span style="flex: 1"><b>${esc(x.name)}</b> · приглашение не открыто<br><span class="small muted">${role[x.role]} · ${[x.telegram && !x.claimed?.includes('telegram') ? 'Telegram' : '', x.web && !x.claimed?.includes('web') ? 'веб' : ''].filter(Boolean).join(' + ')} · истекает ${new Date(x.expires).toLocaleString('ru', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}</span></span><button type="button" class="btn" data-cancel="${esc(x.code)}">Отменить</button></div>`).join('')}
+          <p class="small muted">В Телеграм-боте ${a.telegram.bot ? '@' + esc(a.telegram.bot) + ' ' : ''}владелец — ${esc(a.telegram.owner || '—')}. Монтажёры пишут боту из своего Телеграма; бот работает с одним человеком за раз, остальным говорит подождать.</p></section>
+        <section class="card"><div class="row" style="justify-content: space-between"><h2>Активные сессии · ${a.sessions.length}</h2><button type="button" class="btn" id="endOthers">Завершить все, кроме этой</button></div>
+          ${a.sessions.map((s) => s.kind === 'telegram'
+            ? `<div class="li"><span style="flex: 1; min-width: 200px"><b>${esc(s.device)}</b> <span class="chip">Telegram</span><br><span class="small muted">${esc(s.name)}${s.note ? ' · ' + esc(s.note) : ''}</span></span><span class="small muted">${s.seen ? ago(s.seen) : '—'}</span>${s.owner ? '' : `<button type="button" class="btn" data-endtg="${esc(s.id)}">Отключить</button>`}</div>`
+            : `<div class="li"><span style="flex: 1; min-width: 200px"><b>Веб · ${esc(s.device)}</b>${s.mine ? ' <span class="chip">это устройство</span>' : ''}<br><span class="small muted">${esc(s.name || '?')} · вошёл ${new Date(s.created).toLocaleDateString('ru', {day: 'numeric', month: 'short'})}</span></span><span class="small muted">${ago(s.seen)}</span>${s.mine ? '' : `<button type="button" class="btn" data-end="${esc(s.id)}">Завершить</button>`}</div>`).join('')}</section>
+      </div>
+      <div class="side2" style="display: flex; flex-direction: column; gap: 18px">
+        <section class="card" style="display: flex; flex-direction: column; gap: 12px"><h2>Пригласить</h2>
+          <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Как зовут<input class="f" id="invName" placeholder="Имя"></label>
+          <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Что можно<select class="f" id="invRole"><option value="editor">Монтажёр — делает и правит рилсы</option><option value="viewer">Зритель — смотрит и скачивает</option></select></label>
+          <div class="small muted">Куда подключить</div>
+          <div class="row"><label class="btn" style="cursor: pointer"><input type="checkbox" id="invTg" checked ${a.telegram.bot ? '' : 'disabled'}> Телеграм-бот</label><label class="btn" style="cursor: pointer"><input type="checkbox" id="invWeb" checked> Веб-версия</label></div>
+          <button type="button" class="btn primary" id="invGo" style="min-height: 46px">Создать ссылку-приглашение</button>
+          <div id="invOut"></div>
+          <p class="small muted" style="margin: 0">Ссылка одноразовая и живёт 24 часа. Убрать человека можно в любой момент — его сессии закроются сразу.</p></section>
+        <section class="card"><h2>Кто что делал</h2>${a.log.slice(0, 15).map((l) => `<div class="li small"><span class="muted" style="width: 74px">${ago(l.at)}</span><span style="flex: 1"><b>${esc(l.who)}</b> ${esc(l.what)}</span></div>`).join('') || '<p class="small muted">Пока пусто.</p>'}</section>
+      </div></div></div>`;
+  const act = async (b) => { await post('/api/access', b); vAccess(); };
+  view.querySelectorAll('[data-role]').forEach((s) => (s.onchange = () => act({action: 'role', id: s.dataset.role, role: s.value})));
+  view.querySelectorAll('[data-remove]').forEach((b) => (b.onclick = () => confirm('Убрать человека? Его входы закроются.') && act({action: 'remove', id: b.dataset.remove})));
+  view.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = () => act({action: 'cancel', code: b.dataset.cancel})));
+  view.querySelectorAll('[data-end]').forEach((b) => (b.onclick = () => act({action: 'end', id: b.dataset.end})));
+  view.querySelectorAll('[data-endtg]').forEach((b) => (b.onclick = () => confirm('Отключить этого человека от Телеграм-бота? В веб-версии он останется.') && act({action: 'end-telegram', id: b.dataset.endtg})));
+  $('#endOthers').onclick = () => confirm('Завершить все остальные входы?') && act({action: 'end-others'});
+  $('#invGo').onclick = async () => {
+    const name = $('#invName').value.trim();
+    if (!name) return $('#invName').focus();
+    const role = $('#invRole').value;
+    const r = await post('/api/access', {action: 'invite', name, role, telegram: $('#invTg').checked && role === 'editor', web: $('#invWeb').checked});
+    const links = [r.telegram && ['Телеграм-бот', r.telegram], r.web && ['Веб-версия', location.origin + r.web]].filter(Boolean);
+    $('#invOut').innerHTML = `<div class="card" style="padding: 12px; background: var(--soft); display: flex; flex-direction: column; gap: 8px"><div class="small muted">Ссылки для ${esc(name)} — отправь их ему${role === 'viewer' ? ' (зрителю — только веб)' : ''}</div>
+      ${links.map(([t, l], i) => `<div><div class="small">${t}</div><div class="row" style="flex-wrap: nowrap"><input class="f" readonly value="${esc(l)}"><button type="button" class="btn dark" data-copy="${i}">Скопировать</button></div></div>`).join('')}</div>`;
+    $('#invOut').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => navigator.clipboard.writeText(links[b.dataset.copy][1]).then(() => toast('Скопировано'))));
+  };
+}
+
+async function route() {
+  document.body.classList.remove('menu');
+  const h = location.hash || '#/';
+  try {
+    await sidebar();
+    let m;
+    if ((m = /^#\/reel\/([\w-]+)(?:\/(files))?/.exec(h))) await vReel(m[1], m[2]);
+    else if ((m = /^#\/chat\/(_project)/.exec(h))) await vChat(m[1]);
+    else if (h === '#/new') await vNew();
+    else if ((m = /^#\/knowledge(?:\/(\w+))?/.exec(h))) await vKnowledge(m[1]);
+    else if (h === '#/ds') await vDs();
+    else if (h === '#/files') await vFiles();
+    else if (h === '#/access' && isOwner()) await vAccess();
+    else await vBoard();
+  } catch (e) {
+    view.innerHTML = `<div class="page"><p class="muted">Не получилось загрузить: ${esc(e.message)}. <a href="#/">На главную</a></p></div>`;
+  }
+}
+$('#menuBtn').onclick = () => document.body.classList.toggle('menu');
+document.addEventListener('click', (e) => { if (document.body.classList.contains('menu') && !e.target.closest('nav.side, #menuBtn')) document.body.classList.remove('menu'); });
+window.addEventListener('hashchange', route);
+(async () => {
+  const d = await (await fetch('/api/me')).json();
+  ME = d.me; PROJECTS = d.projects;
+  if (!PROJECTS.some((x) => x.slug === P)) P = PROJECTS[0]?.slug || 'main';
+  route();
+})();
+</script>
+</body>
+</html>

@@ -23,3 +23,9 @@ Autostart entry, per OS (from setup step 7):
 | remove it | Ask: **«Remove the bot? Your reels in projects/ can be kept.»** — `Remove, keep my reels (recommended)` / `Remove everything` / `Cancel`. Then: stop it; delete the autostart entry; delete the folder (moving `projects/` to their Documents first if they keep it); remind them in one line that the Telegram bot itself can be deleted with `/deletebot` in @BotFather. |
 
 Anything else about the bot: read [SECURITY.md](SECURITY.md) and the code, then do it the same way — briefly, with buttons, asking before anything irreversible.
+
+## Web studio
+
+- Stop / start: like the bot, with the `com.reels-web` / `reels-web` autostart entry.
+- **Open it from a phone or for other people:** it listens only on this computer. For an HTTPS link run a Cloudflare quick tunnel (`cloudflared tunnel --url http://127.0.0.1:8080`, no account needed) — ask the owner first, it makes the studio reachable from the internet (still behind the key and per-person invites). The link changes when the tunnel restarts.
+- **Team:** the owner invites people on the studio's «Доступ» page; Telegram invites work once the bot runs with `REELS_MEMBERS` set.

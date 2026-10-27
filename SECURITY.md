@@ -63,6 +63,12 @@ The agent runs headless, so it cannot show permission prompts: it starts with th
 
 This is a rule set, not an operating-system sandbox: the agent has the permissions of your user account, as it does in your terminal. That is why only the owner can talk to it. For hard isolation, run the bot under a separate OS user or in a container.
 
+## Web studio (optional)
+
+- `web/server.mjs` listens on `127.0.0.1:8080` only; nothing is reachable from outside unless the owner starts a tunnel.
+- Entry needs the owner's key (`WEB_KEY`) or a one-time invite; every person and device gets its own session that the owner can end.
+- Its agent runs with an allow-list instead of «skip permissions»: file tools, web search, `node scripts/*.mjs` and its own send command; it may not read the studio's data or the shared access list.
+
 ## Removing it
 
 Ask the agent that installed it — it follows [MANAGE.md](MANAGE.md). By hand: delete the autostart entry, then the folder; send `/revoke` (or `/deletebot`) to @BotFather.

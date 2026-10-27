@@ -13,7 +13,7 @@ import {promisify} from 'node:util';
 import {DATA, ROOT} from './config.mjs';
 
 const run = promisify(execFile);
-const REPO = process.env.REELS_REPO || 'fivol/reels-bot';
+const REPO = process.env.REELS_REPO || 'mixa-lll/reels-studio';
 const BRANCH = process.env.REELS_BRANCH || 'main';
 const VERSION = join(DATA, 'version.json');
 const MANIFEST = join(DATA, 'manifest.json');
@@ -100,7 +100,7 @@ export async function upstreamHead() {
   return latest?.sha ?? null;
 }
 
-/** Where updates come from, e.g. https://github.com/fivol/reels-bot. */
+/** Where updates come from, e.g. https://github.com/mixa-lll/reels-studio. */
 export async function remoteUrl() {
   if (!isGit()) return `https://github.com/${REPO}`;
   const url = await git('remote', 'get-url', 'origin').catch(() => '');

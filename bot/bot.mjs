@@ -21,6 +21,7 @@ import {explain, lostSession} from './errors.mjs';
 import * as updates from './update.mjs';
 const {botChangedSince, head, pendingUpdates, pullUpdates, remoteUrl, upstreamHead} = updates;
 import {telegram} from './telegram.mjs';
+import {claim as claimInvite, member, publishBot, touch} from './members.mjs';
 
 // Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
 for (const level of ['log', 'error']) {
@@ -48,7 +49,7 @@ const T = {
     fresh: '🆕 Следующее сообщение начнёт новую сессию. Что важно — сохраню перед этим.',
     unfinished: '🗂 Незаконченные рилсы — выбери, к какому вернуться:',
     hint: 'Или напиши / надиктуй свой вариант',
-    private: 'Это личный бот. Свой можно поставить: github.com/fivol/reels-bot',
+    private: 'Это личный бот. Свой можно поставить: github.com/mixa-lll/reels-studio',
     conflict: '⚠️ С этим же ключом Telegram запущен ещё один бот (на другом компьютере?). Пока он работает, я не получаю сообщения. Останови второй или попроси агента выпустить новый ключ.',
     confirmOnComputer: '👋 Привет! Подтверди на компьютере, в окне установки, что это ты, — и начнём.',
     tooBig: (what, size) => `⚠️ ${what} весит ${size} — Telegram не даёт ботам скачивать файлы больше 20 МБ. Пришли его обычным видео/фото (не «файлом» — Telegram сам сожмёт) или ссылкой на Google Диск / Яндекс Диск.`,
@@ -95,7 +96,7 @@ const T = {
     fresh: '🆕 The next message starts a new session. What matters is saved first.',
     unfinished: '🗂 Unfinished reels — pick one to get back to:',
     hint: 'Or type / dictate your own',
-    private: 'This is a personal bot. Get your own: github.com/fivol/reels-bot',
+    private: 'This is a personal bot. Get your own: github.com/mixa-lll/reels-studio',
     conflict: '⚠️ Another copy of this bot runs with the same Telegram key (another computer?). While it runs I get no messages. Stop it or ask the agent for a new key.',
     confirmOnComputer: '👋 Hi! Confirm on your computer, in the setup window, that this is you — and we start.',
     tooBig: (what, size) => `⚠️ The ${what} is ${size} — Telegram does not let bots download files over 20 MB. Send it as a regular video/photo (not as a file, Telegram compresses it) or as a Google Drive / Dropbox link.`,
@@ -179,6 +180,23 @@ for (const ev of ['uncaughtException', 'unhandledRejection']) {
   });
 }
 const state = loadState();
+// Team texts: members invited from the web version (bot/members.mjs).
+const TEAM = {
+  ru: {
+    welcome: (name) => `Привет, ${name}! Ты подключён к боту рилсов как монтажёр: пиши, что сделать, — Claude возьмётся. Проект общий с владельцем; бот работает с одним человеком за раз.`,
+    viewer: 'У тебя доступ только на просмотр — смотри и скачивай рилсы в веб-версии.',
+    busy: (who) => `Сейчас Claude занят задачей: ${who}. Я напишу, как только он освободится, — тогда пришли сообщение ещё раз.`,
+    free: '✅ Claude освободился — можно писать.',
+    ownerOnly: 'Эту команду может использовать только владелец бота.',
+  },
+  en: {
+    welcome: (name) => `Hi ${name}! You are connected to the reels bot as an editor: write what to do and Claude takes it. The project is shared with the owner; the bot works with one person at a time.`,
+    viewer: 'You have view-only access: watch and download reels in the web version.',
+    busy: (who) => `Claude is busy with a task for ${who}. I will tell you when it is free; then send your message again.`,
+    free: '✅ Claude is free now — go ahead.',
+    ownerOnly: 'Only the bot owner can use this command.',
+  },
+}[process.env.BOT_LANG === 'en' ? 'en' : 'ru'];
 // Before anything reads the active project: the old single-folder layout becomes one.
 if (ensureProjects(state)) saveState(state);
 const STATUS_FILE = join(DATA, 'status.txt');
@@ -729,6 +747,7 @@ async function drain() {
       prompt = `(${state.note})\n\n${prompt}`;
       delete state.note;
     }
+    if (state.holder) prompt = `(from ${state.holder}, a team member with editor rights — not the owner; address them by name)\n\n${prompt}`;
     try {
       await runTurn(prompt);
     } catch (e) {
@@ -736,8 +755,39 @@ async function drain() {
       current = null;
     }
   }
+  if (!current && !queue.length) releaseTurn();
   if (!current && !queue.length && state.updateApproved) applyUpdate();
   else if (!current && !queue.length) rotateIfDue();
+}
+
+// ---------- team: one person at a time ----------
+// Everything the bot sends goes to state.chatId, so serving a member means pointing it
+// at their chat while the agent works for them; others are told to wait. In a private
+// chat the chat id is the user's id, so the owner's chat is state.ownerId.
+const waiting = new Set();
+const holderName = () => state.holder ?? state.ownerName ?? 'владелец';
+function takeTurn(chatId, who) {
+  if (chatId === state.chatId) return true;
+  if (current || queue.length || batchParts.length) {
+    waiting.add(chatId);
+    tg.sendText(chatId, TEAM.busy(holderName()), {silent: true}).catch(() => {});
+    return false;
+  }
+  state.chatId = chatId;
+  if (who) state.holder = who.name;
+  else delete state.holder;
+  delete state.keyAck;
+  saveState(state);
+  return true;
+}
+function releaseTurn() {
+  for (const c of waiting) if (c !== state.chatId) tg.sendText(c, TEAM.free, {silent: true}).catch(() => {});
+  waiting.clear();
+  if (!state.ownerId || state.chatId === state.ownerId) return;
+  state.chatId = state.ownerId;
+  delete state.holder;
+  delete state.keyAck;
+  saveState(state);
 }
 
 // The queue survives restarts: it is mirrored into state.
@@ -837,9 +887,20 @@ async function onMessage(msg) {
     writeFileSync(CLAIM_REQUEST, JSON.stringify({id: msg.from.id, chatId: msg.chat.id, name, username: msg.from.username}));
     return tg.sendText(msg.chat.id, T.confirmOnComputer);
   }
-  if (msg.from.id !== state.ownerId) return tg.sendText(msg.chat.id, T.private, {silent: true}).catch(() => {});
+  // Team members (bot/members.mjs) talk to the same agent, one person at a time.
+  const who = msg.from.id === state.ownerId ? null : member(msg.from.id);
+  if (msg.from.id !== state.ownerId && !who) {
+    const code = msg.text?.match(/^\/start\s+inv_(\S+)/)?.[1];
+    const joined = code && claimInvite(code, msg.from, msg.chat.id);
+    if (joined) return tg.sendText(msg.chat.id, joined.role === 'editor' ? TEAM.welcome(joined.name) : TEAM.viewer).catch(() => {});
+    return tg.sendText(msg.chat.id, T.private, {silent: true}).catch(() => {});
+  }
+  if (who && who.role !== 'editor') return tg.sendText(msg.chat.id, TEAM.viewer, {silent: true}).catch(() => {});
+  if (who) touch(msg.from.id);
+  if (!takeTurn(msg.chat.id, who)) return;
 
   const cmd = msg.text?.match(/^\/(\w+)/)?.[1];
+  if (who && ['settings', 'update', 'projects'].includes(cmd)) return tg.sendText(state.chatId, TEAM.ownerOnly, {silent: true});
   if (cmd === 'start') return tg.sendText(state.chatId, T.hello, {silent: true});
   // A running task's progress line itself turns into «⏹ Stopped».
   if (cmd === 'stop') return interrupt('stop') ? null : tg.sendText(state.chatId, T.idle, {silent: true});
@@ -943,7 +1004,11 @@ function flushBatch() {
 
 async function onButton(q) {
   await tg.call('answerCallbackQuery', {callback_query_id: q.id}).catch(() => {});
-  if (q.from.id !== state.ownerId || q.data === 'ctl:done') return;
+  if (q.data === 'ctl:done') return;
+  const who = q.from.id === state.ownerId ? null : member(q.from.id);
+  if (q.from.id !== state.ownerId && who?.role !== 'editor') return;
+  if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
+  if (!takeTurn(q.message.chat.id, who)) return;
   if (q.data.startsWith('set:')) return onSettings(q);
   if (q.data.startsWith('p:')) return onProjectButton(q);
   if (q.data.startsWith('px:')) return onCrossButton(q);
@@ -1157,6 +1222,7 @@ setInterval(() => {
 // ---------- long polling ----------
 
 console.log(`reels-bot up: agent=${env.agent}, owner=${state.ownerId ?? 'none yet'}`);
+tg.call('getMe', {}).then((me) => publishBot(me.username)).catch(() => {});
 if (state.statusId) await deleteStatus(state.statusId);
 await announceUpdate();
 await flushOutbox().catch((e) => console.error('outbox', e));

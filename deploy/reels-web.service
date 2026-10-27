@@ -1,0 +1,15 @@
+[Unit]
+Description=reels web studio
+After=network-online.target
+
+[Service]
+WorkingDirectory=__ROOT__/web
+ExecStart=__NODE__ __ROOT__/web/server.mjs
+Environment=PATH=__PATH__
+Restart=always
+RestartSec=5
+StandardOutput=append:__ROOT__/data/web.log
+StandardError=append:__ROOT__/data/web.log
+
+[Install]
+WantedBy=default.target

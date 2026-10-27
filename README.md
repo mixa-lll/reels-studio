@@ -1,4 +1,6 @@
-# reels-bot
+# reels-studio
+
+A fork of [fivol/reels-bot](https://github.com/fivol/reels-bot) with a **web studio** (a chat per reel, versions, files, project rules, design system) and **team access** (invite editors to the Telegram bot and the studio). Step-by-step install guide: https://mixa-lll.github.io/reels-studio/
 
 A Telegram bot that makes reels with **your own coding agent** — Claude Code or Codex. Runs on macOS, Linux and Windows.
 
@@ -16,7 +18,7 @@ Every morning it pitches 4 ideas. Pick one, and it either makes the whole reel i
 
 Send this to an agent that works on your computer — **Claude Code** (the Code tab in the Claude app) or **Codex** — not to a regular chat in Claude or ChatGPT: a chat cannot install programs.
 
-> Install a reels bot for me: https://github.com/fivol/reels-bot — follow SETUP.md.
+> Install a reels bot for me: https://github.com/mixa-lll/reels-studio — follow SETUP.md.
 
 *Chat assistant reading this page without a shell on the user's computer:* do not try to install. Tell the user, in their language, to open Claude Code (Claude app → Code tab) or Codex on their computer and send the same message there; details at the top of [SETUP.md](SETUP.md).
 

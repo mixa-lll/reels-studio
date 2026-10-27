@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reels Studio — установка</title>
+<meta name="description" content="Бот, который придумывает и монтирует рилсы с вашим Claude. Пошаговая установка на свой компьютер.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#F6F6F4; --card:#fff; --ink:#141414; --ink2:#3A3936; --muted:#6B6A66; --line:#E4E3DF; --soft:#EFEEEA; --accent:#D7261A; --ok:#1E7A3D; --okbg:#E7F2EA; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151514; --card:#1F1E1C; --ink:#EDECE8; --ink2:#CFCDC7; --muted:#9A978F; --line:#33312E; --soft:#2A2926; --ok:#5DBB7E; --okbg:#1D2E22; } }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 Geist, -apple-system, system-ui, sans-serif; }
+  a { color: inherit; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px; }
+  header.top { display: flex; align-items: center; gap: 12px; padding: 18px 0; }
+  .logo { width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  header.top b { font-weight: 600; }
+  header.top nav { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+  header.top nav a { text-decoration: none; color: var(--muted); }
+  .hero { padding: 40px 0 28px; }
+  h1 { font-size: clamp(32px, 6vw, 52px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 16px; font-weight: 700; }
+  .lead { font-size: 19px; color: var(--ink2); max-width: 640px; margin: 0 0 24px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 12px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; border: 0; font: inherit; font-weight: 600; cursor: pointer; }
+  .btn.ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+  .shots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 34px 0 10px; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; border-radius: 14px; border: 1px solid var(--line); display: block; background: var(--card); }
+  .shots figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  section { padding: 34px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 8px; font-weight: 600; }
+  .sub { color: var(--muted); margin: 0 0 22px; }
+  .need { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .need div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .need b { display: block; font-weight: 600; margin-bottom: 4px; }
+  .need span { font-size: 14px; color: var(--muted); }
+  .os { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; padding: 3px; background: var(--card); margin-bottom: 18px; }
+  .os button { border: 0; background: none; border-radius: 9px; padding: 8px 16px; font: inherit; font-size: 14px; color: var(--ink2); cursor: pointer; }
+  .os button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .progress { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); margin-bottom: 14px; }
+  .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .3s; }
+  ol.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; }
+  .step.done { border-color: var(--ok); }
+  .num { width: 34px; height: 34px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; font-weight: 600; font-size: 15px; }
+  .step.done .num { background: var(--ok); color: #fff; }
+  .step h3 { margin: 4px 0 6px; font-size: 19px; font-weight: 600; }
+  .step p { margin: 0 0 10px; color: var(--ink2); }
+  .step ul { margin: 0 0 10px; padding-left: 20px; color: var(--ink2); }
+  .step li { margin: 4px 0; }
+  .tag { font-size: 12px; font-weight: 500; border-radius: 999px; padding: 2px 9px; background: var(--soft); color: var(--muted); margin-left: 6px; vertical-align: middle; }
+  .phrase { display: flex; gap: 10px; align-items: stretch; margin: 6px 0 10px; flex-wrap: wrap; }
+  .phrase code { flex: 1 1 300px; font: 14px/1.5 'Geist Mono', ui-monospace, monospace; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; overflow-wrap: anywhere; }
+  .copy { min-height: 46px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg); font: inherit; font-weight: 600; cursor: pointer; }
+  .tip { font-size: 14px; color: var(--muted); background: var(--soft); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; }
+  .check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); cursor: pointer; user-select: none; min-height: 32px; }
+  .check input { width: 18px; height: 18px; accent-color: var(--ok); }
+  .chat { background: var(--soft); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; font-size: 14px; }
+  .chat span { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; width: fit-content; max-width: 100%; }
+  .chat .you { align-self: flex-end; background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--ink2); margin: 10px 0 0; }
+  footer { padding: 30px 0 50px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+  .hide { display: none !important; }
+  @media (max-width: 720px) {
+    .shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .need { grid-template-columns: 1fr; }
+    .step { grid-template-columns: 1fr; gap: 6px; }
+    header.top nav { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><span class="logo">R</span><b>Reels Studio</b><nav aria-label="Разделы"><a href="#need">Что нужно</a><a href="#install">Установка</a><a href="#faq">Вопросы</a><a href="https://github.com/mixa-lll/reels-studio">GitHub</a></nav></header>
+
+  <div class="hero">
+    <h1>Рилсы, которые монтирует ваш Claude</h1>
+    <p class="lead">Бот в Телеграме и веб-студия: каждое утро предлагает идеи, монтирует ролики в вашем стиле, принимает правки текстом или голосом. Работает на вашем компьютере и вашей подписке Claude.</p>
+    <a class="btn" href="#install">Установить за 15 минут →</a>
+    <div class="shots">
+      <figure><img src="screenshots/ideas.png" alt="Идеи рилсов с кнопками выбора" loading="lazy"><figcaption>Идеи каждое утро</figcaption></figure>
+      <figure><img src="screenshots/progress.png" alt="Прогресс монтажа с кнопкой Стоп" loading="lazy"><figcaption>Видно, что он делает</figcaption></figure>
+      <figure><img src="screenshots/version.png" alt="Готовая версия с разбором и правками" loading="lazy"><figcaption>Версия и правки кнопками</figcaption></figure>
+      <figure><img src="screenshots/menu.png" alt="Меню тонкой настройки" loading="lazy"><figcaption>Тонкая настройка</figcaption></figure>
+    </div>
+  </div>
+
+  <section id="need">
+    <h2>Что понадобится</h2>
+    <p class="sub">Больше ничего покупать и настраивать не нужно — остальное поставит сам Claude.</p>
+    <div class="need">
+      <div><b>Подписка Claude Pro или Max</b><span>Бот работает на ней. <a href="https://claude.com/pricing" target="_blank" rel="noopener">Тарифы</a> · Claude доступен <a href="https://www.anthropic.com/supported-countries" target="_blank" rel="noopener">не во всех странах</a></span></div>
+      <div><b>Компьютер</b><span>Mac, Windows или Linux, около 1 ГБ свободного места. Бот работает, пока компьютер включён</span></div>
+      <div><b>Телеграм</b><span>Через него вы общаетесь с ботом с телефона</span></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Установка по шагам</h2>
+    <p class="sub">Отмечайте шаги — прогресс сохранится в этом браузере.</p>
+    <div class="os" role="group" aria-label="Ваш компьютер"><button type="button" data-os="mac" aria-pressed="true">Mac</button><button type="button" data-os="win" aria-pressed="false">Windows</button><button type="button" data-os="linux" aria-pressed="false">Linux</button></div>
+    <div class="progress"><span id="pText">0 из 6</span><span class="bar"><i id="pBar"></i></span></div>
+    <ol class="steps">
+      <li class="step" data-step="1"><span class="num">1</span><div>
+        <h3>Установите приложение Claude</h3>
+        <p>Скачайте его с <a href="https://claude.ai/download" target="_blank" rel="noopener">claude.ai/download</a> и войдите своим аккаунтом с подпиской.</p>
+        <p class="os-mac">Перетащите Claude в «Программы» и откройте.</p>
+        <p class="os-win hide">Запустите установщик. Если позже Claude попросит поставить Git for Windows — соглашайтесь, это нужно для работы.</p>
+        <p class="os-linux hide">Для Linux приложения нет — поставьте Claude Code в терминале по <a href="https://docs.claude.com/en/docs/claude-code/setup" target="_blank" rel="noopener">инструкции</a> и запустите <code>claude</code>.</p>
+        <label class="check"><input type="checkbox">Готово, приложение открыто</label>
+      </div></li>
+
+      <li class="step" data-step="2"><span class="num">2</span><div>
+        <h3>Откройте вкладку «Code»</h3>
+        <p>Наверху приложения переключитесь с «Chat» на <b>«Code»</b>. Если попросит выбрать папку — выберите любую, например «Документы».</p>
+        <div class="tip">Важно: именно «Code». Обычный чат не умеет устанавливать программы на компьютер.</div>
+        <label class="check"><input type="checkbox">Я во вкладке Code</label>
+      </div></li>
+
+      <li class="step" data-step="3"><span class="num">3</span><div>
+        <h3>Отправьте Claude эту фразу</h3>
+        <div class="phrase"><code id="phrase">Install a reels bot for me: https://github.com/mixa-lll/reels-studio — follow SETUP.md</code><button type="button" class="copy" id="copyBtn">Скопировать</button></div>
+        <p>Вставьте в поле ввода и нажмите Enter. Claude прочитает инструкцию, проверит код на безопасность и коротко расскажет, что поставит.</p>
+        <div class="chat"><span class="you">Install a reels bot for me…</span><span>Это бот, который монтирует рилсы… Установить?</span><span>Да, установить (рекомендуется)</span></div>
+        <p>Отвечайте кнопками — первая всегда рекомендуемая. Пока идёт установка, ничего делать не нужно (5–10 минут).</p>
+        <label class="check"><input type="checkbox">Отправил, установка идёт</label>
+      </div></li>
+
+      <li class="step" data-step="4"><span class="num">4</span><div>
+        <h3>Создайте бота в Телеграме</h3>
+        <p>Claude попросит об одном действии руками — создать вашего личного бота:</p>
+        <ul>
+          <li>Откройте <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> (с синей галочкой) и нажмите <b>Start</b>.</li>
+          <li>Отправьте <code>/newbot</code>, затем имя (например, <code>Reelser</code>) и адрес, который заканчивается на <code>bot</code>.</li>
+          <li>BotFather пришлёт длинное сообщение — <b>скопируйте его целиком и вставьте в Claude</b>.</li>
+        </ul>
+        <div class="tip">В этом сообщении ключ от вашего бота. Никому, кроме своего Claude, его не отправляйте.</div>
+        <label class="check"><input type="checkbox">Бот создан, ответ отправлен</label>
+      </div></li>
+
+      <li class="step" data-step="5"><span class="num">5</span><div>
+        <h3>Сделайте бота своим</h3>
+        <p>Claude пришлёт ссылку вида <code>t.me/ваш_бот?start=…</code>. Откройте её и нажмите <b>Start</b> — бот запомнит вас как владельца и всем остальным будет отвечать «это личный бот».</p>
+        <p>Бот сразу спросит, о чём будут ваши рилсы: ответьте текстом, голосом или ссылкой на сайт.</p>
+        <label class="check"><input type="checkbox">Бот ответил мне в Телеграме</label>
+      </div></li>
+
+      <li class="step" data-step="6"><span class="num">6</span><div>
+        <h3>Веб-студия <span class="tag">по желанию</span></h3>
+        <p>В конце Claude предложит включить веб-студию — тот же бот в браузере: отдельный чат на каждый рилс, версии и скачивание, файлы, правила проекта, дизайн-система, доступ для команды. Соглашайтесь — он сам откроет её в браузере.</p>
+        <p>Чтобы открыть студию с телефона или пригласить коллег, напишите Claude: «сделай ссылку на веб-студию для телефона».</p>
+        <label class="check"><input type="checkbox">Студия открылась</label>
+      </div></li>
+    </ol>
+    <div id="doneBox" class="tip hide" style="background: var(--okbg); color: var(--ok); font-size: 16px; margin-top: 16px">Готово! Пишите боту в Телеграме — например, «/ideas». Утром придут первые идеи.</div>
+  </section>
+
+  <section id="faq">
+    <h2>Вопросы</h2>
+    <details><summary>Сколько это стоит?</summary><p>Сам бот бесплатный (открытый код, лицензия MIT). Работает на вашей подписке Claude Pro или Max; ролик с парой правок — это несколько больших задач для Claude, лимиты подписки бот показывает командой /usage.</p></details>
+    <details><summary>Это безопасно?</summary><p>Бот слушается только владельца, ничего не публикует сам и обновляется только по вашей кнопке. Что именно он делает с сетью и файлами, описано в <a href="https://github.com/mixa-lll/reels-studio/blob/main/SECURITY.md">SECURITY.md</a> — Claude читает его перед установкой и пересказывает вам.</p></details>
+    <details><summary>Компьютер должен быть всё время включён?</summary><p>Да, бот работает, пока компьютер включён и не спит. Можно разрешить ему не давать компьютеру засыпать на зарядке. Чтобы бот работал круглосуточно, его можно перенести на недорогой сервер — попросите об этом Claude.</p></details>
+    <details><summary>Можно работать вдвоём или командой?</summary><p>Да. В веб-студии на странице «Доступ» создайте приглашение: человек сможет писать боту из своего Телеграма и заходить в студию. Бот работает с одним человеком за раз, остальным говорит подождать.</p></details>
+    <details><summary>Что-то пошло не так</summary><p>Напишите своему Claude во вкладке Code, что случилось, — он знает, как устроен бот (инструкция MANAGE.md), и починит, остановит, перенесёт или удалит его.</p></details>
+    <details><summary>Как удалить?</summary><p>Напишите Claude: «удали бота рилсов». Он предложит сохранить ваши ролики и уберёт всё остальное.</p></details>
+  </section>
+
+  <footer>Reels Studio — форк <a href="https://github.com/fivol/reels-bot">fivol/reels-bot</a> с веб-студией и доступом для команды · MIT · <a href="https://github.com/mixa-lll/reels-studio">исходный код</a></footer>
+</div>
+<script>
+const KEY = 'reels-install';
+const state = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
+const steps = [...document.querySelectorAll('.step')];
+function render() {
+  const done = steps.filter((s) => state[s.dataset.step]).length;
+  steps.forEach((s) => { const on = !!state[s.dataset.step]; s.classList.toggle('done', on); s.querySelector('input').checked = on; });
+  document.getElementById('pText').textContent = `${done} из ${steps.length}`;
+  document.getElementById('pBar').style.width = `${(done / steps.length) * 100}%`;
+  document.getElementById('doneBox').classList.toggle('hide', done < 5);
+}
+steps.forEach((s) => s.querySelector('input').addEventListener('change', (e) => { state[s.dataset.step] = e.target.checked; save(); render(); }));
+function setOs(os) {
+  document.querySelectorAll('.os button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.os === os)));
+  ['mac', 'win', 'linux'].forEach((o) => document.querySelectorAll('.os-' + o).forEach((el) => el.classList.toggle('hide', o !== os)));
+  state.os = os; save();
+}
+document.querySelectorAll('.os button').forEach((b) => (b.onclick = () => setOs(b.dataset.os)));
+setOs(state.os || (/Win/.test(navigator.platform) ? 'win' : /Linux/.test(navigator.platform) ? 'linux' : 'mac'));
+document.getElementById('copyBtn').onclick = async (e) => {
+  const text = document.getElementById('phrase').textContent;
+  try { await navigator.clipboard.writeText(text); } catch { const r = document.createRange(); r.selectNodeContents(document.getElementById('phrase')); getSelection().removeAllRanges(); getSelection().addRange(r); }
+  e.target.textContent = 'Скопировано ✓';
+  setTimeout(() => (e.target.textContent = 'Скопировать'), 2000);
+};
+render();
+</script>
+</body>
+</html>
