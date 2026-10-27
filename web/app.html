@@ -74,9 +74,9 @@ input.f{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);b
 .err{padding:40px 24px;text-align:center}
 /* camera with a prompter (doski PR1–PR5, animations PRAnim 1–10) */
 .cam{position:fixed;inset:0;background:#000;z-index:30;color:#fff;overflow:hidden;font-family:Manrope,system-ui,sans-serif}
-.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:camIn .4s cubic-bezier(.2,.8,.2,1) both}
+.cam video{position:absolute;left:50%;top:50%;height:100%;aspect-ratio:9/16;max-width:100%;translate:-50% -50%;object-fit:cover;animation:camIn .4s cubic-bezier(.2,.8,.2,1) both}
 @keyframes camIn{from{opacity:0;filter:blur(10px)}to{opacity:1;filter:none}}
-.cam video.mirror{transform:scaleX(-1)}
+.cam .zm{font-size:15px;font-weight:700;color:#fff}
 .cam [hidden]{display:none !important}
 .ctop{position:absolute;top:0;left:0;right:0;padding:calc(10px + env(safe-area-inset-top)) 14px 0;display:flex;align-items:center;justify-content:space-between;z-index:4}
 .cb{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;border:0}
@@ -305,7 +305,7 @@ async function camera(t, opts = {}) {
   const el = document.createElement('div');
   el.className = 'cam';
   el.innerHTML = `<video playsinline muted autoplay class="mirror"></video>
-    <div class="ctop"><button class="cb" id="cx" aria-label="Закрыть">${ic('x', 22)}</button><span class="timer" id="tm">${opts.only != null ? 'Фраза ' + (opts.only + 1) : 'Ролик · ' + t.seconds + ' секунд'}</span><span style="width:44px"></span></div>
+    <div class="ctop"><button class="cb" id="cx" aria-label="Закрыть">${ic('x', 22)}</button><span class="timer" id="tm">${opts.only != null ? 'Фраза ' + (opts.only + 1) : 'Ролик · ' + t.seconds + ' секунд'}</span><button class="cb zm" id="zm" aria-label="Масштаб кадра"></button></div>
     <div class="bars" id="bars" hidden>${phrases.map(() => '<i><b></b></i>').join('')}</div>
     <div class="pt prev" id="pt"><div class="lines" id="lines"></div><div id="pv"></div></div>
     <div class="oval" id="ov" aria-hidden="true"></div>
@@ -322,6 +322,13 @@ async function camera(t, opts = {}) {
   const segs = opts.only != null && shot?.id === t.id ? shot.segs : [];
   const close = () => { closed = true; cancelAnimationFrame(raf); cancelAnimationFrame(drawRaf); cancelAnimationFrame(checkRaf); stream?.getTracks().forEach((x) => x.stop()); audioCtx?.close().catch(() => {}); el.remove(); cam = null; };
   cam = close;
+  // Zoom: 1× is the camera's whole frame; tap to cycle, works while recording too.
+  const ZOOMS = [1, 1.5, 2];
+  let zoom = ZOOMS.includes(Number(store?.getItem('shootZoom'))) ? Number(store.getItem('shootZoom')) : 1;
+  const zm = el.querySelector('#zm');
+  const applyZoom = () => { zm.textContent = `${zoom}×`; video.style.transform = `scaleX(-1) scale(${zoom})`; };
+  applyZoom();
+  zm.onclick = () => { zoom = ZOOMS[(ZOOMS.indexOf(zoom) + 1) % ZOOMS.length]; store?.setItem('shootZoom', zoom); applyZoom(); haptic(); };
   const setSeg = () => {
     el.querySelectorAll('[data-m]').forEach((b) => b.classList.toggle('on', b.dataset.m === mode));
     el.querySelectorAll('[data-sp]').forEach((b) => b.classList.toggle('on', b.dataset.sp === speed));
@@ -396,7 +403,7 @@ async function camera(t, opts = {}) {
   // ---- recording ----
   const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d');
-  const paint = () => { const vw = video.videoWidth, vh = video.videoHeight; if (vw && vh) { const k = Math.max(W / vw, H / vh); ctx.drawImage(video, (W - vw * k) / 2, (H - vh * k) / 2, vw * k, vh * k); } if (rec) drawRaf = requestAnimationFrame(paint); };
+  const paint = () => { const vw = video.videoWidth, vh = video.videoHeight; if (vw && vh) { const k = Math.max(W / vw, H / vh) * zoom; ctx.drawImage(video, (W - vw * k) / 2, (H - vh * k) / 2, vw * k, vh * k); } if (rec) drawRaf = requestAnimationFrame(paint); };
   const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || '';
   let cur = 0, t0 = 0, paused = 0, pausedAt = 0, segStart = 0, phraseAt = [], from = 0, onlyEnd = false;
   const wps = () => SPEEDS[speed][2];
