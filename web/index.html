@@ -5,26 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Рилсы</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#F6F6F4; --card:#fff; --ink:#141414; --ink2:#3A3936; --muted:#6B6A66; --line:#E4E3DF; --soft:#EFEEEA; --accent:#D7261A; --blue:#1F5FD1; --blueBg:#E8EFFC; --amber:#C27A00; --green:#1E7A3D; --me:#141414; --meInk:#fff; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#161615; --card:#201F1D; --ink:#EDECE8; --ink2:#CFCDC7; --muted:#9A978F; --line:#33312E; --soft:#2A2926; --blueBg:#1C2A44; --blue:#7FA8F5; --me:#EDECE8; --meInk:#161615; } }
+  /* One design system (handbook/ROADMAP.md): Manrope, neutral greys, black primary button. */
+  :root { --bg:#FFFFFF; --side:#FAFAFA; --card:#fff; --ink:#171717; --ink2:#525252; --muted:#737373; --line:#EBEBEB; --soft:#F4F4F4; --hov:#F0F0F0; --sel:#E8E8E8; --accent:#171717; --blue:#1D4ED8; --blueBg:#EEF3FD; --amber:#B45309; --green:#1E7A3D; --me:#F0F0F0; --meInk:#171717; --badge:#2F6FEB; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 15px/1.5 Geist, -apple-system, system-ui, sans-serif; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.5 Manrope, -apple-system, system-ui, sans-serif; letter-spacing: -0.005em; }
   a { color: inherit; }
   button, input, select, textarea { font: inherit; color: inherit; }
   button { cursor: pointer; }
   button:disabled { opacity: .5; cursor: default; }
   .app { display: flex; min-height: 100%; }
-  nav.side { width: 264px; flex: none; border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 16px; height: 100vh; position: sticky; top: 0; overflow-y: auto; background: var(--bg); }
+  nav.side { width: 248px; flex: none; border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; height: 100vh; position: sticky; top: 0; overflow-y: auto; background: var(--side); }
   .proj { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 8px 10px; }
   .proj .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: none; }
   .proj select { border: 0; background: none; font-weight: 600; width: 100%; padding: 0; appearance: none; }
-  .nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; text-decoration: none; color: var(--ink2); font-size: 14px; min-height: 38px; }
-  .nav:hover { background: var(--soft); }
-  .nav.on { background: var(--card); border: 1px solid var(--line); color: var(--ink); }
-  .nav svg { flex: none; }
+  .nav { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 7px; text-decoration: none; color: var(--ink2); font-size: 14px; line-height: 1.2; min-height: 32px; }
+  .nav:hover { background: var(--hov); }
+  .nav.on { background: var(--sel); color: var(--ink); font-weight: 600; }
+  .nav svg { flex: none; color: var(--muted); } .nav.on svg { color: var(--ink); }
+  .gh { font-size: 12px; color: var(--muted); padding: 16px 8px 5px; font-weight: 500; }
+  .bdg { margin-left: auto; font-size: 11px; font-weight: 600; color: #fff; background: var(--badge); border-radius: 999px; padding: 1px 7px; }
+  .srch { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted); font-size: 13px; width: 100%; text-align: left; }
+  .srch kbd { margin-left: auto; font-family: inherit; font-size: 11px; }
+  .ph { display: flex; align-items: center; gap: 9px; padding: 4px 6px 10px; }
+  .ph .logo { width: 24px; height: 24px; border-radius: 7px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 600; display: grid; place-items: center; flex: none; }
+  .ph select { border: 0; background: none; font-weight: 600; font-size: 14px; flex: 1; min-width: 0; padding: 0; appearance: none; cursor: pointer; }
+  .me { display: flex; align-items: center; gap: 8px; padding: 8px; font-size: 13px; border-top: 1px solid var(--line); margin-top: 6px; }
+  .me i { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg,#C7D2FE,#A5B4FC); flex: none; }
   .nav .n { margin-left: auto; color: var(--muted); font-size: 12px; }
   .label { font-size: 12px; color: var(--muted); padding: 0 10px 4px; display: flex; justify-content: space-between; }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
@@ -33,18 +42,18 @@
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .top { display: none; }
   .page { padding: 24px 32px; display: flex; flex-direction: column; gap: 18px; max-width: 1400px; width: 100%; }
-  h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+  h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; }
   h2 { margin: 0; font-size: 16px; font-weight: 600; }
   .muted { color: var(--muted); } .small { font-size: 13px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; }
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); background: var(--card); border-radius: 10px; text-decoration: none; font-size: 14px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 0 13px; border: 1px solid var(--line); background: var(--card); border-radius: 9px; text-decoration: none; font-size: 13px; font-weight: 500; white-space: nowrap; }
   .btn:hover { border-color: var(--ink); }
-  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
-  .btn.dark { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .btn.dark { background: var(--ink); color: #fff; border-color: var(--ink); }
   .btn.danger { color: #B4231A; }
   .pill { border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 500; white-space: nowrap; background: var(--soft); color: var(--ink2); }
-  .pill.review { background: var(--blueBg); color: var(--blue); } .pill.cur { background: var(--ink); color: var(--bg); }
+  .pill.review { background: var(--blueBg); color: var(--blue); } .pill.cur { background: var(--ink); color: #fff; }
   .stats { display: flex; gap: 12px; flex-wrap: wrap; } .stats .card { flex: 1 1 200px; padding: 14px 16px; } .stats b { display: block; font-size: 24px; font-weight: 600; }
   .board { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
   .col { flex: 1 1 250px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -57,7 +66,8 @@
   .chat { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
   .chead { padding: 12px 24px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .ctx { padding: 8px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted); }
-  .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--ink2); }
+  .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 11px; font-size: 13px; color: var(--ink2); white-space: nowrap; }
+  button.chip:hover { border-color: var(--ink); }
   .log { flex: 1; overflow-y: auto; padding: 20px 24px; }
   .log .in { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 86%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -81,7 +91,7 @@
   form.send .in { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
   form.send textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); max-height: 160px; min-height: 44px; }
   .icon { width: 44px; height: 44px; border: 1px solid var(--line); background: var(--card); border-radius: 12px; display: grid; place-items: center; flex: none; }
-  .icon.go { background: var(--accent); border-color: var(--accent); }
+  .icon.go { background: var(--ink); border-color: var(--ink); color: #fff; border-radius: 50%; }
   .hint { color: var(--muted); text-align: center; margin: 12vh auto 0; max-width: 420px; }
   aside.vers { width: 360px; flex: none; border-left: 1px solid var(--line); background: var(--card); padding: 16px; display: flex; flex-direction: column; gap: 14px; height: 100vh; overflow-y: auto; }
   .ver { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -94,10 +104,36 @@
   /* misc */
   .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; background: var(--card); flex-wrap: wrap; }
   .tabs a { border-radius: 7px; padding: 6px 12px; font-size: 14px; text-decoration: none; color: var(--ink2); }
-  .tabs a.on { background: var(--ink); color: var(--bg); }
+  .tabs a.on { background: var(--ink); color: #fff; }
   .md h1 { font-size: 20px; margin: 4px 0 8px; } .md h2 { font-size: 16px; margin: 18px 0 6px; } .md h3 { font-size: 14px; margin: 14px 0 4px; color: var(--muted); }
   .md ul { padding-left: 18px; margin: 6px 0; } .md li { margin: 4px 0; } .md code { font-family: 'Geist Mono', monospace; font-size: 13px; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
   .md p { margin: 6px 0; }
+  #tabHost h1, #tabHost .row > div > .small.muted:first-child { display: none; } /* tab title is the settings header */
+  .rmain { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
+  .rbody { display: flex; gap: 32px; padding: 26px 32px; align-items: flex-start; }
+  .rvid { width: 300px; flex: none; display: flex; flex-direction: column; gap: 10px; position: sticky; top: 0; }
+  .rvid video, .vph { width: 100%; aspect-ratio: 9 / 16; border-radius: 18px; background: #000; object-fit: contain; }
+  .vph { background: var(--soft); color: var(--muted); display: grid; place-items: center; text-align: center; padding: 24px; font-size: 13px; }
+  .rinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+  .blk { display: flex; flex-direction: column; gap: 6px; }
+  .lbl { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .02em; text-transform: uppercase; }
+  aside.chatcol { width: 380px; flex: none; border-left: 1px solid var(--line); display: flex; flex-direction: column; height: 100vh; }
+  aside.chatcol .log, aside.chatcol form.send, aside.chatcol .keys, aside.chatcol .status, aside.chatcol .ctx { padding-left: 16px; padding-right: 16px; }
+  aside.chatcol .msg { max-width: 92%; }
+  .utabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
+  .utabs a { padding: 0 0 10px; color: var(--muted); text-decoration: none; }
+  .utabs a.on { color: var(--ink); border-bottom: 2px solid var(--ink); font-weight: 500; }
+  .stg { display: inline-flex; gap: 4px; background: var(--soft); border-radius: 10px; padding: 3px; }
+  .stg span { padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+  .stg span.done { color: var(--ink2); }
+  .stg span.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .box { border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 8px 24px rgba(0,0,0,.04); }
+  .lh { display: flex; align-items: baseline; font-size: 12px; color: var(--muted); padding: 0 2px 6px; border-bottom: 1px solid var(--line); }
+  .lh a { margin-left: auto; color: var(--muted); text-decoration: none; }
+  .wl { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 14px; text-decoration: none; }
+  .wl:hover { background: var(--side); }
+  .wl .r { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .tag { font-size: 11px; color: var(--ink2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
   .li { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--soft); font-size: 14px; flex-wrap: wrap; }
   .sw { width: 40px; height: 24px; border-radius: 12px; border: 0; background: #C9C7C1; position: relative; flex: none; padding: 0; }
   .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
@@ -117,8 +153,8 @@
   .fcard .meta { padding: 8px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .fcard .meta b { font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fcard .acts { display: flex; gap: 10px; }
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 9; }
-  @media (max-width: 1100px) { aside.vers { width: 300px; } }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 9; }
+  @media (max-width: 1100px) { aside.vers { width: 300px; } aside.chatcol { width: 320px; } .rvid { width: 240px; } }
   @media (max-width: 860px) {
     .app { display: block; }
     nav.side { position: fixed; inset: 0 auto 0 0; z-index: 5; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 0 40px rgba(0,0,0,.2); }
@@ -129,6 +165,12 @@
     .work { flex-direction: column; }
     .chat { height: auto; min-height: calc(100vh - 61px); }
     aside.vers { width: auto; height: auto; border-left: 0; border-top: 1px solid var(--line); }
+    .rmain { height: auto; }
+    .wl .small { display: none; }
+    .rbody { flex-direction: column; padding: 16px; gap: 18px; }
+    .rvid { width: 100%; max-width: 340px; margin: 0 auto; position: static; }
+    aside.chatcol { width: auto; height: 80vh; border-left: 0; border-top: 1px solid var(--line); }
+    .chead .stg { order: 5; overflow-x: auto; max-width: 100%; }
     .chead, .ctx, .log, form.send, .keys, .status { padding-left: 14px; padding-right: 14px; }
     iframe.dsf { height: 60vh; }
     .ctx { display: none; }
@@ -170,15 +212,21 @@ const md = (s) => {
 const chatMd = (s) => esc(s).replace(/```\w*\n?([\s\S]*?)```/g, '<pre>$1</pre>').replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
 const STATUS = {work: 'В работе', review: 'На ревью', none: 'Без статуса', done: 'Готовы', published: 'Опубликованы'};
 const ICON = {
+  home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path>',
   board: '<rect x="3" y="3" width="7" height="18" rx="2"></rect><rect x="14" y="3" width="7" height="11" rx="2"></rect>',
   chat: '<path d="M4 5h16v11H8l-4 4Z"></path>',
-  idea: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3Z"></path>',
-  rules: '<path d="M4 5h16M4 12h16M4 19h10"></path>',
+  idea: '<path d="M9 18h6M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"></path>',
+  target: '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle>',
+  search: '<circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>',
+  pen: '<path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path>',
+  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path>',
+  plus: '<path d="M12 5v14M5 12h14"></path>',
+  clip: '<path d="m21.4 11-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"></path>',
   ds: '<circle cx="8" cy="8" r="4"></circle><rect x="13" y="13" width="8" height="8" rx="1"></rect><path d="M4 20l4-6 4 6Z"></path>',
   files: '<path d="M3 7h6l2 2h10v10H3Z"></path>',
-  people: '<circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"></path>',
+  people: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>',
 };
-const svg = (k, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">${ICON[k]}</svg>`;
+const svg = (k, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
 let ME = null, PROJECTS = [], P = localStorage.getItem('project') || 'main', OV = null;
 const api = async (path, opts) => {
@@ -191,37 +239,59 @@ const toast = (t) => { const el = document.createElement('div'); el.className = 
 const isOwner = () => ME?.role === 'owner';
 const canEdit = () => ME && ME.role !== 'viewer';
 
+const projName = () => (PROJECTS.find((x) => x.slug === P) || {}).name || P;
+const ROLE = {owner: 'владелец', editor: 'монтажёр', viewer: 'зритель'};
+
 async function sidebar() {
   OV = await api('/api/overview');
-  const route = location.hash || '#/';
-  const proj = PROJECTS.find((x) => x.slug === P) || {name: P};
-  const review = OV.reels.filter((r) => r.status === 'review').length;
-  const navs = [
-    ['#/', 'board', 'Все рилсы', OV.reels.length],
-    ['#/chat/_project', 'chat', 'Общий чат', ''],
-    ['#/new', 'idea', 'Новый рилс', OV.ideasCount + ' идей'],
-    ['#/knowledge', 'rules', 'Правила и бриф', ''],
-    ['#/ds', 'ds', 'Дизайн-система', ''],
-    ['#/files', 'files', 'Файлы и место', ''],
-    ...(isOwner() ? [['#/access', 'people', 'Доступ', '']] : []),
-  ];
-  const used = OV.disk.total - OV.disk.free;
+  const cur = location.hash || '#/';
+  const on = (h) => (h === '#/' ? cur === '#/' : cur.startsWith(h) || (h === '#/all' && cur.startsWith('#/reel/'))) ? 'on' : '';
+  const item = (h, i, t, n = '') => `<a class="nav ${on(h)}" href="${h}">${svg(i)}<span>${t}</span>${n}</a>`;
+  const initials = projName().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   $('#side').innerHTML = `
-    <div class="proj"><span class="logo">${esc(proj.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase())}</span>
-      <label style="flex: 1; min-width: 0"><span class="small muted" style="display: block">Проект · ${OV.reels.length} рилсов${review ? ' · ' + review + ' на ревью' : ''}</span>
-      <select id="projSel" aria-label="Проект">${PROJECTS.map((x) => `<option value="${esc(x.slug)}" ${x.slug === P ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label></div>
-    <div style="display: flex; flex-direction: column; gap: 2px">${navs.map(([h, i, t, n]) => `<a class="nav ${route === h || (h !== '#/' && route.startsWith(h)) ? 'on' : ''}" href="${h}">${svg(i)}${t}<span class="n">${n}</span></a>`).join('')}</div>
-    <div style="display: flex; flex-direction: column; gap: 2px">
-      <div class="label"><span>Рилсы</span>${canEdit() ? '<a href="#/new" style="text-decoration: none; font-weight: 600; color: var(--ink)">+ Новый</a>' : ''}</div>
-      ${OV.reels.slice(0, 12).map((r) => `<a class="nav ${route === '#/reel/' + r.id ? 'on' : ''}" href="#/reel/${r.id}"><i class="dot s-${r.status}"></i><span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><b style="font-weight: 600">${esc(r.num)}</b> ${esc(r.title)}</span><span class="n">${OV.busy?.key === r.id ? '<i class="spin" style="display: inline-block"></i>' : esc(r.version || '')}</span></a>`).join('')}
-    </div>
-    <div style="margin-top: auto; border-top: 1px solid var(--line); padding: 12px 10px 0; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 6px">
-      <div style="display: flex; justify-content: space-between"><span>Диск сервера</span><span style="color: var(--ink)">${mb(used)} из ${mb(OV.disk.total)}</span></div>
-      <div class="meter"><i style="width: ${Math.round(used / OV.disk.total * 100)}%"></i></div>
-      <div>${esc(ME.name)} · ${ME.role === 'owner' ? 'владелец' : ME.role === 'editor' ? 'монтажёр' : 'зритель'}</div>
+    <div class="ph"><span class="logo">${esc(initials)}</span>
+      <select id="projSel" aria-label="Проект">${PROJECTS.map((x) => `<option value="${esc(x.slug)}" ${x.slug === P ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+      ${canEdit() ? `<a class="icon" style="width: 26px; height: 26px; border: 0; background: none; color: var(--muted)" href="#/new" title="Новый выпуск" aria-label="Новый выпуск">${svg('pen')}</a>` : ''}</div>
+    <button type="button" class="srch" id="srchBtn">${svg('search', 15)}<span>Поиск</span><kbd>⌘K</kbd></button>
+    ${item('#/', 'home', 'Сегодня')}
+    ${item('#/all', 'board', 'Все выпуски', `<span class="n">${OV.reels.length}</span>`)}
+    <div class="gh">План</div>
+    ${item('#/new', 'idea', 'Идеи', `<span class="n">${OV.ideasCount}</span>`)}
+    ${item('#/knowledge', 'target', 'Стратегия')}
+    <div style="margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 2px">
+      ${item('#/settings', 'sliders', 'Настройки проекта')}
+      <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${ROLE[ME.role] || ''}</span></div>
     </div>`;
   $('#projSel').onchange = (e) => { P = e.target.value; localStorage.setItem('project', P); location.hash = '#/'; route(); };
+  $('#srchBtn').onclick = search;
 }
+
+// ⌘K: jump to any reel or screen by name.
+function search() {
+  if ($('#srch')) return;
+  const items = [
+    ...OV.reels.map((r) => [`${r.num} ${r.title}`, '#/reel/' + r.id, STATUS[r.status]]),
+    ['Сегодня', '#/', ''], ['Все выпуски', '#/all', ''], ['Идеи', '#/new', ''], ['Стратегия', '#/knowledge', ''], ['Настройки проекта', '#/settings', ''],
+  ];
+  const d = document.createElement('div');
+  d.id = 'srch';
+  d.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,.18); z-index: 20; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 0';
+  d.innerHTML = `<div class="card" role="dialog" aria-label="Поиск" style="width: 100%; max-width: 560px; padding: 8px; box-shadow: 0 16px 48px rgba(0,0,0,.12)">
+    <input class="f" id="srchIn" placeholder="Выпуск или раздел…" autocomplete="off" style="border: 0; font-size: 15px">
+    <div id="srchList" style="max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 6px; border-top: 1px solid var(--line)"></div></div>`;
+  document.body.append(d);
+  const close = () => d.remove();
+  const draw = (q) => {
+    const hits = items.filter(([t]) => t.toLowerCase().includes(q.toLowerCase())).slice(0, 12);
+    $('#srchList').innerHTML = hits.map(([t, h, x], i) => `<a class="nav ${i ? '' : 'on'}" href="${h}"><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(t)}</span><span class="n">${esc(x)}</span></a>`).join('') || '<p class="small muted" style="padding: 8px">Ничего не нашлось</p>';
+  };
+  d.onclick = (e) => { if (e.target === d || e.target.closest('a')) close(); };
+  $('#srchIn').oninput = (e) => draw(e.target.value);
+  $('#srchIn').onkeydown = (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter') { const a = $('#srchList a'); if (a) { location.hash = a.getAttribute('href'); close(); } } };
+  draw('');
+  $('#srchIn').focus();
+}
+document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && ME) { e.preventDefault(); search(); } });
 
 // ---------- chat ----------
 function chatBox(key, {onDone, onRebind} = {}) {
@@ -367,56 +437,90 @@ function chatBox(key, {onDone, onRebind} = {}) {
 }
 
 // ---------- views ----------
-const view = $('#view');
+let view = $('#view');
 const title = (t) => { $('#topTitle').textContent = t; document.title = t + ' · Рилсы'; };
 
-async function vBoard() {
-  title('Все рилсы');
+async function vToday() {
+  title('Сегодня');
+  const review = OV.reels.filter((r) => r.status === 'review');
+  const work = OV.reels.filter((r) => r.status === 'work');
+  const recent = [...OV.reels].sort((x, y) => y.updated - x.updated).slice(0, 4);
+  const h = new Date().getHours();
+  const hello = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер';
+  const line = (r, tag, note) => `<a class="wl" href="#/reel/${r.id}"><i class="dot s-${r.status}"></i><span>${esc(r.num)} ${esc(r.title)}</span><span class="small muted">${note}</span><span class="r"><span class="tag">${tag}</span>&nbsp;&nbsp;${ago(r.updated)}</span></a>`;
+  const waiting = [...review.map((r) => line(r, 'ревью', r.version ? esc(r.version) + ' готова — посмотри' : '')), ...work.map((r) => line(r, 'в работе', OV.busy?.key === r.id ? 'Claude работает…' : 'монтаж'))];
+  view.innerHTML = `<div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 72px 20px 40px">
+    <div style="width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 30px">
+      <div style="display: flex; flex-direction: column; gap: 6px"><h1 style="font-size: 30px">${hello}, ${esc(ME.name)}</h1>
+        <div class="muted" style="font-size: 15px">${review.length ? `${review.length} ${review.length === 1 ? 'выпуск ждёт' : 'выпуска ждут'} твоего решения` : 'Ничего не ждёт решения'} · ${OV.reels.length} выпусков · ${OV.ideasCount} идей в запасе</div></div>
+      ${canEdit() ? `<form class="box" id="todayForm" style="padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px">
+        <textarea id="todayIn" rows="2" placeholder="Скажи, что сделать — или скинь фото и видео" style="border: 0; resize: none; font-size: 15px; outline: none; padding: 0"></textarea>
+        <div class="row" style="color: var(--muted); gap: 8px"><a href="#/new" class="icon" style="width: 30px; height: 30px; border: 0" title="Новый выпуск" aria-label="Новый выпуск">${svg('plus')}</a><span class="small">Ответ — в чате проекта</span><button type="submit" class="icon go" style="margin-left: auto; width: 32px; height: 32px" aria-label="Отправить">↑</button></div></form>
+      <div class="row" style="gap: 8px; margin-top: -14px">${['Предложи 3 идеи на неделю', 'Что снять на неделе', 'Разбери, что зашло'].map((t) => `<button type="button" class="chip" data-say="${esc(t)}">${t}</button>`).join('')}</div>` : ''}
+      <div><div class="lh">Ждёт тебя<a href="#/all">все выпуски</a></div>${waiting.join('') || '<p class="small muted">Пусто — можно начинать новое.</p>'}</div>
+      <div><div class="lh">Недавнее</div>${recent.map((r) => `<a class="wl" href="#/reel/${r.id}"><span class="muted">◌</span><span>${esc(r.num)} ${esc(r.title)}</span><span class="small muted">${STATUS[r.status]}${r.version ? ' · ' + esc(r.version) : ''}</span><span class="r">${ago(r.updated)}</span></a>`).join('')}</div>
+    </div></div>`;
+  const go = (text) => { if (!text.trim()) return; sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown: text})); location.hash = '#/chat/_project'; };
+  $('#todayForm')?.addEventListener('submit', (e) => { e.preventDefault(); go($('#todayIn').value); });
+  $('#todayIn')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); go(e.target.value); } });
+  view.querySelectorAll('[data-say]').forEach((b) => (b.onclick = () => go(b.dataset.say)));
+}
+
+async function vAll() {
+  title('Все выпуски');
   const groups = ['work', 'review', 'none', 'done', 'published'];
   const by = Object.fromEntries(groups.map((g) => [g, OV.reels.filter((r) => r.status === g)]));
   const used = OV.disk.total - OV.disk.free;
-  view.innerHTML = `<div class="page">
-    <div class="row" style="justify-content: space-between"><div><div class="small muted">Проект</div><h1>${esc((PROJECTS.find((x) => x.slug === P) || {}).name || P)} · рилсы</h1></div>
-      <div class="row"><a class="btn" href="#/knowledge">Правила и дизайн-система</a>${canEdit() ? `<a class="btn primary" href="#/new">+ Новый рилс</a>` : ''}</div></div>
+  const st = await api('/api/storage').catch(() => null);
+  const parts = st ? [['версии', st.reels.reduce((n, r) => n + r.versions, 0)], ['исходники', st.reels.reduce((n, r) => n + r.sources, 0)], ['входящие', st.inbox || 0]].filter(([, n]) => n > 0) : [];
+  view.innerHTML = `<div class="chead" style="padding: 0 28px; min-height: 56px"><b style="font-size: 14px">Все выпуски</b><span style="flex: 1"></span>${canEdit() ? '<a class="btn primary" href="#/new">+ Новый выпуск</a>' : ''}</div>
+  <div class="page" style="padding: 26px 32px; gap: 26px">
     <div class="stats">
-      <div class="card"><span class="small muted">Ждут твоего решения</span><b>${by.review.length}</b></div>
+      <div class="card"><span class="small muted">Ждут твоего решения</span><b>${by.review.length} ${by.review.length === 1 ? 'выпуск' : 'выпуска'}</b></div>
       <div class="card"><span class="small muted">Идей в запасе</span><b>${OV.ideasCount}</b></div>
-      <div class="card" style="flex: 2 1 320px"><div class="row small muted" style="justify-content: space-between"><span>Место на сервере</span><a href="#/files">Разобрать</a></div><b>${mb(used)} <span class="small muted" style="font-weight: 400">из ${mb(OV.disk.total)}</span></b><div class="meter" style="margin-top: 8px"><i style="width: ${Math.round(used / OV.disk.total * 100)}%"></i></div></div>
+      <div class="card" style="flex: 2 1 320px"><div class="row small muted" style="justify-content: space-between"><span>Место на сервере</span><a href="#/settings/files">Разобрать</a></div><b>${mb(used)} <span class="small muted" style="font-weight: 400">из ${mb(OV.disk.total)}</span></b><div class="meter" style="margin-top: 8px"><i style="width: ${Math.round(used / OV.disk.total * 100)}%"></i></div>${parts.length ? `<span class="small muted" style="display: block; margin-top: 4px">${parts.map(([t, n]) => t + ' ' + mb(n)).join(' · ')}</span>` : ''}</div>
     </div>
     <div class="board">${groups.filter((g) => by[g].length || g === 'work').map((g) => `<section class="col" aria-label="${STATUS[g]}">
-      <div class="colh"><i class="dot s-${g}"></i>${STATUS[g]} <span class="muted" style="font-weight: 400">${by[g].length}</span></div>
-      ${by[g].map((r) => `<a class="rc" href="#/reel/${r.id}"><div class="th" ${r.thumb ? `style="background-image: url('${r.thumb}')"` : ''}></div><div style="min-width: 0"><b style="font-weight: 600; font-size: 14px">${esc(r.num)} ${esc(r.title)}</b><div class="small muted">${r.version ? esc(r.version) + ' · ' : 'версий нет · '}${ago(r.updated)}</div>${OV.busy?.key === r.id ? '<div class="small" style="color: var(--accent)">Claude работает…</div>' : ''}</div></a>`).join('') || '<p class="small muted">Пусто. Начни новый рилс.</p>'}
+      <div class="colh" style="font-size: 15px"><i class="dot s-${g}"></i>${STATUS[g]} <span class="muted" style="font-weight: 400">${by[g].length}</span></div>
+      ${by[g].map((r) => `<a class="rc" href="#/reel/${r.id}"><div class="th" ${r.thumb ? `style="background-image: url('${r.thumb}')"` : ''}></div><div style="min-width: 0; display: flex; flex-direction: column; gap: 3px"><b style="font-weight: 600; font-size: 14px">${esc(r.num)} · ${esc(r.title)}</b><span class="small muted">${r.version ? esc(r.version) + ' · ' : 'черновика ещё нет · '}${ago(r.updated)}</span>${r.versions > 1 ? `<span class="small muted">${r.versions} версии</span>` : ''}${OV.busy?.key === r.id ? '<span class="small" style="color: var(--amber)">Claude работает…</span>' : ''}</div></a>`).join('') || '<p class="small muted">Пусто. Начни новый выпуск.</p>'}
     </section>`).join('')}</div></div>`;
+}
+
+// Reel stages from the canvas (Сценарий · Материалы · Монтаж · Выкладка), derived from what the reel already has.
+function stages(r) {
+  const at = !r?.version ? 0 : ['done', 'published'].includes(r.status) ? 3 : 2;
+  return `<span class="stg" aria-label="Этап">${['Сценарий', 'Материалы', 'Монтаж', 'Выкладка'].map((t, i) => `<span class="${i === at ? 'on' : i < at ? 'done' : ''}">${t}</span>`).join('')}</span>`;
 }
 
 async function vReel(id, tab) {
   const isNew = id.startsWith('new-');
   const data = isNew ? null : await api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null);
   const r = data?.reel;
-  title(r ? `${r.num} ${r.title}` : 'Новый рилс');
-  view.innerHTML = `<div class="work"><div class="chat">
-    <div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/">${esc((PROJECTS.find((x) => x.slug === P) || {}).name)}</a> / Рилсы</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} «${esc(r.title)}»` : 'Новый рилс'}</h1></div>
-      ${r ? `<span class="pill ${r.status === 'review' ? 'review' : ''}">${STATUS[r.status]}${r.version ? ' · ' + r.version : ''}</span>` : ''}
-      ${r?.version ? `<a class="btn mob" href="#vers" onclick="event.preventDefault(); document.getElementById('vers').scrollIntoView({behavior: 'smooth'})">Версии и скачать ↓</a>` : ''}
-      ${r ? `<div class="tabs" role="tablist"><a href="#/reel/${esc(id)}" class="${tab !== 'files' ? 'on' : ''}">Чат</a><a href="#/reel/${esc(id)}/files" class="${tab === 'files' ? 'on' : ''}">Файлы</a></div>` : ''}
-      ${canEdit() && tab !== 'files' ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>
-    <div class="ctx">Claude знает: <span class="chip">бриф проекта</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и историю рилса ${esc(r.num)}</span>` : ''}</div>
-    <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div>
-  </div>${isNew ? '' : '<aside class="vers" id="vers" aria-label="Версии"></aside>'}</div>`;
-  if (tab === 'files' && r) { $('.ctx').remove(); renderVersions(id, data); return reelFiles(id); }
+  title(r ? `${r.num} ${r.title}` : 'Новый выпуск');
+  const head = `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Все выпуски</a> › ${esc(projName())}</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
+      ${stages(r)}
+      ${r ? `<div class="tabs" role="tablist"><a href="#/reel/${esc(id)}" class="${tab !== 'files' ? 'on' : ''}">Выпуск</a><a href="#/reel/${esc(id)}/files" class="${tab === 'files' ? 'on' : ''}">Файлы</a></div>` : ''}
+      <span id="dlTop"></span></div>`;
+  const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
+  // A reel that exists: video, versions and script in the middle, its chat as a column on the right (CleanReel).
+  view.innerHTML = isNew || !r
+    ? `<div class="work"><div class="chat">${head}${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`
+    : `<div class="work"><div class="rmain">${head}<div id="reelHost" style="flex: 1; overflow-y: auto"><div class="rbody" id="vers" aria-label="Версии"></div></div></div>
+      <aside class="chatcol" aria-label="Чат выпуска"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат выпуска</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   const box = chatBox(id, {
     onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
-    onDone: (k) => { sidebar(); if (!k.startsWith('new-')) { if (isNew) vReel(k); else renderVersions(k); } },
+    onDone: (k) => { sidebar(); if (!k.startsWith('new-')) { if (isNew) vReel(k); else if (tab !== 'files') renderVersions(k); } },
   });
   $('#chatHost').append(box);
-  $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат рилса заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id); } });
-  if (!isNew) renderVersions(id, data);
+  $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id); } });
+  if (r && tab === 'files') reelFiles(id);
+  else if (r) renderVersions(id, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
   if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
 
 async function reelFiles(id) {
-  const host = $('#chatHost');
+  const host = $('#reelHost');
   host.style.overflowY = 'auto';
   host.innerHTML = `<div class="page" style="max-width: 1000px">
     ${canEdit() ? `<label class="drop" id="drop"><input type="file" multiple hidden id="up"><b style="color: var(--ink); font-weight: 600">Перетащи сюда референсы, исходники, музыку</b><br><span class="small">или нажми, чтобы выбрать файлы · они попадут в материалы этого рилса, Claude их увидит</span></label>` : ''}
@@ -452,27 +556,41 @@ async function reelFiles(id) {
   load();
 }
 
+// What the README says about one version: its line under «## Версии», first sentence.
+const versionNote = (readme, v) => {
+  const line = String(readme || '').split('\n').find((l) => new RegExp(`^\\s*[-*]\\s*${v}\\b`).test(l));
+  return line ? line.replace(/^\s*[-*]\s*\S+\s*(\([^)]*\))?:?\s*/, '').split(/(?<=\.)\s/)[0] : '';
+};
+const section = (readme, name) => (new RegExp(`^## ${name}[^\\n]*\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`, 'm').exec(String(readme || '')) || [])[1] || '';
+
 async function renderVersions(id, data) {
   data ||= await api('/api/reel?reel=' + encodeURIComponent(id));
   const el = $('#vers');
   if (!el) return;
   const vs = data.versions;
-  const kindName = {master: 'Мастер', copy: 'Для Instagram', cover: 'Обложка', thumb: 'Кадр', other: 'Файл'};
-  const fileLinks = (v) => v.files.filter((f) => f.kind !== 'thumb' && f.kind !== 'other').sort((a, b) => ['copy', 'master', 'cover'].indexOf(a.kind) - ['copy', 'master', 'cover'].indexOf(b.kind))
-    .map((f) => `<a class="dl" href="${f.url}&dl=1"><span>${kindName[f.kind]}</span><span class="small muted">${mb(f.size)} ↓</span></a>`).join('');
+  const kindName = {master: 'Мастер', copy: 'Instagram', cover: 'Обложка', thumb: 'Кадр', other: 'Файл'};
+  const files = (v) => v.files.filter((f) => f.kind !== 'thumb' && f.kind !== 'other').sort((a, b) => ['copy', 'master', 'cover'].indexOf(a.kind) - ['copy', 'master', 'cover'].indexOf(b.kind));
+  const fileLinks = (v) => files(v).map((f) => `<a class="chip" href="${f.url}&dl=1">${kindName[f.kind]} · ${mb(f.size)} ↓</a>`).join('');
   const video = (v) => v.files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
   const thumb = (v) => v.files.find((f) => f.kind === 'thumb' || f.kind === 'cover');
   const cur = vs[0], prev = vs.find((v) => v.state === 'previous' && video(v)), old = vs.filter((v) => v !== cur && v !== prev);
-  el.innerHTML = `<div class="row" style="justify-content: space-between"><h2>Версии · ${vs.length}</h2><a class="small" href="#/files">Место</a></div>
-    ${!cur ? '<p class="small muted">Версий пока нет. Когда Claude смонтирует первую, она появится здесь.</p>' : `
-    <div class="ver cur"><div class="row" style="justify-content: space-between"><b>${esc(cur.v)} · текущая</b><span class="small muted">${ago(cur.at)}</span></div>
-      ${video(cur) ? `<video src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video>` : ''}
-      ${fileLinks(cur)}</div>`}
-    ${prev ? `<div class="ver"><div class="row" style="justify-content: space-between"><b>${esc(prev.v)} · предыдущая</b><span class="small muted">${ago(prev.at)}</span></div>
-      <details><summary class="small">Смотреть для сравнения</summary><video src="${video(prev).url}" controls playsinline preload="none" style="margin-top: 8px"></video></details>${fileLinks(prev)}
-      <span class="small muted">Мастер уже удалён ради места</span></div>` : ''}
-    ${old.length ? `<div style="display: flex; flex-direction: column; gap: 8px"><span class="small muted">Архив — кадр и снимок проекта</span>
-      ${old.map((v) => `<div class="arch"><div class="th" ${thumb(v) ? `style="background-image: url('${thumb(v).url}')"` : ''}></div><span style="flex: 1"><b>${esc(v.v)}</b> · ${ago(v.at)}${v.archived ? ` · освобождено ${mb(v.archived.freed)}` : ''}</span>${canEdit() ? `<button type="button" class="btn" data-rebuild="${esc(v.v)}" style="min-height: 34px; font-size: 13px">Пересобрать</button>` : ''}</div>`).join('')}</div>` : ''}`;
+  const note = cur && versionNote(data.readme, cur.v);
+  const script = section(data.readme, 'Сценарий');
+  const dl = cur && files(cur).find((f) => f.kind === 'copy') || cur && files(cur)[0];
+  $('#dlTop').innerHTML = dl ? `<a class="btn primary" href="${dl.url}&dl=1">Скачать ${esc(cur.v)}</a>` : '';
+  el.innerHTML = `<div class="rvid">${cur && video(cur)
+      ? `<video src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video><span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`
+      : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}</div>
+    <div class="rinfo">
+      ${note ? `<div class="blk"><span class="lbl">Что в ${esc(cur.v)}</span><span style="font-size: 15px; line-height: 1.55">${esc(note)}</span></div>` : ''}
+      <div class="blk"><span class="lbl">Версии · ${vs.length}</span>
+        ${!cur ? '<p class="small muted">Версий пока нет. Напиши в чате справа, что снять или смонтировать.</p>' : `
+        <div class="li" style="border-top: 0"><b style="font-weight: 600">${esc(cur.v)} · текущая</b><span class="small muted">${ago(cur.at)}</span><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(cur)}</div></div>`}
+        ${prev ? `<div class="li"><b style="font-weight: 600">${esc(prev.v)}</b><span class="small muted">${ago(prev.at)} · лёгкая копия, мастер удалён ради места</span><details style="flex-basis: 100%"><summary class="small">Смотреть для сравнения</summary><video src="${video(prev).url}" controls playsinline preload="none" style="width: 220px; border-radius: 10px; margin-top: 8px; background: #000"></video></details><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(prev)}</div></div>` : ''}
+        ${old.map((v) => `<div class="li"><div class="th" style="width: 28px; height: 50px; ${thumb(v) ? `background-image: url('${thumb(v).url}')` : ''}"></div><span style="flex: 1"><b style="font-weight: 600">${esc(v.v)}</b> <span class="small muted">· ${ago(v.at)} · кадр и снимок проекта${v.archived ? ` · освобождено ${mb(v.archived.freed)}` : ''}</span></span>${canEdit() ? `<button type="button" class="btn" data-rebuild="${esc(v.v)}">Пересобрать</button>` : ''}</div>`).join('')}
+        <a class="small muted" href="#/settings/files" style="padding-top: 8px">Место на сервере →</a></div>
+      ${script.trim() ? `<div class="blk"><span class="lbl">Сценарий</span><div class="md" style="font-size: 14px">${md(script)}</div></div>` : ''}
+    </div>`;
   el.querySelectorAll('[data-rebuild]').forEach((b) => (b.onclick = () => {
     const box = $('#chatHost > div');
     box.say(`Пересобери версию ${b.dataset.rebuild} этого рилса из её снимка versions/${b.dataset.rebuild}/project-snapshot/ и пришли её.`, `Пересобрать ${b.dataset.rebuild}`);
@@ -540,14 +658,27 @@ async function vNew() {
 }
 
 async function vKnowledge(tab = 'brief') {
-  title('Правила и бриф');
+  title('Стратегия');
   const k = await api('/api/knowledge');
   const rules = (k.playbook.match(/^\s*- /gm) || []).length;
-  view.innerHTML = `<div class="page">
-    <div class="row" style="justify-content: space-between; align-items: flex-end"><div><div class="small muted">Проект</div><h1>Что Claude знает о проекте</h1></div>
-      <div class="tabs" role="tablist"><a href="#/knowledge/brief" class="${tab === 'brief' ? 'on' : ''}">Бриф</a><a href="#/knowledge/rules" class="${tab === 'rules' ? 'on' : ''}">Правила · ${rules}</a><a href="#/ds">Дизайн-система</a></div></div>
-    <div class="card md" style="max-width: 900px">${md(tab === 'rules' ? k.playbook : k.brief) || '<p class="muted">Пусто.</p>'}</div>
-    <p class="small muted">Правила Claude дописывает сам из твоих правок. Поменять — напиши в <a href="#/chat/_project">общий чат</a>.</p></div>`;
+  view.innerHTML = `<div class="page" style="padding: 28px 36px">
+    <div><h1>Стратегия</h1><div class="muted" style="font-size: 15px; margin-top: 6px">Что Claude знает о проекте. Поменять — напиши в <a href="#/chat/_project">чат проекта</a>.</div></div>
+    <div class="utabs" role="tablist"><a href="#/knowledge/brief" class="${tab === 'brief' ? 'on' : ''}">Бриф</a><a href="#/knowledge/rules" class="${tab === 'rules' ? 'on' : ''}">Правила · ${rules}</a></div>
+    <div class="md" style="max-width: 860px">${md(tab === 'rules' ? k.playbook : k.brief) || '<p class="muted">Пусто.</p>'}</div>
+    ${tab === 'rules' ? '<p class="small muted">Правила Claude дописывает сам из твоих правок.</p>' : ''}</div>`;
+}
+
+// Project settings: title + tabs on top, each tab is one of the older pages rendered below.
+async function vSettings(tab = 'ds') {
+  const tabs = [['ds', 'Дизайн-система', vDs], ['files', 'Файлы и место', vFiles], ...(isOwner() ? [['access', 'Доступ', vAccess]] : [])];
+  const cur = tabs.find(([k]) => k === tab) || tabs[0];
+  view.innerHTML = `<div style="padding: 28px 36px 0; display: flex; flex-direction: column; gap: 18px"><h1>Настройки проекта</h1>
+    <div class="utabs" role="tablist">${tabs.map(([k, t]) => `<a href="#/settings/${k}" class="${k === cur[0] ? 'on' : ''}">${t}</a>`).join('')}</div></div>
+    <div id="tabHost" style="flex: 1; display: flex; flex-direction: column; min-height: 0"></div>`;
+  const main = view;
+  view = $('#tabHost');
+  try { await cur[2](); } finally { view = main; }
+  title('Настройки проекта');
 }
 
 async function vDs() {
@@ -564,7 +695,7 @@ async function vDs() {
   const box = chatBox('_ds', {onDone: () => vDsRefresh()});
   $('#chatHost').append(box);
   $('#dsStart')?.addEventListener('click', () => box.say('Собери дизайн-систему рилсов из того, что уже есть: бриф, PLAYBOOK, template/src и код последних рилсов. Сделай страницу design-system/index.html.', 'Собрать дизайн-систему из рилсов'));
-  async function vDsRefresh() { const k2 = await api('/api/knowledge'); if (k2.ds && !$('iframe.dsf')) return vDs(); if (k2.ds) $('iframe.dsf').src = k2.ds.url; }
+  async function vDsRefresh() { const k2 = await api('/api/knowledge'); if (k2.ds && !$('iframe.dsf')) return route(); if (k2.ds) $('iframe.dsf').src = k2.ds.url; }
 }
 
 async function vFiles() {
@@ -648,14 +779,17 @@ async function route() {
   try {
     await sidebar();
     let m;
+    view = $('#view');
     if ((m = /^#\/reel\/([\w-]+)(?:\/(files))?/.exec(h))) await vReel(m[1], m[2]);
     else if ((m = /^#\/chat\/(_project)/.exec(h))) await vChat(m[1]);
     else if (h === '#/new') await vNew();
     else if ((m = /^#\/knowledge(?:\/(\w+))?/.exec(h))) await vKnowledge(m[1]);
-    else if (h === '#/ds') await vDs();
-    else if (h === '#/files') await vFiles();
-    else if (h === '#/access' && isOwner()) await vAccess();
-    else await vBoard();
+    else if ((m = /^#\/settings(?:\/(\w+))?/.exec(h))) await vSettings(m[1]);
+    else if (h === '#/ds') location.replace('#/settings/ds');
+    else if (h === '#/files') location.replace('#/settings/files');
+    else if (h === '#/access') location.replace('#/settings/access');
+    else if (h === '#/all') await vAll();
+    else await vToday();
   } catch (e) {
     view.innerHTML = `<div class="page"><p class="muted">Не получилось загрузить: ${esc(e.message)}. <a href="#/">На главную</a></p></div>`;
   }
