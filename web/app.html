@@ -255,7 +255,7 @@ async function camera(t) {
   const el = document.createElement('div');
   el.className = 'cam';
   const speeds = [0.5, 0.75, 1, 1.25, 1.5];
-  let speed = S.profile.speed || 1, size = S.profile.size === 'normal' ? 22 : 28, facing = 'user', countdown = 0, rec = null, chunks = [], started = 0, raf = 0, offset = 0, last = 0, tries = 0;
+  let drawRaf = 0, speed = S.profile.speed || 1, size = S.profile.size === 'normal' ? 22 : 28, facing = 'user', countdown = 0, rec = null, chunks = [], started = 0, raf = 0, offset = 0, last = 0, tries = 0;
   el.innerHTML = `<video playsinline muted autoplay class="mirror"></video>
     <div class="ctop"><button class="cb" id="cx" aria-label="Закрыть">${ic('x', 22)}</button><span class="timer" id="tm">0:00 / 0:${String(t.seconds).padStart(2, '0')}</span><button class="cb" id="cf" aria-label="Повернуть камеру">${ic('flip', 22)}</button></div>
     <div class="tp"><div class="in" id="tp" style="font-size:${size}px">${esc(taskText(t))}</div></div>
@@ -268,12 +268,14 @@ async function camera(t) {
   const open = async () => {
     stream?.getTracks().forEach((x) => x.stop());
     try {
-      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: facing, width: {ideal: 1080}, height: {ideal: 1920}}, audio: true});
+      // Ask for a portrait picture; phones then give the sensor's full height instead of
+      // a landscape frame (a fixed 1080×1920 makes some of them pick landscape and crop).
+      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: facing, aspectRatio: {ideal: 9 / 16}, height: {ideal: 1920}}, audio: true});
       video.srcObject = stream;
       video.classList.toggle('mirror', facing === 'user');
     } catch (e) { close(); noCamera(t); }
   };
-  const close = () => { cancelAnimationFrame(raf); stream?.getTracks().forEach((x) => x.stop()); el.remove(); cam = null; };
+  const close = () => { cancelAnimationFrame(raf); cancelAnimationFrame(drawRaf); stream?.getTracks().forEach((x) => x.stop()); el.remove(); cam = null; };
   cam = close;
   await open();
   el.querySelector('#cx').onclick = () => { if (!rec || confirm('Остановить запись и выйти?')) close(); };
@@ -296,7 +298,22 @@ async function camera(t) {
   const start = () => {
     const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((x) => window.MediaRecorder?.isTypeSupported?.(x)) || '';
     chunks = [];
-    rec = new MediaRecorder(stream, type ? {mimeType: type} : undefined);
+    // The take is always vertical 9:16: frames are drawn into a portrait canvas with the
+    // same centre crop the screen shows, whatever way the camera delivers them.
+    const W = 1080, H = 1920, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const draw = () => {
+      const vw = video.videoWidth, vh = video.videoHeight;
+      if (vw && vh) {
+        const k = Math.max(W / vw, H / vh), dw = vw * k, dh = vh * k;
+        ctx.drawImage(video, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      }
+      if (rec) drawRaf = requestAnimationFrame(draw);
+    };
+    const out = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...stream.getAudioTracks()]);
+    rec = new MediaRecorder(out, type ? {mimeType: type, videoBitsPerSecond: 8_000_000} : {videoBitsPerSecond: 8_000_000});
+    drawRaf = requestAnimationFrame(draw);
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     rec.onstop = () => {
       const blob = new Blob(chunks, {type: rec.mimeType || 'video/mp4'});
