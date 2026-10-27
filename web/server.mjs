@@ -557,7 +557,7 @@ createServer(async (req, res) => {
     const dir = postDir(studio, id);
     if (!dir) return json(404, {});
     try {
-      const files = renderSlides(dir, studio, BOT, lang === 'en' ? 'en' : 'ru');
+      const files = await renderSlides(dir, studio, BOT, lang === 'en' ? 'en' : 'ru');
       log(me.name, `собрал слайды поста ${id}`);
       return json(200, {files: files.map((f) => mediaUrl(f))});
     } catch (e) { return json(500, {error: e.message}); }

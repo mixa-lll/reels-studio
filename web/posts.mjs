@@ -2,7 +2,7 @@
 // with a photo, or a carousel of slides drawn from five templates. Each post is a folder
 // projects/<p>/posts/<NN-slug>/ with post.json (what the editor shows), sources/ (photos
 // people brought) and images/ (cropped photos, slide PNGs). Its chat key is «post-<id>».
-import {spawnSync} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -132,8 +132,51 @@ export function chromeBin(bot) {
   return ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/chromium', '/usr/bin/google-chrome'].find((f) => existsSync(f)) || null;
 }
 
+// Screenshots through the DevTools protocol: headless Chrome on the server hangs on
+// --screenshot, but drives fine the way Remotion uses it.
+async function shoot(chrome, pages) {
+  const profile = join(tmpdir(), `slides-chrome-${Date.now().toString(36)}`);
+  const proc = spawn(chrome, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars', `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank'], {stdio: ['ignore', 'ignore', 'pipe']});
+  try {
+    const wsUrl = await new Promise((ok, fail) => {
+      let err = '';
+      const t = setTimeout(() => fail(new Error('Chrome не запустился')), 20_000);
+      proc.stderr.on('data', (d) => { err += d; const m = /DevTools listening on (ws:\/\/\S+)/.exec(err); if (m) { clearTimeout(t); ok(m[1]); } });
+      proc.on('exit', () => fail(new Error('Chrome закрылся: ' + err.trim().split('\n').slice(-1)[0])));
+    });
+    const ws = new WebSocket(wsUrl);
+    await new Promise((ok, fail) => { ws.onopen = ok; ws.onerror = () => fail(new Error('нет связи с Chrome')); });
+    let n = 0;
+    const waiting = new Map(), events = [];
+    ws.onmessage = (e) => {
+      const m = JSON.parse(e.data);
+      if (m.id && waiting.has(m.id)) { const [ok, fail] = waiting.get(m.id); waiting.delete(m.id); m.error ? fail(new Error(m.error.message)) : ok(m.result); }
+      else if (m.method) events.push(m);
+    };
+    const send = (method, params = {}, sessionId) => new Promise((ok, fail) => { const id = ++n; waiting.set(id, [ok, fail]); ws.send(JSON.stringify({id, method, params, sessionId})); });
+    const {targetId} = await send('Target.createTarget', {url: 'about:blank'});
+    const {sessionId} = await send('Target.attachToTarget', {targetId, flatten: true});
+    await send('Page.enable', {}, sessionId);
+    await send('Emulation.setDeviceMetricsOverride', {width: 1080, height: 1350, deviceScaleFactor: 1, mobile: false}, sessionId);
+    for (const [html, png] of pages) {
+      events.length = 0;
+      await send('Page.navigate', {url: `file://${html}`}, sessionId);
+      for (let i = 0; i < 100 && !events.some((e) => e.method === 'Page.loadEventFired'); i++) await new Promise((r) => setTimeout(r, 100));
+      await send('Runtime.evaluate', {expression: 'document.fonts.ready.then(() => true)', awaitPromise: true}, sessionId).catch(() => {});
+      const {data} = await send('Page.captureScreenshot', {format: 'png', clip: {x: 0, y: 0, width: 1080, height: 1350, scale: 1}}, sessionId);
+      writeFileSync(png, Buffer.from(data, 'base64'));
+    }
+    ws.close();
+  } finally {
+    const gone = new Promise((r) => { proc.once('exit', r); setTimeout(r, 3000); });
+    proc.kill('SIGKILL');
+    await gone;
+    try { rmSync(profile, {recursive: true, force: true, maxRetries: 3, retryDelay: 200}); } catch { /* a temp profile left behind is harmless */ }
+  }
+}
+
 /** Renders every slide of a post to images[/en]/slide-NN.png; returns the files. */
-export function renderSlides(dir, studio, bot, lang = 'ru') {
+export async function renderSlides(dir, studio, bot, lang = 'ru') {
   const post = readPost(dir);
   const slides = lang === 'en' ? (post.slidesEn || []) : (post.slides || []);
   if (!slides.length) throw new Error('нет слайдов');
@@ -145,17 +188,13 @@ export function renderSlides(dir, studio, bot, lang = 'ru') {
   const th = slideTheme(studio);
   const tmp = join(tmpdir(), `slides-${Date.now().toString(36)}`);
   mkdirSync(tmp, {recursive: true});
-  const out = [];
-  slides.forEach((s, i) => {
+  const pages = slides.map((s, i) => {
     const html = join(tmp, `s${i}.html`);
     writeFileSync(html, slideHtml(s, th, i, slides.length));
-    const png = join(outDir, `slide-${String(i + 1).padStart(2, '0')}.png`);
-    const r = spawnSync(chrome, ['--headless=new', '--disable-gpu', '--no-sandbox', '--hide-scrollbars', '--window-size=1080,1350', '--virtual-time-budget=4000', `--screenshot=${png}`, `file://${html}`], {encoding: 'utf8', timeout: 60_000, windowsHide: true});
-    if (!existsSync(png)) throw new Error(`слайд ${i + 1}: ${(r.stderr || '').trim().split('\n').slice(-1)[0] || 'Chrome не отрисовал'}`);
-    out.push(png);
+    return [html, join(outDir, `slide-${String(i + 1).padStart(2, '0')}.png`)];
   });
-  rmSync(tmp, {recursive: true, force: true});
-  return out;
+  try { await shoot(chrome, pages); } finally { rmSync(tmp, {recursive: true, force: true}); }
+  return pages.map(([, png]) => png);
 }
 
 /** Files a publishing package carries: the chosen photo or the slides, in order. */
