@@ -74,8 +74,8 @@ input.f{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);b
 .err{padding:40px 24px;text-align:center}
 /* camera */
 .cam{position:fixed;inset:0;background:#000;z-index:30;color:#fff;overflow:hidden}
-.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.cam video.mirror{transform:scaleX(-1)}
+.cam video{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:100%;aspect-ratio:9/16;max-width:100%;object-fit:cover}
+.cam video.mirror{transform:translate(-50%,-50%) scaleX(-1)}
 .ctop{position:absolute;top:0;left:0;right:0;padding:calc(12px + env(safe-area-inset-top)) 14px 0;display:flex;align-items:center;justify-content:space-between;z-index:3}
 .cb{width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;border:0}
 .timer{background:rgba(0,0,0,.4);border-radius:999px;padding:7px 14px;font-size:15px;font-weight:700}
@@ -268,9 +268,12 @@ async function camera(t) {
   const open = async () => {
     stream?.getTracks().forEach((x) => x.stop());
     try {
-      // Ask for a portrait picture; phones then give the sensor's full height instead of
-      // a landscape frame (a fixed 1080×1920 makes some of them pick landscape and crop).
-      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: facing, aspectRatio: {ideal: 9 / 16}, height: {ideal: 1920}}, audio: true});
+      // The sensor's own 16:9 mode, asked in landscape terms: held upright the phone gives
+      // it as a full 9:16 frame. Asking for 9:16 directly makes phones crop (zoom in).
+      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: facing, width: {ideal: 1920}, height: {ideal: 1080}, resizeMode: 'none'}, audio: true});
+      // Widest view where the camera can zoom (Android Chrome).
+      const track = stream.getVideoTracks()[0], cap = track.getCapabilities?.();
+      if (cap?.zoom) track.applyConstraints({advanced: [{zoom: cap.zoom.min}]}).catch(() => {});
       video.srcObject = stream;
       video.classList.toggle('mirror', facing === 'user');
     } catch (e) { close(); noCamera(t); }
