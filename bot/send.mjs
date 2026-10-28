@@ -74,6 +74,12 @@ if (o.text) {
   const video = /\.(mp4|mov|webm)$/i.test(o.file) && !o.document;
   await tg.call('sendChatAction', {chat_id: chatId, action: video ? 'upload_video' : 'upload_document'});
   let markup = buttons?.length ? keyboard(buttons) : undefined;
+  // A reel's version opens in the mini app's editor (SE1–SE5): stop at any second and comment.
+  const reel = video && process.env.MINIAPP_URL && /\/reels\/([\w-]+)\/versions\/v\d+\//.exec(o.file)?.[1];
+  if (reel) {
+    markup ??= {inline_keyboard: []};
+    markup.inline_keyboard.push([{text: process.env.BOT_LANG === 'en' ? '✎ Open the editor' : '✎ Открыть редактор', web_app: {url: `${process.env.MINIAPP_URL}?ed=${encodeURIComponent(reel)}`}}]);
+  }
   if (menuId) {
     markup ??= {inline_keyboard: []};
     markup.inline_keyboard.push([{text: tuneLabel(), callback_data: `m:${menuId}:open`}]);
