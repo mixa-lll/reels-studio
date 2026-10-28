@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Съёмка</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -144,49 +145,16 @@ input.f{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);b
 .vid{width:100%;border-radius:20px;background:#000;max-height:56vh;display:block;box-shadow:var(--shadow)}
 .prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:var(--ok);width:0}
 
-/* ---- Telegram-native layer (like the Wallet mini app), our colours ----
-   System font, flat grouped lists on a grey page, no shadows, blue accent buttons,
-   round action buttons under a centred header, iOS-style section titles. */
-:root{--page:#F2F2F6;--card:#FFFFFF;--ink:#171717;--soft:#3C3C43;--mut:#6D6D72;--line:#E3E3E8;--sec2:#E9EEFC;--acc:#2F6FEB;--btn:#2F6FEB;--btnt:#fff;--shadow:none}
-.dark{--page:#101012;--card:#1C1C1E;--ink:#ECECEF;--soft:#C7C7CC;--mut:#98989F;--line:#2C2C2F;--sec2:#1E2A44;--acc:#6E9CF2;--btn:#3A6FE0;--btnt:#fff;--shadow:none}
-html,body{font-family:-apple-system,"SF Pro Text",system-ui,Roboto,"Segoe UI",sans-serif;letter-spacing:-0.01em}
-.scr{padding:8px 16px 150px}
-h1{font-size:26px;line-height:32px;font-weight:700;letter-spacing:-0.02em}
-h1.t2{font-size:22px;line-height:28px}
-.sub{font-size:15px;line-height:21px;color:var(--mut);font-weight:400}
-.lh,.lab{font-size:13px;font-weight:400;letter-spacing:0;text-transform:uppercase;color:var(--mut)}
-.lh{margin-top:22px;padding:0 16px 7px}
-.lh a{text-transform:none}
-.grp,.main,.box,.note{background:var(--card);box-shadow:none;border-radius:12px}
-.grp{padding:0 0 0 16px}
-.li{padding:11px 16px 11px 0;gap:12px;border-top:.5px solid var(--line)}
-.li:first-child{border-top:0}
-.ti{width:30px;height:30px;border-radius:8px}
-.ti svg{width:18px;height:18px}
-.tx b{font-size:16px;line-height:21px;font-weight:500}
-.tx span{font-size:13px;line-height:18px}
-.st{font-size:14px;font-weight:500}
-.bb{height:50px;border-radius:12px;background:var(--btn);box-shadow:none;color:var(--btnt);font-size:16px;font-weight:600}
-.sb2{height:50px;border:0;border-radius:12px;background:var(--sec2);color:var(--acc);font-size:16px;font-weight:600}
-.lk{font-size:16px;font-weight:500}
-.tool{height:36px;border:0;background:var(--sec2);color:var(--acc);font-size:15px;font-weight:500}
-.eb2{width:32px;height:32px;background:var(--sec2);color:var(--acc)}
-.foot{background:linear-gradient(180deg,transparent,var(--page) 30%)}
-.tabs{background:var(--card);box-shadow:0 -.5px 0 var(--line);padding:6px 4px calc(8px + env(safe-area-inset-bottom))}
-.tab{font-size:11px;font-weight:500;color:var(--mut);gap:3px}
-.tab .ib{width:auto;height:28px;border-radius:0;background:none !important}
-.tab.on,.tab.on .ib{color:var(--acc) !important}
-/* Wallet-like header: avatar, big figure, caption, round actions */
-.hero2{display:flex;flex-direction:column;align-items:center;text-align:center;padding:14px 0 6px}
-.hero2 .av{width:64px;height:64px;font-size:26px}
-.hero2 .fig{font-size:44px;line-height:50px;font-weight:700;letter-spacing:-0.03em;margin-top:12px}
-.hero2 .cap{font-size:15px;color:var(--mut);margin-top:2px}
-.acts{display:flex;justify-content:center;gap:22px;margin:18px 0 4px}
-.act{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;color:var(--acc);font-size:13px;font-weight:500}
-.act span{width:52px;height:52px;border-radius:50%;background:var(--btn);color:#fff;display:grid;place-items:center}
-.act.alt span{background:var(--sec2);color:var(--acc)}
-
-
+/* Header with a big figure and round actions — in the v6 system (canvas «Черновик 8», ДС v6):
+   Manrope, white cards with a soft shadow, the black main button, tinted icon tiles. */
+.hero2{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:4px 0}
+.hero2 .av{width:44px;height:44px;font-size:17px}
+.hero2 .fig{font-size:28px;line-height:34px;font-weight:700;letter-spacing:-0.025em;margin-top:12px}
+.hero2 .cap{font-size:16px;line-height:23px;color:var(--mut);margin-top:2px;font-weight:500}
+.acts{display:flex;justify-content:flex-start;gap:18px;margin:18px 0 6px}
+.act{display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:0;color:var(--ink);font-size:13px;font-weight:600}
+.act span{width:56px;height:56px;border-radius:50%;background:var(--btnbg);box-shadow:0 1px 0 rgba(255,255,255,.12) inset,0 3px 8px rgba(0,0,0,.18);color:var(--btnt);display:grid;place-items:center}
+.act.alt span{background:var(--card);box-shadow:var(--shadow);color:var(--ink)}
 
 /* Т3: the reel's chat (SR4) */
 .vcard{background:var(--card);box-shadow:var(--shadow);border-radius:20px;padding:12px;margin-top:12px;display:flex;flex-direction:column;gap:10px}
@@ -249,20 +217,6 @@ h1.t2{font-size:22px;line-height:28px}
 .micb{width:56px;flex:none;border-radius:14px;border:1px solid var(--line);background:var(--sec2);color:var(--ink);display:grid;place-items:center}
 .micb.rec{background:var(--r);color:#fff;border-color:transparent}
 
-/* ---- Telegram-native for the role screens too (Сегодня, Неделя, Люди, Студия, чат, новый ролик):
-   blue accent instead of black, flat cards, the phone's own font everywhere. ---- */
-.cam,textarea,input.f{font-family:-apple-system,"SF Pro Text",system-ui,Roboto,"Segoe UI",sans-serif}
-textarea{font-weight:400;font-size:17px;line-height:24px;border-radius:12px}
-input.f{font-weight:400;border-radius:10px}
-.vcard,.rub,.lay,.sc,.bub.bot,.drop{box-shadow:none;border-radius:12px}
-.vact .pri,.bub.me,.cbar .snd,.mk button.on,.lay .n,.selbtn,.act span{background:var(--btn);color:#fff}
-.act.alt span{background:var(--sec2);color:var(--acc)}
-.vact button,.vact a,.mk button,.micb{background:var(--sec2);color:var(--acc);border-color:transparent}
-.rub.on{border-color:var(--acc)}
-.estg button.on{color:var(--acc);border-color:var(--acc)}
-.tl .run{background:var(--acc)}
-.bub{border-radius:16px}
-.cbar{background:var(--card);box-shadow:0 -.5px 0 var(--line)}
 </style>
 </head>
 <body>
@@ -308,7 +262,7 @@ async function api(path, opts = {}) {
 function theme() {
   const dark = tg?.colorScheme === 'dark';
   document.documentElement.classList.toggle('dark', dark);
-  const page = dark ? '#101012' : '#F2F2F6';
+  const page = dark ? '#1C1C1F' : '#F3F3F5';
   try { tg.setHeaderColor(page); tg.setBackgroundColor(page); tg.setBottomBarColor?.(page); } catch {}
 }
 const backBtn = () => { try { stack.length ? tg.BackButton.show() : tg.BackButton.hide(); } catch {} };
