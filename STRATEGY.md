@@ -15,7 +15,7 @@ and the Calendar from them. Change only what the request is about and keep other
   "rubrics": [{"id": "money", "name": "Деньги и выбор", "color": "#22A55B", "share": 25,
     "why": "why people save it", "about": "topics", "look": "how it looks",
     "rules": [{"text": "Цены с датой и источником", "lock": true}], "series": ["Чек: сколько стоит"],
-    "approve": {"name": "Марина", "note": "директор, неделя по пятницам"}}],
+    "approve": {"name": "Марина", "note": "директор, неделя по пятницам"}, "template": "check"}],
   "rhythm": {"season": "Запись на смены", "slots": [{"day": 3, "time": "19:00", "rubric": "money", "platform": "ig-ru", "kind": "reel"}]},
   "events": [{"date": "2026-11-05", "title": "День открытых дверей"}],
   "voice": {"about": "how the project speaks", "never": ["what we never say"],
@@ -28,6 +28,7 @@ and the Calendar from them. Change only what the request is about and keep other
 - Rubric colours stay stable once chosen: colour means rubric everywhere in the interface; the icon means the format.
 - 🔒 rules (`lock: true`) hold for every reel and post of the rubric.
 - `voice` is the project's voice and 3–4 text styles; post variants are written in these styles (Settings › Голос и стили).
+- `template` is the rubric's reel template (`TEMPLATES.md`, ids from `template/src/templates/catalog.json`): its reels are laid out by the template's scenes in `reel.json`. The owner picks it in Strategy › Рубрики.
 - `approve` names who approves the rubric's week by a link (no account, no sign-in); the team page lists them under the table.
 
 ## plan.json — what goes when

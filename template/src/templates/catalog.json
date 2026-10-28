@@ -1,0 +1,32 @@
+{
+  "kinds": {
+    "hook": {"label": "Хук", "need": "вопрос или фраза крупно; фото или видео фоном — по желанию", "media": "any", "dur": 2},
+    "photo": {"label": "Кадр", "need": "фото или видео", "media": "any", "dur": 3},
+    "clip": {"label": "В кадре", "need": "дубль человека в кадре (видео со звуком)", "media": "video", "dur": 5},
+    "base": {"label": "Основа", "need": "фото + сумма, с которой начинается чек", "media": "any", "dur": 3},
+    "item": {"label": "Пункт", "need": "фото + за что и сколько", "media": "any", "dur": 3},
+    "total": {"label": "Итог", "need": "из шаблона: сумма считается сама", "media": "none", "dur": 3},
+    "tip": {"label": "Совет", "need": "фото или видео + совет одной фразой", "media": "any", "dur": 4},
+    "compare": {"label": "Сравнение", "need": "два фото: вариант А и вариант Б, у каждого подпись и сумма", "media": "pair", "dur": 5},
+    "question": {"label": "Вопрос", "need": "вопрос, как его задают люди", "media": "any", "dur": 3},
+    "answer": {"label": "Ответ", "need": "коротко ответ; фото или дубль", "media": "any", "dur": 5},
+    "fact": {"label": "Факт", "need": "одна цифра на весь экран и подпись", "media": "any", "dur": 4},
+    "cta": {"label": "Призыв", "need": "из рубрики: что сделать дальше", "media": "none", "dur": 2}
+  },
+  "templates": [
+    {"id": "check", "name": "Чек", "about": "сумма растёт по пунктам, итог крупно", "fits": "цены, что входит, сколько стоит",
+      "scenes": [{"kind": "hook"}, {"kind": "base"}, {"kind": "item", "repeat": [1, 6]}, {"kind": "total", "lock": true}, {"kind": "cta", "lock": true}]},
+    {"id": "morning", "name": "Утро", "about": "живые кадры подряд под музыку, подписи короткие", "fits": "жизнь, атмосфера, день из жизни",
+      "scenes": [{"kind": "hook"}, {"kind": "photo", "repeat": [3, 8]}, {"kind": "cta", "lock": true}]},
+    {"id": "tips", "name": "3 совета", "about": "номер и совет на каждом кадре", "fits": "гиды, как сделать, ошибки",
+      "scenes": [{"kind": "hook"}, {"kind": "tip", "repeat": [3, 5]}, {"kind": "cta", "lock": true}]},
+    {"id": "compare", "name": "Сравнение", "about": "два варианта рядом, кто дешевле или лучше", "fits": "выбор между двумя вариантами",
+      "scenes": [{"kind": "hook"}, {"kind": "compare", "repeat": [1, 3]}, {"kind": "total", "lock": true}, {"kind": "cta", "lock": true}]},
+    {"id": "qa", "name": "Вопрос — ответ", "about": "вопрос человека → коротко ответ", "fits": "частые вопросы",
+      "scenes": [{"kind": "question"}, {"kind": "answer", "repeat": [1, 3]}, {"kind": "cta", "lock": true}]},
+    {"id": "fact", "name": "Один факт", "about": "одна цифра на весь экран", "fits": "одна новость, рекорд, цифра",
+      "scenes": [{"kind": "hook"}, {"kind": "fact"}, {"kind": "photo", "repeat": [0, 2]}, {"kind": "cta", "lock": true}]},
+    {"id": "talk", "name": "Говорящая голова", "about": "человек в кадре, плашки с главным под лицом", "fits": "мнение, история, объяснение",
+      "scenes": [{"kind": "clip", "repeat": [1, 6]}, {"kind": "cta", "lock": true}]}
+  ]
+}
