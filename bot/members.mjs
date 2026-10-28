@@ -33,9 +33,13 @@ function save(a) {
  * ('author', bot/author.mjs).
  */
 export function member(telegramId) {
-  if (!FILE) return null;
-  const p = load().people.find((x) => x.telegram?.id === telegramId && !x.isOwner);
-  return p ? {name: p.name, role: isEditor(p) ? 'editor' : 'author', onCamera: !!p.onCamera, chatId: p.telegram.chatId} : null;
+  const p = FILE ? load().people.find((x) => x.telegram?.id === telegramId && !x.isOwner) : null;
+  if (p) return {name: p.name, role: isEditor(p) ? 'editor' : 'author', onCamera: !!p.onCamera, chatId: p.telegram.chatId};
+  // Partners listed in the environment are editors without an invite: on the shared
+  // stage the bot has one owner, and the other partner gets in through MINIAPP_OWNERS
+  // (the same ids the mini app treats as owners) or BOT_EDITORS.
+  const ids = `${process.env.BOT_EDITORS || ''},${process.env.MINIAPP_OWNERS || ''}`.split(',').map((x) => Number(x.trim())).filter(Boolean);
+  return ids.includes(telegramId) ? {name: 'Соавтор', role: 'editor', onCamera: true, chatId: telegramId} : null;
 }
 
 /** Notes when a member last wrote, for the web version's list of sessions (at most once a minute). */
