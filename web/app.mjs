@@ -105,19 +105,19 @@ const REWRITES = {
 
 // A video with byte ranges, so the phone can seek.
 const TYPE = {'.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'};
-function streamFile(req, res, f) {
+function streamFile(req, res, f, extra = {}) {
   const type = TYPE[extname(f).toLowerCase()] || 'application/octet-stream';
   const size = statSync(f).size, range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
   if (range) {
     const a = range[1] ? Number(range[1]) : 0, z = range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
-    res.writeHead(206, {'content-type': type, 'content-range': `bytes ${a}-${z}/${size}`, 'accept-ranges': 'bytes', 'content-length': z - a + 1, 'cache-control': 'no-store'});
+    res.writeHead(206, {'content-type': type, 'content-range': `bytes ${a}-${z}/${size}`, 'accept-ranges': 'bytes', 'content-length': z - a + 1, 'cache-control': 'no-store', ...extra});
     return createReadStream(f, {start: a, end: z}).pipe(res);
   }
-  res.writeHead(200, {'content-type': type, 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store'});
+  res.writeHead(200, {'content-type': type, 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store', ...extra});
   return createReadStream(f).pipe(res);
 }
 
-export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build, busy}) {
+export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build, busy, chat}) {
   const token = () => process.env.TELEGRAM_BOT_TOKEN;
   const sign = (rel) => createHmac('sha256', `${token()}:video`).update(rel).digest('base64url').slice(0, 22);
   const botState = () => readJson(join(BOT, 'data', 'state.json'), {});
@@ -181,7 +181,8 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
       const rel = url.searchParams.get('f') || '';
       const f = join(PROJECTS, rel);
       if (url.searchParams.get('k') !== sign(rel) || relative(PROJECTS, f).startsWith('..') || !/^[\w-]+\/reels\/[\w-]+\/(versions\/v\d+|project\/public|sources)\/[^/]+\.(mp4|mov|webm|jpe?g|png|webp)$/i.test(rel) || !existsSync(f)) { res.writeHead(404); return res.end(); }
-      return streamFile(req, res, f);
+      // ?dl=1: «Скачать» saves the file instead of playing it.
+      return streamFile(req, res, f, url.searchParams.get('dl') ? {'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`} : {});
     }
     if (req.method === 'GET' && url.pathname === '/app') {
       res.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store'});
@@ -388,7 +389,15 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
         const vids = cur ? readdirSync(join(dir, 'versions', cur)).filter((f) => /\.mp4$/i.test(f)).map((f) => ({f, size: statSync(join(dir, 'versions', cur, f)).size})).sort((a, z) => a.size - z.size) : [];
         const rel = vids[0] && relative(PROJECTS, join(dir, 'versions', cur, vids[0].f));
         return json(200, {reel: reels(p).find((x) => x.id === rid), version: cur, nextV, video: rel ? `/app/v?f=${encodeURIComponent(rel)}&k=${sign(rel)}` : null,
-          scenes: Array.isArray(scenes) ? scenes : [], edits: readEdits(dir), busy: !!busy(), working: busy()?.key === rid, layout: layout()});
+          scenes: Array.isArray(scenes) ? scenes : [], edits: readEdits(dir), busy: !!busy(), working: busy()?.key === rid, layout: layout(),
+          // Every version for «v1 ↔ v2» and the downloads: the review copy and, once accepted, the 1080p master.
+          versions: vdirs.map((v) => {
+            const vd = join(dir, 'versions', v);
+            const mp4 = readdirSync(vd).filter((f) => /\.mp4$/i.test(f)).map((f) => ({f, size: statSync(join(vd, f)).size})).sort((a, z) => a.size - z.size);
+            const url = (f) => f && signed(relative(PROJECTS, join(vd, f)));
+            const master = mp4.find((x) => /1080p|master/i.test(x.f));
+            return {v, video: url(mp4[0]?.f), download: mp4.length ? url(mp4.at(-1).f) + '&dl=1' : null, master: master ? url(master.f) + '&dl=1' : null, size: mp4.at(-1)?.size || 0};
+          })});
       }
       if (req.method === 'POST' && url.pathname === '/api/app/reel/edits') {
         if (b.action === 'send') return json(400, {});
@@ -404,6 +413,35 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
         const f = join(dir, 'sources', `voice-${Date.now()}.${/mp4|aac/.test(req.headers['content-type'] || '') ? 'm4a' : 'webm'}`);
         writeFileSync(f, Buffer.concat(chunks));
         return json(200, {text: (await transcribe(f, 'ru').catch(() => null)) || ''});
+      }
+      // ---------- Т3: the reel's chat in the mini app (SR4) — the same chat as on the web page ----------
+      if (req.method === 'GET' && url.pathname === '/api/app/reel/chat') {
+        const fileUrl = (u) => {
+          const abs = /^\/media\?p=(.+)$/.exec(u || '')?.[1];
+          const rel = abs && relative(PROJECTS, decodeURIComponent(abs));
+          return rel && !rel.startsWith('..') && /^[\w-]+\/reels\/[\w-]+\/(versions\/v\d+|project\/public|sources)\/[^/]+\.(mp4|mov|webm|jpe?g|png|webp)$/i.test(rel) ? signed(rel) : null;
+        };
+        const working = busy()?.key === rid;
+        const msgs = chat.history(p, rid).slice(-60).map((m) => ({from: m.from, kind: m.kind, text: m.text || m.caption || '', by: m.by, at: m.at,
+          ...(m.kind === 'file' ? {url: fileUrl(m.url), name: m.name, ext: m.ext} : {})}));
+        return json(200, {messages: msgs, working, status: working ? chat.meta(p, rid).status || '' : '', busy: !!busy()});
+      }
+      // «Правка словами»: a message to the reel's chat; Claude answers there and on the web page.
+      if (req.method === 'POST' && url.pathname === '/api/app/reel/say') {
+        const text = String(b.text || '').trim().slice(0, 2000);
+        if (!text) return json(400, {});
+        if (busy()) return json(429, {error: busy().key === rid ? 'Claude ещё работает над этим выпуском — дождитесь ответа.' : 'Claude сейчас занят другим выпуском. Попробуйте через пару минут.'});
+        if (!build(p, rid, text, text, me.name)) return json(429, {error: 'Claude сейчас занят.'});
+        return json(200, {started: true});
+      }
+      // «Отправить на согласование»: the current version goes to the owner in the bot chat.
+      if (req.method === 'POST' && url.pathname === '/api/app/reel/approve') {
+        if (!cur) return json(400, {error: 'Версии ещё нет'});
+        const vd = join(dir, 'versions', cur);
+        const f = readdirSync(vd).filter((x) => /\.mp4$/i.test(x)).map((x) => join(vd, x)).sort((a, z) => statSync(a).size - statSync(z).size)[0];
+        notify(`🟡 ${me.name} просит согласовать ${cur} «${reels(p).find((x) => x.id === rid)?.title || rid}»${b.note ? `\n${String(b.note).slice(0, 300)}` : ''}`, f && statSync(f).size < 48 * 1024 * 1024 ? f : null);
+        log?.(me.name, `отправил ${cur} «${rid}» на согласование`);
+        return json(200, {sent: true});
       }
       // Material in bulk: each file goes to the reel's sources/ as it is.
       if (req.method === 'POST' && url.pathname === '/api/app/reel/upload') {

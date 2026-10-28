@@ -188,6 +188,22 @@ h1.t2{font-size:22px;line-height:28px}
 .act.alt span{background:var(--sec2);color:var(--acc)}
 
 
+
+/* Т3: the reel's chat (SR4) */
+.vcard{background:var(--card);box-shadow:var(--shadow);border-radius:20px;padding:12px;margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.vcard .vbox{margin:0 auto;width:min(100%,calc(42vh * 9 / 16))}
+.vact{display:flex;gap:6px;flex-wrap:wrap}.vact button,.vact a{height:40px;border-radius:12px;border:0;background:var(--sec2);color:var(--ink);font-size:14px;font-weight:600;padding:0 12px;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.vact .pri{background:var(--ink);color:var(--card)}
+.msgs{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.bub{max-width:86%;border-radius:18px;padding:10px 14px;font-size:16px;line-height:22px;white-space:pre-wrap;word-wrap:break-word}
+.bub.me{align-self:flex-end;background:var(--ink);color:var(--card);border-bottom-right-radius:6px}
+.bub.bot{align-self:flex-start;background:var(--card);box-shadow:var(--shadow);border-bottom-left-radius:6px}
+.bub video,.bub img{width:180px;border-radius:12px;display:block;margin-bottom:6px}
+.bub .by{font-size:12px;opacity:.6;margin-top:4px}
+.cbar{position:fixed;left:0;right:0;bottom:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--page);box-shadow:0 -1px 0 var(--line);display:flex;gap:8px;align-items:flex-end;z-index:7;max-width:560px;margin:0 auto}
+.cbar textarea{min-height:48px;max-height:120px;font-size:16px;line-height:22px;padding:12px}
+.cbar .micb{height:48px;width:48px}
+.cbar .snd{height:48px;width:48px;flex:none;border:0;border-radius:14px;background:var(--ink);color:var(--card);display:grid;place-items:center}
 /* Т2: a new reel by the rubric's template (SR2, SR3) */
 .rub{display:flex;flex-direction:column;gap:8px;text-align:left;background:var(--card);box-shadow:var(--shadow);border-radius:18px;padding:16px;border:2px solid transparent;width:100%;color:var(--ink);margin-top:10px}
 .rub.on{border-color:var(--ink)}
@@ -290,7 +306,7 @@ function draw() {
   window.scrollTo(0, 0);
   const top = stack.at(-1);
   if (!top) return ({tasks: drawTasks, studio: S.me.studio ? drawStudio : drawTasks, reels: drawReels, profile: drawProfile})[tab]();
-  return ({task: drawTask, edit: drawEdit, parts: drawParts, review: drawReview, done: drawDone, ed: drawEd, mark: drawMark, comments: drawComments, new1: drawNew1, new2: drawNew2, lay: drawLay})[top.screen](top.arg);
+  return ({task: drawTask, edit: drawEdit, parts: drawParts, review: drawReview, done: drawDone, ed: drawEd, mark: drawMark, comments: drawComments, new1: drawNew1, new2: drawNew2, lay: drawLay, chat: drawChat})[top.screen](top.arg);
 }
 
 // ---------- Задания ----------
@@ -774,7 +790,7 @@ function drawDone() {
 function drawReels() {
   const ST = {published: ['вышел', 'o'], done: ['готов', 'o'], review: ['у редактора', 'm'], work: ['готовится', 'm'], none: ['готовится', 'm']};
   const sent = S.tasks.filter((t) => t.status === 'sent');
-  const row = (title, sub, [st, c], icon, v, reel) => `<div class="li"><span class="ti" style="${tint(v)}">${ic(icon, 22)}</span><span class="tx"><b>${esc(title)}</b><span>${esc(sub)}</span>${reel ? `<button class="lk" style="height:34px;width:auto;justify-content:flex-start;padding:0;margin-top:2px;font-size:15px" data-reel="${esc(reel)}">${ic('pen', 16)}Открыть редактор</button>` : ''}</span><span class="st ${c}">${st}</span></div>`;
+  const row = (title, sub, [st, c], icon, v, reel) => `<div class="li"><span class="ti" style="${tint(v)}">${ic(icon, 22)}</span><span class="tx"><b>${esc(title)}</b><span>${esc(sub)}</span>${reel ? `<button class="lk" style="height:34px;width:auto;justify-content:flex-start;padding:0;margin-top:2px;font-size:15px" data-ed="${esc(reel)}">${ic('pen', 16)}Открыть редактор</button>` : ''}</span><span class="st ${c}">${st}</span></div>`;
   root.innerHTML = `<div class="scr">
     <h1 style="margin-top:10px">Мои ролики</h1><p class="sub">Записи, которые вы отправили, и ролики проекта</p>
     ${sent.length ? `<div class="lh">Отправлены редактору</div><div class="grp">${sent.map((t) => row(t.title, new Date(t.sentAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}), ['отправлено', 'm'], 'upload', '--b')).join('')}</div>` : ''}
@@ -796,9 +812,9 @@ async function loadEd(id) { E = {id, stage: E?.id === id ? E.stage : 'video', ..
 async function saveComment(b) { const r = await api('/api/app/reel/edits', {method: 'POST', json: {reel: E.id, action: 'add', ...b}}); E.edits = r.edits; haptic('ok'); }
 
 function drawStudio() {
-  root.innerHTML = `<div class="scr"><h1 style="margin-top:10px">Студия</h1><p class="sub">Смотрите версию и останавливайте в любой момент — Claude соберёт следующую по вашим комментариям</p>
+  root.innerHTML = `<div class="scr"><h1 style="margin-top:10px">Студия</h1><p class="sub">Все выпуски — как чаты: версия, правки словами, редактор, скачать</p>
     <div class="lh">Выпуски</div>
-    ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 20).map((r) => `<button class="li" data-reel="${esc(r.id)}"><span class="ti" style="${tint('--v')}">${ic('film', 22)}</span><span class="tx"><b>${esc(r.title)}</b><span>${r.version ? `версия ${r.version.slice(1)}` : 'ещё нет версии'}</span></span>${ic('chev', 20)}</button>`).join('')}</div>` : '<p class="sub">Пока нет выпусков.</p>'}
+    ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 20).map((r) => `<button class="li" data-reel="${esc(r.id)}"><span class="ti" style="${tint('--v')}">${ic('film', 22)}</span><span class="tx"><b>${esc(r.title)}</b><span>${r.version ? `${r.version} готова` : 'ещё нет версии'}</span></span>${ic('chev', 20)}</button>`).join('')}</div>` : '<p class="sub">Пока нет выпусков.</p>'}
   </div><div class="foot tabbed"><button class="bb" id="newReel">${ic('spark', 22)}Новый ролик</button></div>${tabs()}`;
   $('#newReel').onclick = () => go('new1', {});
 }
@@ -1107,12 +1123,54 @@ async function drawLay({id}) {
     drawLay({id});
   }));
   const render = async (skipMissing) => {
-    try { await api('/api/app/reel/render', {method: 'POST', json: {reel: id, skipMissing}}); haptic('ok'); stack.pop(); go('ed', {id}); }
+    try { await api('/api/app/reel/render', {method: 'POST', json: {reel: id, skipMissing}}); haptic('ok'); stack.pop(); go('chat', {id}); }
     catch (e) { alert(e.message); }
   };
   $('#bld')?.addEventListener('click', () => render(false));
   $('#bldSkip')?.addEventListener('click', () => render(true));
   $('#relay')?.addEventListener('click', async () => { try { await api('/api/app/reel/layout', {method: 'POST', json: {reel: id}}); drawLay({id}); } catch (e) { alert(e.message); } });
+}
+
+// ---------- Студия: чат выпуска (Т3: SR4) — тот же чат, что на сайте ----------
+let chatTimer = null, chatV = null;
+async function drawChat({id}) {
+  clearTimeout(chatTimer);
+  let c;
+  try { [, c] = await Promise.all([loadEd(id), api('/api/app/reel/chat?id=' + encodeURIComponent(id))]); }
+  catch (e) { root.innerHTML = `<div class="err"><h1 class="t2">Не открылось</h1><p class="sub">${esc(e.message)}</p></div>`; return; }
+  if (stack.at(-1)?.screen !== 'chat') return;
+  const vs = E.versions || [];
+  const curV = vs.find((x) => x.v === chatV) || vs.at(-1);
+  const prev = vs.length > 1 ? vs[vs.indexOf(curV) === vs.length - 1 ? vs.length - 2 : vs.length - 1] : null;
+  const draft = $('#say')?.value || '';
+  const msg = (m) => `<div class="bub ${m.from === 'me' ? 'me' : 'bot'}">${m.kind === 'file' && m.url ? (/\.(mp4|mov|webm)$/i.test(m.ext || '') ? `<video src="${esc(m.url)}" controls playsinline preload="none"></video>` : `<img src="${esc(m.url)}" alt="">`) : ''}${esc(m.text || (m.kind === 'file' ? m.name || 'файл' : ''))}${m.from === 'me' && m.by ? `<div class="by">${esc(m.by)}</div>` : ''}</div>`;
+  root.innerHTML = `<div class="scr" style="padding-bottom:110px"><span class="d">рилс${E.layout ? ` · «${esc(E.layout.name)}»` : ''}${curV ? ` · ${esc(curV.v)}` : ''}</span><h1 class="t2" style="margin-top:2px">${esc(E.reel?.title || id)}</h1>
+    ${curV ? `<div class="vcard"><div class="vbox"><video src="${esc(curV.video)}" controls playsinline preload="metadata"></video></div>
+      <div class="vact"><button class="pri" id="toEd">${ic('pen', 16)}Открыть редактор</button>${curV.download ? `<button data-dl="${esc(curV.download)}" data-name="${esc(E.reel?.title || id)}-${esc(curV.v)}.mp4">${ic('upload', 16)}Скачать</button>` : ''}${curV.master ? `<button data-dl="${esc(curV.master)}" data-name="${esc(E.reel?.title || id)}-${esc(curV.v)}-1080p.mp4">Мастер 1080p</button>` : ''}${prev ? `<button id="swap">${esc(curV.v)} ↔ ${esc(prev.v)}</button>` : ''}${S.me.role !== 'owner' ? '<button id="appr">Отправить на согласование</button>' : ''}</div></div>`
+      : `<div class="vcard"><p class="sub" style="margin:4px">${E.working ? 'Claude работает над выпуском…' : 'Версии ещё нет.'}</p>${E.layout ? `<div class="vact"><button class="pri" id="toLay">${ic('list', 16)}Сцены шаблона</button></div>` : ''}</div>`}
+    <div class="msgs">${c.messages.map(msg).join('') || '<p class="cap">Здесь будет переписка с Claude об этом выпуске — та же, что на сайте.</p>'}</div>
+    ${c.working ? `<p class="cap" style="margin-top:10px">◌ ${esc(c.status || 'Claude работает…')}</p>` : ''}
+  </div>
+  <div class="cbar"><textarea id="say" placeholder="Правка словами…" aria-label="Правка словами">${esc(draft)}</textarea><button class="micb" id="smic" aria-label="Сказать голосом">${ic('mic', 22)}</button><button class="snd" id="snd" aria-label="Отправить">${ic('check', 22)}</button></div>`;
+  window.scrollTo(0, document.body.scrollHeight);
+  $('#toEd')?.addEventListener('click', () => go('ed', {id}));
+  $('#toLay')?.addEventListener('click', () => go('lay', {id}));
+  $('#swap')?.addEventListener('click', () => { chatV = prev.v; drawChat({id}); });
+  root.querySelectorAll('[data-dl]').forEach((b) => (b.onclick = () => {
+    const u = location.origin + b.dataset.dl;
+    try { if (tg?.downloadFile) return tg.downloadFile({url: u, file_name: b.dataset.name}); } catch {}
+    try { tg.openLink(u); } catch { location.href = u; }
+  }));
+  $('#appr')?.addEventListener('click', async () => { try { await api('/api/app/reel/approve', {method: 'POST', json: {reel: id}}); haptic('ok'); alert('Отправлено на согласование'); } catch (e) { alert(e.message); } });
+  micButton($('#smic'), $('#say'));
+  $('#snd').onclick = async () => {
+    const text = $('#say').value.trim();
+    if (!text) return $('#say').focus();
+    $('#snd').disabled = true;
+    try { await api('/api/app/reel/say', {method: 'POST', json: {reel: id, text}}); $('#say').value = ''; haptic('ok'); drawChat({id}); }
+    catch (e) { $('#snd').disabled = false; alert(e.message); }
+  };
+  if (c.working) chatTimer = setTimeout(() => { if (stack.at(-1)?.screen === 'chat') drawChat({id}); }, 4000);
 }
 
 // ---------- Профиль ----------
@@ -1160,8 +1218,11 @@ root.addEventListener('click', (e) => {
   if (tb) { tab = tb.dataset.tab; stack = []; haptic(); return draw(); }
   const tk = e.target.closest('[data-task]');
   if (tk && !stack.length) return go('task', tk.dataset.task);
+  // A reel in «Студия» opens as its chat (SR1 → SR4); «Открыть редактор» goes straight to the editor.
   const rl = e.target.closest('[data-reel]');
-  if (rl && !stack.length) { E = null; tab = 'studio'; return go('ed', {id: rl.dataset.reel}); }
+  if (rl && !stack.length) { E = null; return go('chat', {id: rl.dataset.reel}); }
+  const ed = e.target.closest('[data-ed]');
+  if (ed && !stack.length) { E = null; tab = 'studio'; return go('ed', {id: ed.dataset.ed}); }
 });
 
 (async () => {
