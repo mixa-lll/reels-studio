@@ -17,6 +17,8 @@ import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, exist
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
+import {access as planAccess, MODES, PLANS} from '../bot/plans.mjs';
+import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BOT = process.env.REELS_BOT_ROOT || join(HERE, '..');
@@ -60,13 +62,19 @@ const writeJson = (f, v) => { writeFileSync(`${f}.tmp`, JSON.stringify(v, null, 
 const safe = (s) => typeof s === 'string' && /^[\w-]{1,80}$/.test(s);
 const id = () => randomBytes(18).toString('base64url');
 
+// People of a project: real people work in every real project; a test account's people
+// (test: true, project: <slug>) only in it. The owner sees every project.
+const isTestProject = (p) => !!readJson(join(PROJECTS, p, 'settings.json'), {}).test;
+const peopleOf = (a, p) => a.people.filter((x) => x.isOwner || (isTestProject(p) ? x.project === p : !x.project));
+const projectSettings = (p) => readJson(join(PROJECTS, p, 'settings.json'), {});
+
 // ---------- projects, reels, ideas ----------
 
 const projectDir = (p) => (safe(p) && existsSync(join(PROJECTS, p)) ? join(PROJECTS, p) : null);
 function projects() {
   if (!existsSync(PROJECTS)) return [];
   return readdirSync(PROJECTS).filter((p) => safe(p) && statSync(join(PROJECTS, p)).isDirectory())
-    .map((p) => ({slug: p, name: readJson(join(PROJECTS, p, 'settings.json'), {}).name || (p === 'main' ? 'My Gudauri' : p)}));
+    .map((p) => { const st = readJson(join(PROJECTS, p, 'settings.json'), {}); return {slug: p, name: st.name || (p === 'main' ? 'My Gudauri' : p), test: !!st.test}; });
 }
 // ideas.md: «## Section» then «### Title» entries with Format:/Hook: lines.
 function parseIdeas(p) {
@@ -438,7 +446,7 @@ const buildFromApp = (p, r, text, shown, who) => {
   job = startTurn(p, r, `(from ${who}, mini app)\n${text}`, () => {});
   return true;
 };
-const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, saveAccess, logFile: () => LOG, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: () => job && {p: job.p, key: job.key}});
+const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, saveAccess, logFile: () => LOG, sandboxPaths: {projects: PROJECTS, access: ACCESS, starter: join(BOT, 'starter'), chats: CHATS, outbox: OUTBOX, log: LOG, botState: join(BOT, 'data', 'state.json')}, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: () => job && {p: job.p, key: job.key}});
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -486,6 +494,8 @@ createServer(async (req, res) => {
   if (!isEditor(me) && !(url.pathname === '/' || url.pathname === '/api/me' || url.pathname.startsWith('/api/member') || url.pathname === '/media')) return json(403, {error: 'только для редакторов'});
   const dsPath = /^\/ds\/([\w-]+)\/(.+)$/.exec(url.pathname);
   const p = dsPath?.[1] || url.searchParams.get('project') || 'main';
+  // A test account's person never reaches a real project, and real people never reach a test one.
+  if (url.pathname.startsWith('/api/') && url.pathname !== '/api/me' && !me.isOwner && projectDir(p) && (me.project ? p !== me.project : isTestProject(p))) return json(403, {error: 'нет доступа к этому проекту'});
 
   if (req.method === 'GET' && url.pathname === '/') {
     res.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store'});
@@ -493,8 +503,43 @@ createServer(async (req, res) => {
   }
   if (req.method === 'GET' && url.pathname === '/api/me') {
     const a = access();
-    return json(200, {me: {name: me.name, role: isEditor(me) ? 'editor' : 'member', isOwner: !!me.isOwner, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera},
-      team: a.people.length, projects: projects()});
+    // A test account's person sees only that project; real people do not see test accounts.
+    const mine = projects().filter((x) => me.isOwner || (me.project ? x.slug === me.project : !x.test));
+    const pp = mine.some((x) => x.slug === p) ? p : mine[0]?.slug || 'main';
+    return json(200, {me: {name: me.name, role: isEditor(me) ? 'editor' : 'member', isOwner: !!me.isOwner, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera, test: !!me.test},
+      team: peopleOf(a, pp).length, projects: mine, project: pp, plan: planAccess(projectSettings(pp)), test: isTestProject(pp)});
+  }
+  // ---------- test accounts (bot/sandbox.mjs): a whole pretend client to try a scenario ----------
+  if (url.pathname === '/api/sandbox') {
+    if (!can('owner')) return json(403, {});
+    const paths = {projects: PROJECTS, access: ACCESS, starter: join(BOT, 'starter'), chats: CHATS, outbox: OUTBOX, log: LOG, botState: join(BOT, 'data', 'state.json')};
+    if (req.method === 'POST') {
+      const b = await body(req);
+      if (b.action === 'create') {
+        if (!MODES[b.mode] || !PLANS[b.plan]) return json(400, {});
+        const slug = createSandbox(paths, {mode: b.mode, plan: b.plan});
+        log(me.name, `создал тестовый аккаунт «${projectSettings(slug).name}»`);
+        return json(200, {slug, list: listSandboxes(paths)});
+      }
+      if (b.action === 'link') {
+        // A sign-in link for one of the account's people: open it in a private window to see the studio as them.
+        const a = access();
+        const x = a.people.find((y) => y.id === b.person && y.test && y.project === b.slug);
+        if (!x) return json(404, {});
+        const inv = {code: id(), name: x.name, role: x.role, expires: Date.now() + 24 * 3600_000, web: true, telegram: false, claimed: [], person: x.id};
+        a.invites.push(inv);
+        saveAccess(a);
+        return json(200, {link: `/invite/${inv.code}`});
+      }
+      if (b.action === 'delete') {
+        const r = removeSandbox(paths, String(b.slug || ''));
+        if (!r) return json(404, {});
+        log(me.name, `удалил тестовый аккаунт «${r.name}» со всеми данными`);
+        return json(200, {removed: r, list: listSandboxes(paths)});
+      }
+      return json(400, {});
+    }
+    return json(200, {list: listSandboxes(paths), modes: MODES, plans: Object.fromEntries(Object.entries(PLANS).map(([k, v]) => [k, {name: v.name, features: v.features, limits: v.limits}]))});
   }
   // ---------- a member's own part (D4 «Веб глазами участника») ----------
   if (url.pathname.startsWith('/api/member')) {
@@ -896,7 +941,7 @@ createServer(async (req, res) => {
     const a = access();
     const tg = telegramSessions(a);
     return json(200, {
-      people: a.people.map((x) => ({...x, editorNow: isEditor(x),
+      people: peopleOf(a, p).map((x) => ({...x, editorNow: isEditor(x),
         devices: a.sessions.filter((s) => s.person === x.id).map((s) => ({id: s.id, device: s.device, created: s.created, seen: s.seen, mine: s.id === me.sid})),
         bot: x.isOwner ? tg.find((t) => t.owner) || null : x.telegram ? {username: x.telegram.username, seen: x.telegram.seen || x.added} : null})),
       invites: a.invites.filter((x) => x.expires > Date.now()).map((x) => ({...x, link: inviteLinks(x)})),

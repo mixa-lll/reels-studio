@@ -258,14 +258,18 @@ const isEd = () => !!S?.me.editor;
 // One bottom menu per role (ROADMAP «Вид мини-приложения»): a member — Задания · Моё · Профиль;
 // an editor or a deputy — Сегодня · Неделя · Люди · Профиль. «Студия» lives in «Сегодня» for
 // editors and in «Моё» for members marked «Сам собирает».
-const TABS = () => isEd() ? [['today', 'spark', 'Сегодня'], ['week', 'cal', 'Неделя'], ['people', 'users', 'Люди'], ['profile', 'user', 'Профиль']] : [['tasks', 'list', 'Задания'], ['mine', 'film', 'Моё'], ['profile', 'user', 'Профиль']];
+const TABS = () => isEd() ? [['today', 'spark', 'Сегодня'], ['week', 'cal', 'Неделя'], ...(feat('members') ? [['people', 'users', 'Люди']] : []), ['profile', 'user', 'Профиль']] : [['tasks', 'list', 'Задания'], ['mine', 'film', 'Моё'], ['profile', 'user', 'Профиль']];
 const fixTab = () => { const old = {reels: 'mine', studio: isEd() ? 'today' : 'mine'}; tab = old[tab] || tab; if (!TABS().some(([k]) => k === tab)) tab = TABS()[0][0]; };
 // Test profiles: the owner opens the app «as» a test person; the choice lives in this browser.
 const asId = () => { try { return localStorage.getItem('reels-as') || ''; } catch { return ''; } };
+// A test account the owner opened (header x-project); empty — the real project.
+const projId = () => { try { return localStorage.getItem('reels-project') || ''; } catch { return ''; } };
+const setProj = (v) => { try { v ? localStorage.setItem('reels-project', v) : localStorage.removeItem('reels-project'); } catch {} };
+const feat = (f) => S?.account?.features?.[f] !== false;
 const setAs = (v) => { try { v ? localStorage.setItem('reels-as', v) : localStorage.removeItem('reels-as'); } catch {} };
 async function reload() { S = await api('/api/app/state'); stack = []; tab = ''; draw(); }
 async function api(path, opts = {}) {
-  const r = await fetch(path, {...opts, headers: {'x-tg-init': tg?.initData || '', 'x-as': asId(), ...(opts.json ? {'content-type': 'application/json'} : {}), ...(opts.headers || {})}, body: opts.json ? JSON.stringify(opts.json) : opts.body});
+  const r = await fetch(path, {...opts, headers: {'x-tg-init': tg?.initData || '', 'x-as': asId(), 'x-project': projId(), ...(opts.json ? {'content-type': 'application/json'} : {}), ...(opts.headers || {})}, body: opts.json ? JSON.stringify(opts.json) : opts.body});
   const b = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(b.error || 'Что-то пошло не так. Попробуйте ещё раз.');
   return b;
@@ -290,6 +294,13 @@ const left = () => S.tasks.filter((t) => t.status !== 'sent');
 
 function draw() {
   drawInner();
+  if (S?.account?.test && !S?.me.test) {
+    const b = document.createElement('div');
+    b.className = 'asbar';
+    b.innerHTML = `<span>Тестовый аккаунт: <b>${esc(S.account.name.replace(/^Тест · /, ''))}</b></span><button id="apx">Выйти</button>`;
+    root.prepend(b);
+    b.querySelector('#apx').onclick = () => { setProj(''); setAs(''); haptic(); reload(); };
+  }
   if (S?.me.test) {
     const b = document.createElement('div');
     b.className = 'asbar';
@@ -655,7 +666,7 @@ async function upload(t) {
       await new Promise((ok, fail) => {
         const q = new XMLHttpRequest();
         q.open('POST', `/api/app/clip?id=${encodeURIComponent(t.id)}&n=${n}${x.keep ? '&keep=' + x.keep.toFixed(2) : ''}`);
-        q.setRequestHeader('x-tg-init', tg?.initData || ''); q.setRequestHeader('x-as', asId());
+        q.setRequestHeader('x-tg-init', tg?.initData || ''); q.setRequestHeader('x-as', asId()); q.setRequestHeader('x-project', projId());
         q.setRequestHeader('content-type', x.blob.type || 'video/mp4');
         q.upload.onprogress = (e) => { if (e.lengthComputable) { const p = Math.round(100 * (sent + e.loaded) / total); $('#upb').style.width = p + '%'; $('#up').textContent = `Загружено ${p} % · не закрывайте страницу`; } };
         q.onload = () => (q.status === 200 ? ok() : fail(new Error('upload')));
@@ -832,7 +843,7 @@ function dropSheet() {
       await new Promise((ok) => {
         const x = new XMLHttpRequest();
         x.open('POST', `/api/app/drop?name=${encodeURIComponent(file.name)}`);
-        x.setRequestHeader('x-tg-init', tg?.initData || ''); x.setRequestHeader('x-as', asId());
+        x.setRequestHeader('x-tg-init', tg?.initData || ''); x.setRequestHeader('x-as', asId()); x.setRequestHeader('x-project', projId());
         x.upload.onprogress = (q) => q.lengthComputable && (box.querySelector('i').style.width = `${Math.round((100 * q.loaded) / q.total)}%`);
         x.onloadend = () => { box.querySelector('span').textContent = x.status < 300 ? '✓' : '!'; box.querySelector('i')?.remove(); ok(); };
         x.send(file);
@@ -1139,7 +1150,7 @@ function upFile(id, file, onp) {
   return new Promise((ok, fail) => {
     const x = new XMLHttpRequest();
     x.open('POST', `/api/app/reel/upload?id=${encodeURIComponent(id)}&name=${encodeURIComponent(file.name)}`);
-    x.setRequestHeader('x-tg-init', tg?.initData || ''); x.setRequestHeader('x-as', asId());
+    x.setRequestHeader('x-tg-init', tg?.initData || ''); x.setRequestHeader('x-as', asId()); x.setRequestHeader('x-project', projId());
     x.upload.onprogress = (e) => e.lengthComputable && onp(e.loaded / e.total);
     x.onload = () => (x.status < 300 ? ok(JSON.parse(x.responseText)) : fail(new Error(JSON.parse(x.responseText || '{}').error || 'Не загрузилось')));
     x.onerror = () => fail(new Error('Нет связи'));
@@ -1265,11 +1276,25 @@ function drawProfile() {
       <div class="kv"><span class="ti" style="${tint('--v')}">${ic('gauge', 22)}</span><span class="tx"><b>Скорость текста</b><span>${p.speed}× · можно менять во время съёмки</span></span><button class="eb2" data-k="speed" aria-label="Изменить скорость">${ic('pen', 18)}</button></div>
     </div>
     ${S.demo ? '<p class="cap" style="margin-top:14px">Это пробная версия: задания демонстрационные, записи приходят редактору в Телеграм.</p>' : ''}
+    ${S.sandboxes ? `<div class="lh">Тестовые аккаунты</div><div class="note">
+      <span class="cap">Как будто пришёл новый клиент: свой проект с режимом и тарифом, демо-данные и люди. Удаление стирает всё, что в нём появилось.</span>
+      ${S.sandboxes.map((x) => `<div class="tp-row"><span class="tx"><b>${esc(x.name.replace(/^Тест · /, ''))}</b><span>${x.slug === S.account.slug ? 'открыт сейчас' : (x.people.length ? 'людей: ' + x.people.length : 'только вы')}</span></span>${x.slug === S.account.slug ? '' : `<button class="tp-go" data-proj="${x.slug}">Открыть</button>`}<button class="tp-del" data-pdel="${x.slug}">Удалить</button></div>${x.slug === S.account.slug && x.people.length ? x.people.map((y) => `<div class="tp-row" style="padding-left:14px"><span class="tx"><span>${esc(y.name.replace(/ · [a-z0-9]+$/, ''))}</span></span><button class="tp-go" data-as="${y.id}">Войти как</button></div>`).join('') : ''}`).join('') || '<span class="cap">Пока ни одного.</span>'}
+      <button class="sb2" id="sbnew" style="margin-top:8px">${ic('plus', 20)}Создать тестовый аккаунт</button></div>` : ''}
     ${S.tests ? `<div class="lh">Тестовые профили</div><div class="note">
       <span class="cap">Посмотреть приложение глазами другой роли. Всё, что сделаете под тестовым профилем, удалится вместе с ним.</span>
       ${S.tests.map((x) => `<div class="tp-row"><span class="tx"><b>${esc(x.name.replace(/^Тест · /, ''))}</b><span>${x.id === asId() ? 'вы сейчас здесь' : 'создан ' + new Date(x.added).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}</span></span>${x.id === asId() ? '' : `<button class="tp-go" data-as="${x.id}">Войти</button>`}<button class="tp-del" data-del="${x.id}">Удалить</button></div>`).join('') || '<span class="cap">Пока ни одного.</span>'}
       <button class="sb2" id="tpnew" style="margin-top:8px">${ic('plus', 20)}Создать тестовый профиль</button></div>` : ''}
   </div>${tabs()}`;
+  if (S.sandboxes) {
+    $('#sbnew').onclick = newSandbox;
+    root.querySelectorAll('[data-proj]').forEach((b) => b.onclick = () => { setProj(b.dataset.proj); setAs(''); haptic('ok'); reload(); });
+    root.querySelectorAll('[data-pdel]').forEach((b) => b.onclick = async () => {
+      if (!confirm('Удалить тестовый аккаунт со всем, что в нём есть: задания, записи, файлы, ролики, посты, люди?')) return;
+      const r = await api('/api/app/sandbox', {method: 'POST', json: {action: 'delete', slug: b.dataset.pdel}});
+      if (projId() === b.dataset.pdel) { setProj(''); setAs(''); }
+      haptic('ok'); alert(`Удалено: «${r.removed.name.replace(/^Тест · /, '')}», людей ${r.removed.people}.`); reload();
+    });
+  }
   if (S.tests) {
     $('#tpnew').onclick = newTest;
     root.querySelectorAll('[data-as]').forEach((b) => b.onclick = () => { setAs(b.dataset.as); haptic('ok'); reload(); });
@@ -1288,6 +1313,27 @@ function drawProfile() {
     const r = await api('/api/app/profile', {method: 'POST', json: {consent: p.consent === false}}); Object.assign(S.profile, r.profile); haptic('ok'); draw();
   };
   root.querySelectorAll('[data-k]').forEach((b) => b.onclick = () => editField(b.dataset.k));
+}
+function newSandbox() {
+  const M = [['solo', 'Один', 'эксперт, блогер — без команды'], ['team', 'Команда', 'участники, задания, входящие'], ['agency', 'Агентство', 'несколько клиентов']];
+  const P = [['posts', 'Посты'], ['video', 'Посты + видео'], ['team', 'Команда'], ['agency', 'Агентство']];
+  let mode = 'team', plan = 'team';
+  const el = document.createElement('div');
+  el.className = 'sheet';
+  const paint = () => {
+    el.innerHTML = `<div><span class="grab"></span><div style="font-size:22px;font-weight:700">Новый тестовый аккаунт</div>
+      <span class="lab">Режим</span><div class="opt">${M.map(([k, n]) => `<button data-m="${k}" class="${k === mode ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <span class="cap">${M.find(([k]) => k === mode)[2]}</span>
+      <span class="lab">Тариф</span><div class="opt">${P.map(([k, n]) => `<button data-p="${k}" class="${k === plan ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <button class="bb" id="ok">${ic('check', 22)}Создать и открыть</button><button class="lk" id="cn">Отмена</button></div>`;
+    el.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => { mode = b.dataset.m; paint(); });
+    el.querySelectorAll('[data-p]').forEach((b) => b.onclick = () => { plan = b.dataset.p; paint(); });
+    el.querySelector('#cn').onclick = () => el.remove();
+    el.querySelector('#ok').onclick = async () => { const r = await api('/api/app/sandbox', {method: 'POST', json: {action: 'create', mode, plan}}); el.remove(); setProj(r.slug); setAs(''); haptic('ok'); reload(); };
+  };
+  el.onclick = (e) => { if (e.target === el) el.remove(); };
+  paint();
+  document.body.append(el);
 }
 function newTest() {
   const K = [['member', 'Участник', 'скидывает материал и идеи, получает задания'], ['camera', 'Участник «в кадре»', 'снимает себя с суфлёром'], ['builder', 'Участник «сам собирает»', 'открыта «Студия» в «Моё»'], ['deputy', 'Замещающий', 'права редактора на 2 недели'], ['editor', 'Редактор', 'Сегодня · Неделя · Люди']];
