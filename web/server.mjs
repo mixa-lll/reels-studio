@@ -9,6 +9,7 @@
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
+import {isEditor, normalize} from '../bot/roles.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -41,7 +42,6 @@ const SHARED = process.env.REELS_MEMBERS ? dirname(process.env.REELS_MEMBERS) : 
 // Scheduled publishing packages; the bot sends them (bot/outbox.mjs).
 const OUTBOX = join(SHARED, 'outbox.json');
 const DENIED = [`Edit(/${HERE}/**)`, `Read(/${join(HERE, 'data')}/**)`, `Edit(/${SHARED}/**)`, `Read(/${SHARED}/**)`];
-const ROLES = {owner: 3, editor: 2, viewer: 1};
 const SECTION_STATUS = {'In work': 'work', 'In review': 'review', Done: 'done', Published: 'published'};
 
 if (!KEY || KEY.length < 16) throw new Error('WEB_KEY is not set');
@@ -349,7 +349,7 @@ function toMessage(ev) {
 // ---------- people, sessions, log ----------
 
 const ACCESS = join(SHARED, 'access.json');
-const access = () => ({people: [], invites: [], sessions: [], ...readJson(ACCESS, {})});
+const access = () => { const a = {people: [], invites: [], sessions: [], ...readJson(ACCESS, {})}; a.people = a.people.map(normalize); return a; };
 const saveAccess = (a) => writeJson(ACCESS, a);
 const LOG = join(SHARED, 'log.jsonl');
 const botUsername = () => readJson(join(SHARED, 'bot.json'), {}).username || null;
@@ -369,14 +369,18 @@ function newSession(personId, req) {
 }
 function ownerPerson() {
   const a = access();
-  let owner = a.people.find((x) => x.role === 'owner');
+  let owner = a.people.find((x) => x.isOwner);
   if (!owner) {
-    owner = {id: 'owner', name: telegramOwner() || 'Владелец', role: 'owner', added: Date.now()};
+    owner = {id: 'owner', name: telegramOwner() || 'Владелец', role: 'editor', isOwner: true, web: true, added: Date.now()};
     a.people.push(owner);
     saveAccess(a);
   }
   return owner;
 }
+// Role and flags of a new person, from an invite or the invite form.
+const personFields = (x) => ({role: x.role === 'editor' ? 'editor' : 'member', onCamera: !!x.onCamera, web: x.role === 'editor' || x.web === true,
+  deputyUntil: /^\d{4}-\d{2}-\d{2}$/.test(x.deputyUntil || '') ? x.deputyUntil : null});
+const inviteLinks = (inv) => ({web: inv.web ? `/invite/${inv.code}` : null, telegram: inv.telegram && botUsername() ? `https://t.me/${botUsername()}?start=inv_${inv.code}` : null});
 function whoIs(req) {
   const sid = /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie || '')?.[1];
   if (!sid) return null;
@@ -394,7 +398,7 @@ function telegramSessions(a) {
   const busy = bot.pending ? `работает для: ${bot.holder || bot.ownerName || 'владельца'}` : 'свободен';
   const out = [];
   if (bot.ownerId) out.push({kind: 'telegram', id: 'owner', name: bot.ownerName || 'Владелец', device: 'Телеграм-бот', seen: bot.lastTurnAt || 0, note: busy, owner: true});
-  for (const x of a.people) if (x.telegram && x.role !== 'owner') out.push({kind: 'telegram', id: x.id, name: x.name, device: `Телеграм-бот${x.telegram.username ? ' · @' + x.telegram.username : ''}`, seen: x.telegram.seen || x.added || 0, note: bot.holder === x.name && bot.pending ? 'Claude сейчас работает для него' : ''});
+  for (const x of a.people) if (x.telegram && !x.isOwner) out.push({kind: 'telegram', id: x.id, name: x.name, device: `Телеграм-бот${x.telegram.username ? ' · @' + x.telegram.username : ''}`, seen: x.telegram.seen || x.added || 0, note: bot.holder === x.name && bot.pending ? 'Claude сейчас работает для него' : ''});
   return out;
 }
 const cookie = (req, sid) => `sid=${sid}; Path=/; HttpOnly;${req.headers['x-forwarded-proto'] === 'https' ? ' Secure;' : ''} SameSite=Lax; Max-Age=31536000`;
@@ -439,10 +443,10 @@ createServer(async (req, res) => {
     if (!inv) return invitePage(res, 410, '<h1>Ссылка уже не работает</h1><p>Приглашение использовано или истекло. Попроси новое.</p>');
     // Opening the link only shows a button: link previews in messengers fetch it by
     // themselves, and a GET that signed in would let them use up the invite.
-    if (req.method !== 'POST') return invitePage(res, 200, `<h1>Привет, ${escHtml(inv.name)}!</h1><p>Тебя пригласили в веб-версию бота рилсов как ${inv.role === 'editor' ? 'монтажёра' : 'зрителя'}.</p><form method="post"><button type="submit">Войти</button></form>`);
+    if (req.method !== 'POST') return invitePage(res, 200, `<h1>Привет, ${escHtml(inv.name)}!</h1><p>Тебя пригласили в студию ${inv.role === 'editor' ? 'редактором' : 'участником'}.</p><form method="post"><button type="submit">Войти</button></form>`);
     let person = a.people.find((x) => x.id === inv.person);
     if (!person) {
-      person = {id: id(), name: inv.name, role: inv.role, added: Date.now()};
+      person = {id: id(), name: inv.name, ...personFields(inv), added: Date.now()};
       a.people.push(person);
       inv.person = person.id;
     }
@@ -459,7 +463,10 @@ createServer(async (req, res) => {
 
   const me = whoIs(req);
   if (!me) { res.writeHead(404, {'content-type': 'text/plain; charset=utf-8'}); return res.end('Not found'); }
-  const can = (role) => ROLES[me.role] >= ROLES[role];
+  // owner = the flag; editor = editors and deputies; anyone signed in may read their own things.
+  const can = (role) => role === 'owner' ? me.isOwner === true : role === 'editor' ? isEditor(me) : true;
+  // Members see only their part (D4): their tasks, sending material, what they sent.
+  if (!isEditor(me) && !(url.pathname === '/' || url.pathname === '/api/me' || url.pathname.startsWith('/api/member') || url.pathname === '/media')) return json(403, {error: 'только для редакторов'});
   const dsPath = /^\/ds\/([\w-]+)\/(.+)$/.exec(url.pathname);
   const p = dsPath?.[1] || url.searchParams.get('project') || 'main';
 
@@ -467,7 +474,42 @@ createServer(async (req, res) => {
     res.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store'});
     return res.end(PAGE);
   }
-  if (req.method === 'GET' && url.pathname === '/api/me') return json(200, {me: {name: me.name, role: me.role}, projects: projects()});
+  if (req.method === 'GET' && url.pathname === '/api/me') {
+    const a = access();
+    return json(200, {me: {name: me.name, role: isEditor(me) ? 'editor' : 'member', isOwner: !!me.isOwner, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera},
+      team: a.people.length, projects: projects()});
+  }
+  // ---------- a member's own part (D4 «Веб глазами участника») ----------
+  if (url.pathname.startsWith('/api/member')) {
+    if (!projectDir(p)) return json(404, {});
+    const studio = join(PROJECTS, p);
+    const sent = () => {
+      const byId = new Map();
+      for (const line of read(join(studio, 'inbox', 'authors.jsonl')).split('\n')) { try { const e = JSON.parse(line); byId.set(e.id, {...byId.get(e.id), ...e}); } catch {} }
+      return [...byId.values()];
+    };
+    if (req.method === 'GET' && url.pathname === '/api/member') {
+      const tasks = readJson(join(studio, 'host', 'tasks.json'), {tasks: []}).tasks || [];
+      const mine = sent().filter((e) => e.who === me.name).sort((x, y) => y.at - x.at).slice(0, 40)
+        .map((e) => ({...e, items: (e.items || []).map((i) => ({kind: i.kind, text: i.text, url: i.path ? mediaUrl(join(studio, i.path)) : null}))}));
+      return json(200, {tasks: me.onCamera || isEditor(me) ? tasks.filter((t) => t.status !== 'done').slice(0, 10) : [], sent: mine, bot: botUsername()});
+    }
+    if (req.method === 'POST' && url.pathname === '/api/member/upload') {
+      const day = new Date().toISOString().slice(0, 10);
+      const dir = join(studio, 'inbox', day);
+      mkdirSync(dir, {recursive: true});
+      const path = uniquePath(dir, `web-${Date.now()}-${cleanName(url.searchParams.get('name'))}`);
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      writeFileSync(path, Buffer.concat(chunks));
+      const ext = extname(path).toLowerCase();
+      const kind = ['.mp4', '.mov', '.webm'].includes(ext) ? 'video' : ['.m4a', '.mp3', '.ogg', '.wav'].includes(ext) ? 'voice' : 'photo';
+      appendFileSync(join(studio, 'inbox', 'authors.jsonl'), JSON.stringify({id: `web-${Date.now().toString(36)}`, who: me.name, kind: 'files', via: 'web', status: 'sent', text: String(url.searchParams.get('note') || '').slice(0, 500), items: [{kind, path: relative(studio, path)}], at: Date.now()}) + '\n');
+      log(me.name, `прислал ${basename(path)}`);
+      return json(200, {ok: true});
+    }
+    return json(404, {});
+  }
 
   if (!projectDir(p)) return json(404, {});
   const studio = join(PROJECTS, p);
@@ -483,7 +525,10 @@ createServer(async (req, res) => {
     for (const r of list) { const x = rubricOf('reel:' + r.id); if (x) tally[x] = (tally[x] || 0) + 1; }
     for (const x of posts) { const y = rubricOf('post:' + x.id, x.rubric); if (y) tally[y] = (tally[y] || 0) + 1; }
     const rubrics = (readJson(join(studio, 'strategy.json'), {}).rubrics || []).map((r) => ({id: r.id, name: r.name, color: r.color, n: (tally[r.id] || 0) + (tally[r.name] || 0)}));
-    return json(200, {reels: list, posts, rubrics, ideasCount: ideas.length, chats, busy: job ? {project: job.p, key: job.key} : null,
+    // «Входящие»: what people sent through the bot or the member page in the last week.
+    const sentLines = read(join(studio, 'inbox', 'authors.jsonl')).split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return {}; } });
+    const inboxNew = new Set(sentLines.filter((e) => e.who && e.at > Date.now() - 7 * 864e5 && e.status !== 'private').map((e) => e.id)).size;
+    return json(200, {inbox: inboxNew, reels: list, posts, rubrics, ideasCount: ideas.length, chats, busy: job ? {project: job.p, key: job.key} : null,
       disk: disk()});
   }
   if (req.method === 'GET' && url.pathname === '/api/ideas') {
@@ -739,54 +784,66 @@ createServer(async (req, res) => {
     log(me.name, `освободил место${reel ? ` в «${reel}»` : ''}: ${Math.round(freed / 1e6)} МБ`);
     return json(200, {freed});
   }
+  // ---------- team (D1–D3): editors manage people; owner flag and owners only by an owner ----------
   if (req.method === 'GET' && url.pathname === '/api/access') {
-    if (!can('owner')) return json(403, {});
+    if (!can('editor')) return json(403, {});
     const a = access();
+    const tg = telegramSessions(a);
     return json(200, {
-      people: a.people.map((x) => ({...x, sessions: a.sessions.filter((s) => s.person === x.id).length})),
-      invites: a.invites.filter((x) => x.expires > Date.now()),
-      sessions: [...a.sessions.map((s) => ({...s, kind: 'web', name: a.people.find((x) => x.id === s.person)?.name, mine: s.id === me.sid})), ...telegramSessions(a)].sort((x, y) => y.seen - x.seen),
-      telegram: {owner: telegramOwner(), bot: botUsername()},
+      people: a.people.map((x) => ({...x, editorNow: isEditor(x),
+        devices: a.sessions.filter((s) => s.person === x.id).map((s) => ({id: s.id, device: s.device, created: s.created, seen: s.seen, mine: s.id === me.sid})),
+        bot: x.isOwner ? tg.find((t) => t.owner) || null : x.telegram ? {username: x.telegram.username, seen: x.telegram.seen || x.added} : null})),
+      invites: a.invites.filter((x) => x.expires > Date.now()).map((x) => ({...x, link: inviteLinks(x)})),
+      bot: botUsername(), me: me.id,
       log: read(LOG).split('\n').filter(Boolean).slice(-40).map((l) => JSON.parse(l)).reverse(),
     });
   }
   if (req.method === 'POST' && url.pathname === '/api/access') {
-    if (!can('owner')) return json(403, {});
+    if (!can('editor')) return json(403, {});
     const b = await body(req);
     const a = access();
-    if (b.action === 'invite' && b.name?.trim() && ['editor', 'viewer', 'author'].includes(b.role)) {
-      // Telegram for editors (a conversation with the agent) and for authors, who live
-      // only in the bot (bot/author.mjs) and have no web version.
-      const author = b.role === 'author';
-      if (author && !botUsername()) return json(400, {error: 'Сначала запустите Телеграм-бота'});
-      const telegram = author || (b.telegram === true && b.role === 'editor' && !!botUsername());
-      const web = !author && (b.web !== false || !telegram);
-      const inv = {code: id(), name: b.name.trim().slice(0, 60), role: b.role, expires: Date.now() + 24 * 3600_000, web, telegram, claimed: []};
+    const target = a.people.find((y) => y.id === b.id);
+    const mayTouch = (x) => x && x.id !== me.id && (!x.isOwner || me.isOwner);
+    if (b.action === 'invite' && b.name?.trim() && ['editor', 'member'].includes(b.role)) {
+      const inv = {code: id(), name: b.name.trim().slice(0, 60), note: String(b.note || '').slice(0, 80), ...personFields(b), expires: Date.now() + 7 * 864e5, claimed: []};
+      inv.telegram = !!botUsername();
+      inv.web = inv.role === 'editor' || b.web === true || !inv.telegram;
       a.invites.push(inv);
-      log(me.name, `пригласил ${inv.name} (${({editor: 'монтажёр', viewer: 'зритель', author: 'автор'})[inv.role]}${telegram ? ', Telegram' : ''}${web ? ', веб' : ''})`);
+      log(me.name, `пригласил ${inv.name} (${inv.role === 'editor' ? 'редактор' : 'участник'}${inv.web ? ', бот + веб' : ', бот'})`);
       saveAccess(a);
-      return json(200, {web: web ? `/invite/${inv.code}` : null, telegram: telegram ? `https://t.me/${botUsername()}?start=inv_${inv.code}` : null});
+      return json(200, {invite: {...inv, link: inviteLinks(inv)}});
+    }
+    // A fresh sign-in link for someone already in the team (new phone, lost sign-in).
+    if (b.action === 'relink' && target && (mayTouch(target) || target.id === me.id)) {
+      const inv = {code: id(), name: target.name, person: target.id, role: target.role, expires: Date.now() + 7 * 864e5, claimed: [], telegram: !!botUsername(), web: isEditor(target) || target.web === true};
+      a.invites.push(inv);
+      saveAccess(a);
+      return json(200, {invite: {...inv, link: inviteLinks(inv)}});
     }
     if (b.action === 'cancel') a.invites = a.invites.filter((x) => x.code !== b.code);
-    if (b.action === 'role' && ['editor', 'viewer', 'author'].includes(b.role)) {
-      const x = a.people.find((y) => y.id === b.id && y.role !== 'owner');
-      if (x) { x.role = b.role; log(me.name, `сменил роль ${x.name}`); }
+    if (b.action === 'update' && target && (mayTouch(target) || (target.id === me.id && !('isOwner' in b)))) {
+      if (['editor', 'member'].includes(b.role) && !(target.isOwner && b.role === 'member')) target.role = b.role;
+      if ('onCamera' in b) target.onCamera = !!b.onCamera;
+      if ('web' in b) target.web = !!b.web;
+      if ('deputyUntil' in b) target.deputyUntil = /^\d{4}-\d{2}-\d{2}$/.test(b.deputyUntil || '') ? b.deputyUntil : null;
+      if (Array.isArray(b.groups)) target.groups = b.groups.map((g) => String(g).slice(0, 40)).filter(Boolean).slice(0, 12);
+      if ('isOwner' in b && me.isOwner && target.role === 'editor') target.isOwner = !!b.isOwner;
+      if (!target.web && !isEditor(target)) a.sessions = a.sessions.filter((s) => s.person !== target.id);
+      log(me.name, `поменял доступ: ${target.name}`);
     }
-    if (b.action === 'remove') {
-      const x = a.people.find((y) => y.id === b.id && y.role !== 'owner');
-      if (x) { a.people = a.people.filter((y) => y !== x); a.sessions = a.sessions.filter((s) => s.person !== x.id); a.invites = a.invites.filter((i) => i.person !== x.id); log(me.name, `убрал ${x.name}`); }
+    if (b.action === 'remove' && mayTouch(target)) {
+      a.people = a.people.filter((y) => y !== target); a.sessions = a.sessions.filter((s) => s.person !== target.id); a.invites = a.invites.filter((i) => i.person !== target.id);
+      log(me.name, `убрал ${target.name}`);
     }
-    if (b.action === 'end-telegram') {
-      const x = a.people.find((y) => y.id === b.id && y.role !== 'owner');
-      if (x?.telegram) { log(me.name, `отключил Telegram у ${x.name}`); delete x.telegram; }
-    }
-    if (b.action === 'end') a.sessions = a.sessions.filter((s) => s.id !== b.id || s.id === me.sid);
-    if (b.action === 'end-others') a.sessions = a.sessions.filter((s) => s.id === me.sid);
+    if (b.action === 'end-telegram' && mayTouch(target) && target.telegram) { log(me.name, `отключил бот у ${target.name}`); delete target.telegram; }
+    if (b.action === 'end') { const s0 = a.sessions.find((s) => s.id === b.session); const owner = s0 && a.people.find((x) => x.id === s0.person); if (s0 && s0.id !== me.sid && (owner?.id === me.id || mayTouch(owner))) a.sessions = a.sessions.filter((s) => s !== s0); }
+    if (b.action === 'end-others') a.sessions = a.sessions.filter((s) => s.person !== me.id || s.id === me.sid);
     saveAccess(a);
     return json(200, {});
   }
   if (req.method === 'GET' && url.pathname === '/media') {
     const f = mediaPath(url.searchParams.get('p') || '');
+    if (f && !isEditor(me) && !f.includes('/inbox/')) return res.writeHead(403).end();
     if (!f) return res.writeHead(404).end();
     const size = statSync(f).size;
     const headers = {'content-type': TYPES[extname(f).toLowerCase()] || 'application/octet-stream', 'accept-ranges': 'bytes'};

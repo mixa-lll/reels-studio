@@ -149,6 +149,26 @@
   .pslot { display: flex; flex-direction: column; gap: 4px; border: 1.5px dashed #D4D4D4; border-radius: 10px; padding: 9px 10px; font-size: 13px; line-height: 1.35; text-align: left; background: none; color: var(--ink2); }
   .plan-nochat aside.chatcol { display: none; }
   .pslot:hover { background: var(--side); }
+  .tchip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+  .tchip.ed { background: var(--ink); color: #fff; } .tchip.mb { background: #F0F0F0; color: #404040; } .tchip.own { background: #FEF6E7; color: #8F5C12; } .tchip.dep { background: #EEF4FE; color: #1D4ED8; } .tchip.cam { background: #ECF7EF; color: #1E7A3D; }
+  .ch2 { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink2); border: 1px solid var(--line); border-radius: 7px; padding: 2px 8px; white-space: nowrap; }
+  .av2 { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: #E8E8E8; flex: none; }
+  .ttbl { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .ttr { display: grid; grid-template-columns: minmax(0, 1.5fr) 220px 150px 110px; gap: 14px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--hov); text-decoration: none; }
+  a.ttr:hover { background: var(--side); } .ttr.h { border-top: 0; background: var(--side); font-size: 12px; color: var(--muted); font-weight: 600; padding: 10px 18px; }
+  .tcard2 { display: flex; flex-direction: column; gap: 10px; }
+  .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .topt { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; text-align: left; background: #fff; }
+  .topt.on { border: 2px solid var(--ink); padding: 11px 13px; } .topt b { display: block; font-weight: 600; margin-bottom: 3px; }
+  .rad { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #D4D4D4; flex: none; margin-top: 1px; } .rad.on { border: 5px solid var(--ink); }
+  .tflag { display: flex; gap: 12px; align-items: flex-start; padding-top: 10px; border-top: 1px solid var(--hov); } .tflag input { margin-top: 3px; width: 16px; height: 16px; accent-color: #171717; } .tflag b { display: block; font-weight: 600; margin-bottom: 2px; }
+  .tgp { background: #E7EEE3; border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .tmsg { background: #fff; border-radius: 12px 12px 12px 4px; padding: 8px 10px; font-size: 13px; line-height: 1.45; }
+  .tkbd { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; } .tkbd span { background: #fff; border-radius: 8px; padding: 8px 6px; font-size: 13px; text-align: center; box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+  .tmini { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; min-height: 150px; font-size: 12px; }
+  .tms { width: 120px; background: var(--side); border-right: 1px solid var(--line); padding: 8px 6px; display: flex; flex-direction: column; gap: 2px; }
+  .tms span { padding: 4px 6px; border-radius: 5px; color: var(--ink2); } .tms span.on { background: var(--sel); color: var(--ink); font-weight: 600; } .tms span.off { color: #C4C4C4; text-decoration: line-through; }
+  .seg button:disabled { opacity: .5; }
   .utabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
   .utabs a { padding: 0 0 10px; color: var(--muted); text-decoration: none; }
   .utabs a.on { color: var(--ink); border-bottom: 2px solid var(--ink); font-weight: 500; }
@@ -252,6 +272,15 @@ const md = (s) => {
 const chatMd = (s) => esc(s).replace(/```\w*\n?([\s\S]*?)```/g, '<pre>$1</pre>').replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
 const STATUS = {work: 'В работе', review: 'На ревью', none: 'Без статуса', done: 'Готовы', published: 'Опубликованы'};
 const ICON = {
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>',
+  tg: '<path d="m22 3-9.5 18-2.5-7.5L3 11z"></path><path d="M10 13.5 22 3"></path>',
+  web: '<rect x="2.5" y="4" width="19" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path>',
+  cam: '<path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"></path><rect x="2" y="6" width="14" height="12" rx="3"></rect>',
+  up: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m17 8-5-5-5 5M12 3v12"></path>',
+  folder2: '<path d="M3 7h6l2 2h10v10H3Z"></path>',
+  key: '<circle cx="7.5" cy="15.5" r="4.5"></circle><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14 9l2 2"></path>',
+  crown: '<path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5z"></path>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path>',
   home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path>',
   board: '<rect x="3" y="3" width="7" height="18" rx="2"></rect><rect x="14" y="3" width="7" height="11" rx="2"></rect>',
   chat: '<path d="M4 5h16v11H8l-4 4Z"></path>',
@@ -277,7 +306,7 @@ const KIND = {reel: 'рилс', text: 'текст', photo: 'пост', carousel:
 const kindBadge = (k) => `<span class="kind" title="${KIND[k]}">${svg(k, 13)}${KIND[k]}</span>`;
 const svg = (k, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
-let ME = null, PROJECTS = [], P = localStorage.getItem('project') || 'main', OV = null;
+let TEAM = 1, ME = null, PROJECTS = [], P = localStorage.getItem('project') || 'main', OV = null;
 const api = async (path, opts) => {
   const r = await fetch(path + (path.includes('?') ? '&' : '?') + 'project=' + encodeURIComponent(P), opts);
   if (!r.ok) throw Object.assign(new Error('Ошибка ' + r.status), {status: r.status});
@@ -285,13 +314,15 @@ const api = async (path, opts) => {
 };
 const post = (path, b) => api(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(b || {})});
 const toast = (t) => { const el = document.createElement('div'); el.className = 'toast'; el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 3500); };
-const isOwner = () => ME?.role === 'owner';
-const canEdit = () => ME && ME.role !== 'viewer';
+const isOwner = () => ME?.isOwner === true;
+const canEdit = () => ME?.role === 'editor';
+const isMember = () => ME?.role === 'member';
 
 const projName = () => (PROJECTS.find((x) => x.slug === P) || {}).name || P;
-const ROLE = {owner: 'владелец', editor: 'монтажёр', viewer: 'зритель', author: 'автор'};
+const roleName = (m) => m.role === 'editor' ? (m.isOwner ? 'редактор · владелец' : m.deputyUntil ? 'замещает' : 'редактор') : 'участник';
 
 async function sidebar() {
+  if (isMember()) return memberSidebar();
   OV = await api('/api/overview');
   const cur = location.hash || '#/';
   const on = (h) => (h === '#/' ? cur === '#/' : cur.startsWith(h) || (h === '#/all' && /^#\/(reel|post)\//.test(cur))) ? 'on' : '';
@@ -304,6 +335,7 @@ async function sidebar() {
     <button type="button" class="srch" id="srchBtn">${svg('search', 15)}<span>Поиск</span><kbd>⌘K</kbd></button>
     ${item('#/', 'home', 'Сегодня')}
     ${item('#/all', 'board', 'Все выпуски', `<span class="n">${OV.reels.length}</span>`)}
+    ${TEAM > 1 ? item('#/inbox', 'inbox', 'Входящие', OV.inbox ? `<span class="bdg">${OV.inbox}</span>` : '') : ''}
     <div class="gh">План</div>
     ${item('#/plan', 'cal', 'Календарь')}
     ${item('#/new', 'idea', 'Идеи', `<span class="n">${OV.ideasCount}</span>`)}
@@ -311,7 +343,7 @@ async function sidebar() {
     ${(OV.rubrics || []).length ? `<div class="gh">Рубрики</div>${OV.rubrics.map((x) => `<a class="nav ${cur === '#/rubric/' + x.id ? 'on' : ''}" href="#/rubric/${esc(x.id)}"><span style="width: 16px; display: grid; place-items: center"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${esc(x.color || '#737373')}"></span></span><span>${esc(x.name)}</span><span class="n">${x.n || ''}</span></a>`).join('')}` : ''}
     <div style="margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 2px">
       ${item('#/settings', 'sliders', 'Настройки проекта')}
-      <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${ROLE[ME.role] || ''}</span></div>
+      <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${roleName(ME)}</span></div>
     </div>`;
   $('#projSel').onchange = (e) => { P = e.target.value; localStorage.setItem('project', P); location.hash = '#/'; route(); };
   $('#srchBtn').onclick = search;
@@ -1176,8 +1208,9 @@ async function vRubric(id) {
 }
 
 // Project settings: title + tabs on top, each tab is one of the older pages rendered below.
-async function vSettings(tab = 'ds') {
-  const tabs = [['ds', 'Дизайн-система', vDs], ['files', 'Файлы и место', vFiles], ...(isOwner() ? [['access', 'Доступ', vAccess]] : [])];
+async function vSettings(tab = 'ds', sub) {
+  if (tab === 'access') tab = 'team';
+  const tabs = [['ds', 'Дизайн-система', vDs], ['files', 'Файлы и место', vFiles], ['team', 'Команда', () => vTeam(sub)]];
   const cur = tabs.find(([k]) => k === tab) || tabs[0];
   view.innerHTML = `<div style="padding: 28px 36px 0; display: flex; flex-direction: column; gap: 18px"><h1>Настройки проекта</h1>
     <div class="utabs" role="tablist">${tabs.map(([k, t]) => `<a href="#/settings/${k}" class="${k === cur[0] ? 'on' : ''}">${t}</a>`).join('')}</div></div>
@@ -1239,52 +1272,176 @@ async function vFiles() {
   $('#freeAll')?.addEventListener('click', async () => { if (!confirm('Применить правила хранения ко всем рилсам? Старые версии уйдут в архив.')) return; const {freed} = await post('/api/free', {}); toast(freed ? `Освобождено ${mb(freed)}` : 'Нечего освобождать'); sidebar(); vFiles(); });
 }
 
-async function vAccess() {
-  title('Доступ');
+// ---------- team (handbook/ROADMAP.md этап 5; canvas D1–D5 «Доступ и роли») ----------
+const ago2 = (t) => t ? ago(t) : '—';
+const teamChips = (x) => `<span class="tchip ${x.role === 'editor' ? 'ed' : 'mb'}">${x.role === 'editor' ? 'редактор' : 'участник'}</span>${x.isOwner ? '<span class="tchip own">владелец</span>' : ''}${x.deputyUntil ? `<span class="tchip dep">замещает до ${new Date(x.deputyUntil).toLocaleDateString('ru', {day: 'numeric', month: 'short'})}</span>` : ''}${x.onCamera ? `<span class="tchip cam">${svg('cam', 12)}в кадре</span>` : ''}`;
+const where = (x) => `${x.bot || x.telegram ? `<span class="ch2">${svg('tg', 12)}бот</span>` : ''}${x.role === 'editor' || x.web ? `<span class="ch2">${svg('web', 12)}веб</span>` : ''}`;
+const avatar = (n) => `<span class="av2">${esc((n || '?')[0].toUpperCase())}</span>`;
+const linkBox = (inv) => {
+  const abs = (u) => u && (u.startsWith('/') ? location.origin + u : u);
+  const links = [['Телеграм', abs(inv.link.telegram)], ['Веб', abs(inv.link.web)]].filter(([, u]) => u);
+  return `<div class="card" style="border: 1.5px solid var(--ink); display: flex; flex-direction: column; gap: 10px"><b>Ссылка для ${esc(inv.name)}</b>
+    ${links.map(([t, u], i) => `<div><div class="small muted">${t}</div><div class="row" style="flex-wrap: nowrap; gap: 8px"><input class="f" readonly value="${esc(u)}"><button type="button" class="btn dark" data-copy="${esc(u)}">Скопировать</button></div></div>`).join('')}
+    <span class="small muted">Одноразовая, 7 дней. Открыл → «Войти» (в вебе) или «Запустить» (в Телеграме). Паролей нет.</span></div>`;
+};
+const wireCopy = (root) => root.querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => navigator.clipboard.writeText(b.dataset.copy).then(() => toast('Скопировано'))));
+
+async function vTeam(sub) {
+  if (!canEdit()) { view.innerHTML = '<div class="page"><p class="muted">Команду ведут редакторы.</p></div>'; return; }
   const a = await api('/api/access');
-  const role = {owner: 'Владелец', editor: 'Монтажёр', viewer: 'Зритель'};
-  view.innerHTML = `<div class="page">
-    <div class="row" style="justify-content: space-between; align-items: flex-end"><div><div class="small muted">Проект</div><h1>Кто работает с ботом</h1></div><span class="small muted">Веб-версия: свой вход у каждого человека и устройства</span></div>
-    <div class="split">
-      <div class="grow" style="display: flex; flex-direction: column; gap: 18px">
-        <section class="card"><h2>Люди · ${a.people.length}</h2>
-          ${a.people.map((x) => `<div class="li"><span style="flex: 1; min-width: 180px"><b>${esc(x.name)}</b>${(x.role === 'owner' && a.telegram.owner) || x.telegram ? ` <span class="chip">Telegram${x.telegram?.username ? ' · @' + esc(x.telegram.username) : ''}</span>` : ''} ${x.sessions ? `<span class="chip">веб · ${x.sessions} устр.</span>` : ''}</span>
-            ${x.role === 'owner' ? `<span class="pill cur">Владелец</span>` : `<select class="f" style="width: auto" data-role="${esc(x.id)}" aria-label="Роль ${esc(x.name)}"><option value="editor" ${x.role === 'editor' ? 'selected' : ''}>Монтажёр</option><option value="viewer" ${x.role === 'viewer' ? 'selected' : ''}>Зритель</option><option value="author" ${x.role === 'author' ? 'selected' : ''}>Автор</option></select><button type="button" class="btn danger" data-remove="${esc(x.id)}">Убрать</button>`}</div>`).join('')}
-          ${a.invites.map((x) => `<div class="li" style="opacity: .85"><span style="flex: 1"><b>${esc(x.name)}</b> · приглашение не открыто<br><span class="small muted">${role[x.role]} · ${[x.telegram && !x.claimed?.includes('telegram') ? 'Telegram' : '', x.web && !x.claimed?.includes('web') ? 'веб' : ''].filter(Boolean).join(' + ')} · истекает ${new Date(x.expires).toLocaleString('ru', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}</span></span><button type="button" class="btn" data-cancel="${esc(x.code)}">Отменить</button></div>`).join('')}
-          <p class="small muted">В Телеграм-боте ${a.telegram.bot ? '@' + esc(a.telegram.bot) + ' ' : ''}владелец — ${esc(a.telegram.owner || '—')}. Монтажёры пишут боту из своего Телеграма; бот работает с одним человеком за раз, остальным говорит подождать.</p></section>
-        <section class="card"><div class="row" style="justify-content: space-between"><h2>Активные сессии · ${a.sessions.length}</h2><button type="button" class="btn" id="endOthers">Завершить все, кроме этой</button></div>
-          ${a.sessions.map((s) => s.kind === 'telegram'
-            ? `<div class="li"><span style="flex: 1; min-width: 200px"><b>${esc(s.device)}</b> <span class="chip">Telegram</span><br><span class="small muted">${esc(s.name)}${s.note ? ' · ' + esc(s.note) : ''}</span></span><span class="small muted">${s.seen ? ago(s.seen) : '—'}</span>${s.owner ? '' : `<button type="button" class="btn" data-endtg="${esc(s.id)}">Отключить</button>`}</div>`
-            : `<div class="li"><span style="flex: 1; min-width: 200px"><b>Веб · ${esc(s.device)}</b>${s.mine ? ' <span class="chip">это устройство</span>' : ''}<br><span class="small muted">${esc(s.name || '?')} · вошёл ${new Date(s.created).toLocaleDateString('ru', {day: 'numeric', month: 'short'})}</span></span><span class="small muted">${ago(s.seen)}</span>${s.mine ? '' : `<button type="button" class="btn" data-end="${esc(s.id)}">Завершить</button>`}</div>`).join('')}</section>
-      </div>
-      <div class="side2" style="display: flex; flex-direction: column; gap: 18px">
-        <section class="card" style="display: flex; flex-direction: column; gap: 12px"><h2>Пригласить</h2>
-          <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Как зовут<input class="f" id="invName" placeholder="Имя"></label>
-          <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Что можно<select class="f" id="invRole"><option value="editor">Монтажёр — делает и правит рилсы</option><option value="viewer">Зритель — смотрит и скачивает</option><option value="author">Автор — присылает материалы в Телеграм-бот</option></select></label>
-          <div class="small muted">Куда подключить</div>
-          <div class="row"><label class="btn" style="cursor: pointer"><input type="checkbox" id="invTg" checked ${a.telegram.bot ? '' : 'disabled'}> Телеграм-бот</label><label class="btn" style="cursor: pointer"><input type="checkbox" id="invWeb" checked> Веб-версия</label></div>
-          <button type="button" class="btn primary" id="invGo" style="min-height: 46px">Создать ссылку-приглашение</button>
-          <div id="invOut"></div>
-          <p class="small muted" style="margin: 0">Ссылка одноразовая и живёт 24 часа. Убрать человека можно в любой момент — его сессии закроются сразу.</p></section>
-        <section class="card"><h2>Кто что делал</h2>${a.log.slice(0, 15).map((l) => `<div class="li small"><span class="muted" style="width: 74px">${ago(l.at)}</span><span style="flex: 1"><b>${esc(l.who)}</b> ${esc(l.what)}</span></div>`).join('') || '<p class="small muted">Пока пусто.</p>'}</section>
-      </div></div></div>`;
-  const act = async (b) => { await post('/api/access', b); vAccess(); };
-  view.querySelectorAll('[data-role]').forEach((s) => (s.onchange = () => act({action: 'role', id: s.dataset.role, role: s.value})));
-  view.querySelectorAll('[data-remove]').forEach((b) => (b.onclick = () => confirm('Убрать человека? Его входы закроются.') && act({action: 'remove', id: b.dataset.remove})));
-  view.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = () => act({action: 'cancel', code: b.dataset.cancel})));
-  view.querySelectorAll('[data-end]').forEach((b) => (b.onclick = () => act({action: 'end', id: b.dataset.end})));
-  view.querySelectorAll('[data-endtg]').forEach((b) => (b.onclick = () => confirm('Отключить этого человека от Телеграм-бота? В веб-версии он останется.') && act({action: 'end-telegram', id: b.dataset.endtg})));
-  $('#endOthers').onclick = () => confirm('Завершить все остальные входы?') && act({action: 'end-others'});
-  $('#invGo').onclick = async () => {
-    const name = $('#invName').value.trim();
-    if (!name) return $('#invName').focus();
-    const role = $('#invRole').value;
-    const r = await post('/api/access', {action: 'invite', name, role, telegram: role === 'author' || ($('#invTg').checked && role === 'editor'), web: role !== 'author' && $('#invWeb').checked});
-    const links = [r.telegram && ['Телеграм-бот', r.telegram], r.web && ['Веб-версия', location.origin + r.web]].filter(Boolean);
-    $('#invOut').innerHTML = `<div class="card" style="padding: 12px; background: var(--soft); display: flex; flex-direction: column; gap: 8px"><div class="small muted">Ссылки для ${esc(name)} — отправь их ему${role === 'viewer' ? ' (зрителю — только веб)' : role === 'author' ? ' (автору — только Телеграм-бот)' : ''}</div>
-      ${links.map(([t, l], i) => `<div><div class="small">${t}</div><div class="row" style="flex-wrap: nowrap"><input class="f" readonly value="${esc(l)}"><button type="button" class="btn dark" data-copy="${i}">Скопировать</button></div></div>`).join('')}</div>`;
-    $('#invOut').querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => navigator.clipboard.writeText(links[b.dataset.copy][1]).then(() => toast('Скопировано'))));
+  if (sub === 'invite') return teamInvite(a);
+  if (sub) return teamPerson(a, sub);
+  const n = a.people.length;
+  const ladder = [[1, '1 человек', 'без Входящих, заданий людям и согласования'], [2, '2 человека', 'появляются входящие и задания'], [3, '3 и больше', 'задания на группу, группы и точки']];
+  view.innerHTML = `<div class="page" style="padding: 22px 36px; gap: 18px; max-width: 1240px"><div class="split" style="gap: 24px; align-items: flex-start">
+    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+      <div class="row"><div style="flex: 1"><h2 style="font-size: 17px">Команда · ${n} ${n === 1 ? 'человек' : n < 5 ? 'человека' : 'человек'}</h2><div class="small muted" style="margin-top: 3px">Ролей две: редактор ведёт план и людей, участник присылает материал и берёт задания. Владелец и замещающий — галочки.</div></div><a class="btn primary" href="#/settings/team/invite">+ Пригласить</a></div>
+      <div class="ttbl"><div class="ttr h"><span>Человек</span><span>Роль</span><span>Где работает</span><span>Был</span></div>
+        ${a.people.map((x) => `<a class="ttr" href="#/settings/team/${esc(x.id)}"><span class="row" style="gap: 10px; flex-wrap: nowrap">${avatar(x.name)}<span style="min-width: 0"><b style="font-weight: 600">${esc(x.name)}${x.id === a.me ? ' (вы)' : ''}</b><div class="small muted">${x.isOwner ? 'главный аккаунт · вход по ключу' : esc(x.note || (x.groups || []).join(', ') || '')}</div></span></span><span class="row" style="gap: 5px">${teamChips(x)}</span><span class="row" style="gap: 5px">${where(x)}</span><span class="small muted">${ago2(Math.max(x.bot?.seen || 0, ...x.devices.map((d) => d.seen || 0)))}</span></a>`).join('')}</div>
+      <div class="card" style="display: flex; gap: 12px; align-items: center; background: var(--side)"><span>${svg('key', 18)}</span><span class="small" style="line-height: 1.5"><b>Паролей нет.</b> Каждый входит по одноразовой ссылке: в Телеграме бот узнаёт человека по аккаунту, в браузере ссылка ставит вход на этом устройстве. Устройства видны и закрываются в карточке человека.</span></div>
+    </div>
+    <div style="flex: 0 0 300px; display: flex; flex-direction: column; gap: 14px">
+      <div class="card" style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Ждут входа · ${a.invites.length}</span>${a.invites.map((i) => `<div class="li" style="padding: 8px 0"><span style="flex: 1"><b>${esc(i.name)}</b> <span class="small muted">· ${i.role === 'editor' ? 'редактор' : 'участник'} · ${i.web ? 'бот + веб' : 'только бот'}</span></span><button type="button" class="btn" data-cancel="${esc(i.code)}">Отозвать</button></div>`).join('') || '<span class="small muted">Никого.</span>'}</div>
+      <div class="card" style="display: flex; flex-direction: column; gap: 4px"><span class="lbl">Интерфейс по числу людей</span>${ladder.map(([k, t, d]) => `<div class="li" style="padding: 7px 0; ${(k === 3 ? n >= 3 : n === k) ? 'font-weight: 600' : 'color: var(--muted)'}"><span style="width: 92px">${t}</span><span class="small">${d}</span></div>`).join('')}</div>
+    </div></div></div>`;
+  view.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = async () => { await post('/api/access', {action: 'cancel', code: b.dataset.cancel}); route(); }));
+}
+
+function teamInvite(a) {
+  const st = {role: 'member', web: false, onCamera: false, deputy: false, deputyUntil: ''};
+  view.innerHTML = `<div class="page" style="padding: 18px 36px 28px; gap: 16px; max-width: 1240px"><div class="row"><a class="small muted" href="#/settings/team">Команда</a><span class="muted">›</span><h2 style="font-size: 17px">Пригласить</h2></div>
+    <div class="split" style="gap: 24px; align-items: flex-start"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px" id="invForm"></div><div style="flex: 0 0 400px; display: flex; flex-direction: column; gap: 14px" id="invSide"></div></div></div>`;
+  const opt = (k, v, title, text) => `<button type="button" class="topt ${st[k] === v ? 'on' : ''}" data-k="${k}" data-v="${v}"><span class="rad ${st[k] === v ? 'on' : ''}"></span><span><b>${title}</b><span class="small muted">${text}</span></span></button>`;
+  const flag = (k, title, text, extra = '') => `<label class="tflag"><input type="checkbox" data-f="${k}" ${st[k] ? 'checked' : ''}><span><b>${title}</b><span class="small muted">${text}</span>${extra}</span></label>`;
+  const draw = () => {
+    $('#invForm').innerHTML = `<div class="card tcard2"><span class="lbl">Кто</span><div class="row" style="flex-wrap: nowrap"><input class="f" id="invName" placeholder="Имя" value="${esc(st.name || '')}"><input class="f" id="invNote" placeholder="кто это: «кухня, повар»" value="${esc(st.note || '')}"></div></div>
+      <div class="card tcard2"><span class="lbl">Роль</span><div class="tgrid">${opt('role', 'member', 'Участник', 'Присылает фото, видео, голос и идеи; берёт задания. Варианты и план не видит.')}${opt('role', 'editor', 'Редактор', 'Выбирает варианты, ведёт план, приглашает людей. Всё, кроме подписки.')}</div>
+        ${st.role === 'member' ? flag('onCamera', 'Будет сниматься в кадре', 'Сможет брать задания «снять себя». Согласие на лицо бот спросит при первом таком задании.') + flag('deputy', 'Замещает редактора', 'На время отпуска — права редактора до даты, потом снова участник.', st.deputy ? `<input class="f" type="date" id="invUntil" value="${esc(st.deputyUntil)}" style="width: auto; margin-top: 6px">` : '') : ''}
+        <span class="small muted" style="display: flex; gap: 6px; align-items: center">${svg('crown', 14)} «Владелец» — галочка в карточке редактора: подписка, роли, сигналы владельцу.</span></div>
+      <div class="card tcard2"><span class="lbl">Где будет работать</span>${st.role === 'editor' ? '<span class="small muted">Редактору всегда доступны и бот, и веб.</span>' : `<div class="tgrid">${opt('web', false, 'Только Телеграм-бот', 'Скинуть, задания, съёмка в браузере из бота. Ничего ставить не нужно.')}${opt('web', true, 'Бот + веб на компьютере', 'То же в браузере: удобно загружать много файлов и смотреть свои материалы.')}</div>`}</div>
+      <div><button type="button" class="btn primary" id="invGo" style="min-height: 44px">Создать ссылку</button></div>`;
+    const ed = st.role === 'editor', web = ed || st.web;
+    $('#invSide').innerHTML = `<div id="invOut"></div><div class="card" style="display: flex; flex-direction: column; gap: 10px"><span class="lbl">Что увидит ${esc(st.name || 'человек')}</span>
+      <b class="small" style="display: flex; gap: 6px; align-items: center">${svg('tg', 14)} В боте</b>
+      <div class="tgp"><div class="tmsg">${ed ? 'Привет! Ты подключён к боту как редактор: пиши, что сделать, — Claude возьмётся.' : 'Привет! Вас пригласили в команду. Скидывайте фото и видео как есть — тексты напишет Claude.'}</div>
+        <div class="tkbd">${(ed ? ['💡 Идеи', '📂 Незаконченные', '⚙️ Настройки', '🎬 Новый рилс'] : ['📎 Скинуть', '💡 Идея', '📋 Что снять', '📚 Мои материалы']).map((k) => `<span>${k}</span>`).join('')}</div></div>
+      <b class="small" style="display: flex; gap: 6px; align-items: center">${svg('web', 14)} В вебе</b>
+      ${web ? `<div class="tmini"><div class="tms">${(ed ? [['Сегодня', 1], ['Все выпуски', 1], ['Календарь', 1], ['Стратегия', 1], ['Настройки', 1]] : [['Мои задания', 1], ['Скинуть', 1], ['Мои материалы', 1], ['Все выпуски', 0], ['План', 0], ['Настройки', 0]]).map(([t, on], i) => `<span class="${i ? '' : 'on'} ${on ? '' : 'off'}">${t}</span>`).join('')}</div><div style="flex: 1; padding: 10px; color: var(--muted)">${ed ? 'Вся студия' : 'Задания, загрузка файлов, свои материалы'}</div></div>` : '<span class="small muted">Веба нет — только бот.</span>'}</div>`;
+    view.querySelectorAll('[data-k]').forEach((b) => (b.onclick = () => { keep(); st[b.dataset.k] = b.dataset.v === 'true' ? true : b.dataset.v === 'false' ? false : b.dataset.v; draw(); }));
+    view.querySelectorAll('[data-f]').forEach((b) => (b.onchange = () => { keep(); st[b.dataset.f] = b.checked; draw(); }));
+    $('#invGo').onclick = async () => {
+      keep();
+      if (!st.name?.trim()) return $('#invName').focus();
+      const r = await post('/api/access', {action: 'invite', name: st.name, note: st.note, role: st.role, web: st.web, onCamera: st.role === 'member' && st.onCamera, deputyUntil: st.role === 'member' && st.deputy ? st.deputyUntil : null}).catch(() => null);
+      if (!r?.invite) return toast('Не получилось');
+      $('#invOut').innerHTML = linkBox(r.invite);
+      wireCopy($('#invOut'));
+    };
   };
+  const keep = () => { st.name = $('#invName')?.value; st.note = $('#invNote')?.value; st.deputyUntil = $('#invUntil')?.value || st.deputyUntil; };
+  draw();
+}
+
+function teamPerson(a, pid) {
+  const x = a.people.find((y) => y.id === pid);
+  if (!x) { view.innerHTML = '<div class="page"><p class="muted">Такого человека нет. <a href="#/settings/team">Команда</a></p></div>'; return; }
+  const self = x.id === a.me, locked = x.isOwner && !isOwner();
+  const upd = async (patch) => { await post('/api/access', {action: 'update', id: x.id, ...patch}); route(); };
+  const can = (ok, t) => `<div class="row small" style="gap: 8px; padding: 4px 0"><span style="color: ${ok ? 'var(--green)' : '#C4C4C4'}; font-weight: 700">${ok ? '✓' : '—'}</span><span style="${ok ? '' : 'color: #A3A3A3'}">${t}</span></div>`;
+  const ed = x.editorNow;
+  view.innerHTML = `<div class="page" style="padding: 18px 36px 28px; gap: 16px; max-width: 1240px">
+    <div class="row"><a class="small muted" href="#/settings/team">Команда</a><span class="muted">›</span>${avatar(x.name)}<div><h2 style="font-size: 17px">${esc(x.name)}${self ? ' (вы)' : ''}</h2><div class="small muted">${esc(x.note || '')} в команде с ${new Date(x.added || Date.now()).toLocaleDateString('ru', {day: 'numeric', month: 'long'})}</div></div><span class="row" style="margin-left: auto; gap: 5px">${teamChips(x)}</span></div>
+    <div class="split" style="gap: 24px; align-items: flex-start">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <div class="card tcard2"><span class="lbl">Роль и права</span>
+          <div class="row"><span class="seg">${[['editor', 'Редактор'], ['member', 'Участник']].map(([k, t]) => `<button type="button" data-role="${k}" class="${x.role === k ? 'on' : ''}" ${locked || self || (x.isOwner && k === 'member') ? 'disabled' : ''}>${t}</button>`).join('')}</span><span class="small muted">роль меняется сразу</span></div>
+          ${x.role === 'member' ? `<label class="tflag"><input type="checkbox" id="depOn" ${x.deputyUntil ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><b>Замещает редактора</b><span class="small muted">Права редактора до даты включительно, потом снова участник. Команду и подписку не трогает.</span>${x.deputyUntil ? `<input class="f" type="date" id="depUntil" value="${esc(x.deputyUntil)}" style="width: auto; margin-top: 6px">` : ''}</span></label>` : ''}
+          ${x.role === 'editor' ? `<label class="tflag"><input type="checkbox" id="ownOn" ${x.isOwner ? 'checked' : ''} ${isOwner() && !self ? '' : 'disabled'}><span><b>Владелец</b><span class="small muted">Подписка, роли, сигналы владельцу. Ставит и снимает только владелец.</span></span></label>` : ''}</div>
+        <div class="card tcard2"><span class="lbl">Как входит · паролей нет</span>
+          ${x.bot ? `<div class="li"><span>${svg('tg', 18)}</span><span style="flex: 1"><b>Телеграм${x.bot.username ? ' · @' + esc(x.bot.username) : ''}</b><div class="small muted">последний раз ${ago2(x.bot.seen)}</div></span>${!locked && !self && !x.isOwner ? '<button type="button" class="btn" id="tgOff">Отключить бот</button>' : ''}</div>` : '<div class="li small muted">Бот не подключён.</div>'}
+          ${x.devices.map((d) => `<div class="li"><span>${svg('web', 18)}</span><span style="flex: 1"><b>${esc(d.device)}${d.mine ? ' · это устройство' : ''}</b><div class="small muted">веб · вход ${new Date(d.created).toLocaleDateString('ru', {day: 'numeric', month: 'short'})} · ${ago2(d.seen)}</div></span>${d.mine || locked ? '' : `<button type="button" class="btn" data-end="${esc(d.id)}">Завершить</button>`}</div>`).join('') || (ed || x.web ? '<div class="li small muted">В веб ещё не входил.</div>' : '')}
+          ${x.role === 'member' ? `<label class="tflag"><input type="checkbox" id="webOn" ${x.web ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><b>Веб на компьютере</b><span class="small muted">Без этого у участника только бот; выключение закрывает его входы в веб.</span></span></label>` : ''}
+          <div class="row" style="padding-top: 6px">${locked ? '' : '<button type="button" class="btn" id="relink">Новая ссылка входа</button><span class="small muted" style="flex: 1">если сменил телефон или потерял вход</span>'}${!locked && !self && !x.isOwner ? '<button type="button" class="btn danger" id="rm">Убрать из команды</button>' : ''}</div>
+          <div id="relOut"></div></div>
+      </div>
+      <div style="flex: 0 0 360px; display: flex; flex-direction: column; gap: 14px">
+        <div class="card tcard2"><span class="lbl">Съёмка</span><label class="tflag"><input type="checkbox" id="camOn" ${x.onCamera ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><b>Будет сниматься в кадре</b><span class="small muted">Задания «снять себя»; согласие на лицо — при первом таком задании.</span></span></label></div>
+        ${a.people.length >= 3 ? `<div class="card tcard2"><span class="lbl">Группы и точка</span><input class="f" id="groups" value="${esc((x.groups || []).join(', '))}" placeholder="Учителя, корпус «Старшая»" ${locked ? 'disabled' : ''}><span class="small muted">Через запятую. Задание группе получат все её участники.</span></div>` : ''}
+        <div class="card tcard2"><span class="lbl">Что может сейчас</span>${can(true, 'Скинуть материал, идею')}${can(x.onCamera || ed, 'Задания «снять себя»')}${can(true, 'Мои материалы, убрать своё')}${can(ed, 'Варианты, план, выпуски' + (x.deputyUntil && x.role === 'member' ? ' — пока замещает' : ''))}${can(ed, 'Команда и приглашения')}${can(!!x.isOwner, 'Подписка, роли владельца, правила хранения')}</div>
+      </div></div></div>`;
+  view.querySelectorAll('[data-role]').forEach((b) => (b.onclick = () => upd({role: b.dataset.role})));
+  $('#depOn')?.addEventListener('change', (e) => upd({deputyUntil: e.target.checked ? new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10) : null}));
+  $('#depUntil')?.addEventListener('change', (e) => upd({deputyUntil: e.target.value}));
+  $('#ownOn')?.addEventListener('change', (e) => upd({isOwner: e.target.checked}));
+  $('#webOn')?.addEventListener('change', (e) => upd({web: e.target.checked}));
+  $('#camOn')?.addEventListener('change', (e) => upd({onCamera: e.target.checked}));
+  $('#groups')?.addEventListener('change', (e) => upd({groups: e.target.value.split(',').map((g) => g.trim()).filter(Boolean)}));
+  $('#tgOff')?.addEventListener('click', async () => { if (confirm(`Отключить бот у ${x.name}?`)) { await post('/api/access', {action: 'end-telegram', id: x.id}); route(); } });
+  view.querySelectorAll('[data-end]').forEach((b) => (b.onclick = async () => { await post('/api/access', {action: 'end', session: b.dataset.end}); route(); }));
+  $('#rm')?.addEventListener('click', async () => { if (confirm(`Убрать ${x.name} из команды? Входы закроются.`)) { await post('/api/access', {action: 'remove', id: x.id}); location.hash = '#/settings/team'; } });
+  $('#relink')?.addEventListener('click', async () => { const r = await post('/api/access', {action: 'relink', id: x.id}).catch(() => null); if (r?.invite) { $('#relOut').innerHTML = linkBox(r.invite); wireCopy($('#relOut')); } });
+}
+
+// «Входящие» (team of two or more): what people sent through the bot or their page.
+async function vInbox() {
+  title('Входящие');
+  const {authors} = await api('/api/authors');
+  const ST = {sent: 'новое', idea: 'идея', private: 'не публиковать', used: 'взяли', skip: 'не взяли'};
+  view.innerHTML = `<div class="chead" style="padding: 0 28px; min-height: 56px"><b style="font-size: 14px">Входящие</b><span class="small muted" style="margin-left: 10px">что прислали участники — через бот или свою страницу</span></div>
+    <div class="page" style="padding: 22px 32px; max-width: 1100px">${authors.map((e) => `<div class="li" style="align-items: flex-start"><span style="flex: 1; min-width: 220px"><b>${esc(e.who || 'Участник')}</b> <span class="small muted">· ${e.kind === 'idea' ? 'идея' : e.via === 'web' ? 'с компьютера' : 'через бот'}${e.cls ? ' · ' + esc(e.cls) : ''}</span>${e.rubric ? ` <span class="chip">${esc(e.rubric)}</span>` : ''}<div class="small muted" style="margin-top: 3px">${esc(((e.items || []).map((i) => i.text || i.said).filter(Boolean).join(' ') || e.text || '').slice(0, 200))}</div></span>
+      <span class="row" style="gap: 6px">${(e.items || []).filter((i) => i.url).slice(0, 4).map((i) => i.kind === 'photo' ? `<a href="${i.url}" target="_blank" rel="noopener" class="th" style="width: 44px; height: 55px; background-image: url('${i.url}')"></a>` : `<a class="btn" href="${i.url}" target="_blank" rel="noopener">${i.kind === 'video' ? 'видео' : 'голос'}</a>`).join('')}</span><span class="small muted" style="width: 120px; text-align: right">${ST[e.status] || ''} · ${ago(e.at)}</span></div>`).join('') || '<p class="muted">Пока пусто. Пригласите участников в «Настройки → Команда».</p>'}</div>`;
+}
+
+// ---------- a member's web (D4): their tasks, sending material, what they sent ----------
+let MEM = null;
+async function memberSidebar() {
+  MEM = await api('/api/member');
+  const cur = location.hash || '#/';
+  const item = (h, i, t, n = '') => `<a class="nav ${cur === h ? 'on' : ''}" href="${h}">${svg(i)}<span>${t}</span>${n}</a>`;
+  $('#side').innerHTML = `<div class="ph"><span class="logo">${esc(projName().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase())}</span><b style="font-size: 14px">${esc(projName())}</b></div>
+    ${item('#/', 'home', 'Мои задания', MEM.tasks.length ? `<span class="bdg">${MEM.tasks.length}</span>` : '')}
+    ${item('#/send', 'up', 'Скинуть')}
+    ${item('#/mine', 'folder2', 'Мои материалы', `<span class="n">${MEM.sent.length}</span>`)}
+    <div style="margin-top: auto; padding-top: 16px"><div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">участник</span></div></div>`;
+}
+
+async function vMember(h) {
+  const bot = MEM.bot ? `https://t.me/${MEM.bot}` : null;
+  const drop = `<label class="drop" id="mDrop" style="padding: 32px"><input type="file" multiple hidden id="mUp"><span style="display: grid; justify-items: center; gap: 6px">${svg('up', 22)}<b style="color: var(--ink); font-weight: 600">Перетащи фото, видео, голос</b><span class="small">или нажми, чтобы выбрать · Claude сам поймёт, к чему это</span></span></label>
+    <input class="f" id="mNote" placeholder="Пара слов, если хочется: «7Б, опыт с медью»">`;
+  const ST = {sent: 'отправлено', idea: 'идея', private: 'не публиковать', used: 'взяли', skip: 'не взяли'};
+  const mine = (list) => list.map((e) => `<div class="li"><span class="row" style="gap: 4px">${(e.items || []).filter((i) => i.url && i.kind === 'photo').slice(0, 3).map((i) => `<span class="th" style="width: 36px; height: 45px; background-image: url('${i.url}')"></span>`).join('') || `<span class="th" style="width: 36px; height: 45px; background: var(--soft); display: grid; place-items: center">${svg(e.kind === 'idea' ? 'idea' : 'folder2', 16)}</span>`}</span><span style="flex: 1; min-width: 0"><b>${e.kind === 'idea' ? 'Идея' : (e.items || []).length + ' ' + ((e.items || []).length === 1 ? 'файл' : 'файла')}${e.cls ? ' · ' + esc(e.cls) : ''}</b><div class="small muted">${esc((e.text || (e.items || []).map((i) => i.text).filter(Boolean).join(' ') || '').slice(0, 100))}</div></span><span class="small muted">${ST[e.status] || ''} · ${ago(e.at)}</span></div>`).join('') || '<p class="small muted">Пока ничего.</p>';
+  if (h === '#/send') {
+    title('Скинуть');
+    view.innerHTML = `<div class="page" style="max-width: 760px; padding: 40px 32px; gap: 16px"><h1>Скинуть материал</h1><div class="muted" style="font-size: 15px; margin-top: -8px">Как есть, без подписей — тексты напишет Claude, решает редактор.</div>${drop}${bot ? `<p class="small muted">С телефона удобнее через бот: <a href="${bot}" target="_blank" rel="noopener">открыть в Телеграме</a>.</p>` : ''}</div>`;
+  } else if (h === '#/mine') {
+    title('Мои материалы');
+    view.innerHTML = `<div class="page" style="max-width: 900px; padding: 32px; gap: 14px"><h1>Мои материалы</h1><div class="small muted">Что вы присылали и что с этим стало. Убрать своё или отозвать согласие на лицо — в боте, «📚 Мои материалы».</div>${mine(MEM.sent)}</div>`;
+  } else {
+    title('Мои задания');
+    const h1 = new Date().getHours();
+    view.innerHTML = `<div class="page" style="max-width: 1100px; padding: 40px 32px; gap: 18px"><div><h1>${h1 < 12 ? 'Доброе утро' : h1 < 18 ? 'Добрый день' : 'Добрый вечер'}, ${esc(ME.name)}</h1><div class="muted" style="font-size: 15px; margin-top: 4px">${MEM.tasks.length ? `${MEM.tasks.length} ${MEM.tasks.length === 1 ? 'задание' : 'задания'} на неделю.` : 'Заданий сейчас нет.'} Скидывайте фото и видео как есть — тексты напишет Claude.</div></div>
+      <div class="split" style="gap: 24px; align-items: flex-start"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px"><span class="lbl">Задания</span>
+        ${MEM.tasks.map((t) => `<div class="card" style="display: flex; gap: 14px; align-items: center"><span style="width: 40px; height: 40px; border-radius: 11px; background: var(--soft); display: grid; place-items: center">${svg('cam', 20)}</span><span style="flex: 1"><b>Снять себя: ${esc(t.title)}</b><div class="small muted">${esc((t.text || '').slice(0, 90))}</div></span>${bot ? `<a class="btn primary" href="${bot}" target="_blank" rel="noopener">Снять в Телеграме</a>` : ''}</div>`).join('') || `<p class="small muted">${ME.onCamera ? 'Новых заданий нет.' : 'Задания «снять себя» появятся, если редактор отметит, что вы снимаетесь в кадре.'}</p>`}
+        ${drop}</div>
+        <div style="flex: 0 0 340px" class="card"><span class="lbl">Недавно</span>${mine(MEM.sent.slice(0, 4))}<a class="small" href="#/mine">Все материалы →</a></div></div></div>`;
+  }
+  const up = async (files) => {
+    const d = $('#mDrop'), note = $('#mNote')?.value || '';
+    for (const [i, f] of [...files].entries()) {
+      d.querySelector('b').textContent = `Отправляю ${i + 1} из ${files.length}…`;
+      await fetch(`/api/member/upload?project=${encodeURIComponent(P)}&name=${encodeURIComponent(f.name)}&note=${encodeURIComponent(note)}`, {method: 'POST', body: f});
+    }
+    toast(`Отправлено: ${files.length}. Редактор увидит во «Входящих».`);
+    route();
+  };
+  const d = $('#mDrop');
+  if (d) {
+    $('#mUp').onchange = (e) => e.target.files.length && up(e.target.files);
+    d.ondragover = (e) => { e.preventDefault(); d.classList.add('over'); };
+    d.ondragleave = () => d.classList.remove('over');
+    d.ondrop = (e) => { e.preventDefault(); d.classList.remove('over'); if (e.dataTransfer.files.length) up(e.dataTransfer.files); };
+  }
 }
 
 async function route() {
@@ -1294,13 +1451,15 @@ async function route() {
     await sidebar();
     let m;
     view = $('#view');
-    if ((m = /^#\/reel\/([\w-]+)(?:\/(\w+))?/.exec(h))) await vReel(m[1], m[2]);
+    if (isMember()) await vMember(h);
+    else if ((m = /^#\/reel\/([\w-]+)(?:\/(\w+))?/.exec(h))) await vReel(m[1], m[2]);
     else if ((m = /^#\/chat\/(_project)/.exec(h))) await vChat(m[1]);
     else if (h === '#/new') await vNew();
     else if ((m = /^#\/knowledge(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vKnowledge(m[1], m[2]);
     else if ((m = /^#\/plan(?:\/(-?\d+))?$/.exec(h))) await vPlan(Number(m[1] || 0));
     else if ((m = /^#\/rubric\/([\w-]+)/.exec(h))) await vRubric(m[1]);
-    else if ((m = /^#\/settings(?:\/(\w+))?/.exec(h))) await vSettings(m[1]);
+    else if ((m = /^#\/settings(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vSettings(m[1], m[2]);
+    else if (h === '#/inbox') await vInbox();
     else if (h === '#/ds') location.replace('#/settings/ds');
     else if (h === '#/files') location.replace('#/settings/files');
     else if (h === '#/access') location.replace('#/settings/access');
@@ -1316,7 +1475,7 @@ document.addEventListener('click', (e) => { if (document.body.classList.contains
 window.addEventListener('hashchange', route);
 (async () => {
   const d = await (await fetch('/api/me')).json();
-  ME = d.me; PROJECTS = d.projects;
+  ME = d.me; PROJECTS = d.projects; TEAM = d.team || 1;
   if (!PROJECTS.some((x) => x.slug === P)) P = PROJECTS[0]?.slug || 'main';
   route();
 })();
