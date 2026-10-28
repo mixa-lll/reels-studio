@@ -757,12 +757,12 @@ function drawDone() {
 function drawReels() {
   const ST = {published: ['вышел', 'o'], done: ['готов', 'o'], review: ['у редактора', 'm'], work: ['готовится', 'm'], none: ['готовится', 'm']};
   const sent = S.tasks.filter((t) => t.status === 'sent');
-  const row = (title, sub, [st, c], icon, v) => `<div class="li"><span class="ti" style="${tint(v)}">${ic(icon, 22)}</span><span class="tx"><b>${esc(title)}</b><span>${esc(sub)}</span></span><span class="st ${c}">${st}</span></div>`;
+  const row = (title, sub, [st, c], icon, v, reel) => `<div class="li"><span class="ti" style="${tint(v)}">${ic(icon, 22)}</span><span class="tx"><b>${esc(title)}</b><span>${esc(sub)}</span>${reel ? `<button class="lk" style="height:34px;width:auto;justify-content:flex-start;padding:0;margin-top:2px;font-size:15px" data-reel="${esc(reel)}">${ic('pen', 16)}Открыть редактор</button>` : ''}</span><span class="st ${c}">${st}</span></div>`;
   root.innerHTML = `<div class="scr">
     <h1 style="margin-top:10px">Мои ролики</h1><p class="sub">Записи, которые вы отправили, и ролики проекта</p>
     ${sent.length ? `<div class="lh">Отправлены редактору</div><div class="grp">${sent.map((t) => row(t.title, new Date(t.sentAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}), ['отправлено', 'm'], 'upload', '--b')).join('')}</div>` : ''}
     <div class="lh">Ролики проекта</div>
-    ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 8).map((r) => row(r.title, r.version ? `версия ${r.version.slice(1)}` : 'в работе', ST[r.status] || ST.none, r.status === 'published' || r.status === 'done' ? 'check' : 'film', r.status === 'published' || r.status === 'done' ? '--g' : '--v')).join('')}</div>` : '<p class="sub">Пока пусто — первые ролики появятся здесь.</p>'}
+    ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 8).map((r) => row(r.title, r.version ? `версия ${r.version.slice(1)}` : 'в работе', ST[r.status] || ST.none, r.status === 'published' || r.status === 'done' ? 'check' : 'film', r.status === 'published' || r.status === 'done' ? '--g' : '--v', S.me.studio && r.version ? r.id : null)).join('')}</div>` : '<p class="sub">Пока пусто — первые ролики появятся здесь.</p>'}
     <p class="cap" style="margin-top:14px">Скачать ролик или попросить убрать — скоро здесь. Пока — напишите редактору в чате.</p>
   </div>${tabs()}`;
 }
@@ -1037,14 +1037,20 @@ root.addEventListener('click', (e) => {
   const tk = e.target.closest('[data-task]');
   if (tk && !stack.length) return go('task', tk.dataset.task);
   const rl = e.target.closest('[data-reel]');
-  if (rl && !stack.length) { E = null; return go('ed', {id: rl.dataset.reel}); }
+  if (rl && !stack.length) { E = null; tab = 'studio'; return go('ed', {id: rl.dataset.reel}); }
 });
 
 (async () => {
   try { tg.ready(); tg.expand(); tg.BackButton.onClick(() => (cam ? cam() : back())); tg.onEvent('themeChanged', () => { theme(); draw(); }); } catch {}
   theme();
   if (!tg?.initData) { root.innerHTML = '<div class="err"><h1 class="t2">Откройте из Телеграма</h1><p class="sub">Это приложение работает внутри бота: нажмите «Съёмка» в чате с ботом.</p></div>'; return; }
-  try { S = await api('/api/app/state'); draw(); }
+  try {
+    S = await api('/api/app/state');
+    // «✎ Открыть редактор» under a version in the bot chat opens /app?ed=<reel>.
+    const ed = new URLSearchParams(location.search).get('ed');
+    if (ed && S.me.studio) { tab = 'studio'; stack = [{screen: 'ed', arg: {id: ed}}]; }
+    draw();
+  }
   catch (e) { root.innerHTML = `<div class="err"><h1 class="t2">Не получилось открыть</h1><p class="sub">${esc(e.message)}</p></div>`; }
 })();
 </script>
