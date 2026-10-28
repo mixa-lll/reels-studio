@@ -89,6 +89,17 @@
   .keys:empty { display: none; }
   form.send { border-top: 1px solid var(--line); padding: 10px 24px calc(10px + env(safe-area-inset-bottom)); }
   form.send .in { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
+  form.send .files { max-width: 760px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  form.send .files:empty { display: none; }
+  .fchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 6px 6px 6px 10px; font-size: 13px; }
+  .fchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fchip small { color: var(--muted); }
+  .fchip button { border: 0; background: none; color: var(--muted); width: 22px; height: 22px; border-radius: 6px; cursor: pointer; }
+  .fchip button:hover { background: var(--soft); color: var(--ink); }
+  .msg.me .fchip { margin-top: 6px; background: rgba(255,255,255,.55); border-color: transparent; padding-right: 10px; }
+  .msg.me .fchip:first-child { margin-top: 0; }
+  .dropzone { position: relative; }
+  .dropzone.over::after { content: 'Отпустите, чтобы прикрепить'; position: absolute; inset: 8px; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 16px; background: color-mix(in srgb, var(--card) 88%, transparent); font-weight: 600; color: var(--ink); pointer-events: none; z-index: 5; }
   form.send textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); max-height: 160px; min-height: 44px; }
   .icon { width: 44px; height: 44px; border: 1px solid var(--line); background: var(--card); border-radius: 12px; display: grid; place-items: center; flex: none; }
   .icon.go { background: var(--ink); border-color: var(--ink); color: #fff; border-radius: 50%; }
@@ -434,7 +445,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
   el.innerHTML = `<div class="log"><div class="in"></div></div>
     <div class="status"><i class="spin"></i><span style="display: flex; flex-direction: column; min-width: 0"><span class="stext">Думаю…</span><span class="shint small"></span></span><button class="btn" type="button" style="margin-left: auto; min-height: 32px">Стоп</button></div>
     <div class="keys"></div>
-    ${canEdit() ? `<form class="send"><div class="in">
+    ${canEdit() ? `<form class="send"><div class="files" aria-live="polite"></div><div class="in">
       <button type="button" class="icon clip" aria-label="Прикрепить файл"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"></path></svg></button>
       <input type="file" multiple hidden>
       <label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)" for="ta-${esc(key)}">Сообщение</label>
@@ -483,7 +494,13 @@ function chatBox(key, {onDone, onRebind} = {}) {
   const render = (m) => {
     $('.hint', log)?.remove();
     const d = document.createElement('div');
-    if (m.from === 'me') { d.className = 'msg me'; d.innerHTML = (m.by && m.by !== ME.name ? `<span class="by">${esc(m.by)}</span>` : '') + esc(m.text); }
+    if (m.from === 'me') {
+      d.className = 'msg me';
+      // Attachments travel as «📎 name» lines of the shown text; they come back as chips.
+      const lines = String(m.text || '').split('\n'), files = lines.filter((l) => l.startsWith('📎 ')), text = lines.filter((l) => !l.startsWith('📎 ')).join('\n').trim();
+      d.innerHTML = (m.by && m.by !== ME.name ? `<span class="by">${esc(m.by)}</span>` : '') + (text ? `<div>${esc(text)}</div>` : '')
+        + files.map((l) => `<div class="fchip">${svg('clip', 14)}<span>${esc(l.slice(3))}</span></div>`).join('');
+    }
     else if (m.kind === 'error') { d.className = 'msg err'; d.textContent = '⚠️ ' + m.text; }
     else {
       d.className = 'msg bot';
@@ -543,26 +560,51 @@ function chatBox(key, {onDone, onRebind} = {}) {
     } else if (busy) setBusy(false);
   }
   if (ta) {
-    const form = $('form', el), file = $('input[type=file]', el), clip = $('.clip', el);
+    const form = $('form', el), file = $('input[type=file]', el), clip = $('.clip', el), chips = $('.files', el);
+    let picked = [];
+    const showPicked = () => {
+      chips.innerHTML = picked.map((f, i) => `<div class="fchip">${svg('clip', 14)}<span>${esc(f.name)}</span><small>${f.size < 1e6 ? Math.max(1, Math.round(f.size / 1e3)) + ' КБ' : mb(f.size)}</small><button type="button" data-rm="${i}" aria-label="Убрать ${esc(f.name)}">✕</button></div>`).join('');
+      chips.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { picked.splice(+b.dataset.rm, 1); showPicked(); }));
+    };
+    const add = (list) => { picked.push(...list); showPicked(); ta.focus(); };
     ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
     ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; });
     clip.onclick = () => file.click();
-    file.onchange = () => { clip.style.borderColor = file.files.length ? 'var(--accent)' : ''; clip.title = [...file.files].map((f) => f.name).join(', '); };
+    file.onchange = () => { add([...file.files]); file.value = ''; };
+    // Files dropped anywhere on the chat are attached like the clip does.
+    el.classList.add('dropzone');
+    let depth = 0;
+    const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
+    el.addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; el.classList.add('over'); });
+    el.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+    el.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; el.classList.remove('over'); } });
+    el.addEventListener('drop', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth = 0; el.classList.remove('over'); if (!busy) add([...e.dataTransfer.files]); });
     form.onsubmit = async (e) => {
       e.preventDefault();
-      const files = [...file.files], text = ta.value.trim();
+      const files = [...picked], text = ta.value.trim();
       if ((!text && !files.length) || busy) return;
-      ta.value = ''; ta.style.height = 'auto';
-      const parts = [];
-      for (const f of files) {
-        setBusy(true, `Загружаю ${f.name}…`);
-        const toReel = !key.startsWith('_') && !key.startsWith('new-') ? `&reel=${encodeURIComponent(key)}` : '';
-        const r = await fetch(`/api/upload?project=${encodeURIComponent(P)}${toReel}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f});
-        if (r.ok) parts.push(`(attached file → ${(await r.json()).path})`);
+      const parts = [], shown = [];
+      try {
+        for (const f of files) {
+          setBusy(true, `Загружаю ${f.name}…`);
+          const toReel = !key.startsWith('_') && !key.startsWith('new-') ? `&reel=${encodeURIComponent(key)}` : '';
+          const r = await fetch(`/api/upload?project=${encodeURIComponent(P)}${toReel}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f});
+          if (!r.ok) throw new Error(r.status === 413 ? `${f.name} слишком большой для загрузки` : `${f.name} не загрузился (ошибка ${r.status})`);
+          const u = await r.json();
+          parts.push(`(attached file → ${u.path})`);
+          if (u.digest) parts.push(`(Telegram export «${u.digest.name}», ${u.digest.count} messages unpacked → ${u.digest.path}; ${u.digest.photos} photos it links are in photos/ beside it — open them to see the design)`);
+          shown.push('📎 ' + f.name + (u.digest ? ` · выгрузка Telegram: ${u.digest.count} сообщ., ${u.digest.photos} фото` : ''));
+        }
+      } catch (err) {
+        // Nothing is sent: the text and the files stay in the box to try again.
+        setBusy(false);
+        toast(err.message === 'Failed to fetch' ? 'Файл не загрузился: связь оборвалась. Текст и вложения остались — попробуйте ещё раз' : err.message);
+        return;
       }
       setBusy(false);
-      file.value = ''; clip.style.borderColor = ''; clip.title = '';
-      say([text, ...parts].filter(Boolean).join('\n'), [text, ...files.map((f) => '📎 ' + f.name)].filter(Boolean).join('\n'));
+      ta.value = ''; ta.style.height = 'auto';
+      picked = []; showPicked();
+      say([text, ...parts].filter(Boolean).join('\n'), [text, ...shown].filter(Boolean).join('\n'));
     };
   }
   el.say = say;

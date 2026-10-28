@@ -44,7 +44,7 @@ The owner picks and judges; you do everything else. Every reel is fully automate
 
 When `<project>/brief.md` has no content yet:
 
-1. Ask what the reels are about. Accept anything: a product link, a repo or folder path, a description, a voice note. The bot already asks this when the owner first presses Start and when a project is created, so if the message answers it, go straight on.
+1. Ask what the reels are about. Accept anything: a product link, a repo or folder path, a description, a voice note. A Telegram channel or chat export (.zip) attached in the studio arrives unpacked: `posts.md` (every post with date, reactions and a link to its photo) and `photos/` beside it — read posts.md, open a dozen photos from different months to see the design, and use both for the brief, the rubrics, the voice and the design notes. The bot already asks this when the owner first presses Start and when a project is created, so if the message answers it, go straight on.
 2. Study it (open the site, read the repo's README and docs), then ask at most three short questions about what you could not find: audience, the one thing viewers should do after watching, language of on-screen text.
 3. If `ideasBoard` is set, open it: bring the owner's ideas from it into «Owner's ideas» as they wrote them and note in the brief how the board is organised. If you cannot reach it, say so in one line (what is missing, e.g. a connection to that service) and go on without it.
 4. Fill `<project>/brief.md`; if `name` in `<project>/settings.json` is empty, set a 1–3 word name for the project from the brief (in the owner's language).
