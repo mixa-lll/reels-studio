@@ -187,14 +187,14 @@ const state = loadState();
 // Team texts: members invited from the web version (bot/members.mjs).
 const TEAM = {
   ru: {
-    welcome: (name) => `Привет, ${name}! Ты подключён к боту рилсов как монтажёр: пиши, что сделать, — Claude возьмётся. Проект общий с владельцем; бот работает с одним человеком за раз.`,
+    welcome: (name) => `Привет, ${name}! Ты подключён к боту как редактор: пиши, что сделать, — Claude возьмётся. Проект общий с командой; бот работает с одним человеком за раз.`,
     viewer: 'У тебя доступ только на просмотр — смотри и скачивай рилсы в веб-версии.',
     busy: (who) => `Сейчас Claude занят задачей: ${who}. Я напишу, как только он освободится, — тогда пришли сообщение ещё раз.`,
     free: '✅ Claude освободился — можно писать.',
     ownerOnly: 'Эту команду может использовать только владелец бота.',
   },
   en: {
-    welcome: (name) => `Hi ${name}! You are connected to the reels bot as an editor: write what to do and Claude takes it. The project is shared with the owner; the bot works with one person at a time.`,
+    welcome: (name) => `Hi ${name}! You are connected to the bot as an editor: write what to do and Claude takes it. The project is shared with the team; the bot works with one person at a time.`,
     viewer: 'You have view-only access: watch and download reels in the web version.',
     busy: (who) => `Claude is busy with a task for ${who}. I will tell you when it is free; then send your message again.`,
     free: '✅ Claude is free now — go ahead.',

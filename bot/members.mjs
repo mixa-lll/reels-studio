@@ -1,19 +1,23 @@
 // Team members besides the owner, invited from the web version.
 //
 // The list lives in REELS_MEMBERS (a JSON file the web version writes too):
-//   {people: [{id, name, role: 'owner'|'editor'|'viewer', telegram?: {id, chatId, username}}],
+//   {people: [{id, name, role: 'editor'|'member', isOwner?, deputyUntil?, onCamera?, telegram?: {id, chatId, username}}],
 //    invites: [{code, name, role, expires, telegram: bool, web: bool, person?, claimed?: [...]}]}
+// (bot/roles.mjs; older owner / viewer / author lists read as the new shape.)
 // Without REELS_MEMBERS the bot stays a one-owner bot. Members share the owner's
 // project and agent; the bot serves one person at a time (see bot.mjs, «team»).
 import {existsSync, readFileSync, renameSync, writeFileSync} from 'node:fs';
 import {randomBytes} from 'node:crypto';
 import {dirname, join} from 'node:path';
+import {isEditor, normalize} from './roles.mjs';
 
 export const FILE = process.env.REELS_MEMBERS || '';
 
 function load() {
   try {
-    return {people: [], invites: [], sessions: [], ...JSON.parse(readFileSync(FILE, 'utf8'))};
+    const a = {people: [], invites: [], sessions: [], ...JSON.parse(readFileSync(FILE, 'utf8'))};
+    a.people = a.people.map(normalize);
+    return a;
   } catch {
     return {people: [], invites: [], sessions: []};
   }
@@ -23,11 +27,15 @@ function save(a) {
   renameSync(`${FILE}.tmp`, FILE);
 }
 
-/** The member with this Telegram id who may talk to the agent (editors), or null. */
+/**
+ * The team member with this Telegram id, or null. In the bot an editor (or a deputy)
+ * talks to the agent ('editor'); a member gets the button dialog for sending material
+ * ('author', bot/author.mjs).
+ */
 export function member(telegramId) {
   if (!FILE) return null;
-  const p = load().people.find((x) => x.telegram?.id === telegramId && x.role !== 'owner');
-  return p ? {name: p.name, role: p.role, chatId: p.telegram.chatId} : null;
+  const p = load().people.find((x) => x.telegram?.id === telegramId && !x.isOwner);
+  return p ? {name: p.name, role: isEditor(p) ? 'editor' : 'author', onCamera: !!p.onCamera, chatId: p.telegram.chatId} : null;
 }
 
 /** Notes when a member last wrote, for the web version's list of sessions (at most once a minute). */
@@ -48,7 +56,7 @@ export function claim(code, from, chatId) {
   if (!inv) return null;
   let person = a.people.find((x) => x.id === inv.person);
   if (!person) {
-    person = {id: randomBytes(18).toString('base64url'), name: inv.name, role: inv.role, added: Date.now()};
+    person = normalize({id: randomBytes(18).toString('base64url'), name: inv.name, role: inv.role, onCamera: !!inv.onCamera, web: !!inv.web, deputyUntil: inv.deputyUntil || null, added: Date.now()});
     a.people.push(person);
     inv.person = person.id;
   }
@@ -58,7 +66,7 @@ export function claim(code, from, chatId) {
   if (!inv.web || inv.claimed.includes('web')) a.invites = a.invites.filter((x) => x !== inv);
   save(a);
   appendLog(person.name, 'подключился к Telegram-боту по приглашению');
-  return {name: person.name, role: person.role};
+  return {name: person.name, role: isEditor(person) ? 'editor' : 'author'};
 }
 
 /** The bot's @username, for the web version's invite links. */
