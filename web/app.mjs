@@ -177,7 +177,8 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
     if (req.method === 'GET' && url.pathname === '/api/app/state') {
       const prof = profiles(p)[me.key] || {};
       const mine = reels(p).map((r) => ({id: r.id, title: r.title, status: r.status, version: r.version, updated: r.updated}));
-      return json(200, {me: {name: me.name, role: me.role}, project: p, week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks, reels: mine,
+      // A task for one person (to) is shown to them only; one without «to» to everyone.
+      return json(200, {me: {name: me.name, role: me.role}, project: p, week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
         profile: {langs: 'русский, английский', when: 'вт и чт после 15:00', where: 'кабинет 204, у окна', speed: 1, size: 'large', consent: true, ...prof}});
     }
     let b = {};

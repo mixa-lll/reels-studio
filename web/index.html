@@ -362,6 +362,7 @@ async function sidebar() {
     ${TEAM > 1 ? item('#/inbox', 'inbox', 'Входящие', OV.inbox ? `<span class="bdg">${OV.inbox}</span>` : '') : ''}
     <div class="gh">План</div>
     ${item('#/plan', 'cal', 'Календарь')}
+    ${TEAM > 1 ? item('#/tasks', 'people', 'Задания людям') : ''}
     ${item('#/new', 'idea', 'Идеи', `<span class="n">${OV.ideasCount}</span>`)}
     ${item('#/knowledge', 'target', 'Стратегия')}
     ${(OV.rubrics || []).length ? `<div class="gh">Рубрики</div>${OV.rubrics.map((x) => `<a class="nav ${cur === '#/rubric/' + x.id ? 'on' : ''}" href="#/rubric/${esc(x.id)}" title="${esc(x.name)}"><span style="width: 16px; display: grid; place-items: center"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${esc(x.color || '#737373')}"></span></span><span>${esc(x.name)}</span><span class="n">${x.n || ''}</span></a>`).join('')}` : ''}
@@ -1227,7 +1228,7 @@ async function vRubric(id) {
 // Project settings: title + tabs on top, each tab is one of the older pages rendered below.
 async function vSettings(tab = 'ds', sub) {
   if (tab === 'access') tab = 'team';
-  const tabs = [['ds', 'Дизайн-система', vDs], ['files', 'Файлы и место', vFiles], ['team', 'Команда', () => vTeam(sub)]];
+  const tabs = [['voice', 'Голос и стили', vVoice], ['rules', 'Правила', vRules], ['ds', 'Дизайн-система', vDs], ['team', 'Команда', () => vTeam(sub)], ['files', 'Файлы и место', vFiles]];
   const cur = tabs.find(([k]) => k === tab) || tabs[0];
   view.innerHTML = `<div style="padding: 28px 36px 0; display: flex; flex-direction: column; gap: 18px"><h1>Настройки проекта</h1>
     <div class="utabs" role="tablist">${tabs.map(([k, t]) => `<a href="#/settings/${k}" class="${k === cur[0] ? 'on' : ''}">${t}</a>`).join('')}</div></div>
@@ -1427,13 +1428,70 @@ function teamPerson(a, pid) {
 }
 
 // «Входящие» (team of two or more): what people sent through the bot or their page.
+// Задания людям (Д2): what the mini app «Съёмка» shows each person; «снять себя» for now.
+async function vTasks() {
+  title('Задания людям');
+  const d = await api('/api/tasks');
+  const who = (id) => d.people.find((x) => x.id === id)?.name;
+  const ST = {todo: ['ждёт', 'var(--amber)'], redo: ['переснять', 'var(--amber)'], sent: ['прислали', 'var(--green)']};
+  const cam = d.people.filter((x) => x.role !== 'editor' || x.onCamera);
+  view.innerHTML = `<div class="chead" style="padding: 0 28px; min-height: 56px"><b style="font-size: 14px">Задания людям</b><span class="small muted" style="margin-left: 10px">приходят в бот и в мини-приложение «Съёмка»</span></div>
+    <div class="page" style="max-width: 1100px"><div class="split" style="gap: 28px; align-items: flex-start">
+      <div style="flex: 1 1 460px; min-width: 0"><span class="lbl">Задания · ${d.tasks.length}</span>
+        ${d.tasks.map((t) => `<div class="li" style="align-items: flex-start"><span style="color: var(--muted); padding-top: 2px">${svg('cam', 18)}</span><span style="flex: 1; min-width: 0"><b style="font-weight: 600">${esc(t.title)}</b><div class="small muted">${esc(t.to ? who(t.to) || 'кто-то из команды' : 'любому, кто снимается')} · ${t.seconds || 20} с${t.lang === 'en' ? ' · на английском' : ''}${t.place ? ' · ' + esc(t.place) : ''}</div>${t.note ? `<div class="small" style="color: var(--amber)">${esc(t.note)}</div>` : ''}</span>
+          <span class="small" style="color: ${(ST[t.status] || ['', 'var(--muted)'])[1]}; width: 80px">${(ST[t.status] || [t.status])[0]}</span>
+          <span class="row" style="gap: 6px">${t.status === 'sent' ? `<button type="button" class="btn" data-redo="${esc(t.id)}">Переснять</button>` : ''}<button type="button" class="btn" data-rm="${esc(t.id)}" aria-label="Убрать задание">✕</button></span></div>`).join('') || '<p class="muted">Заданий пока нет.</p>'}</div>
+      <form class="card" id="tNew" style="flex: 0 0 340px; display: flex; flex-direction: column; gap: 10px"><b>Новое задание · снять себя</b>
+        <label class="small muted">Кому<select class="f" name="to"><option value="">любому, кто снимается</option>${cam.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label>
+        <label class="small muted">Что снимаем<input class="f" name="title" required placeholder="День открытых дверей: что спрашивают"></label>
+        <label class="small muted">Текст, который прочитать с экрана<textarea class="f" name="text" required style="min-height: 110px" placeholder="Текст пойдёт в суфлёр"></textarea></label>
+        <div class="row" style="gap: 8px"><label class="small muted" style="flex: 1">Секунд<input class="f" name="seconds" type="number" min="5" max="90" value="20"></label><label class="small muted" style="flex: 1">Язык<select class="f" name="lang"><option value="ru">русский</option><option value="en">английский</option></select></label></div>
+        <label class="small muted">Где снять<input class="f" name="place" placeholder="у окна, свет сбоку"></label>
+        <button type="button" class="btn" id="tAsk">Попросить Claude написать текст</button>
+        <button type="submit" class="btn primary">Отправить задание</button></form>
+    </div></div>`;
+  $('#tNew').onsubmit = async (e) => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); await post('/api/tasks', {action: 'add', ...f}); toast('Задание отправлено — придёт в бот и в «Съёмку»'); vTasks(); };
+  $('#tAsk').onclick = () => { const t = $('#tNew').title.value.trim(); sessionStorage.setItem('firstMsg:_project', JSON.stringify({text: `Напиши текст для задания «снять себя»${t ? ' «' + t + '»' : ''}: 15–25 секунд, тепло, разговорно, 2–4 фразы. Пришли текст сюда.`, shown: 'Текст для задания'})); location.hash = '#/chat/_project'; };
+  view.querySelectorAll('[data-redo]').forEach((b) => (b.onclick = async () => { const note = prompt('Что поправить? Это увидит человек.'); if (note === null) return; await post('/api/tasks', {action: 'redo', id: b.dataset.redo, note}); vTasks(); }));
+  view.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = async () => { if (confirm('Убрать задание?')) { await post('/api/tasks', {action: 'remove', id: b.dataset.rm}); vTasks(); } }));
+}
+
+// Настройки › Голос и стили, Правила (Д2): from strategy.json «voice» and PLAYBOOK.md; edits go through the project chat.
+async function vVoice() {
+  const [plan] = await Promise.all([api('/api/plan')]);
+  const v = plan.strategy?.voice || {};
+  view.innerHTML = `<div class="page" style="max-width: 980px; padding: 22px 36px">${v.about || (v.styles || []).length ? `
+    ${v.about ? `<div class="blk"><span class="lbl">Голос проекта</span><div style="font-size: 15px; line-height: 1.6">${esc(v.about)}</div></div>` : ''}
+    ${(v.never || []).length ? `<div class="blk"><span class="lbl">Не говорим</span>${v.never.map((x) => `<div class="li">🔒 ${esc(x)}</div>`).join('')}</div>` : ''}
+    <div class="blk"><span class="lbl">Стили текста · ${(v.styles || []).length}</span><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px">${(v.styles || []).map((x) => `<div class="card" style="display: flex; flex-direction: column; gap: 6px"><b>${esc(x.name)}</b>${x.when ? `<span class="small muted">${esc(x.when)}</span>` : ''}${x.sample ? `<span style="line-height: 1.55">«${esc(x.sample)}»</span>` : ''}</div>`).join('')}</div></div>`
+    : `<div class="card" style="display: flex; flex-direction: column; gap: 10px; max-width: 640px"><b>Голос и стили ещё не описаны</b><span class="muted">Claude соберёт их из брифа и вышедших текстов: как мы говорим, чего не говорим и 3–4 стиля (тёплый, новость, коротко…). Варианты постов пишутся в этих стилях.</span></div>`}
+    ${canEdit() ? '<div><button type="button" class="btn" id="vAsk">Попросить Claude собрать или поправить</button></div>' : ''}</div>`;
+  $('#vAsk')?.addEventListener('click', () => { sessionStorage.setItem('firstMsg:_project', JSON.stringify({text: 'Опиши голос проекта и 3–4 стиля текста в strategy.json, поле voice: {about, never: [...], styles: [{name, when, sample}]} (STRATEGY.md).', shown: 'Собрать голос и стили'})); location.hash = '#/chat/_project'; });
+}
+async function vRules() {
+  const [k, plan] = await Promise.all([api('/api/knowledge'), api('/api/plan')]);
+  const locks = (plan.strategy?.rubrics || []).flatMap((r) => (r.rules || []).filter((x) => x.lock).map((x) => [r, x]));
+  view.innerHTML = `<div class="page" style="max-width: 980px; padding: 22px 36px">
+    ${locks.length ? `<div class="blk"><span class="lbl">🔒 Жёсткие правила рубрик</span>${locks.map(([r, x]) => `<div class="li"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${esc(r.color || '#A3A3A3')}"></span><span style="flex: 1">${esc(x.text)}</span><a class="small muted" href="#/knowledge/rubrics/${esc(r.id)}">${esc(r.name)}</a></div>`).join('')}</div>` : ''}
+    <div class="blk"><span class="lbl">Правила, которые Claude выучил из правок</span><div class="md">${md(k.playbook) || '<p class="muted">Пока пусто.</p>'}</div></div>
+    <p class="small muted">Поменять — напиши в <a href="#/chat/_project">чат проекта</a>: «больше не делай …».</p></div>`;
+}
+
 async function vInbox() {
   title('Входящие');
   const {authors} = await api('/api/authors');
   const ST = {sent: 'новое', idea: 'идея', private: 'не публиковать', used: 'взяли', skip: 'не взяли'};
   view.innerHTML = `<div class="chead" style="padding: 0 28px; min-height: 56px"><b style="font-size: 14px">Входящие</b><span class="small muted" style="margin-left: 10px">что прислали участники — через бот или свою страницу</span></div>
     <div class="page" style="padding: 22px 32px; max-width: 1100px">${authors.map((e) => `<div class="li" style="align-items: flex-start"><span style="flex: 1; min-width: 220px"><b>${esc(e.who || 'Участник')}</b> <span class="small muted">· ${e.kind === 'idea' ? 'идея' : e.via === 'web' ? 'с компьютера' : 'через бот'}${e.cls ? ' · ' + esc(e.cls) : ''}</span>${e.rubric ? ` <span class="chip">${esc(e.rubric)}</span>` : ''}<div class="small muted" style="margin-top: 3px">${esc(((e.items || []).map((i) => i.text || i.said).filter(Boolean).join(' ') || e.text || '').slice(0, 200))}</div></span>
-      <span class="row" style="gap: 6px">${(e.items || []).filter((i) => i.url).slice(0, 4).map((i) => i.kind === 'photo' ? `<a href="${i.url}" target="_blank" rel="noopener" class="th" style="width: 44px; height: 55px; background-image: url('${i.url}')"></a>` : `<a class="btn" href="${i.url}" target="_blank" rel="noopener">${i.kind === 'video' ? 'видео' : 'голос'}</a>`).join('')}</span><span class="small muted" style="width: 120px; text-align: right">${ST[e.status] || ''} · ${ago(e.at)}</span></div>`).join('') || '<p class="muted">Пока пусто. Пригласите участников в «Настройки → Команда».</p>'}</div>`;
+      <span class="row" style="gap: 6px">${(e.items || []).filter((i) => i.url).slice(0, 4).map((i) => i.kind === 'photo' ? `<a href="${i.url}" target="_blank" rel="noopener" class="th" style="width: 44px; height: 55px; background-image: url('${i.url}')"></a>` : `<a class="btn" href="${i.url}" target="_blank" rel="noopener">${i.kind === 'video' ? 'видео' : 'голос'}</a>`).join('')}</span><span class="small muted" style="width: 120px; text-align: right">${ST[e.status] || ''} · ${ago(e.at)}</span>${canEdit() && !['private', 'skip'].includes(e.status) ? `<span class="row" style="gap: 6px">${e.post ? `<a class="btn" href="#/post/${esc(e.post)}">Открыть пост</a>` : `<button type="button" class="btn primary" data-var="${esc(e.id)}">Сделать варианты</button><button type="button" class="btn" data-skip="${esc(e.id)}">Не брать</button>`}</span>` : ''}</div>`).join('') || '<p class="muted">Пока пусто. Пригласите участников в «Настройки → Команда».</p>'}</div>`;
+  view.querySelectorAll('[data-var]').forEach((b) => (b.onclick = async () => {
+    b.disabled = true;
+    const e = authors.find((x) => x.id === b.dataset.var);
+    const r = await post('/api/authors/variants', {id: e.id});
+    if (!r.existed) sessionStorage.setItem('firstMsg:post-' + r.id, JSON.stringify({text: `Материал от ${e.who || 'участника'}${e.note ? ': «' + e.note + '»' : ''}${r.photos ? ` — ${r.photos} фото в sources/` : ''}. ${r.photos ? 'Выбери лучшее фото и объясни выбор (лица детей не видны и т. п.), ' : ''}напиши 3 варианта текста в разных стилях, первым — стиль рубрики (POSTS.md).`, shown: 'Сделать варианты'}));
+    location.hash = '#/post/' + r.id;
+  }));
+  view.querySelectorAll('[data-skip]').forEach((b) => (b.onclick = async () => { await post('/api/authors/variants', {id: b.dataset.skip, skip: true}); vInbox(); }));
 }
 
 // ---------- a member's web (D4): their tasks, sending material, what they sent ----------
@@ -1537,6 +1595,7 @@ async function route() {
     else if ((m = /^#\/rubric\/([\w-]+)/.exec(h))) await vRubric(m[1]);
     else if ((m = /^#\/settings(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vSettings(m[1], m[2]);
     else if (h === '#/inbox') await vInbox();
+    else if (h === '#/tasks') await vTasks();
     else if (h === '#/ds') location.replace('#/settings/ds');
     else if (h === '#/files') location.replace('#/settings/files');
     else if (h === '#/access') location.replace('#/settings/access');
