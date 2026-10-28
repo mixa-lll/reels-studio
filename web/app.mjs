@@ -9,9 +9,11 @@
 import {spawn} from 'node:child_process';
 import {createHmac, randomBytes} from 'node:crypto';
 import {appendFileSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {join, relative} from 'node:path';
 import {ffCommand} from '../bot/media.mjs';
 import {transcribe} from '../bot/stt.mjs';
+import {isEditor} from '../bot/roles.mjs';
+import {buildRequest, changeEdits, readEdits} from './edits.mjs';
 
 const MAX_TAKE = 300 * 1024 * 1024;
 const readJson = (f, fallback) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return fallback; } };
@@ -98,8 +100,21 @@ const REWRITES = {
   fix: (t) => t.replace(/\s+/g, ' ').replace(/\s+([,.!?])/g, '$1').replace(/(^|[.!?]\s+)([а-яёa-z])/g, (m, a, b) => a + b.toUpperCase()).trim(),
 };
 
-export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
+// A video with byte ranges, so the phone can seek.
+function streamFile(req, res, f) {
+  const size = statSync(f).size, range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+  if (range) {
+    const a = range[1] ? Number(range[1]) : 0, z = range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+    res.writeHead(206, {'content-type': 'video/mp4', 'content-range': `bytes ${a}-${z}/${size}`, 'accept-ranges': 'bytes', 'content-length': z - a + 1, 'cache-control': 'no-store'});
+    return createReadStream(f, {start: a, end: z}).pipe(res);
+  }
+  res.writeHead(200, {'content-type': 'video/mp4', 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store'});
+  return createReadStream(f).pipe(res);
+}
+
+export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build, busy}) {
   const token = () => process.env.TELEGRAM_BOT_TOKEN;
+  const sign = (rel) => createHmac('sha256', `${token()}:video`).update(rel).digest('base64url').slice(0, 22);
   const botState = () => readJson(join(BOT, 'data', 'state.json'), {});
   const project = () => (botState().project && existsSync(join(PROJECTS, botState().project)) ? botState().project : 'main');
   // Where the studio runs without the bot (the shared stage), MINIAPP_OWNERS lists the
@@ -109,9 +124,10 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
 
   function person(user) {
     const st = botState();
-    if (user.id === st.ownerId || owners().includes(user.id)) return {key: 'owner', name: st.ownerName || user.first_name, role: 'owner'};
+    if (user.id === st.ownerId || owners().includes(user.id)) return {key: 'owner', name: st.ownerName || user.first_name, role: 'owner', studio: true};
     const x = access().people.find((y) => y.telegram?.id === user.id);
-    return x ? {key: x.id, name: x.name, role: x.role} : null;
+    // «Студия» (SR0): editors of the project and people marked «Сам собирает».
+    return x ? {key: x.id, name: x.name, role: x.role, studio: isEditor(x) || !!x.selfBuild} : null;
   }
   function tasks(p) {
     const f = join(hostDir(p), 'tasks.json');
@@ -153,14 +169,14 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
       const meta = readJson(join(d, 'meta.json'), {});
       const f = join(d, 'take.mp4');
       if (!meta.key || meta.key !== tk[2] || !existsSync(f)) { res.writeHead(404); return res.end(); }
-      const size = statSync(f).size, range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
-      if (range) {
-        const a = range[1] ? Number(range[1]) : 0, z = range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
-        res.writeHead(206, {'content-type': 'video/mp4', 'content-range': `bytes ${a}-${z}/${size}`, 'accept-ranges': 'bytes', 'content-length': z - a + 1, 'cache-control': 'no-store'});
-        return createReadStream(f, {start: a, end: z}).pipe(res);
-      }
-      res.writeHead(200, {'content-type': 'video/mp4', 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store'});
-      return createReadStream(f).pipe(res);
+      return streamFile(req, res, f);
+    }
+    // A reel's video for the editor's <video>: a link signed with the bot token, no header needed.
+    if (req.method === 'GET' && url.pathname === '/app/v') {
+      const rel = url.searchParams.get('f') || '';
+      const f = join(PROJECTS, rel);
+      if (url.searchParams.get('k') !== sign(rel) || relative(PROJECTS, f).startsWith('..') || !/^[\w-]+\/reels\/[\w-]+\/versions\/v\d+\/[^/]+\.mp4$/.test(rel) || !existsSync(f)) { res.writeHead(404); return res.end(); }
+      return streamFile(req, res, f);
     }
     if (req.method === 'GET' && url.pathname === '/app') {
       res.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store'});
@@ -178,11 +194,11 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
       const prof = profiles(p)[me.key] || {};
       const mine = reels(p).map((r) => ({id: r.id, title: r.title, status: r.status, version: r.version, updated: r.updated}));
       // A task for one person (to) is shown to them only; one without «to» to everyone.
-      return json(200, {me: {name: me.name, role: me.role}, project: p, week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
+      return json(200, {me: {name: me.name, role: me.role, studio: !!me.studio}, project: p, week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
         profile: {langs: 'русский, английский', when: 'вт и чт после 15:00', where: 'кабинет 204, у окна', speed: 1, size: 'large', consent: true, ...prof}});
     }
     let b = {};
-    if (req.method === 'POST' && !['/api/app/take', '/api/app/clip'].includes(url.pathname)) {
+    if (req.method === 'POST' && !['/api/app/take', '/api/app/clip', '/api/app/reel/voice'].includes(url.pathname)) {
       let s = '';
       for await (const chunk of req) s += chunk;
       try { b = JSON.parse(s || '{}'); } catch {}
@@ -306,6 +322,49 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log}) {
       all[me.key] = cur;
       writeJson(join(hostDir(p), 'profiles.json'), all);
       return json(200, {profile: cur});
+    }
+    // ---------- «Студия»: the reel editor (SE1–SE5) — comments at every stage → «Собрать vN» ----------
+    if (url.pathname.startsWith('/api/app/reel')) {
+      if (!me.studio) return json(403, {error: 'Студия открыта редакторам и тем, у кого отметка «Сам собирает»'});
+      const rid = url.searchParams.get('id') || b.reel;
+      const dir = reelDir(p, rid);
+      if (!dir) return json(404, {error: 'Нет такого выпуска'});
+      const vdirs = existsSync(join(dir, 'versions')) ? readdirSync(join(dir, 'versions')).filter((v) => /^v\d+$/.test(v)).sort((a, z) => Number(a.slice(1)) - Number(z.slice(1))) : [];
+      const cur = vdirs.at(-1) || null;
+      const nextV = cur ? `v${Number(cur.slice(1)) + 1}` : 'v1';
+      const scenes = readJson(join(dir, 'scenes.json'), []);
+      if (req.method === 'GET' && url.pathname === '/api/app/reel') {
+        // The smallest video of the current version: the draft plays faster on a phone.
+        const vids = cur ? readdirSync(join(dir, 'versions', cur)).filter((f) => /\.mp4$/i.test(f)).map((f) => ({f, size: statSync(join(dir, 'versions', cur, f)).size})).sort((a, z) => a.size - z.size) : [];
+        const rel = vids[0] && relative(PROJECTS, join(dir, 'versions', cur, vids[0].f));
+        return json(200, {reel: reels(p).find((x) => x.id === rid), version: cur, nextV, video: rel ? `/app/v?f=${encodeURIComponent(rel)}&k=${sign(rel)}` : null,
+          scenes: Array.isArray(scenes) ? scenes : [], edits: readEdits(dir), busy: busy()});
+      }
+      if (req.method === 'POST' && url.pathname === '/api/app/reel/edits') {
+        if (b.action === 'send') return json(400, {});
+        const list = changeEdits(dir, b, me.name);
+        return list ? json(200, {edits: list}) : json(400, {});
+      }
+      // A spoken comment: kept with the reel's materials and written out by the local Whisper.
+      if (req.method === 'POST' && url.pathname === '/api/app/reel/voice') {
+        const chunks = [];
+        let size = 0;
+        for await (const c of req) { size += c.length; if (size > 20 * 1024 * 1024) return json(413, {}); chunks.push(c); }
+        mkdirSync(join(dir, 'sources'), {recursive: true});
+        const f = join(dir, 'sources', `voice-${Date.now()}.${/mp4|aac/.test(req.headers['content-type'] || '') ? 'm4a' : 'webm'}`);
+        writeFileSync(f, Buffer.concat(chunks));
+        return json(200, {text: (await transcribe(f, 'ru').catch(() => null)) || ''});
+      }
+      if (req.method === 'POST' && url.pathname === '/api/app/reel/build') {
+        const open = readEdits(dir).filter((x) => x.state === 'open');
+        if (!open.length) return json(400, {error: 'Нет комментариев'});
+        if (busy()) return json(429, {error: 'Claude сейчас занят другим выпуском. Попробуйте через пару минут.'});
+        if (!build(p, rid, buildRequest(open, scenes, nextV), `Собрать ${nextV} · комментариев: ${open.length}`, me.name)) return json(429, {error: 'Claude сейчас занят. Попробуйте через пару минут.'});
+        changeEdits(dir, {action: 'send', forV: nextV}, me.name);
+        notify(`🛠 ${me.name} собирает ${nextV} «${reels(p).find((x) => x.id === rid)?.title || rid}» из мини-приложения: комментариев ${open.length}.`);
+        return json(200, {edits: readEdits(dir), nextV});
+      }
+      return json(404, {});
     }
     return json(404, {});
   };

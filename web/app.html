@@ -186,6 +186,36 @@ h1.t2{font-size:22px;line-height:28px}
 .act{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;color:var(--acc);font-size:13px;font-weight:500}
 .act span{width:52px;height:52px;border-radius:50%;background:var(--btn);color:#fff;display:grid;place-items:center}
 .act.alt span{background:var(--sec2);color:var(--acc)}
+
+/* «Студия»: the reel editor (SE1–SE5) */
+.estg{display:flex;gap:6px;margin:14px 0 4px;border-bottom:1px solid var(--line)}
+.estg button{flex:1;height:44px;border:0;background:none;color:var(--mut);font-size:16px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
+.estg button.on{color:var(--ink);border-color:var(--ink)}
+.estg i{font-style:normal;font-size:12px;font-weight:700;background:#FDE68A;color:#78350F;border-radius:999px;padding:1px 7px;margin-left:5px}
+.vbox{position:relative;margin:14px auto 0;width:min(100%,calc(58vh * 9 / 16));aspect-ratio:9/16;background:#000;border-radius:18px;overflow:hidden}
+.vbox video,.vbox img{width:100%;height:100%;object-fit:contain;display:block}
+.vbox svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.tl{position:relative;height:28px;margin:10px 4px 0}
+.tl .bar{position:absolute;left:0;right:0;top:12px;height:4px;border-radius:2px;background:var(--line)}
+.tl .run{position:absolute;left:0;top:12px;height:4px;border-radius:2px;background:var(--ink)}
+.tl .dot{position:absolute;top:7px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#F5B700;border:2px solid var(--card);padding:0}
+.tl .tm{position:absolute;right:0;top:-6px;font-size:13px;color:var(--mut);font-weight:600}
+.stopb{background:#F5B700 !important;color:#1C1300 !important;box-shadow:0 3px 10px rgba(245,183,0,.35) !important}
+.sc{background:var(--card);box-shadow:var(--shadow);border-radius:16px;padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:6px;user-select:text;-webkit-user-select:text}
+.sc .h{font-size:13px;font-weight:700;color:var(--mut);letter-spacing:.03em}
+.sc .w{font-size:18px;line-height:26px;font-weight:600}
+.sc.long{user-select:none;-webkit-user-select:none}
+.cmt{display:flex;gap:10px;align-items:flex-start;background:#FEF9E7;border-radius:12px;padding:10px 12px;font-size:15px;line-height:21px;color:#3D2E00}
+.dark .cmt{background:#3A3216;color:#F4E7B8}
+.cmt .who{font-size:13px;color:inherit;opacity:.7}
+.cav{width:26px;height:26px;border-radius:50%;background:#F5B700;color:#1C1300;font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
+.cmt.cl .cav{background:var(--acc);color:#fff}.cmt.done .cav{background:var(--ok);color:#fff}
+.selbtn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(150px + env(safe-area-inset-bottom));z-index:8;height:44px;border:0;border-radius:999px;background:var(--ink);color:var(--card);font-size:16px;font-weight:600;padding:0 18px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow)}
+.mk{display:flex;gap:6px;margin-top:12px}.mk button{flex:1;height:44px;border-radius:12px;border:0;background:var(--sec2);color:var(--ink);font-size:14px;font-weight:600}
+.mk button.on{background:var(--ink);color:var(--card)}
+.crow{display:flex;gap:8px}.crow textarea{min-height:76px;font-size:16px;line-height:23px}
+.micb{width:56px;flex:none;border-radius:14px;border:1px solid var(--line);background:var(--sec2);color:var(--ink);display:grid;place-items:center}
+.micb.rec{background:var(--r);color:#fff;border-color:transparent}
 </style>
 </head>
 <body>
@@ -204,6 +234,8 @@ const I = {
   type:'<path d="M4 7V5h16v2M9 19h6M12 5v14"/>', gauge:'<path d="M12 14l4-4"/><path d="M3.3 18a10 10 0 1 1 17.4 0"/>',
   globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', pin:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  msg:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>', mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  wand:'<path d="M15 4V2M15 10V8M11 6H9M21 6h-2M3 21l12-12"/>',
   cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>', upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/>',
 };
 const ic = (n, s = 24, c = 'currentColor', w = 2.25) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
@@ -212,7 +244,7 @@ const $ = (s) => document.querySelector(s);
 const haptic = (k = 'light') => { try { k === 'ok' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred(k); } catch {} };
 const root = $('#root');
 
-let S = null, tab = ['reels', 'profile'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tasks', stack = [];
+let S = null, tab = ['studio', 'reels', 'profile'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tasks', stack = [];
 async function api(path, opts = {}) {
   const r = await fetch(path, {...opts, headers: {'x-tg-init': tg?.initData || '', ...(opts.json ? {'content-type': 'application/json'} : {}), ...(opts.headers || {})}, body: opts.json ? JSON.stringify(opts.json) : opts.body});
   const b = await r.json().catch(() => ({}));
@@ -229,7 +261,7 @@ const backBtn = () => { try { stack.length ? tg.BackButton.show() : tg.BackButto
 function go(screen, arg) { stack.push({screen, arg}); haptic(); draw(); }
 function back() { stack.pop(); draw(); }
 function tabs() {
-  const T = [['tasks','list','Задания'],['reels','film','Мои ролики'],['profile','user','Профиль']];
+  const T = [['tasks','list','Задания'], ...(S.me.studio ? [['studio','wand','Студия']] : []), ['reels','film','Мои ролики'],['profile','user','Профиль']];
   return `<nav class="tabs" aria-label="Разделы">${T.map(([k, i, l]) => `<button class="tab${tab === k ? ' on' : ''}" data-tab="${k}"><span class="ib">${ic(i)}</span>${l}</button>`).join('')}</nav>`;
 }
 const tint = (v) => `background:color-mix(in srgb,var(${v}) 14%,transparent);color:var(${v})`;
@@ -240,8 +272,8 @@ function draw() {
   backBtn();
   window.scrollTo(0, 0);
   const top = stack.at(-1);
-  if (!top) return ({tasks: drawTasks, reels: drawReels, profile: drawProfile})[tab]();
-  return ({task: drawTask, edit: drawEdit, parts: drawParts, review: drawReview, done: drawDone})[top.screen](top.arg);
+  if (!top) return ({tasks: drawTasks, studio: S.me.studio ? drawStudio : drawTasks, reels: drawReels, profile: drawProfile})[tab]();
+  return ({task: drawTask, edit: drawEdit, parts: drawParts, review: drawReview, done: drawDone, ed: drawEd, mark: drawMark, comments: drawComments})[top.screen](top.arg);
 }
 
 // ---------- Задания ----------
@@ -735,6 +767,230 @@ function drawReels() {
   </div>${tabs()}`;
 }
 
+// ---------- Студия: редактор выпуска (SE1–SE5) ----------
+// Not a pixel editor: at every stage you stop and leave a comment — on the script's words,
+// on a scene, or on a frozen frame with an area marked. Claude reads them all for vN+1.
+let E = null;
+const tcs = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const secs = (t) => { const m = /^(\d+):(\d+)/.exec(t || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : 0; };
+const openOf = () => E.edits.filter((x) => x.state === 'open');
+const countOf = (st) => openOf().filter((x) => (x.stage || 'video') === st).length;
+async function loadEd(id) { E = {id, stage: E?.id === id ? E.stage : 'video', ...(await api('/api/app/reel?id=' + encodeURIComponent(id)))}; }
+async function saveComment(b) { const r = await api('/api/app/reel/edits', {method: 'POST', json: {reel: E.id, action: 'add', ...b}}); E.edits = r.edits; haptic('ok'); }
+
+function drawStudio() {
+  root.innerHTML = `<div class="scr"><h1 style="margin-top:10px">Студия</h1><p class="sub">Смотрите версию и останавливайте в любой момент — Claude соберёт следующую по вашим комментариям</p>
+    <div class="lh">Выпуски</div>
+    ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 20).map((r) => `<button class="li" data-reel="${esc(r.id)}"><span class="ti" style="${tint('--v')}">${ic('film', 22)}</span><span class="tx"><b>${esc(r.title)}</b><span>${r.version ? `версия ${r.version.slice(1)}` : 'ещё нет версии'}</span></span>${ic('chev', 20)}</button>`).join('')}</div>` : '<p class="sub">Пока нет выпусков.</p>'}
+  </div>${tabs()}`;
+}
+
+async function drawEd({id}) {
+  if (!E || E.id !== id) {
+    root.innerHTML = '<div class="scr center"><p class="sub" style="margin-top:80px">Открываем выпуск…</p></div>';
+    try { await loadEd(id); } catch (e) { root.innerHTML = `<div class="err"><h1 class="t2">Не открылось</h1><p class="sub">${esc(e.message)}</p></div>`; return; }
+  }
+  const n = openOf().length;
+  const st = [['script', 'Сценарий'], ['scenes', 'Сцены'], ['video', 'Ролик']];
+  root.innerHTML = `<div class="scr" style="padding-bottom:170px">
+    <span class="d">${E.version ? `Смотрю ${esc(E.version)}` : 'Версии ещё нет'}</span><h1 class="t2" style="margin-top:2px">${esc(E.reel?.title || id)}</h1>
+    <div class="estg" role="tablist">${st.map(([k, l]) => `<button role="tab" data-st="${k}" class="${E.stage === k ? 'on' : ''}">${l}${countOf(k) ? `<i>${countOf(k)}</i>` : ''}</button>`).join('')}</div>
+    <div id="stage"></div>
+  </div><div class="foot"><button class="bb" id="cms" ${n ? '' : 'disabled'}>${ic('msg', 22)}${n ? `Комментарии · ${n} → собрать ${esc(E.nextV)}` : 'Комментариев пока нет'}</button></div>`;
+  root.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => { E.stage = b.dataset.st; haptic(); drawEd({id}); }));
+  $('#cms').onclick = () => go('comments', {id});
+  ({script: stageScript, scenes: stageScenes, video: stageVideo})[E.stage]($('#stage'));
+}
+
+// SE1: watch; «Стоп — комментарий» freezes the frame at this second.
+function stageVideo(box) {
+  if (!E.video) { box.innerHTML = '<p class="sub" style="margin-top:20px">Видео этой версии нет — комментируйте сценарий и сцены.</p>'; return; }
+  const dots = E.edits.filter((x) => (x.stage || 'video') === 'video' && x.state === 'open');
+  box.innerHTML = `<div class="vbox"><video id="ev" src="${esc(E.video)}" playsinline preload="metadata" crossorigin="anonymous"></video></div>
+    <div class="tl" id="tl"><span class="bar"></span><span class="run" id="run"></span><span class="tm" id="etm">0:00</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px"><button class="bb stopb" id="stop">${ic('msg', 22)}Стоп — комментарий</button>
+    <button class="lk" id="pp">Смотреть</button></div>
+    <p class="cap" style="margin-top:6px">Кадр замирает, комментарий привязывается к секунде. Жёлтые точки — уже оставленные.</p>`;
+  const v = $('#ev'), tl = $('#tl');
+  const upd = () => { const d = v.duration || 1; $('#run').style.width = `${(100 * v.currentTime) / d}%`; $('#etm').textContent = `${tcs(v.currentTime)} / ${tcs(v.duration || 0)}`; $('#pp').textContent = v.paused ? 'Смотреть' : 'Пауза'; };
+  v.addEventListener('loadedmetadata', () => { tl.insertAdjacentHTML('beforeend', dots.map((x) => `<button class="dot" data-t="${x.t}" style="left:${(100 * x.t) / (v.duration || 1)}%" aria-label="Комментарий на ${tcs(x.t)}"></button>`).join('')); upd(); });
+  ['timeupdate', 'play', 'pause', 'seeked'].forEach((e) => v.addEventListener(e, upd));
+  v.onclick = $('#pp').onclick = () => (v.paused ? v.play() : v.pause());
+  tl.onclick = (e) => { const d = e.target.closest('.dot'); if (d) { v.currentTime = Number(d.dataset.t); return; } const r = tl.getBoundingClientRect(); v.currentTime = ((e.clientX - r.left) / r.width) * (v.duration || 0); };
+  $('#stop').onclick = () => {
+    v.pause();
+    let frame = null;
+    try { const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0); frame = c.toDataURL('image/jpeg', 0.8); } catch {}
+    go('mark', {t: v.currentTime, frame});
+  };
+}
+
+// SE2: on the frozen frame mark what is wrong (an area, a brush stroke, a point or the whole
+// frame), pick a quick hint and say or type the comment.
+function drawMark({t, frame}) {
+  let tool = 'rect', shape = null, hint = null, voice = false;
+  const HINT = [['blur', 'Размыть'], ['replace', 'Заменить кадр'], ['trim', 'Обрезать'], ['remove', 'Убрать']];
+  root.innerHTML = `<div class="scr" style="padding-bottom:170px"><span class="d">Стоп на ${tcs(t)}</span><h1 class="t2" style="margin-top:2px">Обведите, что не так</h1>
+    <div class="vbox">${frame ? `<img src="${frame}" alt="Кадр на ${tcs(t)}">` : ''}<svg id="ov" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Кадр: отметьте место"></svg></div>
+    <div class="mk" role="group" aria-label="Чем отметить">${[['rect', '◯ Обвести'], ['brush', '✎ Кисть'], ['point', '⌖ Точка'], ['frame', 'Весь кадр']].map(([k, l]) => `<button data-tool="${k}" class="${k === tool ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="opt" style="margin-top:10px">${HINT.map(([k, l]) => `<button data-hint="${k}">${l}</button>`).join('')}</div>
+    <div class="crow" style="margin-top:10px"><textarea id="ct" placeholder="Что поправить — голосом или текстом" aria-label="Комментарий"></textarea><button class="micb" id="mic" aria-label="Сказать голосом">${ic('mic', 22)}</button></div>
+    <p class="cap">Claude поймёт, что отмечено и на какой секунде, и предложит, как исправить.</p>
+  </div><div class="foot"><button class="bb" id="keep">${ic('check', 22)}Оставить</button><button class="lk" id="cn">Отмена</button></div>`;
+  const ov = $('#ov');
+  const draw = () => {
+    ov.innerHTML = !shape ? '' : shape.kind === 'frame' ? '<rect x="1" y="1" width="98" height="98" fill="none" stroke="#F5B700" stroke-width="1.6" vector-effect="non-scaling-stroke" style="stroke-width:4px"/>'
+      : shape.kind === 'point' ? `<circle cx="${shape.x * 100}" cy="${shape.y * 100}" r="2.4" fill="#F5B700" stroke="#fff" stroke-width="0.8"/>`
+      : shape.kind === 'rect' ? `<rect x="${shape.x * 100}" y="${shape.y * 100}" width="${shape.w * 100}" height="${shape.h * 100}" rx="2" fill="rgba(245,183,0,.18)" stroke="#F5B700" vector-effect="non-scaling-stroke" style="stroke-width:3px"/>`
+      : `<polyline points="${shape.pts.map(([x, y]) => `${x * 100},${y * 100}`).join(' ')}" fill="none" stroke="#F5B700" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" style="stroke-width:6px;opacity:.85"/>`;
+  };
+  const at = (e) => { const r = ov.getBoundingClientRect(); return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))]; };
+  let start = null;
+  ov.onpointerdown = (e) => {
+    if (tool === 'frame') return;
+    ov.setPointerCapture(e.pointerId);
+    const [x, y] = at(e);
+    start = [x, y];
+    shape = tool === 'point' ? {kind: 'point', x, y} : tool === 'rect' ? {kind: 'rect', x, y, w: 0, h: 0} : {kind: 'brush', pts: [[x, y]]};
+    draw();
+  };
+  ov.onpointermove = (e) => {
+    if (!start || !shape) return;
+    const [x, y] = at(e);
+    if (shape.kind === 'rect') Object.assign(shape, {x: Math.min(x, start[0]), y: Math.min(y, start[1]), w: Math.abs(x - start[0]), h: Math.abs(y - start[1])});
+    else if (shape.kind === 'brush') shape.pts.push([x, y]);
+    else Object.assign(shape, {x, y});
+    draw();
+  };
+  ov.onpointerup = () => { start = null; if (shape?.kind === 'rect' && shape.w < 0.02 && shape.h < 0.02) shape = {kind: 'point', x: shape.x, y: shape.y}; draw(); };
+  root.querySelectorAll('[data-tool]').forEach((b) => (b.onclick = () => {
+    tool = b.dataset.tool; root.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('on', x === b));
+    if (tool === 'frame') { shape = {kind: 'frame'}; draw(); } else if (shape?.kind === 'frame') { shape = null; draw(); }
+  }));
+  root.querySelectorAll('[data-hint]').forEach((b) => (b.onclick = () => {
+    hint = hint === b.dataset.hint ? null : b.dataset.hint;
+    root.querySelectorAll('[data-hint]').forEach((x) => x.classList.toggle('on', x.dataset.hint === hint));
+    if (hint && !$('#ct').value.trim()) $('#ct').value = b.textContent;
+  }));
+  micButton($('#mic'), $('#ct'), () => { voice = true; });
+  $('#cn').onclick = back;
+  $('#keep').onclick = async () => {
+    const text = $('#ct').value.trim();
+    if (!text) return $('#ct').focus();
+    $('#keep').disabled = true;
+    try { await saveComment({stage: 'video', t, text, shape, hint, voice}); back(); }
+    catch (e) { $('#keep').disabled = false; alert(e.message); }
+  };
+}
+
+// Voice: record → the server's Whisper → the text lands in the field.
+function micButton(btn, field, onVoice) {
+  let rec = null;
+  btn.onclick = async () => {
+    if (rec) return rec.stop();
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); } catch { alert('Нет доступа к микрофону — напишите текстом'); return; }
+    const chunks = [];
+    rec = new MediaRecorder(stream);
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach((x) => x.stop());
+      const type = rec.mimeType || 'audio/webm'; rec = null;
+      btn.classList.remove('rec'); btn.disabled = true;
+      field.placeholder = 'Распознаём…';
+      const r = await api(`/api/app/reel/voice?id=${encodeURIComponent(E.id)}`, {method: 'POST', headers: {'content-type': type}, body: new Blob(chunks, {type})}).catch(() => ({}));
+      btn.disabled = false; field.placeholder = 'Что поправить — голосом или текстом';
+      if (r.text) { field.value = (field.value ? field.value + ' ' : '') + r.text; onVoice?.(); } else alert('Не расслышали — напишите словами');
+    };
+    rec.start(); btn.classList.add('rec'); haptic('medium');
+  };
+}
+
+// A comment sheet for the script (picked words) and scenes (long press).
+function commentSheet(title, quote, onSave) {
+  const el = document.createElement('div');
+  el.className = 'sheet';
+  el.innerHTML = `<div><span class="grab"></span><span class="lab">${esc(title)}</span>${quote ? `<div style="font-size:18px;font-weight:700">«${esc(quote)}»</div>` : ''}
+    <div class="crow"><textarea id="sct" placeholder="Комментарий — голосом или текстом" aria-label="Комментарий"></textarea><button class="micb" id="smic" aria-label="Сказать голосом">${ic('mic', 22)}</button></div>
+    <button class="bb" id="ok">${ic('check', 22)}Оставить</button><button class="lk" id="cn">Отмена</button></div>`;
+  document.body.append(el);
+  let voice = false;
+  const close = () => el.remove();
+  el.onclick = (e) => { if (e.target === el) close(); };
+  el.querySelector('#cn').onclick = close;
+  micButton(el.querySelector('#smic'), el.querySelector('#sct'), () => { voice = true; });
+  el.querySelector('#ok').onclick = async () => {
+    const text = el.querySelector('#sct').value.trim();
+    if (!text) return el.querySelector('#sct').focus();
+    try { await onSave(text, voice); close(); draw(); } catch (e) { alert(e.message); }
+  };
+  setTimeout(() => el.querySelector('#sct').focus(), 50);
+}
+const cmtsOf = (pred) => E.edits.filter((x) => x.state === 'open' && pred(x)).map((x) => `<div class="cmt"><span class="cav">${esc((x.by || '?')[0])}</span><span>${esc(x.text)}<div class="who">${esc(x.by || '')}${x.quote ? ` · к словам «${esc(x.quote)}»` : ''}</div></span></div>`).join('');
+
+// SE3 «Сценарий»: select words → «Комментарий».
+function stageScript(box) {
+  const sc = E.scenes || [];
+  box.innerHTML = sc.length ? sc.map((x, i) => `<div class="sc" data-sc="${i}"><span class="h">${esc(x.name || 'Сцена ' + (i + 1))} · ${esc(x.t || '')}</span><span class="w">${esc(x.text || x.screen || '')}</span>${cmtsOf((c) => c.stage === 'script' && c.scene === i)}</div>`).join('') +
+    '<p class="cap" style="margin-top:12px">Выделите слова — появится «Комментарий».</p>' : '<p class="sub" style="margin-top:20px">Сценарий ещё не разложен по сценам.</p>';
+  const btn = document.createElement('button');
+  btn.className = 'selbtn'; btn.hidden = true; btn.innerHTML = `${ic('msg', 20)}Комментарий`;
+  box.append(btn);
+  let pick = null;
+  const onSel = () => {
+    if (!document.body.contains(box)) return document.removeEventListener('selectionchange', onSel);
+    const s = window.getSelection(), q = s?.toString().trim();
+    const card = s?.anchorNode && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentElement)?.closest('[data-sc]');
+    pick = q && card && box.contains(card) ? {quote: q.slice(0, 200), scene: Number(card.dataset.sc)} : pick && btn.matches(':active') ? pick : null;
+    btn.hidden = !pick;
+  };
+  document.addEventListener('selectionchange', onSel);
+  btn.onpointerdown = (e) => e.preventDefault();
+  btn.onclick = () => { if (!pick) return; const p = pick; window.getSelection()?.removeAllRanges(); btn.hidden = true;
+    commentSheet('Комментарий к сценарию', p.quote, (text, voice) => saveComment({stage: 'script', scene: p.scene, quote: p.quote, t: secs(sc[p.scene]?.t), text, voice})); };
+}
+
+// SE3 «Сцены»: long press on a scene (or its button) → comment.
+function stageScenes(box) {
+  const sc = E.scenes || [];
+  box.innerHTML = sc.length ? sc.map((x, i) => `<div class="sc long" data-sc="${i}"><span class="h">${i + 1} · ${esc(x.name || '')} · ${esc(x.t || '')}</span><span style="font-size:16px;line-height:23px">${esc(x.screen || '')}</span>
+    ${x.have ? `<span class="cap">Материал: ${esc(x.have)}</span>` : x.need ? `<span class="cap" style="color:var(--warn)">Нужно: ${esc(x.need)}</span>` : ''}
+    ${cmtsOf((c) => c.stage === 'scenes' && c.scene === i)}<button class="lk" style="height:36px;justify-content:flex-start;width:auto" data-cs="${i}">${ic('msg', 18)}Комментарий к сцене</button></div>`).join('') +
+    '<p class="cap" style="margin-top:12px">Долгое нажатие на сцену — тоже комментарий: «фото тёмное», «показать дольше».</p>' : '<p class="sub" style="margin-top:20px">Сцен пока нет.</p>';
+  const ask = (i) => commentSheet(`Сцена ${i + 1} · ${sc[i].name || ''}`, '', (text, voice) => saveComment({stage: 'scenes', scene: i, t: secs(sc[i].t), text, voice}));
+  box.querySelectorAll('[data-cs]').forEach((b) => (b.onclick = () => ask(Number(b.dataset.cs))));
+  box.querySelectorAll('.sc.long').forEach((c) => {
+    let timer = null;
+    c.onpointerdown = () => { timer = setTimeout(() => { haptic('medium'); ask(Number(c.dataset.sc)); }, 550); };
+    c.onpointerup = c.onpointerleave = c.onpointercancel = () => clearTimeout(timer);
+  });
+}
+
+// SE5: every comment to this version by stage → «Собрать vN».
+async function drawComments({id}) {
+  if (!E || E.id !== id) await loadEd(id);
+  const open = openOf(), notes = E.edits.filter((x) => x.state === 'note'), done = E.edits.filter((x) => x.state === 'done' && x.forV === E.version);
+  const sent = E.edits.filter((x) => x.state === 'sent' && x.forV === E.nextV);
+  const HOW = (x) => x.stage === 'script' ? 'текстом к словам' : x.stage === 'scenes' ? 'к сцене' : x.shape ? ({rect: 'обведено на кадре', brush: 'кистью на кадре', point: 'точка на кадре', frame: 'весь кадр'})[x.shape.kind] : 'на секунде';
+  const badge = (x) => x.stage === 'script' ? 'Сценарий' : x.stage === 'scenes' ? `Сцена ${(x.scene ?? 0) + 1}` : tcs(x.t);
+  const row = (x, cls = '') => `<div class="cmt ${cls}" style="margin-top:8px"><span class="cav">${cls === 'cl' ? 'C' : cls === 'done' ? '✓' : esc((x.by || '?')[0])}</span><span style="flex:1;min-width:0"><b style="font-size:13px">${esc(badge(x))}</b> ${esc(cls === 'done' && x.result ? x.result : x.text)}
+    <div class="who">${esc(cls === 'cl' ? 'Claude · проверка' : cls === 'done' ? x.text : `${x.by || ''} · ${HOW(x)}${x.voice ? ' · голосом' : ''}`)}</div></span>${!cls ? `<button class="lk" style="width:auto;height:30px" data-rm="${esc(x.id)}" aria-label="Убрать комментарий">${ic('x', 18)}</button>` : ''}</div>`;
+  root.innerHTML = `<div class="scr" style="padding-bottom:190px"><span class="d">${esc(E.reel?.title || '')}</span><h1 class="t2" style="margin-top:2px">Комментарии к ${esc(E.version || 'версии')}</h1>
+    <p class="sub">${open.length} · Claude учтёт все в ${esc(E.nextV)}</p>
+    ${open.map((x) => row(x)).join('') || (sent.length ? `<p class="sub" style="margin-top:16px">Отправлено ${sent.length} — Claude собирает ${esc(E.nextV)}. Новая версия появится здесь.</p>` : '<p class="sub" style="margin-top:16px">Пока нет комментариев.</p>')}
+    ${notes.length ? `<div class="lh">Проверка Claude</div>${notes.map((x) => row(x, 'cl')).join('')}` : ''}
+    ${done.length ? `<div class="lh">Что поменялось в ${esc(E.version)}</div>${done.map((x) => row(x, 'done')).join('')}` : ''}
+    <p class="cap" style="margin-top:14px">Лица, субтитры и согласия Claude проверит сам перед сборкой — если что-то не так, напишет сюда же.</p>
+  </div><div class="foot">${open.length ? `<button class="bb" id="build">${ic('wand', 22)}Собрать ${esc(E.nextV)}</button>` : ''}<button class="sb2" id="more">Ещё посмотреть</button></div>`;
+  root.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = async () => { const r = await api('/api/app/reel/edits', {method: 'POST', json: {reel: id, action: 'remove', id: b.dataset.rm}}); E.edits = r.edits; drawComments({id}); }));
+  $('#more').onclick = back;
+  $('#build')?.addEventListener('click', async () => {
+    $('#build').disabled = true;
+    try { const r = await api('/api/app/reel/build', {method: 'POST', json: {reel: id}}); E.edits = r.edits; haptic('ok'); drawComments({id}); }
+    catch (e) { $('#build').disabled = false; alert(e.message); }
+  });
+}
+
 // ---------- Профиль ----------
 function drawProfile() {
   const p = S.profile;
@@ -780,6 +1036,8 @@ root.addEventListener('click', (e) => {
   if (tb) { tab = tb.dataset.tab; stack = []; haptic(); return draw(); }
   const tk = e.target.closest('[data-task]');
   if (tk && !stack.length) return go('task', tk.dataset.task);
+  const rl = e.target.closest('[data-reel]');
+  if (rl && !stack.length) { E = null; return go('ed', {id: rl.dataset.reel}); }
 });
 
 (async () => {
