@@ -1179,8 +1179,12 @@ async function vChat(key) {
   title(key === '_project' ? 'Общий чат' : 'Чат');
   view.innerHTML = `<div class="work"><div class="chat"><div class="chead"><div style="flex: 1"><div class="small muted">${esc((PROJECTS.find((x) => x.slug === P) || {}).name)}</div><h1 style="font-size: 20px">Общий чат проекта</h1></div>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
     <div class="ctx">Идеи, бриф, правила, настройки. <a href="#/new">Новый рилс</a> начинается в своём чате.</div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`;
-  $('#chatHost').append(chatBox(key, {onDone: () => sidebar()}));
+  const box = chatBox(key, {onDone: () => sidebar()});
+  $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Очистить общий чат?')) { await post('/api/chat/reset', {key}); vChat(key); } });
+  // What was typed on «Сегодня» (or asked from another page) goes out as the first message here.
+  const pending = sessionStorage.getItem('firstMsg:' + key);
+  if (pending) { sessionStorage.removeItem('firstMsg:' + key); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
 
 async function vNew() {
@@ -1601,7 +1605,7 @@ function teamPerson(a, pid) {
 async function vTests() {
   const body = view;
   const d = await api('/api/sandbox');
-  body.innerHTML = `<div style="display: flex; flex-direction: column; gap: 16px; max-width: 980px">
+  body.innerHTML = `<div class="page" style="max-width: 980px; padding: 22px 36px; gap: 16px">
     <div><h2 style="font-size: 17px">Тестовые аккаунты</h2><div class="small muted" style="margin-top: 3px">Как будто вы новый клиент и пришли впервые: пустой проект, а в чате «Сегодня» Claude задаёт наводящие вопросы — о чём проект, кто делает контент, где и как часто публикуете — и сам собирает стратегию, режим и команду. Удаление стирает всё, что в аккаунте появилось. Рабочие проекты и люди не затрагиваются.</div></div>
     <div><button class="btn primary" id="tNew">Начать как новый клиент</button></div>
     ${d.list.length ? d.list.map((x) => `<div class="card" style="display: flex; flex-direction: column; gap: 10px">
