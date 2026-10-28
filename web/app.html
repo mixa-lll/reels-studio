@@ -134,7 +134,13 @@ input.f{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);b
 .scr.tall{padding-bottom:250px}
 .part{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
 .part:first-child{border-top:0}
-.part .th{width:44px;height:78px;border-radius:8px;background:#000;object-fit:cover;flex:none}
+.part .th{width:44px;height:78px;border-radius:8px;background:#1c1c1f center/cover no-repeat;flex:none;border:0;padding:0;position:relative;display:grid;place-items:center;color:#fff}
+.part .th::after{content:"";width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.45) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M9 7v10l8-5z'/%3E%3C/svg%3E") center/16px no-repeat}
+.part .tx{cursor:pointer}
+.player{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(16px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom))}
+.player video{width:auto;max-width:100%;height:min(68vh,100%);aspect-ratio:9/16;border-radius:18px;background:#000;object-fit:contain}
+.player .cap2{color:#fff;font-size:16px;line-height:22px;text-align:center;max-width:360px}
+.player .row2{display:flex;gap:10px;width:100%;max-width:420px}
 @media (prefers-reduced-motion: reduce){.cam *,.cam,.psheet,.dim,.fly,.wavy,.chipm,.sendok,.ck,.oval{animation:none !important;transition:none !important}}
 .vid{width:100%;border-radius:20px;background:#000;max-height:56vh;display:block;box-shadow:var(--shadow)}
 .prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:var(--ok);width:0}
@@ -562,10 +568,34 @@ function drawParts({id}) {
   const phrases = phrasesOf(taskText(t));
   const dur = (seg) => new Promise((ok) => { const v = document.createElement('video'); v.preload = 'metadata'; v.onloadedmetadata = () => ok(isFinite(v.duration) ? v.duration : 0); v.onerror = () => ok(0); v.src = URL.createObjectURL(seg.blob); });
   root.innerHTML = `<div class="scr"><h1 class="t2" style="margin-top:10px">${phrases.length} ${plural(phrases.length, 'фраза снята', 'фразы сняты', 'фраз снято')}</h1><p class="sub">Склеим сами. Любую фразу можно переснять отдельно.</p>
-    <div class="grp" style="margin-top:16px">${shot.segs.map((x, i) => `<div class="part"><video class="th" src="${URL.createObjectURL(x.blob)}#t=0.3" muted playsinline preload="metadata"></video><span class="tx"><span data-d="${i}">…</span><b style="font-size:16px;line-height:22px">${x.from + 1} · ${esc(phrases.slice(x.from, x.to + 1).join(' '))}</b></span><button class="eb2" data-re="${x.from}" aria-label="Переснять фразу ${x.from + 1}">↺</button></div>`).join('')}</div>
+    <div class="grp" style="margin-top:16px">${shot.segs.map((x, i) => `<div class="part"><button class="th" data-play="${i}" aria-label="Посмотреть фразу ${x.from + 1}"></button><span class="tx" data-play="${i}"><span data-d="${i}">…</span><b style="font-size:16px;line-height:22px">${x.from + 1} · ${esc(phrases.slice(x.from, x.to + 1).join(' '))}</b></span><button class="eb2" data-re="${x.from}" aria-label="Переснять фразу ${x.from + 1}">↺</button></div>`).join('')}</div>
   </div><div class="foot"><button class="bb" id="all">${ic('film', 22)}Склеить и посмотреть</button></div>`;
   shot.segs.forEach((x, i) => (x.secs ? Promise.resolve(x.secs) : dur(x)).then((d) => { const e = root.querySelector(`[data-d="${i}"]`); if (e) e.textContent = mmss(d); }));
   root.querySelectorAll('[data-re]').forEach((b) => b.onclick = () => camera(t, {only: Number(b.dataset.re), mode: 'parts'}));
+  // A frame of each piece as its cover: a muted video, seeked a little in, drawn once.
+  shot.segs.forEach((x, i) => {
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = URL.createObjectURL(x.blob);
+    v.onloadeddata = () => { v.currentTime = Math.min(0.3, (v.duration || 1) / 2); };
+    v.onseeked = () => {
+      const c = document.createElement('canvas'); c.width = 132; c.height = 234;
+      const k = Math.max(c.width / v.videoWidth, c.height / v.videoHeight);
+      c.getContext('2d').drawImage(v, (c.width - v.videoWidth * k) / 2, (c.height - v.videoHeight * k) / 2, v.videoWidth * k, v.videoHeight * k);
+      const b = root.querySelector(`.th[data-play="${i}"]`); if (b) b.style.backgroundImage = `url(${c.toDataURL('image/jpeg', .7)})`;
+    };
+    v.load();
+  });
+  // Tap a piece: watch it, then keep it or shoot that phrase again.
+  root.querySelectorAll('[data-play]').forEach((b) => b.onclick = () => {
+    const x = shot.segs[Number(b.dataset.play)];
+    const el = document.createElement('div'); el.className = 'player';
+    el.innerHTML = `<video src="${URL.createObjectURL(x.blob)}" controls autoplay playsinline></video><div class="cap2">${x.from + 1} · ${esc(phrases.slice(x.from, x.to + 1).join(' '))}</div>
+      <div class="row2"><button class="sb2" id="pre">${ic('video', 22)}Переснять</button><button class="bb" id="pok">${ic('check', 22)}Хорошо</button></div>`;
+    document.body.append(el); haptic();
+    const shut = () => { el.querySelector('video').pause(); el.remove(); };
+    el.querySelector('#pok').onclick = shut;
+    el.querySelector('#pre').onclick = () => { shut(); camera(t, {only: x.from, mode: 'parts'}); };
+    el.onclick = (e) => { if (e.target === el) shut(); };
+  });
   $('#all').onclick = () => upload(t);
 }
 
