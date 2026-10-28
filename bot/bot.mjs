@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Telegram ↔ coding agent bridge for the reels workflow.
 // One owner, one agent turn at a time; messages that arrive mid-turn join it at once.
+import {createSandbox, isTest, listSandboxes, removeSandbox} from './sandbox.mjs';
+import {MODES, PLANS} from './plans.mjs';
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
-import {join, relative} from 'node:path';
+import {dirname, join, relative} from 'node:path';
 import {DATA, FIRST_PROJECT, PROJECTS, ROOT, env, loadState, saveState, settings, studio, writeSettings} from './config.mjs';
 import {createProject, dropRequest, ensureProjects, listProjects, projectAt, projectExists, projectName, removeProject, takeRequest, untouched} from './projects.mjs';
 import {APPROVED as CLAIM_APPROVED, REQUEST as CLAIM_REQUEST} from './claim.mjs';
@@ -22,7 +24,7 @@ import * as updates from './update.mjs';
 const {botChangedSince, head, pendingUpdates, pullUpdates, remoteUrl, upstreamHead} = updates;
 import {telegram} from './telegram.mjs';
 import {authors} from './author.mjs';
-import {claim as claimInvite, member, publishBot, touch} from './members.mjs';
+import {claim as claimInvite, FILE as memberFile, member, publishBot, touch} from './members.mjs';
 import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
 
 // Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
@@ -364,6 +366,49 @@ async function showUnfinished() {
 // id of each stretch) tells which project any earlier message belongs to.
 
 const nameOf = (slug) => projectName(slug) || (slug === FIRST_PROJECT ? T.mainName : T.unnamed);
+
+// ---------- /test: test accounts (bot/sandbox.mjs) ----------
+const SHARED_DIR = memberFile ? dirname(memberFile) : join(DATA, 'shared');
+const sandboxPaths = () => ({projects: PROJECTS, access: memberFile || join(SHARED_DIR, 'access.json'), starter: join(ROOT, 'starter'), chats: join(ROOT, 'web', 'data', 'chats'), outbox: join(SHARED_DIR, 'outbox.json'), log: join(SHARED_DIR, 'log.jsonl')});
+async function showTests(edit) {
+  const list = listSandboxes(sandboxPaths());
+  const here = isTest(PROJECTS, state.project);
+  const text = ['🧪 Тестовые аккаунты — как будто пришёл новый клиент: свой проект с режимом и тарифом, демо-данные и люди. Удаление стирает всё, что в нём появилось; рабочие проекты не трогаются.',
+    here ? `\nСейчас вы в тестовом: «${nameOf(state.project)}».` : '', list.length ? '' : '\nПока ни одного.'].filter(Boolean).join('\n');
+  const rows = list.map((x) => [{text: `${x.slug === state.project ? '✅ ' : '▶ '}${x.name.replace(/^Тест · /, '')}`.slice(0, 60), callback_data: `tst:go:${x.slug}`}, {text: '🗑 Удалить', callback_data: `tst:del:${x.slug}`}]);
+  rows.push(Object.entries(MODES).map(([k, m]) => ({text: `＋ ${m.name}`, callback_data: `tst:new:${k}`})));
+  if (here) rows.push([{text: '↩ В рабочий проект', callback_data: 'tst:back'}]);
+  rows.push([{text: T.close, callback_data: 'tst:x'}]);
+  if (edit) return tg.call('editMessageText', {chat_id: state.chatId, message_id: edit, text, reply_markup: {inline_keyboard: rows}}).catch(() => {});
+  return tg.sendText(state.chatId, text, {silent: true, reply_markup: {inline_keyboard: rows}});
+}
+async function onTestButton(q) {
+  const [, act, arg] = q.data.split(':');
+  if (act === 'x') return markChosen(q, null);
+  if (act === 'new') {
+    const plan = {solo: 'video', team: 'team', agency: 'agency'}[arg];
+    if (!MODES[arg] || !PLANS[plan]) return;
+    if (!isTest(PROJECTS, state.project)) state.realProject = state.project;
+    const slug = createSandbox(sandboxPaths(), {mode: arg, plan});
+    await markChosen(q, `Создан: ${projectName(slug).replace(/^Тест · /, '')}`);
+    return requestSwitch({slug});
+  }
+  if (act === 'go' && projectExists(arg)) {
+    if (!isTest(PROJECTS, state.project)) state.realProject = state.project;
+    await markChosen(q, projectName(arg).replace(/^Тест · /, ''));
+    return requestSwitch({slug: arg});
+  }
+  if (act === 'back') {
+    await markChosen(q, 'В рабочий проект');
+    return requestSwitch({slug: projectExists(state.realProject) && !isTest(PROJECTS, state.realProject) ? state.realProject : FIRST_PROJECT});
+  }
+  if (act === 'del') {
+    if (arg === state.project) return tg.call('answerCallbackQuery', {callback_query_id: q.id, text: 'Сначала вернитесь в рабочий проект — «↩ В рабочий проект».', show_alert: true}).catch(() => {});
+    const r = removeSandbox(sandboxPaths(), arg);
+    if (r) await tg.sendText(state.chatId, `🗑 Удалён тестовый аккаунт «${r.name.replace(/^Тест · /, '')}» со всеми данными${r.people ? `, людей: ${r.people}` : ''}.`, {silent: true});
+    return showTests(q.message.message_id);
+  }
+}
 
 async function showProjects() {
   const rows = listProjects().map((p) => [{text: `${p.slug === state.project ? '✅ ' : ''}${nameOf(p.slug)}`.slice(0, 60), callback_data: `p:${p.slug}`}]);
@@ -983,6 +1028,7 @@ async function onMessage(msg) {
   if (cmd === 'ideas') return enqueue(T.ideasPrompt);
   if (cmd === 'unfinished') return showUnfinished();
   if (cmd === 'projects') return showProjects();
+  if (cmd === 'test') return who ? tg.sendText(state.chatId, TEAM.ownerOnly, {silent: true}) : showTests();
   if (cmd === 'settings') return showSettings();
   if (cmd === 'update') return checkUpdates(true);
   if (cmd === 'app') {
@@ -1095,6 +1141,7 @@ async function onButton(q) {
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
   if (q.data.startsWith('set:')) return onSettings(q);
+  if (q.data.startsWith('tst:')) return who ? null : onTestButton(q);
   if (q.data.startsWith('p:')) return onProjectButton(q);
   if (q.data.startsWith('px:')) return onCrossButton(q);
   if (q.data === 'upd:yes' || q.data === 'upd:no') {

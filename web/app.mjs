@@ -6,6 +6,8 @@
 // Data per project: projects/<p>/host/tasks.json (tasks), host/profiles.json (per person),
 // takes go to the project's inbox like anything else sent to the bot. Until the editor
 // side exists, a project without tasks.json gets demo tasks (seeded: true).
+import {access as planAccess, can as planCan} from '../bot/plans.mjs';
+import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
 import {execFileSync, spawn} from 'node:child_process';
 import {createHmac, randomBytes} from 'node:crypto';
 import {appendFileSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
@@ -117,7 +119,7 @@ function streamFile(req, res, f, extra = {}) {
   return createReadStream(f).pipe(res);
 }
 
-export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, reels, log, reelDir, build, busy, chat}) {
+export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, sandboxPaths, reels, log, reelDir, build, busy, chat}) {
   const token = () => process.env.TELEGRAM_BOT_TOKEN;
   const sign = (rel) => createHmac('sha256', `${token()}:video`).update(rel).digest('base64url').slice(0, 22);
   const botState = () => readJson(join(BOT, 'data', 'state.json'), {});
@@ -135,7 +137,7 @@ export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, reels
     const owner = user.id === st.ownerId || owners().includes(user.id);
     if (owner && as) {
       const x = access().people.find((y) => y.id === as && y.test);
-      if (x) return {key: x.id, name: x.name, role: x.role, editor: isEditor(x), deputyUntil: x.deputyUntil || null, onCamera: !!x.onCamera, studio: isEditor(x) || !!x.selfBuild, test: true, realOwner: true};
+      if (x) return {key: x.id, name: x.name, role: x.role, editor: isEditor(x), deputyUntil: x.deputyUntil || null, onCamera: !!x.onCamera, studio: isEditor(x) || !!x.selfBuild, test: true, realOwner: true, project: x.project || null};
     }
     if (owner) return {key: 'owner', realOwner: true, name: st.ownerName || user.first_name, role: 'owner', editor: true, onCamera: true, studio: true};
     const x = access().people.find((y) => y.telegram?.id === user.id);
@@ -191,15 +193,17 @@ export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, reels
     });
   }
   // «Люди» (LE2): tasks by person and who has not sent anything for a long time.
-  function peopleOf(t) {
+  function peopleOf(t, p) {
     const a = access();
+    const own = (x) => (String(p).startsWith('test-') ? x.project === p : !x.project);
+    a.people = a.people.filter(own);
     const name = (k) => a.people.find((x) => x.id === k)?.name || (k === 'owner' ? botState().ownerName || 'Владелец' : null);
     const tasks = t.tasks.filter((x) => x.to).map((x) => ({title: x.title, who: name(x.to) || '—', status: x.status, due: t.due}));
     const quiet = a.people.filter((x) => x.telegram && !x.isOwner).map((x) => ({name: x.name, days: Math.floor((Date.now() - (x.telegram.seen || x.added || Date.now())) / 864e5)})).filter((x) => x.days >= 7).sort((x, y) => y.days - x.days);
     return {tasks, quiet};
   }
 
-  const testList = () => access().people.filter((x) => x.test).map((x) => ({id: x.id, name: x.name, role: x.role, onCamera: !!x.onCamera, selfBuild: !!x.selfBuild, deputyUntil: x.deputyUntil || null, added: x.added}));
+  const testList = () => access().people.filter((x) => x.test && !x.project).map((x) => ({id: x.id, name: x.name, role: x.role, onCamera: !!x.onCamera, selfBuild: !!x.selfBuild, deputyUntil: x.deputyUntil || null, added: x.added}));
   // Removes a test profile and everything tagged with it: its own tasks and takes, files it
   // sent (inbox lines «(mini app, <name>, …)»), reels it started, its text edits, its
   // settings and its lines in the shared log. Real people's data is never touched.
@@ -273,7 +277,13 @@ export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, reels
     if (!user) return json(401, {error: 'Откройте приложение из Телеграм-бота'});
     const me = person(user, req.headers['x-as']);
     if (!me) return json(403, {error: 'Вас ещё не добавили в команду. Попросите у редактора приглашение.'});
-    const p = project();
+    // Which project: a test account's person works in it; the owner may open a test account (x-project).
+    const wanted = me.project || (me.realOwner && req.headers['x-project']) || null;
+    const p = wanted && /^test-[a-z0-9]+$/.test(wanted) && existsSync(join(PROJECTS, wanted)) ? wanted : project();
+    const pset = readJson(join(PROJECTS, p, 'settings.json'), {});
+    // The plan switches parts off: no reels — no «Студия»; no self-shooting — no «в кадре».
+    if (!planCan(pset, 'reels')) me.studio = false;
+    if (!planCan(pset, 'selfShoot')) me.onCamera = false;
     const t = tasks(p);
     const task = (tid) => t.tasks.find((x) => x.id === tid);
 
@@ -304,11 +314,19 @@ export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, reels
       }
       return json(200, {tests: testList()});
     }
+    if (url.pathname === '/api/app/sandbox') {
+      if (!me.realOwner || !sandboxPaths) return json(403, {});
+      let sb = {};
+      if (req.method === 'POST') { let raw = ''; for await (const c of req) raw += c; try { sb = JSON.parse(raw || '{}'); } catch {} }
+      if (sb.action === 'create') { try { const slug = createSandbox(sandboxPaths, {mode: sb.mode, plan: sb.plan}); log?.(me.name, `создал тестовый аккаунт в мини-приложении`); return json(200, {slug, list: listSandboxes(sandboxPaths)}); } catch { return json(400, {}); } }
+      if (sb.action === 'delete') { const r = removeSandbox(sandboxPaths, String(sb.slug || '')); if (!r) return json(404, {}); log?.(me.name, `удалил тестовый аккаунт «${r.name}» со всеми данными`); return json(200, {removed: r, list: listSandboxes(sandboxPaths)}); }
+      return json(200, {list: listSandboxes(sandboxPaths)});
+    }
     if (req.method === 'GET' && url.pathname === '/api/app/state') {
       const prof = profiles(p)[me.key] || {};
       const mine = reels(p).map((r) => ({id: r.id, title: r.title, status: r.status, version: r.version, updated: r.updated}));
       // A task for one person (to) is shown to them only; one without «to» to everyone.
-      return json(200, {tests: me.realOwner ? testList() : undefined, me: {test: !!me.test, name: me.name, role: me.role, editor: !!me.editor, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera, studio: !!me.studio}, project: p, ...(me.editor ? {plan: weekOf(p), people: peopleOf(t)} : {}), week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
+      return json(200, {account: {slug: p, name: pset.name || p, test: !!pset.test, ...planAccess(pset)}, sandboxes: me.realOwner && sandboxPaths ? listSandboxes(sandboxPaths) : undefined, tests: me.realOwner ? testList() : undefined, me: {test: !!me.test, name: me.name, role: me.role, editor: !!me.editor, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera, studio: !!me.studio}, project: p, ...(me.editor ? {plan: weekOf(p), people: peopleOf(t, p)} : {}), week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
         profile: {langs: 'русский, английский', when: 'вт и чт после 15:00', where: 'кабинет 204, у окна', speed: 1, size: 'large', consent: true, ...prof}});
     }
     let b = {};
