@@ -19,6 +19,7 @@ import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
 import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
+import {telegramDigest} from '../bot/tgexport.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BOT = process.env.REELS_BOT_ROOT || join(HERE, '..');
@@ -227,6 +228,11 @@ const history = (p, k) => read(chatFile(p, k, 'jsonl')).split('\n').filter(Boole
 const chatMeta = (p, k) => readJson(chatFile(p, k, 'json'), {});
 const setChatMeta = (p, k, v) => { mkdirSync(join(CHATS, p), {recursive: true}); writeJson(chatFile(p, k, 'json'), {...chatMeta(p, k), ...v}); };
 
+const onboardingDue = (studio) => {
+  const settings = readJson(join(studio, 'settings.json'), {});
+  return read(join(studio, 'brief.md')) === read(join(BOT, 'starter', 'brief.md')) || (settings.test && !settings.mode);
+};
+
 function preamble(p, k) {
   const studio = join(PROJECTS, p);
   const lines = [
@@ -241,6 +247,9 @@ function preamble(p, k) {
   if (k === '_ds') lines.push(`THIS CHAT develops the project's design system for its reels. The result is ONE self-contained HTML page, \`${relative(BOT, studio)}/design-system/index.html\` (inline CSS/JS, Google Fonts allowed, images as relative files next to it): a small landing page with the system's name and idea, color and type tokens, spacing and motion rules, and a library of the components (plates, price receipts, titles, subtitles, phone mockup…) drawn in HTML/CSS as they look in the reels, each with its name, when to use it and its Remotion component name if there is one. Read the brief, PLAYBOOK.md, \`template/src\` and the reels' code to stay true to what is really used. After each change, rewrite the page and tell the owner in one or two lines what changed; the page reloads by itself. Keep \`design-system/tokens.json\` in sync with the tokens on the page.`);
   else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules, settings, strategy and plan. Reels and posts themselves are made in their own chats; if the owner asks to make one here, say that «+ Новый выпуск» starts it in its own chat.',
     `Strategy and plan follow STRATEGY.md: \`${relative(BOT, studio)}/strategy.json\` (platforms, rubrics, weekly rhythm, events) and \`${relative(BOT, studio)}/plan.json\` (dates and rubrics of reels and posts); the page draws Strategy and the Calendar from them.`);
+  // A new project (the starter brief, or a test account not set up yet) is a first visit: the
+  // whole onboarding, as the bot runs it, not just an answer to the first message.
+  if (k === '_project' && onboardingDue(studio)) lines.push(`THIS PROJECT IS NEW: run REELS.md section 0 (Onboarding) from where it stands, whatever the owner's message is about — their message and files are the answer to step 1. Ask ONE question per turn with \`--keyboard\` buttons and stop until they answer; the next turn goes on with the next question. You are not done until \`brief.md\` is filled, \`strategy.json\` is written and \`settings.json\` has \`mode\`, \`plan\` and \`team\` (step 5), and the summary (step 6) is shown.`);
   else if (k.startsWith('new-')) lines.push('THIS CHAT starts a NEW reel. Create its folder with `node scripts/new-reel.mjs <latin-slug>` as soon as the idea is clear, before anything else; the page then moves this chat to that reel. One reel per chat.');
   else if (k.startsWith('post-')) {
     const dir = join(studio, 'posts', k.slice(5));
@@ -836,11 +845,25 @@ createServer(async (req, res) => {
     const path = uniquePath(dir, rdir ? cleanName(url.searchParams.get('name')) : `web-${Date.now()}-${cleanName(url.searchParams.get('name'))}`);
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    writeFileSync(path, Buffer.concat(chunks));
+    const buf = Buffer.concat(chunks);
+    writeFileSync(path, buf);
+    // A Telegram export (.zip): Claude can't unpack it, so the posts (posts.md) and photos go next to it.
+    let digest = null;
+    if (/\.zip$/i.test(path)) {
+      let d = null;
+      try { d = telegramDigest(buf); } catch {}
+      if (d) {
+        const out = path.replace(/\.zip$/i, '-telegram');
+        mkdirSync(join(out, 'photos'), {recursive: true});
+        for (const ph of d.photos) { const data = ph.read(); if (data && !ph.path.includes('..')) writeFileSync(join(out, 'photos', basename(ph.path)), data); }
+        writeFileSync(join(out, 'posts.md'), d.md);
+        digest = {path: join(out, 'posts.md'), name: d.name || '', count: d.count, photos: d.photos.length};
+      }
+    }
     mkdirSync(join(studio, 'inbox'), {recursive: true});
     appendFileSync(join(studio, 'inbox', 'history.md'), `- ${new Date().toISOString()} (web, ${me.name}${rdir ? `, reel ${reel}` : ''}) ${path}\n`);
     log(me.name, `загрузил ${basename(path)}${rdir ? ` в рилс ${reel}` : ''}`);
-    return json(200, {path, url: mediaUrl(path)});
+    return json(200, {path, url: mediaUrl(path), digest});
   }
   // Inbox → variants (Д2): an author's material becomes a post whose chat writes 2–3 variants.
   if (req.method === 'POST' && url.pathname === '/api/authors/variants') {
