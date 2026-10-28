@@ -380,7 +380,7 @@ async function sidebar() {
     <div class="ph"><button type="button" class="fold" data-fold="side" title="Свернуть панель (⌘\\)" aria-label="Свернуть панель">${svg('panel', 16)}</button><span class="logo">${esc(initials)}</span>
       <select id="projSel" aria-label="Проект">${PROJECTS.map((x) => `<option value="${esc(x.slug)}" ${x.slug === P ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
       ${canEdit() ? `<a class="icon" style="width: 26px; height: 26px; border: 0; background: none; color: var(--muted)" href="#/new" title="Новый выпуск" aria-label="Новый выпуск">${svg('pen')}</a>` : ''}</div>
-    ${TEST ? `<a class="testbar" href="#/settings/tests">Тестовый аккаунт · ${esc([PLAN?.mode && {solo: 'Один', team: 'Команда', agency: 'Агентство'}[PLAN.mode], PLAN?.plan && {posts: 'Посты', video: 'Посты + видео', team: 'Команда', agency: 'Агентство'}[PLAN.plan]].filter(Boolean).join(' · '))}</a>` : ''}
+    ${TEST ? `<a class="testbar" href="#/settings/tests">Тестовый аккаунт${PLAN?.mode ? '' : ' · расскажите о проекте в чате «Сегодня»'}</a>` : ''}
     <button type="button" class="srch" id="srchBtn">${svg('search', 15)}<span>Поиск</span><kbd>⌘K</kbd></button>
     ${item('#/', 'home', 'Сегодня')}
     ${item('#/all', 'board', 'Все выпуски', `<span class="n">${OV.reels.length}</span>`)}
@@ -1601,23 +1601,15 @@ function teamPerson(a, pid) {
 async function vTests() {
   const body = view;
   const d = await api('/api/sandbox');
-  const opt = (o, sel) => Object.entries(o).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(v.name)}</option>`).join('');
-  const FN = {posts: 'посты', plan: 'план', reels: 'ролики', selfShoot: 'съёмка себя', members: 'участники', tasks: 'задания', inbox: 'входящие', approval: 'согласование', projects: 'несколько проектов'};
   body.innerHTML = `<div style="display: flex; flex-direction: column; gap: 16px; max-width: 980px">
-    <div><h2 style="font-size: 17px">Тестовые аккаунты</h2><div class="small muted" style="margin-top: 3px">Как будто пришёл новый клиент: свой проект с режимом и тарифом, демо-стратегия и идеи, свои люди. Проверьте сценарий в студии, боте и мини-приложении, потом удалите — уйдёт всё, что в нём появилось. Рабочие проекты и люди не затрагиваются.</div></div>
-    <div class="card" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap">
-      <label class="small muted" style="display: flex; flex-direction: column; gap: 4px">Режим<select class="f" id="tMode">${opt(d.modes, 'team')}</select></label>
-      <label class="small muted" style="display: flex; flex-direction: column; gap: 4px">Тариф<select class="f" id="tPlan">${opt(d.plans, 'team')}</select></label>
-      <span class="small muted" id="tFeat" style="flex: 1; min-width: 220px"></span>
-      <button class="btn primary" id="tNew">Создать тестовый аккаунт</button></div>
+    <div><h2 style="font-size: 17px">Тестовые аккаунты</h2><div class="small muted" style="margin-top: 3px">Как будто вы новый клиент и пришли впервые: пустой проект, а в чате «Сегодня» Claude задаёт наводящие вопросы — о чём проект, кто делает контент, где и как часто публикуете — и сам собирает стратегию, режим и команду. Удаление стирает всё, что в аккаунте появилось. Рабочие проекты и люди не затрагиваются.</div></div>
+    <div><button class="btn primary" id="tNew">Начать как новый клиент</button></div>
     ${d.list.length ? d.list.map((x) => `<div class="card" style="display: flex; flex-direction: column; gap: 10px">
       <div class="row" style="gap: 10px"><b style="flex: 1">${esc(x.name)}</b><span class="small muted">создан ${new Date(x.created).toLocaleString('ru-RU', {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'})}</span>
         <button class="btn" data-open="${esc(x.slug)}">Открыть</button><button class="btn" data-del="${esc(x.slug)}" style="color: #B3261E">Удалить со всеми данными</button></div>
-      ${x.people.length ? `<div class="small muted">Люди: ${x.people.map((y) => `${esc(y.name.replace(/ · [a-z0-9]+$/, ''))} <a href="#" data-link="${esc(y.id)}" data-slug="${esc(x.slug)}">войти как</a>`).join(' · ')}</div>` : '<div class="small muted">Режим «Один»: только вы.</div>'}</div>`).join('') : '<p class="muted">Пока нет ни одного.</p>'}
-    <p class="small muted">«Войти как» даёт ссылку на сутки: откройте её в приватном окне браузера — студия откроется глазами этого человека. В Телеграме тестовый аккаунт открывается в мини-приложении (Профиль › Тестовые аккаунты) и командой /test в боте.</p></div>`;
-  const feats = () => { const pl = d.plans[$('#tPlan').value]; const solo = $('#tMode').value === 'solo'; $('#tFeat').textContent = 'Включено: ' + pl.features.filter((f) => !(solo && ['members', 'tasks', 'inbox', 'approval'].includes(f))).map((f) => FN[f]).join(', '); };
-  $('#tMode').onchange = feats; $('#tPlan').onchange = feats; feats();
-  $('#tNew').onclick = async () => { const r = await post('/api/sandbox', {action: 'create', mode: $('#tMode').value, plan: $('#tPlan').value}); toast('Тестовый аккаунт создан'); P = r.slug; await loadMe(); location.hash = '#/'; route(); };
+      ${x.people.length ? `<div class="small muted">Люди: ${x.people.map((y) => `${esc(y.name)} <a href="#" data-link="${esc(y.id)}" data-slug="${esc(x.slug)}">войти как</a>`).join(' · ')}</div>` : ''}</div>`).join('') : '<p class="muted">Пока нет ни одного.</p>'}
+    <p class="small muted">В Телеграме — команда /test в боте: он переключится в тестовый аккаунт и начнёт знакомство.</p></div>`;
+  $('#tNew').onclick = async () => { const r = await post('/api/sandbox', {action: 'create'}); toast('Тестовый аккаунт создан — расскажите о проекте в чате'); P = r.slug; await loadMe(); location.hash = '#/'; route(); };
   body.querySelectorAll('[data-open]').forEach((b) => b.onclick = async () => { P = b.dataset.open; await loadMe(); location.hash = '#/'; route(); });
   body.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
     if (!confirm('Удалить тестовый аккаунт со всем, что в нём есть: выпуски, посты, файлы, задания, чаты, люди?')) return;

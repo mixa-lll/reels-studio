@@ -17,7 +17,7 @@ import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, exist
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
-import {access as planAccess, MODES, PLANS} from '../bot/plans.mjs';
+import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -74,7 +74,7 @@ const projectDir = (p) => (safe(p) && existsSync(join(PROJECTS, p)) ? join(PROJE
 function projects() {
   if (!existsSync(PROJECTS)) return [];
   return readdirSync(PROJECTS).filter((p) => safe(p) && statSync(join(PROJECTS, p)).isDirectory())
-    .map((p) => { const st = readJson(join(PROJECTS, p, 'settings.json'), {}); return {slug: p, name: st.name || (p === 'main' ? 'My Gudauri' : p), test: !!st.test}; });
+    .map((p) => { const st = readJson(join(PROJECTS, p, 'settings.json'), {}); return {slug: p, name: st.test ? `🧪 Тест · ${st.name || 'новый клиент'}` : st.name || (p === 'main' ? 'My Gudauri' : p), test: !!st.test}; });
 }
 // ideas.md: «## Section» then «### Title» entries with Format:/Hook: lines.
 function parseIdeas(p) {
@@ -516,9 +516,9 @@ createServer(async (req, res) => {
     if (req.method === 'POST') {
       const b = await body(req);
       if (b.action === 'create') {
-        if (!MODES[b.mode] || !PLANS[b.plan]) return json(400, {});
-        const slug = createSandbox(paths, {mode: b.mode, plan: b.plan});
-        log(me.name, `создал тестовый аккаунт «${projectSettings(slug).name}»`);
+        // Empty, as a first visit: the onboarding in the chat builds the strategy, mode and team.
+        const slug = createSandbox(paths);
+        log(me.name, 'создал тестовый аккаунт');
         return json(200, {slug, list: listSandboxes(paths)});
       }
       if (b.action === 'link') {
@@ -539,7 +539,7 @@ createServer(async (req, res) => {
       }
       return json(400, {});
     }
-    return json(200, {list: listSandboxes(paths), modes: MODES, plans: Object.fromEntries(Object.entries(PLANS).map(([k, v]) => [k, {name: v.name, features: v.features, limits: v.limits}]))});
+    return json(200, {list: listSandboxes(paths)});
   }
   // ---------- a member's own part (D4 «Веб глазами участника») ----------
   if (url.pathname.startsWith('/api/member')) {

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Telegram ↔ coding agent bridge for the reels workflow.
 // One owner, one agent turn at a time; messages that arrive mid-turn join it at once.
-import {createSandbox, isTest, listSandboxes, removeSandbox} from './sandbox.mjs';
-import {MODES, PLANS} from './plans.mjs';
+import {createSandbox, isTest, listSandboxes, removeSandbox, sandboxName} from './sandbox.mjs';
 import {editor as makeEditor, KEYS as EDITOR_KEYS, LABELS as EDITOR_LABELS} from './editor.mjs';
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
@@ -378,10 +377,10 @@ const sandboxPaths = () => ({projects: PROJECTS, access: memberFile || join(SHAR
 async function showTests(edit) {
   const list = listSandboxes(sandboxPaths());
   const here = isTest(PROJECTS, state.project);
-  const text = ['🧪 Тестовые аккаунты — как будто пришёл новый клиент: свой проект с режимом и тарифом, демо-данные и люди. Удаление стирает всё, что в нём появилось; рабочие проекты не трогаются.',
+  const text = ['🧪 Тестовые аккаунты — как будто вы новый клиент и открыли бота первый раз: я задам вопросы, соберу стратегию, режим и команду по ответам. Удаление стирает всё, что в аккаунте появилось; рабочие проекты не трогаются.',
     here ? `\nСейчас вы в тестовом: «${nameOf(state.project)}».` : '', list.length ? '' : '\nПока ни одного.'].filter(Boolean).join('\n');
   const rows = list.map((x) => [{text: `${x.slug === state.project ? '✅ ' : '▶ '}${x.name.replace(/^Тест · /, '')}`.slice(0, 60), callback_data: `tst:go:${x.slug}`}, {text: '🗑 Удалить', callback_data: `tst:del:${x.slug}`}]);
-  rows.push(Object.entries(MODES).map(([k, m]) => ({text: `＋ ${m.name}`, callback_data: `tst:new:${k}`})));
+  rows.push([{text: '＋ Новый тестовый аккаунт', callback_data: 'tst:new'}]);
   if (here) rows.push([{text: '↩ В рабочий проект', callback_data: 'tst:back'}]);
   rows.push([{text: T.close, callback_data: 'tst:x'}]);
   if (edit) return tg.call('editMessageText', {chat_id: state.chatId, message_id: edit, text, reply_markup: {inline_keyboard: rows}}).catch(() => {});
@@ -391,17 +390,16 @@ async function onTestButton(q) {
   const [, act, arg] = q.data.split(':');
   if (act === 'x') return markChosen(q, null);
   if (act === 'new') {
-    const plan = {solo: 'video', team: 'team', agency: 'agency'}[arg];
-    if (!MODES[arg] || !PLANS[plan]) return;
     if (!isTest(PROJECTS, state.project)) state.realProject = state.project;
-    const slug = createSandbox(sandboxPaths(), {mode: arg, plan});
-    await markChosen(q, `Создан: ${projectName(slug).replace(/^Тест · /, '')}`);
-    return requestSwitch({slug});
+    const slug = createSandbox(sandboxPaths());
+    await markChosen(q, 'Новый тестовый аккаунт');
+    return requestSwitch({slug, created: true});
   }
   if (act === 'go' && projectExists(arg)) {
     if (!isTest(PROJECTS, state.project)) state.realProject = state.project;
-    await markChosen(q, projectName(arg).replace(/^Тест · /, ''));
-    return requestSwitch({slug: arg});
+    await markChosen(q, sandboxName(PROJECTS, arg).replace(/^Тест · /, ''));
+    // Not set up yet: it opens as a first visit, with the onboarding question.
+    return requestSwitch({slug: arg, created: untouched(arg)});
   }
   if (act === 'back') {
     await markChosen(q, 'В рабочий проект');
@@ -440,7 +438,7 @@ async function onProjectButton(q) {
 function requestSwitch(req) {
   // A new project replaced by another choice before anyone used it leaves no trace.
   const prev = state.switchTo;
-  if (prev?.created && prev.slug !== req.slug && untouched(prev.slug)) removeProject(prev.slug);
+  if (prev?.created && prev.slug !== req.slug && untouched(prev.slug) && !isTest(PROJECTS, prev.slug)) removeProject(prev.slug);
   state.switchTo = req;
   saveState(state);
   if (current) tg.sendText(state.chatId, T.switchLater(nameOf(req.slug)), {silent: true}).catch(() => {});
@@ -463,7 +461,7 @@ async function switchProject() {
   await postPending(tg, state.chatId, {drop: true});
   forgetKeys();
   const fromName = projectExists(from) ? nameOf(from) : '';
-  if (projectExists(from) && untouched(from)) removeProject(from);
+  if (projectExists(from) && untouched(from) && !isTest(PROJECTS, from)) removeProject(from);
   state.project = req.slug;
   saveState(state);
   const text = req.created ? `${T.projectNew(projectName(req.slug), fromName)}${req.carry ? '' : `\n\n${T.askAbout}`}` : T.projectOpen(nameOf(req.slug));
@@ -949,7 +947,7 @@ const HOME_KEYS = EDITOR_KEYS;
 const MORE = () => ({inline_keyboard: [
   [{text: '💡 Идеи от Claude', callback_data: 'more:ideas'}, {text: '📂 Незаконченные', callback_data: 'more:unfinished'}],
   [{text: '📁 Проекты', callback_data: 'more:projects'}, {text: '🧪 Тестовые аккаунты', callback_data: 'more:test'}],
-  [{text: '🎭 Посмотреть как роль', callback_data: 'more:role'}, {text: '⚙️ Настройки', callback_data: 'more:settings'}],
+  [{text: '⚙️ Настройки', callback_data: 'more:settings'}],
   ...(process.env.MINIAPP_URL ? [[{text: '🎬 Открыть студию', web_app: {url: process.env.MINIAPP_URL}}]] : []),
 ]});
 // A project still at the starter brief needs the onboarding talk with Claude first.

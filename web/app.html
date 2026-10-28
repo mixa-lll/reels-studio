@@ -1406,13 +1406,10 @@ function drawProfile() {
     </div>
     ${S.demo ? '<p class="cap" style="margin-top:14px">Это пробная версия: задания демонстрационные, записи приходят редактору в Телеграм.</p>' : ''}
     ${S.sandboxes ? `<div class="lh">Тестовые аккаунты</div><div class="note">
-      <span class="cap">Как будто пришёл новый клиент: свой проект с режимом и тарифом, демо-данные и люди. Удаление стирает всё, что в нём появилось.</span>
+      <span class="cap">Как будто вы новый клиент и открыли бота первый раз: бот задаст вопросы и сам соберёт стратегию, режим и команду. Удаление стирает всё, что в аккаунте появилось.</span>
       ${S.sandboxes.map((x) => `<div class="tp-row"><span class="tx"><b>${esc(x.name.replace(/^Тест · /, ''))}</b><span>${x.slug === S.account.slug ? 'открыт сейчас' : (x.people.length ? 'людей: ' + x.people.length : 'только вы')}</span></span>${x.slug === S.account.slug ? '' : `<button class="tp-go" data-proj="${x.slug}">Открыть</button>`}<button class="tp-del" data-pdel="${x.slug}">Удалить</button></div>${x.slug === S.account.slug && x.people.length ? x.people.map((y) => `<div class="tp-row" style="padding-left:14px"><span class="tx"><span>${esc(y.name.replace(/ · [a-z0-9]+$/, ''))}</span></span><button class="tp-go" data-as="${y.id}">Войти как</button></div>`).join('') : ''}`).join('') || '<span class="cap">Пока ни одного.</span>'}
       <button class="sb2" id="sbnew" style="margin-top:8px">${ic('plus', 20)}Создать тестовый аккаунт</button></div>` : ''}
-    ${S.tests ? `<div class="lh">Тестовые профили</div><div class="note">
-      <span class="cap">Посмотреть приложение глазами другой роли. Всё, что сделаете под тестовым профилем, удалится вместе с ним.</span>
-      ${S.tests.map((x) => `<div class="tp-row"><span class="tx"><b>${esc(x.name.replace(/^Тест · /, ''))}</b><span>${x.id === asId() ? 'вы сейчас здесь' : 'создан ' + new Date(x.added).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}</span></span>${x.id === asId() ? '' : `<button class="tp-go" data-as="${x.id}">Войти</button>`}<button class="tp-del" data-del="${x.id}">Удалить</button></div>`).join('') || '<span class="cap">Пока ни одного.</span>'}
-      <button class="sb2" id="tpnew" style="margin-top:8px">${ic('plus', 20)}Создать тестовый профиль</button></div>` : ''}
+
   </div>${tabs()}`;
   if (S.sandboxes) {
     $('#sbnew').onclick = newSandbox;
@@ -1424,63 +1421,18 @@ function drawProfile() {
       haptic('ok'); alert(`Удалено: «${r.removed.name.replace(/^Тест · /, '')}», людей ${r.removed.people}.`); reload();
     });
   }
-  if (S.tests) {
-    $('#tpnew').onclick = newTest;
-    root.querySelectorAll('[data-as]').forEach((b) => b.onclick = () => { setAs(b.dataset.as); haptic('ok'); reload(); });
-    root.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
-      const x = S.tests.find((y) => y.id === b.dataset.del);
-      if (!confirm(`Удалить «${x.name.replace(/^Тест · /, '')}» и всё, что он создал: задания, записи, загрузки, ролики, правки текста?`)) return;
-      const r = await api('/api/app/test', {method: 'POST', json: {action: 'delete', id: x.id}});
-      if (asId() === x.id) setAs('');
-      haptic('ok');
-      alert(`Удалено: заданий ${r.wiped.tasks}, файлов ${r.wiped.files}, роликов ${r.wiped.reels}.`);
-      reload();
-    });
-  }
   $('#cons').onclick = async () => {
     if (p.consent !== false && !confirm('Отозвать разрешение на лицо в кадре? Редактор получит сообщение.')) return;
     const r = await api('/api/app/profile', {method: 'POST', json: {consent: p.consent === false}}); Object.assign(S.profile, r.profile); haptic('ok'); draw();
   };
   root.querySelectorAll('[data-k]').forEach((b) => b.onclick = () => editField(b.dataset.k));
 }
-function newSandbox() {
-  const M = [['solo', 'Один', 'эксперт, блогер — без команды'], ['team', 'Команда', 'участники, задания, входящие'], ['agency', 'Агентство', 'несколько клиентов']];
-  const P = [['posts', 'Посты'], ['video', 'Посты + видео'], ['team', 'Команда'], ['agency', 'Агентство']];
-  let mode = 'team', plan = 'team';
-  const el = document.createElement('div');
-  el.className = 'sheet';
-  const paint = () => {
-    el.innerHTML = `<div><span class="grab"></span><div style="font-size:22px;font-weight:700">Новый тестовый аккаунт</div>
-      <span class="lab">Режим</span><div class="opt">${M.map(([k, n]) => `<button data-m="${k}" class="${k === mode ? 'on' : ''}">${n}</button>`).join('')}</div>
-      <span class="cap">${M.find(([k]) => k === mode)[2]}</span>
-      <span class="lab">Тариф</span><div class="opt">${P.map(([k, n]) => `<button data-p="${k}" class="${k === plan ? 'on' : ''}">${n}</button>`).join('')}</div>
-      <button class="bb" id="ok">${ic('check', 22)}Создать и открыть</button><button class="lk" id="cn">Отмена</button></div>`;
-    el.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => { mode = b.dataset.m; paint(); });
-    el.querySelectorAll('[data-p]').forEach((b) => b.onclick = () => { plan = b.dataset.p; paint(); });
-    el.querySelector('#cn').onclick = () => el.remove();
-    el.querySelector('#ok').onclick = async () => { const r = await api('/api/app/sandbox', {method: 'POST', json: {action: 'create', mode, plan}}); el.remove(); setProj(r.slug); setAs(''); haptic('ok'); reload(); };
-  };
-  el.onclick = (e) => { if (e.target === el) el.remove(); };
-  paint();
-  document.body.append(el);
-}
-function newTest() {
-  const K = [['member', 'Участник', 'скидывает материал и идеи, получает задания'], ['camera', 'Участник «в кадре»', 'снимает себя с суфлёром'], ['builder', 'Участник «сам собирает»', 'открыта «Студия» в «Моё»'], ['deputy', 'Замещающий', 'права редактора на 2 недели'], ['editor', 'Редактор', 'Сегодня · Неделя · Люди']];
-  const el = document.createElement('div');
-  el.className = 'sheet';
-  el.innerHTML = `<div><span class="grab"></span><div style="font-size:22px;font-weight:700">Новый тестовый профиль</div>
-    ${K.map(([k, n, d]) => `<button class="sb2" data-kind="${k}" style="height:auto;padding:12px 16px;flex-direction:column;align-items:flex-start;gap:2px;text-align:left"><b>${n}</b><span style="font-size:13px;font-weight:500;color:var(--mut)">${d}</span></button>`).join('')}
-    <button class="lk" id="cn">Отмена</button></div>`;
-  document.body.append(el);
-  const close = () => el.remove();
-  el.onclick = (e) => { if (e.target === el) close(); };
-  el.querySelector('#cn').onclick = close;
-  el.querySelectorAll('[data-kind]').forEach((b) => b.onclick = async () => {
-    const r = await api('/api/app/test', {method: 'POST', json: {action: 'create', kind: b.dataset.kind}});
-    close();
-    const x = r.tests.at(-1);
-    setAs(x.id); haptic('ok'); reload();
-  });
+async function newSandbox() {
+  if (!confirm('Создать тестовый аккаунт? Он начнётся как первый заход: знакомство пройдёт в чате с ботом.')) return;
+  await api('/api/app/sandbox', {method: 'POST', json: {action: 'create'}});
+  haptic('ok');
+  alert('Готово. В чате с ботом — кнопка «Начать как новый клиент».');
+  try { tg.close(); } catch { reload(); }
 }
 function editField(k) {
   const p = S.profile;
