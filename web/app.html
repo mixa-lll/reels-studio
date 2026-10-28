@@ -255,7 +255,7 @@ function drawTasks() {
     ${S.demo ? '<span class="demo">Демо-задания — пока редактор не задал свои</span>' : ''}
     <div class="hero2"><span class="av">${esc(S.me.name[0] || '·')}</span>
       <div class="fig">${left().length ? `${left().length} ${plural(left().length, 'ролик', 'ролика', 'роликов')}` : 'Всё снято'}</div>
-      <div class="cap">${left().length ? `${hi}, ${esc(S.me.name.split(' ')[0])} · около ${Math.max(3, left().length * 3)} минут, до ${esc(S.due || 'пятницы')}` : 'Новые задания придут в понедельник'}</div>
+      <div class="cap">${left().length ? `${hi}, ${esc(S.me.name.split(' ')[0])} · около ${Math.max(3, left().length * 3)} минут, до ${esc(dueG(S.due))}` : 'Новые задания придут в понедельник'}</div>
       <div class="acts">
         ${next ? `<button class="act" data-task="${next.id}"><span>${ic('video', 24)}</span>${redo.length ? 'Переснять' : 'Снимать'}</button>` : ''}
         <button class="act alt" data-tab="reels"><span>${ic('film', 24)}</span>Ролики</button>
@@ -263,11 +263,13 @@ function drawTasks() {
       </div>
       <div class="cap" style="font-size:13px">Снято ${done} из ${all.length} · ${day}</div>
     </div>
-    ${todo.length ? `<div class="lh">Надо снять · до ${esc(S.due || 'пятницы')}</div><div class="grp">${todo.map((t) => row(t, '')).join('')}</div>` : ''}
+    ${todo.length ? `<div class="lh">Надо снять · до ${esc(dueG(S.due))}</div><div class="grp">${todo.map((t) => row(t, '')).join('')}</div>` : ''}
     ${redo.length ? `<div class="lh">Попросили переснять</div><div class="grp">${redo.map((t) => row(t, '<span class="st b">переснять</span>')).join('')}</div>` : ''}
     ${all.some((t) => t.status === 'sent') ? `<div class="lh">Отправлено</div><div class="grp">${all.filter((t) => t.status === 'sent').map((t) => row(t, '<span class="st o">отправлено</span>')).join('')}</div>` : ''}
   </div>${tabs()}`;
 }
+// «до пятницы», not «до пятница»: the due day comes in the nominative.
+const dueG = (d) => ({понедельник: 'понедельника', вторник: 'вторника', среда: 'среды', четверг: 'четверга', пятница: 'пятницы', суббота: 'субботы', воскресенье: 'воскресенья'})[d] || d || 'пятницы';
 const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
 
 // ---------- Задание ----------
@@ -276,7 +278,7 @@ function drawTask(id) {
   const i = S.tasks.indexOf(t) + 1;
   const words = taskText(t).split(/(\s+)/).map((w, k) => (/\S/.test(w) ? `<span class="w" data-w="${k}">${esc(w)}</span>` : w)).join('');
   root.innerHTML = `<div class="scr">
-    <div class="lab" style="margin-top:6px;${t.status === 'redo' ? 'color:var(--bad)' : ''}">${t.status === 'redo' ? 'Редактор просит переснять' : `Задание ${i} из ${S.tasks.length} · до ${esc(S.due || 'пятницы')}`}</div>
+    <div class="lab" style="margin-top:6px;${t.status === 'redo' ? 'color:var(--bad)' : ''}">${t.status === 'redo' ? 'Редактор просит переснять' : `Задание ${i} из ${S.tasks.length} · до ${esc(dueG(S.due))}`}</div>
     <h1 class="t2">${esc(t.title)}</h1>
     ${t.lang !== 'ru' ? '<span class="lab" style="color:var(--acc)">Ролик на английском</span>' : ''}
     ${t.status === 'redo' && t.note ? `<div class="note" style="margin-top:12px"><span class="lab">Редактор</span><span style="font-size:17px;line-height:25px">«${esc(t.note)}»</span></div>` : ''}
