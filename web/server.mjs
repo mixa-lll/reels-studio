@@ -11,7 +11,7 @@ import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
-import {appendFileSync, closeSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
+import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
@@ -731,6 +731,45 @@ createServer(async (req, res) => {
     appendFileSync(join(studio, 'inbox', 'history.md'), `- ${new Date().toISOString()} (web, ${me.name}${rdir ? `, reel ${reel}` : ''}) ${path}\n`);
     log(me.name, `загрузил ${basename(path)}${rdir ? ` в рилс ${reel}` : ''}`);
     return json(200, {path, url: mediaUrl(path)});
+  }
+  // Inbox → variants (Д2): an author's material becomes a post whose chat writes 2–3 variants.
+  if (req.method === 'POST' && url.pathname === '/api/authors/variants') {
+    if (!can('editor')) return json(403, {});
+    const {id: eid, skip} = await body(req);
+    const byId = new Map();
+    for (const line of read(join(studio, 'inbox', 'authors.jsonl')).split('\n')) { try { const e = JSON.parse(line); byId.set(e.id, {...byId.get(e.id), ...e}); } catch {} }
+    const e = byId.get(eid);
+    if (!e) return json(404, {});
+    const mark = (fields) => appendFileSync(join(studio, 'inbox', 'authors.jsonl'), JSON.stringify({id: eid, ...fields}) + '\n');
+    if (skip) { mark({status: 'skip'}); return json(200, {}); }
+    if (e.post && postDir(studio, e.post)) return json(200, {id: e.post, existed: true});
+    const photos = (e.items || []).filter((i) => i.kind === 'photo' && i.path && existsSync(join(studio, i.path)));
+    const pid = newPost(studio, {kind: photos.length ? 'photo' : 'text', title: (e.note || `От ${e.who || 'участника'}`).slice(0, 80), by: me.name});
+    const dir = postDir(studio, pid);
+    for (const i of photos) copyFileSync(join(studio, i.path), join(dir, 'sources', basename(i.path)));
+    mark({status: 'used', post: pid});
+    log(me.name, `сделал пост ${pid} из материала ${e.who || ''}`);
+    return json(200, {id: pid, photos: photos.length});
+  }
+  // Задания людям (Д2): the editor's side of the mini app's tasks (projects/<p>/host/tasks.json).
+  if (url.pathname === '/api/tasks') {
+    if (!can('editor')) return json(403, {});
+    const f = join(studio, 'host', 'tasks.json');
+    const t = readJson(f, {tasks: []});
+    if (req.method === 'GET') return json(200, {tasks: t.tasks || [], week: t.week, due: t.due, people: access().people.map((x) => ({id: x.id, name: x.name, role: x.role, onCamera: !!x.onCamera}))});
+    const b = await body(req);
+    const x = (t.tasks || []).find((y) => y.id === b.id);
+    if (b.action === 'add' && b.title?.trim() && b.text?.trim()) {
+      mkdirSync(join(studio, 'host'), {recursive: true});
+      delete t.seeded;
+      t.tasks = [...(t.tasks || []), {id: randomBytes(9).toString('base64url'), status: 'todo', title: b.title.trim().slice(0, 120), text: b.text.trim().slice(0, 2000),
+        seconds: Math.min(90, Math.max(5, Number(b.seconds) || 20)), place: String(b.place || '').slice(0, 80), lang: b.lang === 'en' ? 'en' : 'ru', to: b.to || null, kind: 'shoot_self', by: me.name, created: Date.now()}];
+    } else if (b.action === 'redo' && x) { x.status = 'redo'; x.note = String(b.note || '').slice(0, 300); }
+    else if (b.action === 'remove' && x) t.tasks = t.tasks.filter((y) => y !== x);
+    else return json(400, {});
+    writeJson(f, t);
+    log(me.name, `задания людям: ${b.action} ${b.title || x?.title || ''}`);
+    return json(200, {tasks: t.tasks});
   }
   // What authors sent through the bot (bot/author.mjs): one line per update, merged by id.
   if (req.method === 'GET' && url.pathname === '/api/authors') {
