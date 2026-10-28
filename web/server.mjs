@@ -475,6 +475,7 @@ createServer(async (req, res) => {
   }
 
   // The Telegram mini app signs its own requests (web/app.mjs), no session needed.
+  if (req.method === 'GET' && url.pathname === '/preview.js') { res.writeHead(200, {'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache'}); return res.end(readFileSync(join(HERE, 'preview.js'))); }
   if (url.pathname === '/app' || url.pathname.startsWith('/api/app/') || url.pathname.startsWith('/app/take/') || url.pathname === '/app/v') return miniApp(req, res, url);
 
   const me = whoIs(req);
@@ -611,7 +612,7 @@ createServer(async (req, res) => {
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
-      scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir),
+      scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10)});
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
@@ -624,6 +625,18 @@ createServer(async (req, res) => {
     const list = changeEdits(dir, b, me.name);
     if (!list) return json(400, {});
     return json(200, {edits: list});
+  }
+  // «Как увидят» (NX7): which platform views someone has looked at before publishing (publish.json → seen).
+  if (req.method === 'POST' && url.pathname === '/api/reel/seen') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir || typeof b.key !== 'string') return json(404, {});
+    const f = join(dir, 'publish.json');
+    const pub = readJson(f, {});
+    pub.seen = {...pub.seen, [b.key.slice(0, 80)]: {by: me.name, at: Date.now()}};
+    writeJson(f, pub);
+    return json(200, {seen: pub.seen});
   }
   // A spoken note: saved next to the reel's materials and turned into text by the bot's local Whisper.
   if (req.method === 'POST' && url.pathname === '/api/reel/voice') {
@@ -663,7 +676,7 @@ createServer(async (req, res) => {
     const dir = postDir(studio, id);
     if (!dir || !patch || typeof patch !== 'object') return json(400, {});
     const cur = readPost(dir);
-    for (const k of ['kind', 'title', 'chosen', 'texts', 'slides', 'slidesEn', 'slideCount', 'captions', 'after', 'photos', 'published']) if (k in patch) cur[k] = patch[k];
+    for (const k of ['kind', 'title', 'chosen', 'texts', 'slides', 'slidesEn', 'slideCount', 'captions', 'after', 'photos', 'published', 'seen']) if (k in patch) cur[k] = patch[k];
     savePost(dir, cur);
     return json(200, {post: cur});
   }

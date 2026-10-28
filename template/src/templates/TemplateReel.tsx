@@ -73,7 +73,7 @@ const useIn = (delay = 0, len = 14) => interpolate(useCurrentFrame(), [delay, de
 const Plate = ({t, text, note, place = 'bottom', lead, children}: {t: Th; text?: string; note?: string; place?: Scene['place']; lead?: React.ReactNode; children?: React.ReactNode}) => {
   const p = useIn(4);
   if (!text && !children) return null;
-  const pos: CSSProperties = place === 'top' ? {top: 230} : place === 'middle' ? {top: '42%'} : place === 'under-face' ? {top: '64%'} : {bottom: 300};
+  const pos: CSSProperties = place === 'top' ? {top: 230} : place === 'middle' ? {top: '42%'} : place === 'under-face' ? {top: '64%'} : {bottom: 430};
   return (
     <div style={{position: 'absolute', left: 70, right: 70, ...pos, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 14, opacity: p, transform: `translateY(${(1 - p) * 40}px)`}}>
       {lead}
@@ -139,7 +139,7 @@ function SceneView({s, i, d, t, total}: {s: Scene; i: number; d: ReelData; t: Th
         <div style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
           <Fill m={v?.media} />
           {s.win === k && <AbsoluteFill style={{boxShadow: `inset 0 0 0 14px ${t.accent}`}} />}
-          <div style={{position: 'absolute', left: 30, right: 30, bottom: 340, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start'}}>
+          <div style={{position: 'absolute', left: 30, right: 30, bottom: 430, display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start'}}>
             <div style={{background: t.plate, color: t.plateInk, fontFamily: t.font, fontWeight: 800, fontSize: 46, padding: '14px 22px', borderRadius: 20}}>{k.toUpperCase()} · {v?.label}</div>
             {v?.amount != null && <Chip t={t}>{money(v.amount, cur)}</Chip>}
             {s.win === k && <div style={{background: '#171717', color: '#fff', fontFamily: t.font, fontWeight: 700, fontSize: 40, padding: '10px 20px', borderRadius: 999}}>выгоднее</div>}
