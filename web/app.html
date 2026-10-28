@@ -217,6 +217,12 @@ input.f{width:100%;height:48px;border-radius:12px;border:1px solid var(--line);b
 .micb{width:56px;flex:none;border-radius:14px;border:1px solid var(--line);background:var(--sec2);color:var(--ink);display:grid;place-items:center}
 .micb.rec{background:var(--r);color:#fff;border-color:transparent}
 
+.asbar{position:sticky;top:0;z-index:9;display:flex;align-items:center;gap:10px;background:#2F6FEB;color:#fff;padding:10px 16px;font-size:14px;line-height:19px}
+.asbar span{flex:1}.asbar b{font-weight:700}
+.asbar button{height:32px;border:0;border-radius:999px;background:#fff;color:#2F6FEB;font-weight:700;font-size:14px;padding:0 14px}
+.tp-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line)}.tp-row:first-child{border-top:0}
+.tp-row .tx{flex:1}.tp-row button{height:36px;border-radius:999px;border:0;padding:0 14px;font-weight:700;font-size:14px}
+.tp-go{background:#171717;color:#fff}.tp-del{background:#FDE7E7;color:#B3261E}
 </style>
 </head>
 <body>
@@ -237,6 +243,7 @@ const I = {
   globe:'<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', pin:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
   msg:'<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>', mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
   wand:'<path d="M15 4V2M15 10V8M11 6H9M21 6h-2M3 21l12-12"/>',
   cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>', upload:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/>',
 };
@@ -253,8 +260,12 @@ const isEd = () => !!S?.me.editor;
 // editors and in «Моё» for members marked «Сам собирает».
 const TABS = () => isEd() ? [['today', 'spark', 'Сегодня'], ['week', 'cal', 'Неделя'], ['people', 'users', 'Люди'], ['profile', 'user', 'Профиль']] : [['tasks', 'list', 'Задания'], ['mine', 'film', 'Моё'], ['profile', 'user', 'Профиль']];
 const fixTab = () => { const old = {reels: 'mine', studio: isEd() ? 'today' : 'mine'}; tab = old[tab] || tab; if (!TABS().some(([k]) => k === tab)) tab = TABS()[0][0]; };
+// Test profiles: the owner opens the app «as» a test person; the choice lives in this browser.
+const asId = () => { try { return localStorage.getItem('reels-as') || ''; } catch { return ''; } };
+const setAs = (v) => { try { v ? localStorage.setItem('reels-as', v) : localStorage.removeItem('reels-as'); } catch {} };
+async function reload() { S = await api('/api/app/state'); stack = []; tab = ''; draw(); }
 async function api(path, opts = {}) {
-  const r = await fetch(path, {...opts, headers: {'x-tg-init': tg?.initData || '', ...(opts.json ? {'content-type': 'application/json'} : {}), ...(opts.headers || {})}, body: opts.json ? JSON.stringify(opts.json) : opts.body});
+  const r = await fetch(path, {...opts, headers: {'x-tg-init': tg?.initData || '', 'x-as': asId(), ...(opts.json ? {'content-type': 'application/json'} : {}), ...(opts.headers || {})}, body: opts.json ? JSON.stringify(opts.json) : opts.body});
   const b = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(b.error || 'Что-то пошло не так. Попробуйте ещё раз.');
   return b;
@@ -278,6 +289,16 @@ const taskText = (t) => t.edit?.text || t.text;
 const left = () => S.tasks.filter((t) => t.status !== 'sent');
 
 function draw() {
+  drawInner();
+  if (S?.me.test) {
+    const b = document.createElement('div');
+    b.className = 'asbar';
+    b.innerHTML = `<span>Тест: вы смотрите как <b>${esc(S.me.name.replace(/^Тест · /, ''))}</b></span><button id="asx">Выйти</button>`;
+    root.prepend(b);
+    b.querySelector('#asx').onclick = () => { setAs(''); haptic(); reload(); };
+  }
+}
+function drawInner() {
   backBtn();
   window.scrollTo(0, 0);
   const top = stack.at(-1);
@@ -634,7 +655,7 @@ async function upload(t) {
       await new Promise((ok, fail) => {
         const q = new XMLHttpRequest();
         q.open('POST', `/api/app/clip?id=${encodeURIComponent(t.id)}&n=${n}${x.keep ? '&keep=' + x.keep.toFixed(2) : ''}`);
-        q.setRequestHeader('x-tg-init', tg?.initData || '');
+        q.setRequestHeader('x-tg-init', tg?.initData || ''); q.setRequestHeader('x-as', asId());
         q.setRequestHeader('content-type', x.blob.type || 'video/mp4');
         q.upload.onprogress = (e) => { if (e.lengthComputable) { const p = Math.round(100 * (sent + e.loaded) / total); $('#upb').style.width = p + '%'; $('#up').textContent = `Загружено ${p} % · не закрывайте страницу`; } };
         q.onload = () => (q.status === 200 ? ok() : fail(new Error('upload')));
@@ -811,7 +832,7 @@ function dropSheet() {
       await new Promise((ok) => {
         const x = new XMLHttpRequest();
         x.open('POST', `/api/app/drop?name=${encodeURIComponent(file.name)}`);
-        x.setRequestHeader('x-tg-init', tg?.initData || '');
+        x.setRequestHeader('x-tg-init', tg?.initData || ''); x.setRequestHeader('x-as', asId());
         x.upload.onprogress = (q) => q.lengthComputable && (box.querySelector('i').style.width = `${Math.round((100 * q.loaded) / q.total)}%`);
         x.onloadend = () => { box.querySelector('span').textContent = x.status < 300 ? '✓' : '!'; box.querySelector('i')?.remove(); ok(); };
         x.send(file);
@@ -1118,7 +1139,7 @@ function upFile(id, file, onp) {
   return new Promise((ok, fail) => {
     const x = new XMLHttpRequest();
     x.open('POST', `/api/app/reel/upload?id=${encodeURIComponent(id)}&name=${encodeURIComponent(file.name)}`);
-    x.setRequestHeader('x-tg-init', tg?.initData || '');
+    x.setRequestHeader('x-tg-init', tg?.initData || ''); x.setRequestHeader('x-as', asId());
     x.upload.onprogress = (e) => e.lengthComputable && onp(e.loaded / e.total);
     x.onload = () => (x.status < 300 ? ok(JSON.parse(x.responseText)) : fail(new Error(JSON.parse(x.responseText || '{}').error || 'Не загрузилось')));
     x.onerror = () => fail(new Error('Нет связи'));
@@ -1244,12 +1265,47 @@ function drawProfile() {
       <div class="kv"><span class="ti" style="${tint('--v')}">${ic('gauge', 22)}</span><span class="tx"><b>Скорость текста</b><span>${p.speed}× · можно менять во время съёмки</span></span><button class="eb2" data-k="speed" aria-label="Изменить скорость">${ic('pen', 18)}</button></div>
     </div>
     ${S.demo ? '<p class="cap" style="margin-top:14px">Это пробная версия: задания демонстрационные, записи приходят редактору в Телеграм.</p>' : ''}
+    ${S.tests ? `<div class="lh">Тестовые профили</div><div class="note">
+      <span class="cap">Посмотреть приложение глазами другой роли. Всё, что сделаете под тестовым профилем, удалится вместе с ним.</span>
+      ${S.tests.map((x) => `<div class="tp-row"><span class="tx"><b>${esc(x.name.replace(/^Тест · /, ''))}</b><span>${x.id === asId() ? 'вы сейчас здесь' : 'создан ' + new Date(x.added).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}</span></span>${x.id === asId() ? '' : `<button class="tp-go" data-as="${x.id}">Войти</button>`}<button class="tp-del" data-del="${x.id}">Удалить</button></div>`).join('') || '<span class="cap">Пока ни одного.</span>'}
+      <button class="sb2" id="tpnew" style="margin-top:8px">${ic('plus', 20)}Создать тестовый профиль</button></div>` : ''}
   </div>${tabs()}`;
+  if (S.tests) {
+    $('#tpnew').onclick = newTest;
+    root.querySelectorAll('[data-as]').forEach((b) => b.onclick = () => { setAs(b.dataset.as); haptic('ok'); reload(); });
+    root.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
+      const x = S.tests.find((y) => y.id === b.dataset.del);
+      if (!confirm(`Удалить «${x.name.replace(/^Тест · /, '')}» и всё, что он создал: задания, записи, загрузки, ролики, правки текста?`)) return;
+      const r = await api('/api/app/test', {method: 'POST', json: {action: 'delete', id: x.id}});
+      if (asId() === x.id) setAs('');
+      haptic('ok');
+      alert(`Удалено: заданий ${r.wiped.tasks}, файлов ${r.wiped.files}, роликов ${r.wiped.reels}.`);
+      reload();
+    });
+  }
   $('#cons').onclick = async () => {
     if (p.consent !== false && !confirm('Отозвать разрешение на лицо в кадре? Редактор получит сообщение.')) return;
     const r = await api('/api/app/profile', {method: 'POST', json: {consent: p.consent === false}}); Object.assign(S.profile, r.profile); haptic('ok'); draw();
   };
   root.querySelectorAll('[data-k]').forEach((b) => b.onclick = () => editField(b.dataset.k));
+}
+function newTest() {
+  const K = [['member', 'Участник', 'скидывает материал и идеи, получает задания'], ['camera', 'Участник «в кадре»', 'снимает себя с суфлёром'], ['builder', 'Участник «сам собирает»', 'открыта «Студия» в «Моё»'], ['deputy', 'Замещающий', 'права редактора на 2 недели'], ['editor', 'Редактор', 'Сегодня · Неделя · Люди']];
+  const el = document.createElement('div');
+  el.className = 'sheet';
+  el.innerHTML = `<div><span class="grab"></span><div style="font-size:22px;font-weight:700">Новый тестовый профиль</div>
+    ${K.map(([k, n, d]) => `<button class="sb2" data-kind="${k}" style="height:auto;padding:12px 16px;flex-direction:column;align-items:flex-start;gap:2px;text-align:left"><b>${n}</b><span style="font-size:13px;font-weight:500;color:var(--mut)">${d}</span></button>`).join('')}
+    <button class="lk" id="cn">Отмена</button></div>`;
+  document.body.append(el);
+  const close = () => el.remove();
+  el.onclick = (e) => { if (e.target === el) close(); };
+  el.querySelector('#cn').onclick = close;
+  el.querySelectorAll('[data-kind]').forEach((b) => b.onclick = async () => {
+    const r = await api('/api/app/test', {method: 'POST', json: {action: 'create', kind: b.dataset.kind}});
+    close();
+    const x = r.tests.at(-1);
+    setAs(x.id); haptic('ok'); reload();
+  });
 }
 function editField(k) {
   const p = S.profile;
