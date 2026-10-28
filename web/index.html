@@ -147,7 +147,27 @@
   .pchip { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-left: 4px solid #A3A3A3; border-radius: 10px; padding: 9px 10px; font-size: 13px; line-height: 1.35; text-decoration: none; background: #fff; cursor: grab; }
   .pchip b { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .pslot { display: flex; flex-direction: column; gap: 4px; border: 1.5px dashed #D4D4D4; border-radius: 10px; padding: 9px 10px; font-size: 13px; line-height: 1.35; text-align: left; background: none; color: var(--ink2); }
-  .plan-nochat aside.chatcol { display: none; }
+  /* Folding panels: the sidebar becomes an icon rail, the chat a thin rail on the right (remembered). */
+  nav.side, aside.chatcol { transition: width .18s ease, padding .18s ease; }
+  .fold { width: 28px; height: 28px; border: 0; background: none; border-radius: 7px; color: var(--muted); display: grid; place-items: center; flex: none; padding: 0; }
+  .fold:hover { background: var(--hov); color: var(--ink); }
+  .crail { display: none; }
+  @media (min-width: 861px) {
+    body.side-mini nav.side { width: 64px; padding: 12px 8px; overflow-x: hidden; }
+    body.side-mini nav.side .ph select, body.side-mini nav.side .ph .icon, body.side-mini nav.side .ph b, body.side-mini nav.side .gh, body.side-mini nav.side .srch span, body.side-mini nav.side .srch kbd, body.side-mini nav.side .me span, body.side-mini nav.side .nav > span:not(:first-child) { display: none; }
+    body.side-mini nav.side .ph { flex-direction: column; gap: 10px; padding: 4px 0 10px; }
+    body.side-mini nav.side .nav, body.side-mini nav.side .srch { justify-content: center; padding: 8px 0; position: relative; }
+    body.side-mini nav.side .srch { border-color: transparent; background: none; }
+    body.side-mini nav.side .gh { display: block; height: 0; padding: 8px 0; border-top: 1px solid var(--line); margin: 6px 8px 0; font-size: 0; }
+    body.side-mini nav.side .nav .bdg { display: block; position: absolute; top: 3px; right: 9px; padding: 0; width: 8px; height: 8px; font-size: 0; }
+    body.side-mini nav.side .me { justify-content: center; padding: 8px 0; }
+    body.chat-mini aside.chatcol { width: 48px; }
+    body.chat-mini aside.chatcol > :not(.crail) { display: none; }
+    body.chat-mini aside.chatcol .crail { display: flex; }
+    .crail { flex-direction: column; align-items: center; gap: 10px; padding: 12px 0; height: 100%; width: 100%; border: 0; background: none; color: var(--muted); cursor: pointer; }
+    .crail:hover { background: var(--side); color: var(--ink); }
+    .crail span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+  }
   .pslot:hover { background: var(--side); }
   .tchip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
   .tchip.ed { background: var(--ink); color: #fff; } .tchip.mb { background: #F0F0F0; color: #404040; } .tchip.own { background: #FEF6E7; color: #8F5C12; } .tchip.dep { background: #EEF4FE; color: #1D4ED8; } .tchip.cam { background: #ECF7EF; color: #1E7A3D; }
@@ -272,6 +292,9 @@ const md = (s) => {
 const chatMd = (s) => esc(s).replace(/```\w*\n?([\s\S]*?)```/g, '<pre>$1</pre>').replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
 const STATUS = {work: 'В работе', review: 'На ревью', none: 'Без статуса', done: 'Готовы', published: 'Опубликованы'};
 const ICON = {
+  panel: '<rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path>',
+  panelR: '<rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M15 4v16"></path>',
+  chat2: '<path d="M4 5h16v11H8l-4 4Z"></path>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>',
   tg: '<path d="m22 3-9.5 18-2.5-7.5L3 11z"></path><path d="M10 13.5 22 3"></path>',
   web: '<rect x="2.5" y="4" width="19" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path>',
@@ -326,10 +349,10 @@ async function sidebar() {
   OV = await api('/api/overview');
   const cur = location.hash || '#/';
   const on = (h) => (h === '#/' ? cur === '#/' : cur.startsWith(h) || (h === '#/all' && /^#\/(reel|post)\//.test(cur))) ? 'on' : '';
-  const item = (h, i, t, n = '') => `<a class="nav ${on(h)}" href="${h}">${svg(i)}<span>${t}</span>${n}</a>`;
+  const item = (h, i, t, n = '') => `<a class="nav ${on(h)}" href="${h}" title="${t}">${svg(i)}<span>${t}</span>${n}</a>`;
   const initials = projName().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   $('#side').innerHTML = `
-    <div class="ph"><span class="logo">${esc(initials)}</span>
+    <div class="ph"><button type="button" class="fold" data-fold="side" title="Свернуть панель (⌘\\)" aria-label="Свернуть панель">${svg('panel', 16)}</button><span class="logo">${esc(initials)}</span>
       <select id="projSel" aria-label="Проект">${PROJECTS.map((x) => `<option value="${esc(x.slug)}" ${x.slug === P ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
       ${canEdit() ? `<a class="icon" style="width: 26px; height: 26px; border: 0; background: none; color: var(--muted)" href="#/new" title="Новый выпуск" aria-label="Новый выпуск">${svg('pen')}</a>` : ''}</div>
     <button type="button" class="srch" id="srchBtn">${svg('search', 15)}<span>Поиск</span><kbd>⌘K</kbd></button>
@@ -340,7 +363,7 @@ async function sidebar() {
     ${item('#/plan', 'cal', 'Календарь')}
     ${item('#/new', 'idea', 'Идеи', `<span class="n">${OV.ideasCount}</span>`)}
     ${item('#/knowledge', 'target', 'Стратегия')}
-    ${(OV.rubrics || []).length ? `<div class="gh">Рубрики</div>${OV.rubrics.map((x) => `<a class="nav ${cur === '#/rubric/' + x.id ? 'on' : ''}" href="#/rubric/${esc(x.id)}"><span style="width: 16px; display: grid; place-items: center"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${esc(x.color || '#737373')}"></span></span><span>${esc(x.name)}</span><span class="n">${x.n || ''}</span></a>`).join('')}` : ''}
+    ${(OV.rubrics || []).length ? `<div class="gh">Рубрики</div>${OV.rubrics.map((x) => `<a class="nav ${cur === '#/rubric/' + x.id ? 'on' : ''}" href="#/rubric/${esc(x.id)}" title="${esc(x.name)}"><span style="width: 16px; display: grid; place-items: center"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${esc(x.color || '#737373')}"></span></span><span>${esc(x.name)}</span><span class="n">${x.n || ''}</span></a>`).join('')}` : ''}
     <div style="margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 2px">
       ${item('#/settings', 'sliders', 'Настройки проекта')}
       <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${roleName(ME)}</span></div>
@@ -1169,13 +1192,6 @@ async function vPlan(offset = 0) {
           <div class="blk pdrop" style="flex: 1" data-day=""><span class="lbl">Без даты · ${undated.length}</span><div style="display: flex; flex-direction: column; gap: 6px">${undated.map(chip).join('') || '<span class="small muted">Пусто.</span>'}</div></div>
         </div></div></div>
     <aside class="chatcol" aria-label="Чат плана"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат плана</b></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
-  // The week needs the width: the plan's chat folds away and is remembered per browser.
-  const work = view.querySelector('.work');
-  const fold = (on) => { work.classList.toggle('plan-nochat', on); try { localStorage.setItem('planChat', on ? 'off' : 'on'); } catch {} $('#chatToggle').textContent = on ? 'Чат плана' : 'Скрыть чат'; };
-  view.querySelector('.chead').insertAdjacentHTML('beforeend', '<button type="button" class="btn" id="chatToggle" style="margin-left: 8px">Скрыть чат</button>');
-  $('#chatToggle').onclick = () => fold(!work.classList.contains('plan-nochat'));
-  let saved = null; try { saved = localStorage.getItem('planChat'); } catch {}
-  fold(saved !== 'on');
   const box = chatBox('_project', {onDone: () => { sidebar(); vPlan(offset); }});
   $('#chatHost').append(box);
   view.querySelectorAll('[data-fill]').forEach((b) => (b.onclick = () => { const [d, t, r, k] = b.dataset.fill.split('|'); box.say(`Чем заполнить пустое место ${d} ${t}: рубрика «${r}»${k ? ', ' + KIND[k] : ''}? Предложи 2–3 варианта из идей и выпусков в работе.`, `Чем заполнить: ${r}, ${d.slice(5)} ${t}`); }));
@@ -1397,8 +1413,8 @@ let MEM = null;
 async function memberSidebar() {
   MEM = await api('/api/member');
   const cur = location.hash || '#/';
-  const item = (h, i, t, n = '') => `<a class="nav ${cur === h ? 'on' : ''}" href="${h}">${svg(i)}<span>${t}</span>${n}</a>`;
-  $('#side').innerHTML = `<div class="ph"><span class="logo">${esc(projName().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase())}</span><b style="font-size: 14px">${esc(projName())}</b></div>
+  const item = (h, i, t, n = '') => `<a class="nav ${cur === h ? 'on' : ''}" href="${h}" title="${t}">${svg(i)}<span>${t}</span>${n}</a>`;
+  $('#side').innerHTML = `<div class="ph"><button type="button" class="fold" data-fold="side" title="Свернуть панель (⌘\\)" aria-label="Свернуть панель">${svg('panel', 16)}</button><span class="logo">${esc(projName().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase())}</span><b style="font-size: 14px">${esc(projName())}</b></div>
     ${item('#/', 'home', 'Мои задания', MEM.tasks.length ? `<span class="bdg">${MEM.tasks.length}</span>` : '')}
     ${item('#/send', 'up', 'Скинуть')}
     ${item('#/mine', 'folder2', 'Мои материалы', `<span class="n">${MEM.sent.length}</span>`)}
@@ -1444,11 +1460,44 @@ async function vMember(h) {
   }
 }
 
+// ---------- folding the sidebar and the chat (remembered per browser) ----------
+const UI = {get: (k) => { try { return localStorage.getItem('ui.' + k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem('ui.' + k, v); } catch {} }};
+function foldSide(on = !document.body.classList.contains('side-mini')) {
+  document.body.classList.toggle('side-mini', on);
+  UI.set('side', on ? 'mini' : 'open');
+  document.querySelectorAll('[data-fold="side"]').forEach((b) => { b.title = on ? 'Развернуть панель (⌘\\)' : 'Свернуть панель (⌘\\)'; b.setAttribute('aria-label', b.title); });
+}
+function foldChat(on = !document.body.classList.contains('chat-mini')) {
+  document.body.classList.toggle('chat-mini', on);
+  UI.set('chat', on ? 'mini' : 'open');
+}
+// Every chat column gets a fold button in its header and a thin rail to bring it back.
+function decorateChat() {
+  document.querySelectorAll('aside.chatcol').forEach((a) => {
+    if (a.querySelector('.crail')) return;
+    const name = a.getAttribute('aria-label') || 'Чат';
+    a.insertAdjacentHTML('afterbegin', `<button type="button" class="crail" title="Развернуть чат (⌘⇧\\)" aria-label="Развернуть: ${esc(name)}">${svg('chat2', 18)}<span>${esc(name)}</span></button>`);
+    a.querySelector('.crail').onclick = () => foldChat(false);
+    const head = a.querySelector('.chead');
+    if (head) { head.insertAdjacentHTML('beforeend', `<button type="button" class="fold" title="Свернуть чат (⌘⇧\\)" aria-label="Свернуть чат">${svg('panelR', 16)}</button>`); head.lastElementChild.onclick = () => foldChat(true); }
+  });
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-fold="side"]')) foldSide(); });
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key !== '\\' && e.code !== 'Backslash') return;
+  e.preventDefault();
+  if (e.shiftKey) foldChat(); else foldSide();
+});
+new MutationObserver(decorateChat).observe(document.getElementById('view'), {childList: true, subtree: true});
+document.body.classList.toggle('side-mini', UI.get('side') === 'mini');
+document.body.classList.toggle('chat-mini', UI.get('chat') === 'mini');
+
 async function route() {
   document.body.classList.remove('menu');
   const h = location.hash || '#/';
   try {
     await sidebar();
+    foldSide(document.body.classList.contains('side-mini'));
     let m;
     view = $('#view');
     if (isMember()) await vMember(h);
