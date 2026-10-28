@@ -129,10 +129,11 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
 
   function person(user) {
     const st = botState();
-    if (user.id === st.ownerId || owners().includes(user.id)) return {key: 'owner', name: st.ownerName || user.first_name, role: 'owner', studio: true};
+    if (user.id === st.ownerId || owners().includes(user.id)) return {key: 'owner', name: st.ownerName || user.first_name, role: 'owner', editor: true, onCamera: true, studio: true};
     const x = access().people.find((y) => y.telegram?.id === user.id);
     // «Студия» (SR0): editors of the project and people marked «Сам собирает».
-    return x ? {key: x.id, name: x.name, role: x.role, studio: isEditor(x) || !!x.selfBuild} : null;
+    const deputy = x && x.role !== 'editor' && !x.isOwner && isEditor(x) ? x.deputyUntil : null;
+    return x ? {key: x.id, name: x.name, role: x.role, editor: isEditor(x), deputyUntil: deputy, onCamera: !!x.onCamera, studio: isEditor(x) || !!x.selfBuild} : null;
   }
   function tasks(p) {
     const f = join(hostDir(p), 'tasks.json');
@@ -163,6 +164,31 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
         await fetch(`${api}/sendMessage`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({chat_id: chat, text}), signal: AbortSignal.timeout(30_000)});
       }
     } catch (e) { console.error('mini app notify:', e.message); }
+  }
+
+
+  // «Неделя» (LE1): this week's days with what is planned on them (plan.json) and the rhythm's empty slots.
+  function weekOf(p) {
+    const plan = readJson(join(PROJECTS, p, 'plan.json'), {});
+    const slots = readJson(join(PROJECTS, p, 'strategy.json'), {}).rhythm?.slots || [];
+    const now = new Date(), mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+    const rs = reels(p);
+    const titleOf = (key) => key.startsWith('reel:') ? rs.find((x) => x.id === key.slice(5))?.title : readJson(join(PROJECTS, p, 'posts', key.slice(5), 'post.json'), {}).title;
+    const statusOf = (key) => key.startsWith('reel:') ? rs.find((x) => x.id === key.slice(5))?.status : null;
+    return Array.from({length: 7}, (_, i) => {
+      const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const items = Object.entries(plan.at || {}).filter(([, at]) => String(at).startsWith(iso)).map(([key, at]) => ({key, kind: key.startsWith('reel:') ? 'reel' : 'post', title: titleOf(key) || key.slice(5), time: String(at).slice(11, 16), status: statusOf(key)}));
+      return {day: i + 1, date: d.getDate(), items, slot: !items.length && slots.some((x) => x.day === i + 1)};
+    });
+  }
+  // «Люди» (LE2): tasks by person and who has not sent anything for a long time.
+  function peopleOf(t) {
+    const a = access();
+    const name = (k) => a.people.find((x) => x.id === k)?.name || (k === 'owner' ? botState().ownerName || 'Владелец' : null);
+    const tasks = t.tasks.filter((x) => x.to).map((x) => ({title: x.title, who: name(x.to) || '—', status: x.status, due: t.due}));
+    const quiet = a.people.filter((x) => x.telegram && !x.isOwner).map((x) => ({name: x.name, days: Math.floor((Date.now() - (x.telegram.seen || x.added || Date.now())) / 864e5)})).filter((x) => x.days >= 7).sort((x, y) => y.days - x.days);
+    return {tasks, quiet};
   }
 
   return async function app(req, res, url) {
@@ -200,11 +226,11 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
       const prof = profiles(p)[me.key] || {};
       const mine = reels(p).map((r) => ({id: r.id, title: r.title, status: r.status, version: r.version, updated: r.updated}));
       // A task for one person (to) is shown to them only; one without «to» to everyone.
-      return json(200, {me: {name: me.name, role: me.role, studio: !!me.studio}, project: p, week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
+      return json(200, {me: {name: me.name, role: me.role, editor: !!me.editor, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera, studio: !!me.studio}, project: p, ...(me.editor ? {plan: weekOf(p), people: peopleOf(t)} : {}), week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
         profile: {langs: 'русский, английский', when: 'вт и чт после 15:00', where: 'кабинет 204, у окна', speed: 1, size: 'large', consent: true, ...prof}});
     }
     let b = {};
-    if (req.method === 'POST' && !['/api/app/take', '/api/app/clip', '/api/app/reel/voice', '/api/app/reel/upload'].includes(url.pathname)) {
+    if (req.method === 'POST' && !['/api/app/take', '/api/app/clip', '/api/app/reel/voice', '/api/app/reel/upload', '/api/app/drop'].includes(url.pathname)) {
       let s = '';
       for await (const chunk of req) s += chunk;
       try { b = JSON.parse(s || '{}'); } catch {}
@@ -328,6 +354,21 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
       all[me.key] = cur;
       writeJson(join(hostDir(p), 'profiles.json'), all);
       return json(200, {profile: cur});
+    }
+    // «Скинуть» (M1, M5): a photo or video into the project's inbox, as when sent to the bot.
+    if (req.method === 'POST' && url.pathname === '/api/app/drop') {
+      const name = basename(String(url.searchParams.get('name') || 'file')).replace(/[^\w.\-а-яё ]/gi, '_').replace(/^\.+/, '') || 'file';
+      if (!MEDIA.test(name) && !/\.(heic|heif)$/i.test(name)) return json(400, {error: 'Нужны фото или видео'});
+      const dir = join(PROJECTS, p, 'inbox', new Date().toISOString().slice(0, 10));
+      mkdirSync(dir, {recursive: true});
+      const f = join(dir, `app-${Date.now()}-${name}`);
+      let size = 0;
+      const out = [];
+      for await (const c of req) { size += c.length; if (size > MAX_TAKE) return json(413, {error: 'Файл больше 300 МБ'}); out.push(c); }
+      writeFileSync(f, Buffer.concat(out));
+      appendFileSync(join(PROJECTS, p, 'inbox', 'history.md'), `- ${new Date().toISOString()} (mini app, ${me.name}, «Скинуть») ${f}\n`);
+      log?.(me.name, `скинул материал: ${name}`);
+      return json(200, {file: basename(f)});
     }
     // ---------- Т2: a new reel by the rubric's template (SR2, SR3; TEMPLATES.md) ----------
     const catalog = () => readJson(join(BOT, 'template', 'src', 'templates', 'catalog.json'), {kinds: {}, templates: []});

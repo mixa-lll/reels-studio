@@ -914,7 +914,7 @@ function hostChat(chatId, first) {
   const ok = !!process.env.MINIAPP_URL;
   return tg.call('sendMessage', {chat_id: chatId, parse_mode: 'HTML',
     text: `${first ? 'Вы — ведущий.\n\n' : ''}<b>Задания на неделю готовы</b>\n3 коротких ролика · около 10 минут. Снять до пятницы.${ok ? '' : '\n\n⚠️ Мини-приложение «Съёмка» не подключено: нет адреса MINIAPP_URL.'}`,
-    reply_markup: ok ? {keyboard: [[appButton('📋 Задания'), appButton('🎬 Мои ролики', '#reels')], [appButton('👤 Профиль', '#profile')]], resize_keyboard: true, is_persistent: true} : {remove_keyboard: true}})
+    reply_markup: ok ? {keyboard: [[appButton('📋 Задания'), appButton('🎬 Моё', '#mine')], [appButton('👤 Профиль', '#profile')]], resize_keyboard: true, is_persistent: true} : {remove_keyboard: true}})
     .then(() => ok && tg.call('sendMessage', {chat_id: chatId, text: 'Съёмка — в приложении: текст у камеры, запись, отправка.', reply_markup: {inline_keyboard: [[{text: 'Открыть задания', web_app: {url: process.env.MINIAPP_URL}}], [{text: 'Не могу на этой неделе', callback_data: 'hs:skip'}]]}}));
 }
 // The approver has no account: a week comes as one message with buttons (stub until the link page).
