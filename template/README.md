@@ -1,5 +1,7 @@
 # Reel project (Remotion)
 
+- `src/reel.json` — a reel by a rubric template: which template and the scenes with their material (`TEMPLATES.md` in the repo root). With `"template": null` the reel is drawn from `story.ts`.
+- `src/templates/` — the templates' components and `catalog.json`; do not change them for one reel.
 - `src/story.ts` — the reel as data: fps, bar length, music, theme, scenes. Start here.
 - `src/Reel.tsx` — backdrop, titles and the composition. Replace freely: every reel gets its own look.
 - `public/` — music, screen captures (PNG sequences under `public/screens/<scene>/0001.png`), images.

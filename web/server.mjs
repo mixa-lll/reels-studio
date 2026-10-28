@@ -97,6 +97,9 @@ const versionDirs = (reelDir) => {
   const d = join(reelDir, 'versions');
   return existsSync(d) ? readdirSync(d).filter((v) => /^v\d+$/.test(v)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : [];
 };
+// The rubric templates' catalog: scene kinds and the templates built from them.
+const templates = () => readJson(join(BOT, 'template', 'src', 'templates', 'catalog.json'), {kinds: {}, templates: []});
+
 function reels(p) {
   const root = join(PROJECTS, p, 'reels');
   const status = {};
@@ -561,7 +564,20 @@ createServer(async (req, res) => {
       ...reels(p).map((r) => ({key: 'reel:' + r.id, kind: 'reel', id: r.id, title: `${r.num} ${r.title}`, status: r.status, thumb: r.thumb})),
       ...posts.map((x) => ({key: 'post:' + x.id, kind: x.kind, id: x.id, title: x.title, status: x.stage, thumb: x.thumb, at: x.at ? new Date(x.at).toISOString() : null, rubric: x.rubric})),
     ].map((x) => ({...x, at: at[x.key] || x.at || null, rubric: rubric[x.key] || x.rubric || null}));
-    return json(200, {strategy: readJson(join(studio, 'strategy.json'), {}), items, events: plan.events || []});
+    return json(200, {strategy: readJson(join(studio, 'strategy.json'), {}), items, events: plan.events || [], templates: templates().templates});
+  }
+  // A rubric's template (TEMPLATES.md): which of template/src/templates its reels are built by.
+  if (req.method === 'POST' && url.pathname === '/api/strategy/template') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const f = join(studio, 'strategy.json');
+    const st = readJson(f, {});
+    const rub = (st.rubrics || []).find((x) => x.id === b.rubric);
+    if (!rub || (b.template !== null && !templates().templates.some((x) => x.id === b.template))) return json(400, {});
+    if (b.template) rub.template = b.template; else delete rub.template;
+    writeJson(f, st);
+    log(me.name, `шаблон рубрики «${rub.name}»: ${b.template || 'без шаблона'}`);
+    return json(200, {rubric: rub});
   }
   if (req.method === 'POST' && url.pathname === '/api/plan/set') {
     if (!can('editor')) return json(403, {});

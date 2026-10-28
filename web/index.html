@@ -1190,6 +1190,15 @@ const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const rubricColor = (st, id) => (st.rubrics || []).find((x) => x.id === id || x.name === id)?.color || '#A3A3A3';
 const rubricName = (st, id) => (st.rubrics || []).find((x) => x.id === id || x.name === id)?.name || id || '';
 
+// «Шаблон» of a rubric (TEMPLATES.md): its reels are built from this template's scenes.
+function tplBlock(cur, list) {
+  const t = list.find((x) => x.id === cur.template);
+  const scenes = (x) => x.scenes.map((s) => `<span class="tchip mb" title="${esc(s.kind)}">${s.lock ? '🔒 ' : ''}${esc({hook: 'Хук', photo: 'Кадр', clip: 'В кадре', base: 'Основа', item: 'Пункт', total: 'Итог', tip: 'Совет', compare: 'Сравнение', question: 'Вопрос', answer: 'Ответ', fact: 'Факт', cta: 'Призыв'}[s.kind] || s.kind)}${s.repeat ? ` ×${s.repeat[0]}–${s.repeat[1]}` : ''}</span>`).join(' ');
+  return `<div class="blk"><span class="lbl">Шаблон ролика</span>
+    <div class="row" style="gap: 10px"><select class="f" id="tplSel" data-rubric="${esc(cur.id)}" style="width: auto">${['', ...list.map((x) => x.id)].map((id) => `<option value="${esc(id)}" ${id === (cur.template || '') ? 'selected' : ''}>${id ? esc(list.find((x) => x.id === id).name) : 'Без шаблона — Claude пишет ролик целиком'}</option>`).join('')}</select>${t ? `<span class="small muted">${esc(t.about)}</span>` : ''}</div>
+    ${t ? `<div class="row" style="gap: 6px; flex-wrap: wrap">${scenes(t)}</div><span class="small muted">Новый ролик рубрики собирается из этих сцен: материал раскладывается по ним, 🔒 берутся из рубрики. Подходит для: ${esc(t.fits)}.</span>` : '<span class="small muted">С шаблоном ролик собирается быстрее и всегда в виде рубрики.</span>'}</div>`;
+}
+
 async function vKnowledge(tab = 'overview', sel) {
   title('Стратегия');
   const [k, plan] = await Promise.all([api('/api/knowledge'), api('/api/plan')]);
@@ -1213,6 +1222,7 @@ async function vKnowledge(tab = 'overview', sel) {
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 22px"><div class="row" style="gap: 12px"><span style="width: 16px; height: 16px; border-radius: 5px; background: ${esc(cur.color || '#A3A3A3')}"></span><h2 style="font-size: 22px">${esc(cur.name)}</h2><span class="muted">${cur.share ? cur.share + ' % плана' : 'вне долей'} · ${own.length} выпусков</span><a class="btn" style="margin-left: auto" href="#/rubric/${esc(cur.id)}">Все выпуски рубрики</a></div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 18px">${[['Зачем', cur.why], ['О чём', cur.about], ['Вид', cur.look]].filter(([, v]) => v).map(([t, v]) => `<div><div class="small muted">${t}</div>${esc(v)}</div>`).join('')}</div>
         <div class="blk"><span class="lbl">Куда идёт</span>${slots.filter((x) => x.rubric === cur.id || x.rubric === cur.name).map((x) => `<div class="li"><span style="width: 160px; font-weight: 600">${esc((plats.find((p) => p.id === x.platform) || {}).name || x.platform || '')}</span><span class="small muted" style="flex: 1; display: inline-flex; gap: 6px; align-items: center">${svg(x.kind || 'photo', 14)}${esc(KIND[x.kind] || '')}</span><span>${DAYS[(x.day || 1) - 1]} ${esc(x.time || '')}</span></div>`).join('') || '<span class="small muted">В ритме её пока нет.</span>'}</div>
+        ${tplBlock(cur, plan.templates || [])}
         <div class="split" style="gap: 24px"><div class="blk" style="flex: 1"><span class="lbl">Правила рубрики</span>${(cur.rules || []).map((x) => `<div class="li">${x.lock ? '🔒 ' : ''}${esc(x.text || x)}</div>`).join('') || (cur.approve ? '' : '<span class="small muted">—</span>')}${cur.approve?.name ? `<div class="li">✓ Согласует по ссылке: <b>${esc(cur.approve.name)}</b>${cur.approve.note ? ` <span class="small muted">· ${esc(cur.approve.note)}</span>` : ''}<span class="small muted" style="margin-left: auto">ссылка на неделю, без входа</span></div>` : ''}</div><div class="blk" style="flex: 1"><span class="lbl">Серии</span>${(cur.series || []).map((x) => `<div class="li">${esc(x)}</div>`).join('') || '<span class="small muted">—</span>'}</div></div></div></div>`; }
   else if (tab === 'rhythm') body = `<div style="display: flex; flex-direction: column; gap: 18px"><div class="muted">${esc(st.rhythm?.season ? 'Сезон: ' + st.rhythm.season + '. ' : '')}Каждая ячейка становится пустым местом в Календаре — его Claude предлагает заполнить.</div>${week()}${balance()}<div class="row" style="gap: 8px">${ask('Поправь ритм под доли рубрик')}${ask('Сделай ритм на межсезонье')}</div></div>`;
   else body = `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px">
@@ -1226,6 +1236,7 @@ async function vKnowledge(tab = 'overview', sel) {
   const box = chatBox('_project', {onDone: () => { sidebar(); vKnowledge(tab, sel); }});
   $('#chatHost').append(box);
   view.querySelectorAll('[data-ask]').forEach((b) => (b.onclick = () => box.say(b.dataset.ask + ' (strategy.json, STRATEGY.md).', b.dataset.ask)));
+  $('#tplSel')?.addEventListener('change', async (e) => { await post('/api/strategy/template', {rubric: e.target.dataset.rubric, template: e.target.value || null}); route(); });
 }
 
 // Календарь (CleanPlan): a week of reels and posts from plan.json, empty rhythm slots, events; drag to a day.
