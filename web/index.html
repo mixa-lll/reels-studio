@@ -985,8 +985,8 @@ const section = (readme, name) => (new RegExp(`^## ${name}[^\\n]*\\n([\\s\\S]*?)
 // typed or spoken (Whisper on the server), optionally with a point on the frame.
 function editsBlock(edits, cur, nextV) {
   const open = edits.filter((x) => x.state === 'open'), sent = edits.filter((x) => x.state === 'sent' && x.forV === nextV), done = edits.filter((x) => x.state === 'done' && x.forV === cur.v);
-  const row = (x, i, kind) => `<div class="li" style="align-items: flex-start; gap: 10px"><span class="enum ${kind}">${kind === 'done' ? '✓' : i + 1}</span><span style="flex: 1; min-width: 0"><button type="button" class="tcx" data-eseek="${x.t}">${tc(x.t)}</button> ${esc(kind === 'done' && x.result ? x.result : x.text)}
-    <div class="small muted">${kind === 'done' ? esc(x.text) : [x.voice ? 'голосом' : 'текстом', x.point ? 'точка на кадре' : '', esc(x.by || '')].filter(Boolean).join(' · ')}</div></span>${kind === 'open' && canEdit() ? `<button type="button" class="btn" data-erm="${esc(x.id)}" aria-label="Убрать правку">✕</button>` : ''}</div>`;
+  const row = (x, i, kind) => `<div class="li" style="align-items: flex-start; gap: 10px"><span class="enum ${kind}">${kind === 'done' ? '✓' : i + 1}</span><span style="flex: 1; min-width: 0"><button type="button" class="tcx" data-eseek="${x.t}">${x.stage === 'script' ? 'Сценарий' : x.stage === 'scenes' ? `Сцена ${(x.scene ?? 0) + 1}` : tc(x.t)}</button> ${esc(kind === 'done' && x.result ? x.result : x.text)}${x.quote ? ` <span class="muted">— к словам «${esc(x.quote)}»</span>` : ''}
+    <div class="small muted">${kind === 'done' ? esc(x.text) : [x.voice ? 'голосом' : 'текстом', x.shape ? ({rect: 'обведено на кадре', brush: 'кистью на кадре', point: 'точка на кадре', frame: 'весь кадр'})[x.shape.kind] : x.point ? 'точка на кадре' : '', esc(x.by || '')].filter(Boolean).join(' · ')}</div></span>${kind === 'open' && canEdit() ? `<button type="button" class="btn" data-erm="${esc(x.id)}" aria-label="Убрать правку">✕</button>` : ''}</div>`;
   return `${done.length ? `<div class="blk"><span class="lbl">Что поменялось в ${esc(cur.v)} · ${done.length}</span>${done.map((x, i) => row(x, i, 'done')).join('')}</div>` : ''}
     <div class="blk"><span class="lbl">Правки к ${esc(nextV)} · ${open.length}</span>
       ${open.map((x, i) => row(x, i, 'open')).join('') || `<span class="small muted">${sent.length ? `Отправлено ${sent.length} — Claude собирает ${esc(nextV)}.` : 'Пока нет. Останови видео и скажи или напиши, что поменять.'}</span>`}
@@ -1480,9 +1480,10 @@ function teamPerson(a, pid) {
           <div id="relOut"></div></div>
       </div>
       <div style="flex: 0 0 360px; display: flex; flex-direction: column; gap: 14px">
-        <div class="card tcard2"><span class="lbl">Съёмка</span><label class="tflag"><input type="checkbox" id="camOn" ${x.onCamera ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><b>Будет сниматься в кадре</b><span class="small muted">Задания «снять себя»; согласие на лицо — при первом таком задании.</span></span></label></div>
+        <div class="card tcard2"><span class="lbl">Съёмка</span><label class="tflag"><input type="checkbox" id="camOn" ${x.onCamera ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><b>Будет сниматься в кадре</b><span class="small muted">Задания «снять себя»; согласие на лицо — при первом таком задании.</span></span></label>
+          <label class="tflag"><input type="checkbox" id="buildOn" ${x.selfBuild || ed ? 'checked' : ''} ${locked || ed ? 'disabled' : ''}><span><b>Сам собирает</b><span class="small muted">${ed ? 'У редактора «Студия» есть всегда.' : 'Вкладка «Студия» в мини-приложении: смотрит версии, оставляет комментарии, собирает следующую.'}</span></span></label></div>
         ${a.people.length >= 3 ? `<div class="card tcard2"><span class="lbl">Группы и точка</span><input class="f" id="groups" value="${esc((x.groups || []).join(', '))}" placeholder="Учителя, корпус «Старшая»" ${locked ? 'disabled' : ''}><span class="small muted">Через запятую. Задание группе получат все её участники.</span></div>` : ''}
-        <div class="card tcard2"><span class="lbl">Что может сейчас</span>${can(true, 'Скинуть материал, идею')}${can(x.onCamera || ed, 'Задания «снять себя»')}${can(true, 'Мои материалы, убрать своё')}${can(ed, 'Варианты, план, выпуски' + (x.deputyUntil && x.role === 'member' ? ' — пока замещает' : ''))}${can(ed, 'Команда и приглашения')}${can(!!x.isOwner, 'Подписка, роли владельца, правила хранения')}</div>
+        <div class="card tcard2"><span class="lbl">Что может сейчас</span>${can(true, 'Скинуть материал, идею')}${can(x.onCamera || ed, 'Задания «снять себя»')}${can(x.selfBuild || ed, 'Студия: комментарии и сборка версий')}${can(true, 'Мои материалы, убрать своё')}${can(ed, 'Варианты, план, выпуски' + (x.deputyUntil && x.role === 'member' ? ' — пока замещает' : ''))}${can(ed, 'Команда и приглашения')}${can(!!x.isOwner, 'Подписка, роли владельца, правила хранения')}</div>
       </div></div></div>`;
   view.querySelectorAll('[data-role]').forEach((b) => (b.onclick = () => upd({role: b.dataset.role})));
   $('#depOn')?.addEventListener('change', (e) => upd({deputyUntil: e.target.checked ? new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10) : null}));
@@ -1490,6 +1491,7 @@ function teamPerson(a, pid) {
   $('#ownOn')?.addEventListener('change', (e) => upd({isOwner: e.target.checked}));
   $('#webOn')?.addEventListener('change', (e) => upd({web: e.target.checked}));
   $('#camOn')?.addEventListener('change', (e) => upd({onCamera: e.target.checked}));
+  $('#buildOn')?.addEventListener('change', (e) => upd({selfBuild: e.target.checked}));
   $('#groups')?.addEventListener('change', (e) => upd({groups: e.target.value.split(',').map((g) => g.trim()).filter(Boolean)}));
   $('#tgOff')?.addEventListener('click', async () => { if (confirm(`Отключить бот у ${x.name}?`)) { await post('/api/access', {action: 'end-telegram', id: x.id}); route(); } });
   view.querySelectorAll('[data-end]').forEach((b) => (b.onclick = async () => { await post('/api/access', {action: 'end', session: b.dataset.end}); route(); }));

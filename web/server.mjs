@@ -11,6 +11,7 @@ import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
+import {changeEdits, readEdits} from './edits.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -240,7 +241,7 @@ function preamble(p, k) {
     '`scenes.json`: [{"t":"0:00","name":"Хук","screen":"what is on screen","text":"text on screen","sound":"…","need":"what material it needs","have":"what file covers it","status":"готово|нужно|переснять"}]. ' +
     '`publish.json`: {"captions":[{"platform":"Instagram RU","account":"@…","text":"caption"}],"checks":[{"ok":true,"text":"…"}]}. ' +
     'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version. ' +
-    'Notes for the next version also live in `edits.json` ([{"id","t":seconds,"text","point":{"x":% from left,"y":% from top}|null,"state":"open|sent|done","forV":"v4"}]); when you have built that version, set each sent note to "done" and add "result": what you changed, in a few words — the page shows it as «что поменялось».');
+    'Comments for the next version live in `edits.json` (format in web/edits.mjs): [{"id","stage":"script|scenes|video","t":seconds,"text","quote"?,"scene"?,"shape"?:{"kind":"rect|brush|point|frame",…fractions of the frame},"hint"?:"blur|replace|trim|remove","state":"open|sent|done|note","forV":"v4","by"}]; they come from the page and from the mini app\'s editor. When you have built that version, set each sent comment to "done" and add "result": what you changed, in a few words — the page shows it as «что поменялось». Your own pre-build findings (faces, subtitles, consents) go there as "state":"note" with "by":"Claude".');
   return lines.join('\n');
 }
 
@@ -380,7 +381,7 @@ function ownerPerson() {
   return owner;
 }
 // Role and flags of a new person, from an invite or the invite form.
-const personFields = (x) => ({role: x.role === 'editor' ? 'editor' : 'member', onCamera: !!x.onCamera, web: x.role === 'editor' || x.web === true,
+const personFields = (x) => ({role: x.role === 'editor' ? 'editor' : 'member', onCamera: !!x.onCamera, selfBuild: !!x.selfBuild, web: x.role === 'editor' || x.web === true,
   deputyUntil: /^\d{4}-\d{2}-\d{2}$/.test(x.deputyUntil || '') ? x.deputyUntil : null});
 // Six digits to type into the bot by hand, unique among live invites.
 const newPin = (a) => { for (;;) { const pin = String(100000 + randomBytes(4).readUInt32BE(0) % 900000); if (!a.invites.some((x) => x.pin === pin && x.expires > Date.now())) return pin; } };
@@ -426,7 +427,15 @@ async function body(req) {
 }
 
 const APP_PAGE = join(HERE, 'app.html');
-const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, reels, log});
+// The mini app's editor hands its comments to the reel's chat, as «Собрать vN» on the page does.
+const buildFromApp = (p, r, text, shown, who) => {
+  if (job) return false;
+  record(p, r, {from: 'me', kind: 'text', text: shown, by: who});
+  log(who, `собрал из мини-приложения: ${shown}`);
+  job = startTurn(p, r, `(from ${who}, mini app)\n${text}`, () => {});
+  return true;
+};
+const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, reels, log, reelDir, build: buildFromApp, busy: () => !!job});
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -463,7 +472,7 @@ createServer(async (req, res) => {
   }
 
   // The Telegram mini app signs its own requests (web/app.mjs), no session needed.
-  if (url.pathname === '/app' || url.pathname.startsWith('/api/app/') || url.pathname.startsWith('/app/take/')) return miniApp(req, res, url);
+  if (url.pathname === '/app' || url.pathname.startsWith('/api/app/') || url.pathname.startsWith('/app/take/') || url.pathname === '/app/v') return miniApp(req, res, url);
 
   const me = whoIs(req);
   if (!me) { res.writeHead(404, {'content-type': 'text/plain; charset=utf-8'}); return res.end('Not found'); }
@@ -586,7 +595,7 @@ createServer(async (req, res) => {
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
-      scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readJson(join(dir, 'edits.json'), []),
+      scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10)});
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
@@ -596,15 +605,8 @@ createServer(async (req, res) => {
     const b = await body(req);
     const dir = reelDir(p, b.reel);
     if (!dir) return json(404, {});
-    const f = join(dir, 'edits.json');
-    let list = readJson(f, []);
-    if (b.action === 'add' && String(b.text || '').trim()) {
-      const pt = b.point && Number.isFinite(b.point.x) && Number.isFinite(b.point.y) ? {x: Math.round(b.point.x), y: Math.round(b.point.y)} : null;
-      list.push({id: randomBytes(5).toString('hex'), t: Math.max(0, Number(b.t) || 0), text: String(b.text).trim().slice(0, 600), point: pt, voice: !!b.voice, state: 'open', by: me.name, at: Date.now()});
-    } else if (b.action === 'remove') list = list.filter((x) => x.id !== b.id || x.state !== 'open');
-    else if (b.action === 'send') list = list.map((x) => (x.state === 'open' ? {...x, state: 'sent', forV: String(b.forV || '').slice(0, 10)} : x));
-    else return json(400, {});
-    writeJson(f, list);
+    const list = changeEdits(dir, b, me.name);
+    if (!list) return json(400, {});
     return json(200, {edits: list});
   }
   // A spoken note: saved next to the reel's materials and turned into text by the bot's local Whisper.
@@ -899,6 +901,7 @@ createServer(async (req, res) => {
     if (b.action === 'update' && target && (mayTouch(target) || (target.id === me.id && !('isOwner' in b)))) {
       if (['editor', 'member'].includes(b.role) && !(target.isOwner && b.role === 'member')) target.role = b.role;
       if ('onCamera' in b) target.onCamera = !!b.onCamera;
+      if ('selfBuild' in b) target.selfBuild = !!b.selfBuild;
       if ('web' in b) target.web = !!b.web;
       if ('deputyUntil' in b) target.deputyUntil = /^\d{4}-\d{2}-\d{2}$/.test(b.deputyUntil || '') ? b.deputyUntil : null;
       if (Array.isArray(b.groups)) target.groups = b.groups.map((g) => String(g).slice(0, 40)).filter(Boolean).slice(0, 12);
