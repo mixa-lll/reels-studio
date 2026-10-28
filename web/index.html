@@ -119,6 +119,14 @@
   .vph { background: var(--soft); color: var(--muted); display: grid; place-items: center; text-align: center; padding: 24px; font-size: 13px; }
   .rinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
   .blk { display: flex; flex-direction: column; gap: 6px; }
+  .vwrap { position: relative; } .vwrap video { display: block; }
+  .pinlayer { position: absolute; inset: 0 0 48px 0; cursor: crosshair; z-index: 2; }
+  .pinlayer .pin { position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 50%; background: #2F6FEB; color: #fff; font-size: 10px; display: grid; place-items: center; box-shadow: 0 0 0 4px rgba(47,111,235,.35); }
+  .ecomp { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .ecomp textarea.f { min-height: 60px; }
+  .tcx { font-size: 12px; font-weight: 700; color: #2F6FEB; background: #EEF4FE; border-radius: 6px; padding: 2px 7px; border: 0; }
+  .enum { width: 24px; height: 24px; border-radius: 50%; background: #2F6FEB; color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; flex: none; }
+  .enum.done { background: var(--green); }
   .lbl { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .02em; text-transform: uppercase; }
   aside.chatcol { width: 380px; flex: none; border-left: 1px solid var(--line); display: flex; flex-direction: column; height: 100vh; }
   aside.chatcol .log, aside.chatcol form.send, aside.chatcol .keys, aside.chatcol .status, aside.chatcol .ctx { padding-left: 16px; padding-right: 16px; }
@@ -973,6 +981,61 @@ const versionNote = (readme, v) => {
 };
 const section = (readme, name) => (new RegExp(`^## ${name}[^\\n]*\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`, 'm').exec(String(readme || '')) || [])[1] || '';
 
+// Правки по секундам (Д3, VE1, VP1–VP6): a list of notes for the next version, each at a second,
+// typed or spoken (Whisper on the server), optionally with a point on the frame.
+function editsBlock(edits, cur, nextV) {
+  const open = edits.filter((x) => x.state === 'open'), sent = edits.filter((x) => x.state === 'sent' && x.forV === nextV), done = edits.filter((x) => x.state === 'done' && x.forV === cur.v);
+  const row = (x, i, kind) => `<div class="li" style="align-items: flex-start; gap: 10px"><span class="enum ${kind}">${kind === 'done' ? '✓' : i + 1}</span><span style="flex: 1; min-width: 0"><button type="button" class="tcx" data-eseek="${x.t}">${tc(x.t)}</button> ${esc(kind === 'done' && x.result ? x.result : x.text)}
+    <div class="small muted">${kind === 'done' ? esc(x.text) : [x.voice ? 'голосом' : 'текстом', x.point ? 'точка на кадре' : '', esc(x.by || '')].filter(Boolean).join(' · ')}</div></span>${kind === 'open' && canEdit() ? `<button type="button" class="btn" data-erm="${esc(x.id)}" aria-label="Убрать правку">✕</button>` : ''}</div>`;
+  return `${done.length ? `<div class="blk"><span class="lbl">Что поменялось в ${esc(cur.v)} · ${done.length}</span>${done.map((x, i) => row(x, i, 'done')).join('')}</div>` : ''}
+    <div class="blk"><span class="lbl">Правки к ${esc(nextV)} · ${open.length}</span>
+      ${open.map((x, i) => row(x, i, 'open')).join('') || `<span class="small muted">${sent.length ? `Отправлено ${sent.length} — Claude собирает ${esc(nextV)}.` : 'Пока нет. Останови видео и скажи или напиши, что поменять.'}</span>`}
+      ${sent.length && open.length ? `<span class="small muted">Ещё ${sent.length} уже у Claude.</span>` : ''}
+      ${open.length && canEdit() ? `<button type="button" class="btn primary" id="eBuild" style="align-self: flex-start; margin-top: 6px">Собрать ${esc(nextV)} · правок: ${open.length}</button>` : ''}</div>`;
+}
+
+function wireEdits(id, rv, form, cur, nextV) {
+  let point = null, voice = false, rec = null, pinMode = false;
+  const tEl = $('#eT'), layer = $('#pinL'), hint = $('#eHint');
+  const upd = () => { tEl.textContent = tc(rv.currentTime); };
+  rv.addEventListener('timeupdate', upd); rv.addEventListener('seeked', upd); rv.addEventListener('pause', upd);
+  $('#eText').addEventListener('focus', () => rv.pause());
+  // Point on the frame: a layer over the paused video takes one click.
+  $('#ePt').onclick = () => { rv.pause(); pinMode = !pinMode; layer.hidden = !pinMode; $('#ePt').classList.toggle('primary', pinMode); hint.textContent = pinMode ? 'Нажми на кадр, где поправить' : ''; };
+  layer.onclick = (e) => {
+    const r = layer.getBoundingClientRect();
+    point = {x: Math.round(100 * (e.clientX - r.left) / r.width), y: Math.round(100 * (e.clientY - r.top) / r.height)};
+    layer.innerHTML = `<span class="pin" style="left: ${point.x}%; top: ${point.y}%">●</span>`;
+    pinMode = false; $('#ePt').classList.remove('primary'); layer.style.pointerEvents = 'none'; hint.textContent = `Точка: ${point.x}% слева, ${point.y}% сверху`;
+  };
+  // Voice: record, the server writes it out with Whisper, the text lands in the field.
+  $('#eMic').onclick = async () => {
+    if (rec) { rec.stop(); return; }
+    rv.pause();
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); } catch { toast('Нет доступа к микрофону'); return; }
+    const chunks = [];
+    rec = new MediaRecorder(stream);
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach((x) => x.stop());
+      const type = rec.mimeType || 'audio/webm'; rec = null;
+      $('#eMic').textContent = '… распознаю'; $('#eMic').disabled = true;
+      const r = await fetch(`/api/reel/voice?project=${encodeURIComponent(P)}&reel=${encodeURIComponent(id)}`, {method: 'POST', headers: {'content-type': type}, body: new Blob(chunks, {type})}).then((x) => x.json()).catch(() => ({}));
+      $('#eMic').textContent = '🎙 Голосом'; $('#eMic').disabled = false; $('#eMic').classList.remove('primary');
+      if (r.text) { $('#eText').value = ($('#eText').value ? $('#eText').value + ' ' : '') + r.text; voice = true; } else toast('Не расслышал — напиши словами');
+    };
+    rec.start(); $('#eMic').textContent = '■ Стоп'; $('#eMic').classList.add('primary'); hint.textContent = 'Говори — нажми «Стоп», когда закончишь';
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const text = $('#eText').value.trim();
+    if (!text) return $('#eText').focus();
+    await post('/api/reel/edits', {reel: id, action: 'add', t: rv.currentTime, text, point, voice});
+    renderVersions(id);
+  };
+}
+
 async function renderVersions(id, data) {
   data ||= await api('/api/reel?reel=' + encodeURIComponent(id));
   const el = $('#vers');
@@ -985,16 +1048,21 @@ async function renderVersions(id, data) {
   const thumb = (v) => v.files.find((f) => f.kind === 'thumb' || f.kind === 'cover');
   const cur = vs[0], prev = vs.find((v) => v.state === 'previous' && video(v)), old = vs.filter((v) => v !== cur && v !== prev);
   const note = cur && versionNote(data.readme, cur.v);
+  const nextV = cur ? 'v' + (Number(cur.v.replace(/\D/g, '')) + 1) : 'v1';
   const script = section(data.readme, 'Сценарий');
   const dl = cur && files(cur).find((f) => f.kind === 'copy') || cur && files(cur)[0];
   $('#dlTop').innerHTML = dl ? `<a class="btn primary" href="${dl.url}&dl=1">Скачать ${esc(cur.v)}</a>` : '';
   el.innerHTML = `<div class="rvid">${cur && video(cur)
-      ? `<video id="rv" src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video>
-        ${canEdit() ? '<button type="button" class="btn" id="tcBtn">⏱ Правка на 0:00</button><span class="small muted" style="text-align: center">Останови видео в нужный момент — правка привяжется к секунде</span>' : `<span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`}
+      ? `<div class="vwrap"><video id="rv" src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video><div class="pinlayer" id="pinL" hidden></div></div>
+        ${canEdit() ? `<form class="ecomp" id="eComp"><div class="row" style="gap: 6px"><b id="eT" class="tcx">0:00</b><span class="small muted">правка к ${esc(nextV)}</span></div>
+          <textarea class="f" id="eText" rows="2" placeholder="Что поменять в этот момент — словами или голосом"></textarea>
+          <div class="row" style="gap: 6px"><button type="button" class="btn" id="eMic" title="Сказать голосом">🎙 Голосом</button><button type="button" class="btn" id="ePt" title="Показать место на кадре">◎ Точка на кадре</button><button type="submit" class="btn primary" style="margin-left: auto">Добавить</button></div>
+          <span class="small muted" id="eHint">Останови видео в нужный момент — правка привяжется к секунде</span></form>` : `<span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`}
         ${prev ? `<a class="btn" href="#/reel/${esc(id)}/compare">Сравнить с ${esc(prev.v)}</a>` : ''}
         ${canEdit() && !cur.files.some((f) => f.kind === 'master') ? `<button type="button" class="btn primary" id="acceptV">Принять ${esc(cur.v)} — собрать мастер 1080p</button>` : ''}`
       : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}</div>
     <div class="rinfo">
+      ${cur ? editsBlock(data.edits || [], cur, nextV) : ''}
       ${note ? `<div class="blk"><span class="lbl">Что в ${esc(cur.v)}</span><span style="font-size: 15px; line-height: 1.55">${esc(note)}</span></div>` : ''}
       <div class="blk"><span class="lbl">Версии · ${vs.length}</span>
         ${!cur ? '<p class="small muted">Версий пока нет. Напиши в чате справа, что снять или смонтировать.</p>' : `
@@ -1005,15 +1073,16 @@ async function renderVersions(id, data) {
       ${script.trim() ? `<div class="blk"><span class="lbl">Сценарий</span><div class="md" style="font-size: 14px">${md(script)}</div></div>` : ''}
     </div>`;
   $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1080p этой версии (без --draft) и скажи, когда будет готов.`, `Принять ${cur.v}`));
-  const rv = $('#rv'), tcb = $('#tcBtn');
-  if (rv && tcb) {
-    const upd = () => { tcb.textContent = `⏱ Правка на ${tc(rv.currentTime)}`; };
-    rv.addEventListener('timeupdate', upd);
-    rv.addEventListener('seeked', upd);
-    rv.addEventListener('pause', () => { upd(); tcb.classList.add('primary'); });
-    rv.addEventListener('play', () => tcb.classList.remove('primary'));
-    tcb.onclick = () => { rv.pause(); draft(`${tc(rv.currentTime)} —`); };
-  }
+  const rv = $('#rv'), form = $('#eComp');
+  if (rv && form) wireEdits(id, rv, form, cur, nextV);
+  el.querySelectorAll('[data-erm]').forEach((b) => (b.onclick = async () => { await post('/api/reel/edits', {reel: id, action: 'remove', id: b.dataset.erm}); renderVersions(id); }));
+  el.querySelectorAll('[data-eseek]').forEach((b) => (b.onclick = () => { if (rv) { rv.currentTime = Number(b.dataset.eseek); rv.pause(); } }));
+  $('#eBuild')?.addEventListener('click', async () => {
+    const open = (data.edits || []).filter((x) => x.state === 'open');
+    await post('/api/reel/edits', {reel: id, action: 'send', forV: nextV});
+    chatOf().say(`Правки к ${nextV}:\n${open.map((x, i) => `${i + 1}. ${tc(x.t)} — ${x.text}${x.point ? ` (точка на кадре: ${x.point.x}% слева, ${x.point.y}% сверху)` : ''}`).join('\n')}\nСобери ${nextV} черновиком и отметь в edits.json, что сделано.`, `Собрать ${nextV} · правок: ${open.length}`);
+    renderVersions(id);
+  });
   el.querySelectorAll('[data-rebuild]').forEach((b) => (b.onclick = () => {
     const box = $('#chatHost > div');
     box.say(`Пересобери версию ${b.dataset.rebuild} этого рилса из её снимка versions/${b.dataset.rebuild}/project-snapshot/ и пришли её.`, `Пересобрать ${b.dataset.rebuild}`);

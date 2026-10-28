@@ -10,6 +10,7 @@ import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
+import {transcribe} from '../bot/stt.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -238,7 +239,8 @@ function preamble(p, k) {
     'The page shows the reel in four stages (Сценарий, Материалы, Монтаж, Выкладка) from two optional files in the reel folder; keep them current when the script, materials or captions change. ' +
     '`scenes.json`: [{"t":"0:00","name":"Хук","screen":"what is on screen","text":"text on screen","sound":"…","need":"what material it needs","have":"what file covers it","status":"готово|нужно|переснять"}]. ' +
     '`publish.json`: {"captions":[{"platform":"Instagram RU","account":"@…","text":"caption"}],"checks":[{"ok":true,"text":"…"}]}. ' +
-    'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version.');
+    'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version. ' +
+    'Notes for the next version also live in `edits.json` ([{"id","t":seconds,"text","point":{"x":% from left,"y":% from top}|null,"state":"open|sent|done","forV":"v4"}]); when you have built that version, set each sent note to "done" and add "result": what you changed, in a few words — the page shows it as «что поменялось».');
   return lines.join('\n');
 }
 
@@ -584,8 +586,40 @@ createServer(async (req, res) => {
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
-      scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null),
+      scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readJson(join(dir, 'edits.json'), []),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10)});
+  }
+  // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
+  // point on the frame; «Собрать vN» hands the open ones to the reel chat (edits.json).
+  if (req.method === 'POST' && url.pathname === '/api/reel/edits') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir) return json(404, {});
+    const f = join(dir, 'edits.json');
+    let list = readJson(f, []);
+    if (b.action === 'add' && String(b.text || '').trim()) {
+      const pt = b.point && Number.isFinite(b.point.x) && Number.isFinite(b.point.y) ? {x: Math.round(b.point.x), y: Math.round(b.point.y)} : null;
+      list.push({id: randomBytes(5).toString('hex'), t: Math.max(0, Number(b.t) || 0), text: String(b.text).trim().slice(0, 600), point: pt, voice: !!b.voice, state: 'open', by: me.name, at: Date.now()});
+    } else if (b.action === 'remove') list = list.filter((x) => x.id !== b.id || x.state !== 'open');
+    else if (b.action === 'send') list = list.map((x) => (x.state === 'open' ? {...x, state: 'sent', forV: String(b.forV || '').slice(0, 10)} : x));
+    else return json(400, {});
+    writeJson(f, list);
+    return json(200, {edits: list});
+  }
+  // A spoken note: saved next to the reel's materials and turned into text by the bot's local Whisper.
+  if (req.method === 'POST' && url.pathname === '/api/reel/voice') {
+    if (!can('editor')) return json(403, {});
+    const dir = reelDir(p, url.searchParams.get('reel'));
+    if (!dir) return json(404, {});
+    const chunks = [];
+    let size = 0;
+    for await (const c of req) { size += c.length; if (size > 20 * 1024 * 1024) return json(413, {}); chunks.push(c); }
+    mkdirSync(join(dir, 'sources'), {recursive: true});
+    const f = join(dir, 'sources', `voice-${Date.now()}.${/mp4|aac/.test(req.headers['content-type'] || '') ? 'm4a' : 'webm'}`);
+    writeFileSync(f, Buffer.concat(chunks));
+    const text = await transcribe(f, 'ru').catch(() => null);
+    return json(200, {text: text || '', file: basename(f)});
   }
   // ---------- posts (web/posts.mjs) ----------
   if (req.method === 'GET' && url.pathname === '/api/post') {
