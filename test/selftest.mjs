@@ -230,7 +230,7 @@ await check('end to end: owner link, reply despite a hung progress line, task su
   let bot = start();
   try {
     tg.message(9, '/start wrong');
-    await tg.waitFor(/personal bot/);
+    await tg.waitFor(/team bot/);
     tg.message(5, '/start abc');
     await tg.waitFor(/I make reels/);
     // The progress line hangs forever; the agent must still run and the reply arrive.

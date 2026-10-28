@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // Telegram ↔ coding agent bridge for the reels workflow.
 // One owner, one agent turn at a time; messages that arrive mid-turn join it at once.
+import {createSandbox, isTest, listSandboxes, removeSandbox} from './sandbox.mjs';
+import {MODES, PLANS} from './plans.mjs';
+import {editor as makeEditor, KEYS as EDITOR_KEYS, LABELS as EDITOR_LABELS} from './editor.mjs';
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
-import {join, relative} from 'node:path';
+import {dirname, join, relative} from 'node:path';
 import {DATA, FIRST_PROJECT, PROJECTS, ROOT, env, loadState, saveState, settings, studio, writeSettings} from './config.mjs';
 import {createProject, dropRequest, ensureProjects, listProjects, projectAt, projectExists, projectName, removeProject, takeRequest, untouched} from './projects.mjs';
 import {APPROVED as CLAIM_APPROVED, REQUEST as CLAIM_REQUEST} from './claim.mjs';
@@ -22,7 +25,8 @@ import * as updates from './update.mjs';
 const {botChangedSince, head, pendingUpdates, pullUpdates, remoteUrl, upstreamHead} = updates;
 import {telegram} from './telegram.mjs';
 import {authors} from './author.mjs';
-import {claim as claimInvite, member, publishBot, touch} from './members.mjs';
+import {isEditor} from './roles.mjs';
+import {claim as claimInvite, FILE as memberFile, member, publishBot, touch} from './members.mjs';
 import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
 
 // Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
@@ -173,6 +177,9 @@ for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(0));
 const tg = telegram(env.token);
 // Authors get their own button-driven dialog (bot/author.mjs), never the agent.
 const author = authors({tg, transcribe, notify: (text) => state.chatId && tg.sendText(state.chatId, text, {silent: true}).catch(() => {})});
+// The editor's scenarios (bot/editor.mjs): Сегодня, Входящие → варианты → очередь, Неделя, Люди.
+const miniApp = (text, hash = '') => (process.env.MINIAPP_URL ? {text, web_app: {url: process.env.MINIAPP_URL + hash}} : null);
+const ed = makeEditor({tg, studio, app: miniApp});
 
 // A crash of the bot itself is reported too; the service manager then restarts it.
 for (const ev of ['uncaughtException', 'unhandledRejection']) {
@@ -364,6 +371,49 @@ async function showUnfinished() {
 // id of each stretch) tells which project any earlier message belongs to.
 
 const nameOf = (slug) => projectName(slug) || (slug === FIRST_PROJECT ? T.mainName : T.unnamed);
+
+// ---------- /test: test accounts (bot/sandbox.mjs) ----------
+const SHARED_DIR = memberFile ? dirname(memberFile) : join(DATA, 'shared');
+const sandboxPaths = () => ({projects: PROJECTS, access: memberFile || join(SHARED_DIR, 'access.json'), starter: join(ROOT, 'starter'), chats: join(ROOT, 'web', 'data', 'chats'), outbox: join(SHARED_DIR, 'outbox.json'), log: join(SHARED_DIR, 'log.jsonl')});
+async function showTests(edit) {
+  const list = listSandboxes(sandboxPaths());
+  const here = isTest(PROJECTS, state.project);
+  const text = ['🧪 Тестовые аккаунты — как будто пришёл новый клиент: свой проект с режимом и тарифом, демо-данные и люди. Удаление стирает всё, что в нём появилось; рабочие проекты не трогаются.',
+    here ? `\nСейчас вы в тестовом: «${nameOf(state.project)}».` : '', list.length ? '' : '\nПока ни одного.'].filter(Boolean).join('\n');
+  const rows = list.map((x) => [{text: `${x.slug === state.project ? '✅ ' : '▶ '}${x.name.replace(/^Тест · /, '')}`.slice(0, 60), callback_data: `tst:go:${x.slug}`}, {text: '🗑 Удалить', callback_data: `tst:del:${x.slug}`}]);
+  rows.push(Object.entries(MODES).map(([k, m]) => ({text: `＋ ${m.name}`, callback_data: `tst:new:${k}`})));
+  if (here) rows.push([{text: '↩ В рабочий проект', callback_data: 'tst:back'}]);
+  rows.push([{text: T.close, callback_data: 'tst:x'}]);
+  if (edit) return tg.call('editMessageText', {chat_id: state.chatId, message_id: edit, text, reply_markup: {inline_keyboard: rows}}).catch(() => {});
+  return tg.sendText(state.chatId, text, {silent: true, reply_markup: {inline_keyboard: rows}});
+}
+async function onTestButton(q) {
+  const [, act, arg] = q.data.split(':');
+  if (act === 'x') return markChosen(q, null);
+  if (act === 'new') {
+    const plan = {solo: 'video', team: 'team', agency: 'agency'}[arg];
+    if (!MODES[arg] || !PLANS[plan]) return;
+    if (!isTest(PROJECTS, state.project)) state.realProject = state.project;
+    const slug = createSandbox(sandboxPaths(), {mode: arg, plan});
+    await markChosen(q, `Создан: ${projectName(slug).replace(/^Тест · /, '')}`);
+    return requestSwitch({slug});
+  }
+  if (act === 'go' && projectExists(arg)) {
+    if (!isTest(PROJECTS, state.project)) state.realProject = state.project;
+    await markChosen(q, projectName(arg).replace(/^Тест · /, ''));
+    return requestSwitch({slug: arg});
+  }
+  if (act === 'back') {
+    await markChosen(q, 'В рабочий проект');
+    return requestSwitch({slug: projectExists(state.realProject) && !isTest(PROJECTS, state.realProject) ? state.realProject : FIRST_PROJECT});
+  }
+  if (act === 'del') {
+    if (arg === state.project) return tg.call('answerCallbackQuery', {callback_query_id: q.id, text: 'Сначала вернитесь в рабочий проект — «↩ В рабочий проект».', show_alert: true}).catch(() => {});
+    const r = removeSandbox(sandboxPaths(), arg);
+    if (r) await tg.sendText(state.chatId, `🗑 Удалён тестовый аккаунт «${r.name.replace(/^Тест · /, '')}» со всеми данными${r.people ? `, людей: ${r.people}` : ''}.`, {silent: true});
+    return showTests(q.message.message_id);
+  }
+}
 
 async function showProjects() {
   const rows = listProjects().map((p) => [{text: `${p.slug === state.project ? '✅ ' : ''}${nameOf(p.slug)}`.slice(0, 60), callback_data: `p:${p.slug}`}]);
@@ -892,8 +942,18 @@ function interrupt(reason) {
 // ---------- role preview for the owner (/role) ----------
 // The owner's own keyboard whenever no reply-specific one is shown: the main commands,
 // so nothing has to be typed or found in the menu.
-const HOME_LABELS = {'💡 Идеи': 'ideas', '📂 Незаконченные': 'unfinished', '🎭 Роль': 'role', '⚙️ Настройки': 'settings'};
-const HOME_KEYS = {keyboard: [[{text: '💡 Идеи'}, {text: '📂 Незаконченные'}], [{text: '🎭 Роль'}, {text: '⚙️ Настройки'}]], resize_keyboard: true, is_persistent: true};
+// Editor keyboard (bot/editor.mjs); the old labels still work for messages already in chats.
+const HOME_LABELS = {...EDITOR_LABELS, '💡 Идеи': 'ideas', '📂 Незаконченные': 'unfinished', '🎭 Роль': 'role', '⚙️ Настройки': 'settings'};
+const HOME_KEYS = EDITOR_KEYS;
+// «☰ Ещё»: everything that is not an everyday step.
+const MORE = () => ({inline_keyboard: [
+  [{text: '💡 Идеи от Claude', callback_data: 'more:ideas'}, {text: '📂 Незаконченные', callback_data: 'more:unfinished'}],
+  [{text: '📁 Проекты', callback_data: 'more:projects'}, {text: '🧪 Тестовые аккаунты', callback_data: 'more:test'}],
+  [{text: '🎭 Посмотреть как роль', callback_data: 'more:role'}, {text: '⚙️ Настройки', callback_data: 'more:settings'}],
+  ...(process.env.MINIAPP_URL ? [[{text: '🎬 Открыть студию', web_app: {url: process.env.MINIAPP_URL}}]] : []),
+]});
+// A project still at the starter brief needs the onboarding talk with Claude first.
+const onboarding = () => { try { return readFileSync(join(studio(), 'brief.md'), 'utf8') === readFileSync(join(ROOT, 'starter', 'brief.md'), 'utf8'); } catch { return false; } };
 const ROLE_NAMES = {owner: 'Владелец / редактор', author: 'Автор (учитель)', host: 'Ведущий', approver: 'Согласующий (директор)'};
 const ROLE_PICK = {
   text: (cur) => `Чьими глазами посмотреть на бота? Сейчас: ${ROLE_NAMES[cur || 'owner']}.\n\nАвтор присылает материалы, ведущий снимает по заданиям, согласующий одобряет неделю. Вернуться — /role.`,
@@ -907,13 +967,22 @@ async function switchRole(chatId, from, role) {
   if (role === 'author') return author.welcome(chatId, from, state.ownerName || from.first_name, 'Вы');
   if (role === 'host') return hostChat(chatId, true);
   if (role === 'approver') return approverChat(chatId, true);
-  return tg.call('sendMessage', {chat_id: chatId, text: 'Вы снова владелец: сообщения идут Claude. Кнопки — внизу, сменить роль — «🎭 Роль».', reply_markup: HOME_KEYS});
+  await tg.call('sendMessage', {chat_id: chatId, text: 'Вы снова редактор. Внизу — Входящие, Неделя, Люди; сменить роль — «☰ Ещё».', reply_markup: HOME_KEYS}).catch(() => {});
+  return ed.today(chatId);
 }
 // The host lives in the mini app; the chat only brings the week's tasks and a button.
+function hostLine() {
+  let t = {tasks: []};
+  try { t = JSON.parse(readFileSync(join(studio(), 'host', 'tasks.json'), 'utf8')); } catch {}
+  const left = (t.tasks || []).filter((x) => x.status !== 'sent');
+  if (!left.length) return '<b>Всё снято</b>\nНовые задания придут в понедельник утром.';
+  const redo = left.filter((x) => x.status === 'redo').length;
+  return `<b>Задания на неделю</b>\n${left.length} ${left.length === 1 ? 'ролик' : left.length < 5 ? 'ролика' : 'роликов'} · около ${Math.max(3, left.length * 3)} минут${t.due ? `. Снять до: ${t.due}` : ''}.${redo ? `\nПопросили переснять: ${redo}.` : ''}`;
+}
 function hostChat(chatId, first) {
   const ok = !!process.env.MINIAPP_URL;
   return tg.call('sendMessage', {chat_id: chatId, parse_mode: 'HTML',
-    text: `${first ? 'Вы — ведущий.\n\n' : ''}<b>Задания на неделю готовы</b>\n3 коротких ролика · около 10 минут. Снять до пятницы.${ok ? '' : '\n\n⚠️ Мини-приложение «Съёмка» не подключено: нет адреса MINIAPP_URL.'}`,
+    text: `${first ? 'Вы — ведущий.\n\n' : ''}${hostLine()}${ok ? '' : '\n\n⚠️ Мини-приложение «Съёмка» не подключено: нет адреса MINIAPP_URL.'}`,
     reply_markup: ok ? {keyboard: [[appButton('📋 Задания'), appButton('🎬 Моё', '#mine')], [appButton('👤 Профиль', '#profile')]], resize_keyboard: true, is_persistent: true} : {remove_keyboard: true}})
     .then(() => ok && tg.call('sendMessage', {chat_id: chatId, text: 'Съёмка — в приложении: текст у камеры, запись, отправка.', reply_markup: {inline_keyboard: [[{text: 'Открыть задания', web_app: {url: process.env.MINIAPP_URL}}], [{text: 'Не могу на этой неделе', callback_data: 'hs:skip'}]]}}));
 }
@@ -968,10 +1037,16 @@ async function onMessage(msg) {
 
   const cmd = msg.text?.match(/^\/(\w+)/)?.[1] ?? HOME_LABELS[msg.text?.trim()];
   if (who && ['settings', 'update', 'projects'].includes(cmd)) return tg.sendText(state.chatId, TEAM.ownerOnly, {silent: true});
-  if (cmd === 'start') {
-    await tg.sendText(state.chatId, T.hello, {silent: true, reply_markup: HOME_KEYS});
-    return tg.call('sendMessage', {chat_id: state.chatId, text: ROLE_PICK.text(state.actAs), reply_markup: ROLE_PICK.kb, disable_notification: true}).catch(() => {});
+  if (cmd === 'start' || cmd === 'today') {
+    if (cmd === 'start' && onboarding()) return tg.sendText(state.chatId, T.hello, {silent: true, reply_markup: HOME_KEYS});
+    await tg.call('sendMessage', {chat_id: state.chatId, text: '👋', reply_markup: HOME_KEYS, disable_notification: true}).catch(() => {});
+    return ed.today(state.chatId);
   }
+  if (cmd === 'inbox') return ed.inbox(state.chatId);
+  if (cmd === 'week') return ed.week(state.chatId);
+  if (cmd === 'people') return ed.people(state.chatId);
+  if (cmd === 'more') return tg.call('sendMessage', {chat_id: state.chatId, text: 'Ещё', reply_markup: MORE(), disable_notification: true});
+  if (cmd === 'role') return tg.call('sendMessage', {chat_id: state.chatId, text: ROLE_PICK.text(state.actAs), reply_markup: ROLE_PICK.kb});
   // A running task's progress line itself turns into «⏹ Stopped».
   if (cmd === 'stop') return interrupt('stop') ? null : tg.sendText(state.chatId, T.idle, {silent: true});
   if (cmd === 'new') {
@@ -983,6 +1058,7 @@ async function onMessage(msg) {
   if (cmd === 'ideas') return enqueue(T.ideasPrompt);
   if (cmd === 'unfinished') return showUnfinished();
   if (cmd === 'projects') return showProjects();
+  if (cmd === 'test') return who ? tg.sendText(state.chatId, TEAM.ownerOnly, {silent: true}) : showTests();
   if (cmd === 'settings') return showSettings();
   if (cmd === 'update') return checkUpdates(true);
   if (cmd === 'app') {
@@ -1081,6 +1157,19 @@ async function onButton(q) {
   await tg.call('answerCallbackQuery', {callback_query_id: q.id}).catch(() => {});
   if (q.data === 'ctl:done') return;
   const who = q.from.id === state.ownerId ? null : member(q.from.id);
+  const editorHere = !who ? !state.actAs : isEditor(who);
+  if (q.data.startsWith('ed:')) return editorHere ? ed.onButton(q).catch((e) => console.error('editor', e)) : null;
+  if (q.data.startsWith('more:') && editorHere) {
+    tg.call('answerCallbackQuery', {callback_query_id: q.id}).catch(() => {});
+    const c = q.data.slice(5);
+    if (who && ['projects', 'test', 'settings', 'role'].includes(c)) return tg.sendText(state.chatId, TEAM.ownerOnly, {silent: true});
+    if (c === 'ideas') return enqueue(T.ideasPrompt);
+    if (c === 'unfinished') return showUnfinished();
+    if (c === 'projects') return showProjects();
+    if (c === 'test') return showTests();
+    if (c === 'settings') return showSettings();
+    if (c === 'role') return tg.call('sendMessage', {chat_id: q.message.chat.id, text: ROLE_PICK.text(state.actAs), reply_markup: ROLE_PICK.kb});
+  }
   if (q.data.startsWith('a:')) return who?.role === 'author' || (q.from.id === state.ownerId && state.actAs === 'author') ? author.onButton(q).catch((e) => console.error('author', e)) : null;
   if (q.from.id === state.ownerId && q.data.startsWith('role:')) {
     await tg.call('editMessageReplyMarkup', {chat_id: q.message.chat.id, message_id: q.message.message_id, reply_markup: {inline_keyboard: []}}).catch(() => {});
@@ -1095,6 +1184,7 @@ async function onButton(q) {
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
   if (q.data.startsWith('set:')) return onSettings(q);
+  if (q.data.startsWith('tst:')) return who ? null : onTestButton(q);
   if (q.data.startsWith('p:')) return onProjectButton(q);
   if (q.data.startsWith('px:')) return onCrossButton(q);
   if (q.data === 'upd:yes' || q.data === 'upd:no') {

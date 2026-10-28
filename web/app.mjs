@@ -6,6 +6,8 @@
 // Data per project: projects/<p>/host/tasks.json (tasks), host/profiles.json (per person),
 // takes go to the project's inbox like anything else sent to the bot. Until the editor
 // side exists, a project without tasks.json gets demo tasks (seeded: true).
+import {access as planAccess, can as planCan} from '../bot/plans.mjs';
+import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
 import {execFileSync, spawn} from 'node:child_process';
 import {createHmac, randomBytes} from 'node:crypto';
 import {appendFileSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
@@ -117,7 +119,7 @@ function streamFile(req, res, f, extra = {}) {
   return createReadStream(f).pipe(res);
 }
 
-export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build, busy, chat}) {
+export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, sandboxPaths, reels, log, reelDir, build, busy, chat}) {
   const token = () => process.env.TELEGRAM_BOT_TOKEN;
   const sign = (rel) => createHmac('sha256', `${token()}:video`).update(rel).digest('base64url').slice(0, 22);
   const botState = () => readJson(join(BOT, 'data', 'state.json'), {});
@@ -127,9 +129,17 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
   const owners = () => (process.env.MINIAPP_OWNERS || '').split(',').map((x) => Number(x.trim())).filter(Boolean);
   const hostDir = (p) => { const d = join(PROJECTS, p, 'host'); mkdirSync(d, {recursive: true}); return d; };
 
-  function person(user) {
+  // Test profiles (owner only): people with test: true and no Telegram account. The owner
+  // opens the app «as» one of them (header x-as); everything they create is tagged by name
+  // and is wiped with the profile (wipeTest below).
+  function person(user, as) {
     const st = botState();
-    if (user.id === st.ownerId || owners().includes(user.id)) return {key: 'owner', name: st.ownerName || user.first_name, role: 'owner', editor: true, onCamera: true, studio: true};
+    const owner = user.id === st.ownerId || owners().includes(user.id);
+    if (owner && as) {
+      const x = access().people.find((y) => y.id === as && y.test);
+      if (x) return {key: x.id, name: x.name, role: x.role, editor: isEditor(x), deputyUntil: x.deputyUntil || null, onCamera: !!x.onCamera, studio: isEditor(x) || !!x.selfBuild, test: true, realOwner: true, project: x.project || null};
+    }
+    if (owner) return {key: 'owner', realOwner: true, name: st.ownerName || user.first_name, role: 'owner', editor: true, onCamera: true, studio: true};
     const x = access().people.find((y) => y.telegram?.id === user.id);
     // «Студия» (SR0): editors of the project and people marked «Сам собирает».
     const deputy = x && x.role !== 'editor' && !x.isOwner && isEditor(x) ? x.deputyUntil : null;
@@ -183,12 +193,61 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
     });
   }
   // «Люди» (LE2): tasks by person and who has not sent anything for a long time.
-  function peopleOf(t) {
+  function peopleOf(t, p) {
     const a = access();
+    const own = (x) => (String(p).startsWith('test-') ? x.project === p : !x.project);
+    a.people = a.people.filter(own);
     const name = (k) => a.people.find((x) => x.id === k)?.name || (k === 'owner' ? botState().ownerName || 'Владелец' : null);
     const tasks = t.tasks.filter((x) => x.to).map((x) => ({title: x.title, who: name(x.to) || '—', status: x.status, due: t.due}));
     const quiet = a.people.filter((x) => x.telegram && !x.isOwner).map((x) => ({name: x.name, days: Math.floor((Date.now() - (x.telegram.seen || x.added || Date.now())) / 864e5)})).filter((x) => x.days >= 7).sort((x, y) => y.days - x.days);
     return {tasks, quiet};
+  }
+
+  const testList = () => access().people.filter((x) => x.test && !x.project).map((x) => ({id: x.id, name: x.name, role: x.role, onCamera: !!x.onCamera, selfBuild: !!x.selfBuild, deputyUntil: x.deputyUntil || null, added: x.added}));
+  // Removes a test profile and everything tagged with it: its own tasks and takes, files it
+  // sent (inbox lines «(mini app, <name>, …)»), reels it started, its text edits, its
+  // settings and its lines in the shared log. Real people's data is never touched.
+  function wipeTest(p, pid) {
+    const a = access();
+    const x = a.people.find((y) => y.id === pid && y.test);
+    if (!x) return null;
+    const out = {name: x.name, tasks: 0, files: 0, reels: 0};
+    const t = tasks(p);
+    const takes = join(hostDir(p), 'takes');
+    const rmTake = (tid) => { const d = join(takes, String(tid).replace(/[^\w-]/g, '')); if (existsSync(d)) rmSync(d, {recursive: true, force: true}); };
+    t.tasks = t.tasks.filter((k) => {
+      if (k.to === pid) { out.tasks++; rmTake(k.id); if (k.take) rmSync(join(PROJECTS, k.take), {force: true}); return false; }
+      if (k.sentBy === x.name) { if (k.take) rmSync(join(PROJECTS, k.take), {force: true}); rmTake(k.id); k.status = 'todo'; delete k.take; delete k.sentAt; delete k.sentBy; }
+      if (k.edit?.by === x.name) delete k.edit;
+      return true;
+    });
+    saveTasks(p, t);
+    const hist = join(PROJECTS, p, 'inbox', 'history.md');
+    if (existsSync(hist)) {
+      const keep = [];
+      for (const line of readFileSync(hist, 'utf8').split('\n')) {
+        if (line.includes(`(mini app, ${x.name},`)) { const f = line.split(') ').pop().trim(); if (f && f.startsWith(PROJECTS)) { rmSync(f, {force: true}); out.files++; } }
+        else keep.push(line);
+      }
+      writeFileSync(hist, keep.join('\n'));
+    }
+    const rdir = join(PROJECTS, p, 'reels');
+    if (existsSync(rdir)) for (const r of readdirSync(rdir)) {
+      const readme = join(rdir, r, 'README.md');
+      if (existsSync(readme) && readFileSync(readme, 'utf8').includes(`Started: mini app, ${x.name},`)) {
+        rmSync(join(rdir, r), {recursive: true, force: true}); out.reels++;
+        const plan = readJson(join(PROJECTS, p, 'plan.json'), null);
+        if (plan) { for (const k of ['at', 'rubric']) if (plan[k]) delete plan[k][`reel:${r}`]; writeJson(join(PROJECTS, p, 'plan.json'), plan); }
+      }
+    }
+    const prof = profiles(p); if (prof[pid]) { delete prof[pid]; writeJson(join(hostDir(p), 'profiles.json'), prof); }
+    a.people = a.people.filter((y) => y !== x);
+    a.sessions = (a.sessions || []).filter((s) => s.person !== pid);
+    a.invites = (a.invites || []).filter((i) => i.person !== pid);
+    saveAccess(a);
+    const logf = logFile?.();
+    if (logf && existsSync(logf)) writeFileSync(logf, readFileSync(logf, 'utf8').split('\n').filter((l) => !l.includes(`"who":${JSON.stringify(x.name)}`)).join('\n'));
+    return out;
   }
 
   return async function app(req, res, url) {
@@ -216,17 +275,58 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
     }
     const user = verifyInitData(req.headers['x-tg-init'], token());
     if (!user) return json(401, {error: 'Откройте приложение из Телеграм-бота'});
-    const me = person(user);
+    const me = person(user, req.headers['x-as']);
     if (!me) return json(403, {error: 'Вас ещё не добавили в команду. Попросите у редактора приглашение.'});
-    const p = project();
+    // Which project: a test account's person works in it; the owner may open a test account (x-project).
+    const wanted = me.project || (me.realOwner && req.headers['x-project']) || null;
+    const p = wanted && /^test-[a-z0-9]+$/.test(wanted) && existsSync(join(PROJECTS, wanted)) ? wanted : project();
+    const pset = readJson(join(PROJECTS, p, 'settings.json'), {});
+    // The plan switches parts off: no reels — no «Студия»; no self-shooting — no «в кадре».
+    if (!planCan(pset, 'reels')) me.studio = false;
+    if (!planCan(pset, 'selfShoot')) me.onCamera = false;
     const t = tasks(p);
     const task = (tid) => t.tasks.find((x) => x.id === tid);
 
+    if (url.pathname === '/api/app/test') {
+      if (!me.realOwner) return json(403, {});
+      let tb = {};
+      if (req.method === 'POST') { let raw = ''; for await (const c of req) raw += c; try { tb = JSON.parse(raw || '{}'); } catch {} }
+      if (tb.action === 'create') {
+        const roles = {member: 'Участник', camera: 'Участник «в кадре»', builder: 'Участник «сам собирает»', deputy: 'Замещающий', editor: 'Редактор'};
+        if (!roles[tb.kind]) return json(400, {});
+        const a = access();
+        const pid = id();
+        const x = {id: pid, name: `Тест · ${roles[tb.kind]} · ${pid.slice(0, 4)}`, role: tb.kind === 'editor' ? 'editor' : 'member', added: Date.now(), test: true,
+          onCamera: tb.kind === 'camera', selfBuild: tb.kind === 'builder', ...(tb.kind === 'deputy' ? {deputyUntil: Date.now() + 14 * 864e5} : {})};
+        a.people.push(x);
+        saveAccess(a);
+        // Something to try at once: one task of their own (a filming one for «в кадре»).
+        t.tasks.push({...DEMO[x.onCamera ? 0 : 1], id: id(), status: 'todo', to: pid});
+        saveTasks(p, t);
+        log?.(me.name, `создал тестовый профиль «${x.name}»`);
+        return json(200, {tests: testList()});
+      }
+      if (tb.action === 'delete') {
+        const done = wipeTest(p, tb.id);
+        if (!done) return json(404, {});
+        log?.(me.name, `удалил тестовый профиль «${done.name}» и его данные`);
+        return json(200, {tests: testList(), wiped: done});
+      }
+      return json(200, {tests: testList()});
+    }
+    if (url.pathname === '/api/app/sandbox') {
+      if (!me.realOwner || !sandboxPaths) return json(403, {});
+      let sb = {};
+      if (req.method === 'POST') { let raw = ''; for await (const c of req) raw += c; try { sb = JSON.parse(raw || '{}'); } catch {} }
+      if (sb.action === 'create') { try { const slug = createSandbox(sandboxPaths, {mode: sb.mode, plan: sb.plan}); log?.(me.name, `создал тестовый аккаунт в мини-приложении`); return json(200, {slug, list: listSandboxes(sandboxPaths)}); } catch { return json(400, {}); } }
+      if (sb.action === 'delete') { const r = removeSandbox(sandboxPaths, String(sb.slug || '')); if (!r) return json(404, {}); log?.(me.name, `удалил тестовый аккаунт «${r.name}» со всеми данными`); return json(200, {removed: r, list: listSandboxes(sandboxPaths)}); }
+      return json(200, {list: listSandboxes(sandboxPaths)});
+    }
     if (req.method === 'GET' && url.pathname === '/api/app/state') {
       const prof = profiles(p)[me.key] || {};
       const mine = reels(p).map((r) => ({id: r.id, title: r.title, status: r.status, version: r.version, updated: r.updated}));
       // A task for one person (to) is shown to them only; one without «to» to everyone.
-      return json(200, {me: {name: me.name, role: me.role, editor: !!me.editor, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera, studio: !!me.studio}, project: p, ...(me.editor ? {plan: weekOf(p), people: peopleOf(t)} : {}), week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
+      return json(200, {account: {slug: p, name: pset.name || p, test: !!pset.test, ...planAccess(pset)}, sandboxes: me.realOwner && sandboxPaths ? listSandboxes(sandboxPaths) : undefined, tests: me.realOwner ? testList() : undefined, me: {test: !!me.test, name: me.name, role: me.role, editor: !!me.editor, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera, studio: !!me.studio}, project: p, ...(me.editor ? {plan: weekOf(p), people: peopleOf(t, p)} : {}), week: t.week, due: t.due, demo: !!t.seeded, tasks: t.tasks.filter((x) => !x.to || x.to === me.key || me.key === 'owner'), reels: mine,
         profile: {langs: 'русский, английский', when: 'вт и чт после 15:00', where: 'кабинет 204, у окна', speed: 1, size: 'large', consent: true, ...prof}});
     }
     let b = {};
@@ -271,6 +371,7 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
       appendFileSync(join(PROJECTS, p, 'inbox', 'history.md'), `- ${new Date().toISOString()} (mini app, ${me.name}, задание «${x.title}») ${file}\n`);
       x.status = 'sent';
       x.sentAt = Date.now();
+      x.sentBy = me.name;
       x.take = file.slice(PROJECTS.length + 1);
       delete x.note;
       saveTasks(p, t);
