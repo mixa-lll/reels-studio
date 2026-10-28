@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Съёмка</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--page:#F3F3F5;--card:#fff;--ink:#171717;--soft:#525252;--mut:#6B6B6B;--line:#EBEBEB;--sec2:#F1F1F2;--acc:#2F6FEB;--tint:#EEF3FE;--ok:#2E8A4F;--warn:#8F5C12;--bad:#C2362B;
@@ -249,6 +248,21 @@ h1.t2{font-size:22px;line-height:28px}
 .crow{display:flex;gap:8px}.crow textarea{min-height:76px;font-size:16px;line-height:23px}
 .micb{width:56px;flex:none;border-radius:14px;border:1px solid var(--line);background:var(--sec2);color:var(--ink);display:grid;place-items:center}
 .micb.rec{background:var(--r);color:#fff;border-color:transparent}
+
+/* ---- Telegram-native for the role screens too (Сегодня, Неделя, Люди, Студия, чат, новый ролик):
+   blue accent instead of black, flat cards, the phone's own font everywhere. ---- */
+.cam,textarea,input.f{font-family:-apple-system,"SF Pro Text",system-ui,Roboto,"Segoe UI",sans-serif}
+textarea{font-weight:400;font-size:17px;line-height:24px;border-radius:12px}
+input.f{font-weight:400;border-radius:10px}
+.vcard,.rub,.lay,.sc,.bub.bot,.drop{box-shadow:none;border-radius:12px}
+.vact .pri,.bub.me,.cbar .snd,.mk button.on,.lay .n,.selbtn,.act span{background:var(--btn);color:#fff}
+.act.alt span{background:var(--sec2);color:var(--acc)}
+.vact button,.vact a,.mk button,.micb{background:var(--sec2);color:var(--acc);border-color:transparent}
+.rub.on{border-color:var(--acc)}
+.estg button.on{color:var(--acc);border-color:var(--acc)}
+.tl .run{background:var(--acc)}
+.bub{border-radius:16px}
+.cbar{background:var(--card);box-shadow:0 -.5px 0 var(--line)}
 </style>
 </head>
 <body>
