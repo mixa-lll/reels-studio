@@ -51,7 +51,7 @@ const T = {
     fresh: '🆕 Следующее сообщение начнёт новую сессию. Что важно — сохраню перед этим.',
     unfinished: '🗂 Незаконченные рилсы — выбери, к какому вернуться:',
     hint: 'Или напиши / надиктуй свой вариант',
-    private: 'Это личный бот. Свой можно поставить: github.com/mixa-lll/reels-studio',
+    private: 'Это бот команды. Если вас пригласили — пришлите сюда 6 цифр из приглашения. Свой бот можно поставить: github.com/mixa-lll/reels-studio',
     conflict: '⚠️ С этим же ключом Telegram запущен ещё один бот (на другом компьютере?). Пока он работает, я не получаю сообщения. Останови второй или попроси агента выпустить новый ключ.',
     confirmOnComputer: '👋 Привет! Подтверди на компьютере, в окне установки, что это ты, — и начнём.',
     tooBig: (what, size) => `⚠️ ${what} весит ${size} — Telegram не даёт ботам скачивать файлы больше 20 МБ. Пришли его обычным видео/фото (не «файлом» — Telegram сам сожмёт) или ссылкой на Google Диск / Яндекс Диск.`,
@@ -98,7 +98,7 @@ const T = {
     fresh: '🆕 The next message starts a new session. What matters is saved first.',
     unfinished: '🗂 Unfinished reels — pick one to get back to:',
     hint: 'Or type / dictate your own',
-    private: 'This is a personal bot. Get your own: github.com/mixa-lll/reels-studio',
+    private: 'This is a team bot. If you were invited, send the 6-digit code from the invite here. Get your own: github.com/mixa-lll/reels-studio',
     conflict: '⚠️ Another copy of this bot runs with the same Telegram key (another computer?). While it runs I get no messages. Stop it or ask the agent for a new key.',
     confirmOnComputer: '👋 Hi! Confirm on your computer, in the setup window, that this is you — and we start.',
     tooBig: (what, size) => `⚠️ The ${what} is ${size} — Telegram does not let bots download files over 20 MB. Send it as a regular video/photo (not as a file, Telegram compresses it) or as a Google Drive / Dropbox link.`,
@@ -946,7 +946,8 @@ async function onMessage(msg) {
   // Team members (bot/members.mjs) talk to the same agent, one person at a time.
   const who = msg.from.id === state.ownerId ? null : member(msg.from.id);
   if (msg.from.id !== state.ownerId && !who) {
-    const code = msg.text?.match(/^\/start\s+inv_(\S+)/)?.[1];
+    // The invite link sends «/start inv_<code>»; by hand people type the 6-digit code.
+    const code = msg.text?.match(/^\/start\s+inv_(\S+)/)?.[1] || msg.text?.trim().replace(/\s+/g, '').match(/^(?:inv_)?(\d{6}|[\w-]{20,})$/)?.[1];
     const joined = code && claimInvite(code, msg.from, msg.chat.id);
     if (joined?.role === 'author') return author.welcome(msg.chat.id, msg.from, joined.name, state.ownerName).catch((e) => console.error('author', e));
     if (joined) return tg.sendText(msg.chat.id, joined.role === 'editor' ? TEAM.welcome(joined.name) : TEAM.viewer).catch(() => {});

@@ -52,7 +52,7 @@ export function touch(telegramId) {
 export function claim(code, from, chatId) {
   if (!FILE || !existsSync(FILE)) return null;
   const a = load();
-  const inv = a.invites.find((x) => x.code === code && x.telegram && x.expires > Date.now() && !x.claimed?.includes('telegram'));
+  const inv = a.invites.find((x) => (x.code === code || x.pin === code) && x.telegram && x.expires > Date.now() && !x.claimed?.includes('telegram'));
   if (!inv) return null;
   let person = a.people.find((x) => x.id === inv.person);
   if (!person) {
