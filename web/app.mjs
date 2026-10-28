@@ -318,7 +318,15 @@ export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, sandb
       if (!me.realOwner || !sandboxPaths) return json(403, {});
       let sb = {};
       if (req.method === 'POST') { let raw = ''; for await (const c of req) raw += c; try { sb = JSON.parse(raw || '{}'); } catch {} }
-      if (sb.action === 'create') { try { const slug = createSandbox(sandboxPaths, {mode: sb.mode, plan: sb.plan}); log?.(me.name, `создал тестовый аккаунт в мини-приложении`); return json(200, {slug, list: listSandboxes(sandboxPaths)}); } catch { return json(400, {}); } }
+      if (sb.action === 'create') {
+        const slug = createSandbox(sandboxPaths);
+        log?.(me.name, 'создал тестовый аккаунт в мини-приложении');
+        // The first visit happens in the bot chat: a button there switches to the account and starts the onboarding.
+        const st = botState(), chatId = st.chatId || owners()[0];
+        if (chatId && token()) fetch(`${process.env.REELS_TELEGRAM_API || 'https://api.telegram.org'}/bot${token()}/sendMessage`, {method: 'POST', headers: {'content-type': 'application/json'}, signal: AbortSignal.timeout(30_000),
+          body: JSON.stringify({chat_id: chatId, text: '🧪 Тестовый аккаунт создан — как будто вы новый клиент. Нажмите, и я начну знакомство: спрошу о проекте и соберу стратегию.', reply_markup: {inline_keyboard: [[{text: '▶ Начать как новый клиент', callback_data: `tst:go:${slug}`}]]}})}).catch(() => {});
+        return json(200, {slug, list: listSandboxes(sandboxPaths)});
+      }
       if (sb.action === 'delete') { const r = removeSandbox(sandboxPaths, String(sb.slug || '')); if (!r) return json(404, {}); log?.(me.name, `удалил тестовый аккаунт «${r.name}» со всеми данными`); return json(200, {removed: r, list: listSandboxes(sandboxPaths)}); }
       return json(200, {list: listSandboxes(sandboxPaths)});
     }

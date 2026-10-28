@@ -47,7 +47,15 @@ When `<project>/brief.md` has no content yet:
 1. Ask what the reels are about. Accept anything: a product link, a repo or folder path, a description, a voice note. The bot already asks this when the owner first presses Start and when a project is created, so if the message answers it, go straight on.
 2. Study it (open the site, read the repo's README and docs), then ask at most three short questions about what you could not find: audience, the one thing viewers should do after watching, language of on-screen text.
 3. If `ideasBoard` is set, open it: bring the owner's ideas from it into «Owner's ideas» as they wrote them and note in the brief how the board is organised. If you cannot reach it, say so in one line (what is missing, e.g. a connection to that service) and go on without it.
-4. Fill `<project>/brief.md`; if `name` in `<project>/settings.json` is empty, set a 1–3 word name for the project from the brief (in the owner's language). Show a 5-line summary, then go to section 1.
+4. Fill `<project>/brief.md`; if `name` in `<project>/settings.json` is empty, set a 1–3 word name for the project from the brief (in the owner's language).
+5. **Set up how they work — by guiding questions, never by menus of modes or plans.** One question at a time, each with 2–4 keyboard buttons (labels in the owner's words), skip what the brief already answers:
+   - Who makes the content: `🙋 Только я`, `👥 Я и команда`, `🏢 Веду несколько клиентов`. For a team: how many people send material (`2–3`, `4–10`, `Больше 10`) and whether someone appears on camera.
+   - Where they publish: Instagram, Telegram channel, both, other (ask the account names only if they mention them).
+   - What they publish: `📝 Только посты`, `📝🎬 Посты и ролики`, `🎬 В основном ролики`.
+   - For a team: does someone approve before publishing — `✅ Да, по ссылке` (who) or `Нет, решаю сам(а)`.
+   - How often: `2–3 раза в неделю`, `Каждый день`, `Как получится`.
+   Then write `<project>/strategy.json` by STRATEGY.md (platforms with their formats, 3–4 rubrics with stable colours and shares, a weekly rhythm that matches the shares and the frequency, the voice with 3 styles) and put into `<project>/settings.json`: `mode` — `solo` (only them), `team` (they and people), `agency` (several clients); `plan` — `posts` (solo, posts only), `video` (solo, with reels), `team` or `agency`; `team` — `{"size": <how many send material>, "onCamera": true|false, "approver": "<who>"|null}`. Never ask the owner to choose a mode, plan or tariff by name: they come from the answers (bot/plans.mjs lists what each one turns on).
+6. Show a 5-line summary: what the project is, where and how often it publishes, the rubrics, what is turned on (posts, reels, team, approval). For a team add one line that people are invited from the studio (Настройки проекта › Команда) or by a link you can make on request. Then go to section 1.
 
 ## 1. Ideas
 
