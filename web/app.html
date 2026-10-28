@@ -9,9 +9,9 @@
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--page:#F3F3F5;--card:#fff;--ink:#171717;--soft:#525252;--mut:#6B6B6B;--line:#EBEBEB;--sec2:#F1F1F2;--acc:#2F6FEB;--tint:#EEF3FE;--ok:#2E8A4F;--warn:#8F5C12;--bad:#C2362B;
---g:#22A55B;--v:#8B5CF6;--a:#F59E0B;--b:#2F6FEB;--r:#EF4444;--btnbg:linear-gradient(180deg,#2B2B2B,#171717);--btnt:#fff;--shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.06)}
+--tile:#F2F2F2;--tileInk:#404040;--g:#22A55B;--v:#8B5CF6;--a:#F59E0B;--b:#2F6FEB;--r:#EF4444;--btnbg:linear-gradient(180deg,#2B2B2B,#171717);--btnt:#fff;--shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.06)}
 .dark{--page:#1C1C1F;--card:#26262A;--ink:#E4E4E7;--soft:#C2C2C7;--mut:#9A9AA1;--line:#38383D;--sec2:#323237;--acc:#86A9EE;--tint:#24304A;--ok:#79C493;--warn:#D8AE6A;--bad:#E4948B;
---g:#5FC48A;--v:#A78BFA;--a:#E5B062;--b:#86A9EE;--r:#E4948B;--btnbg:linear-gradient(180deg,#4A7BE6,#3A68D0);--btnt:#fff;--shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25)}
+--tile:#34343A;--tileInk:#D4D4D8;--g:#5FC48A;--v:#A78BFA;--a:#E5B062;--b:#86A9EE;--r:#E4948B;--btnbg:linear-gradient(180deg,#4A7BE6,#3A68D0);--btnt:#fff;--shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25)}
 html,body{margin:0;background:var(--page);color:var(--ink);font-family:Manrope,system-ui,sans-serif;letter-spacing:-0.005em;-webkit-font-smoothing:antialiased}
 body{min-height:100vh}
 button{font-family:inherit;cursor:pointer}
@@ -259,6 +259,7 @@ const I = {
   list:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/>',
   film:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M10 8.5v7l6-3.5z"/>',
   user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/>',
   video:'<path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"/><rect x="2" y="6" width="14" height="12" rx="3"/>',
   chev:'<path d="m9 18 6-6-6-6"/>', check:'<path d="M20 6 9 17l-5-5"/>', x:'<path d="M18 6 6 18M6 6l12 12"/>',
   pen:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
@@ -277,7 +278,13 @@ const $ = (s) => document.querySelector(s);
 const haptic = (k = 'light') => { try { k === 'ok' ? tg.HapticFeedback.notificationOccurred('success') : tg.HapticFeedback.impactOccurred(k); } catch {} };
 const root = $('#root');
 
-let S = null, tab = ['studio', 'reels', 'profile'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tasks', stack = [];
+let S = null, tab = location.hash.slice(1).split('&')[0], stack = [];
+const isEd = () => !!S?.me.editor;
+// One bottom menu per role (ROADMAP «Вид мини-приложения»): a member — Задания · Моё · Профиль;
+// an editor or a deputy — Сегодня · Неделя · Люди · Профиль. «Студия» lives in «Сегодня» for
+// editors and in «Моё» for members marked «Сам собирает».
+const TABS = () => isEd() ? [['today', 'spark', 'Сегодня'], ['week', 'cal', 'Неделя'], ['people', 'users', 'Люди'], ['profile', 'user', 'Профиль']] : [['tasks', 'list', 'Задания'], ['mine', 'film', 'Моё'], ['profile', 'user', 'Профиль']];
+const fixTab = () => { const old = {reels: 'mine', studio: isEd() ? 'today' : 'mine'}; tab = old[tab] || tab; if (!TABS().some(([k]) => k === tab)) tab = TABS()[0][0]; };
 async function api(path, opts = {}) {
   const r = await fetch(path, {...opts, headers: {'x-tg-init': tg?.initData || '', ...(opts.json ? {'content-type': 'application/json'} : {}), ...(opts.headers || {})}, body: opts.json ? JSON.stringify(opts.json) : opts.body});
   const b = await r.json().catch(() => ({}));
@@ -294,10 +301,11 @@ const backBtn = () => { try { stack.length ? tg.BackButton.show() : tg.BackButto
 function go(screen, arg) { stack.push({screen, arg}); haptic(); draw(); }
 function back() { stack.pop(); draw(); }
 function tabs() {
-  const T = [['tasks','list','Задания'], ...(S.me.studio ? [['studio','wand','Студия']] : []), ['reels','film','Мои ролики'],['profile','user','Профиль']];
+  const T = TABS();
   return `<nav class="tabs" aria-label="Разделы">${T.map(([k, i, l]) => `<button class="tab${tab === k ? ' on' : ''}" data-tab="${k}"><span class="ib">${ic(i)}</span>${l}</button>`).join('')}</nav>`;
 }
-const tint = (v) => `background:color-mix(in srgb,var(${v}) 14%,transparent);color:var(${v})`;
+// Row icons are grey (plate #F2F2F2, glyph #404040): colour means a rubric and nothing else.
+const tint = () => 'background:var(--tile);color:var(--tileInk)';
 const taskText = (t) => t.edit?.text || t.text;
 const left = () => S.tasks.filter((t) => t.status !== 'sent');
 
@@ -305,7 +313,8 @@ function draw() {
   backBtn();
   window.scrollTo(0, 0);
   const top = stack.at(-1);
-  if (!top) return ({tasks: drawTasks, studio: S.me.studio ? drawStudio : drawTasks, reels: drawReels, profile: drawProfile})[tab]();
+  fixTab();
+  if (!top) return ({tasks: drawTasks, today: drawToday, week: drawWeek, people: drawPeople, mine: drawMine, profile: drawProfile})[tab]();
   return ({task: drawTask, edit: drawEdit, parts: drawParts, review: drawReview, done: drawDone, ed: drawEd, mark: drawMark, comments: drawComments, new1: drawNew1, new2: drawNew2, lay: drawLay, chat: drawChat})[top.screen](top.arg);
 }
 
@@ -315,23 +324,25 @@ function drawTasks() {
   const hour = new Date().getHours(), hi = hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
   const day = new Date().toLocaleDateString('ru-RU', {weekday: 'long', day: 'numeric', month: 'long'});
   const next = redo[0] || todo[0];
-  const row = (t, st) => `<button class="li" data-task="${t.id}"><span class="ti" style="${tint(t.status === 'redo' ? '--r' : t.lang !== 'ru' ? '--g' : '--b')}">${ic(t.lang !== 'ru' ? 'globe' : 'video', 22)}</span><span class="tx"><b>${esc(t.title)}</b><span>${t.seconds} секунд${t.lang !== 'ru' ? ' · на английском' : ''}${t.status === 'redo' ? ' · ' + esc(t.note || '') : ''}</span></span>${st}${ic('chev', 20, 'var(--mut)', 2.5)}</button>`;
+  const row = (t, st) => `<button class="li" data-task="${t.id}"><span class="ti" style="${tint(t.status === 'redo' ? '--r' : t.lang !== 'ru' ? '--g' : '--b')}">${ic(t.lang !== 'ru' ? 'globe' : 'video', 22)}</span><span class="tx"><b>${esc(t.title)}</b><span>${t.seconds} секунд${t.lang !== 'ru' ? ' · на английском' : ''}${t.status === 'redo' ? ' · ' + esc(t.note || '') : ''}</span></span>${st || ic('chev', 20, 'var(--mut)', 2.5)}</button>`;
   root.innerHTML = `<div class="scr">
     ${S.demo ? '<span class="demo">Демо-задания — пока редактор не задал свои</span>' : ''}
     <div class="hero2"><span class="av">${esc(S.me.name[0] || '·')}</span>
       <div class="fig">${left().length ? `${left().length} ${plural(left().length, 'ролик', 'ролика', 'роликов')}` : 'Всё снято'}</div>
       <div class="cap">${left().length ? `${hi}, ${esc(S.me.name.split(' ')[0])} · около ${Math.max(3, left().length * 3)} минут, до ${esc(dueG(S.due))}` : 'Новые задания придут в понедельник'}</div>
       <div class="acts">
-        ${next ? `<button class="act" data-task="${next.id}"><span>${ic('video', 24)}</span>${redo.length ? 'Переснять' : 'Снимать'}</button>` : ''}
-        <button class="act alt" data-tab="reels"><span>${ic('film', 24)}</span>Ролики</button>
-        <button class="act alt" data-tab="profile"><span>${ic('user', 24)}</span>Профиль</button>
+        ${next && S.me.onCamera ? `<button class="act" data-task="${next.id}"><span>${ic('video', 24)}</span>${redo.length ? 'Переснять' : 'Снимать'}</button>` : ''}
+        <button class="act alt" id="drop"><span>${ic('upload', 24)}</span>Скинуть</button>
+        <button class="act alt" data-tab="mine"><span>${ic('film', 24)}</span>Моё</button>
       </div>
       <div class="cap" style="font-size:13px">Снято ${done} из ${all.length} · ${day}</div>
     </div>
     ${todo.length ? `<div class="lh">Надо снять · до ${esc(dueG(S.due))}</div><div class="grp">${todo.map((t) => row(t, '')).join('')}</div>` : ''}
     ${redo.length ? `<div class="lh">Попросили переснять</div><div class="grp">${redo.map((t) => row(t, '<span class="st b">переснять</span>')).join('')}</div>` : ''}
+    ${S.me.onCamera ? '' : '<p class="cap" style="margin-top:14px">Кнопки «Снимать» нет — отметки «в кадре» нет. Появится, когда редактор её поставит.</p>'}
     ${all.some((t) => t.status === 'sent') ? `<div class="lh">Отправлено</div><div class="grp">${all.filter((t) => t.status === 'sent').map((t) => row(t, '<span class="st o">отправлено</span>')).join('')}</div>` : ''}
   </div>${tabs()}`;
+  $('#drop')?.addEventListener('click', dropSheet);
 }
 // «до пятницы», not «до пятница»: the due day comes in the nominative.
 const dueG = (d) => ({понедельник: 'понедельника', вторник: 'вторника', среда: 'среды', четверг: 'четверга', пятница: 'пятницы', суббота: 'субботы', воскресенье: 'воскресенья'})[d] || d || 'пятницы';
@@ -792,10 +803,10 @@ function drawReels() {
   const sent = S.tasks.filter((t) => t.status === 'sent');
   const row = (title, sub, [st, c], icon, v, reel) => `<div class="li"><span class="ti" style="${tint(v)}">${ic(icon, 22)}</span><span class="tx"><b>${esc(title)}</b><span>${esc(sub)}</span>${reel ? `<button class="lk" style="height:34px;width:auto;justify-content:flex-start;padding:0;margin-top:2px;font-size:15px" data-ed="${esc(reel)}">${ic('pen', 16)}Открыть редактор</button>` : ''}</span><span class="st ${c}">${st}</span></div>`;
   root.innerHTML = `<div class="scr">
-    <h1 style="margin-top:10px">Мои ролики</h1><p class="sub">Записи, которые вы отправили, и ролики проекта</p>
+    <h1 style="margin-top:10px">Моё</h1><p class="sub">Что стало с тем, что вы прислали, и ролики проекта</p>
     ${sent.length ? `<div class="lh">Отправлены редактору</div><div class="grp">${sent.map((t) => row(t.title, new Date(t.sentAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}), ['отправлено', 'm'], 'upload', '--b')).join('')}</div>` : ''}
-    <div class="lh">Ролики проекта</div>
-    ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 8).map((r) => row(r.title, r.version ? `версия ${r.version.slice(1)}` : 'в работе', ST[r.status] || ST.none, r.status === 'published' || r.status === 'done' ? 'check' : 'film', r.status === 'published' || r.status === 'done' ? '--g' : '--v', S.me.studio && r.version ? r.id : null)).join('')}</div>` : '<p class="sub">Пока пусто — первые ролики появятся здесь.</p>'}
+    ${S.me.studio ? '' : `<div class="lh">Ролики проекта</div>
+    ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 8).map((r) => row(r.title, r.version ? `версия ${r.version.slice(1)}` : 'в работе', ST[r.status] || ST.none, r.status === 'published' || r.status === 'done' ? 'check' : 'film', r.status === 'published' || r.status === 'done' ? '--g' : '--v', S.me.studio && r.version ? r.id : null)).join('')}</div>` : '<p class="sub">Пока пусто — первые ролики появятся здесь.</p>'}`}
     <p class="cap" style="margin-top:14px">Скачать ролик или попросить убрать — скоро здесь. Пока — напишите редактору в чате.</p>
   </div>${tabs()}`;
 }
@@ -810,6 +821,85 @@ const openOf = () => E.edits.filter((x) => x.state === 'open');
 const countOf = (st) => openOf().filter((x) => (x.stage || 'video') === st).length;
 async function loadEd(id) { E = {id, stage: E?.id === id ? E.stage : 'video', ...(await api('/api/app/reel?id=' + encodeURIComponent(id)))}; }
 async function saveComment(b) { const r = await api('/api/app/reel/edits', {method: 'POST', json: {reel: E.id, action: 'add', ...b}}); E.edits = r.edits; haptic('ok'); }
+
+// The reels as chats (SR1): used in «Сегодня» (editor) and «Моё» (members who build).
+const reelRows = (list) => `<div class="grp">${list.map((r) => `<button class="li" data-reel="${esc(r.id)}"><span class="ti" style="${tint()}">${ic('film', 22)}</span><span class="tx"><b>${esc(r.title)}</b><span>${r.version ? `${r.version} готова` : 'ещё нет версии'}</span></span>${ic('chev', 20, 'var(--mut)', 2.5)}</button>`).join('')}</div>`;
+// «Скинуть»: photos and videos straight into the project's inbox, as when sent to the bot.
+function dropSheet() {
+  const el = document.createElement('div');
+  el.className = 'sheet';
+  el.innerHTML = `<div><span class="grab"></span><span class="lab">Скинуть материал</span><span class="sub" style="font-size:15px">Фото и видео уйдут редактору во «Входящие» — как если отправить боту.</span>
+    <label class="drop" style="margin-top:4px">${ic('upload', 28)}Выбрать фото и видео<input type="file" accept="image/*,video/*" multiple hidden id="dfl"></label><div class="ups" id="dups"></div><button class="lk" id="cn">Готово</button></div>`;
+  document.body.append(el);
+  const close = () => el.remove();
+  el.onclick = (e) => { if (e.target === el) close(); };
+  el.querySelector('#cn').onclick = close;
+  el.querySelector('#dfl').onchange = async (e) => {
+    for (const file of e.target.files) {
+      const box = document.createElement('div');
+      if (file.type.startsWith('image/')) box.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
+      box.innerHTML = '<span></span><i style="width:0"></i>';
+      el.querySelector('#dups').append(box);
+      await new Promise((ok) => {
+        const x = new XMLHttpRequest();
+        x.open('POST', `/api/app/drop?name=${encodeURIComponent(file.name)}`);
+        x.setRequestHeader('x-tg-init', tg?.initData || '');
+        x.upload.onprogress = (q) => q.lengthComputable && (box.querySelector('i').style.width = `${Math.round((100 * q.loaded) / q.total)}%`);
+        x.onloadend = () => { box.querySelector('span').textContent = x.status < 300 ? '✓' : '!'; box.querySelector('i')?.remove(); ok(); };
+        x.send(file);
+      });
+    }
+    haptic('ok');
+  };
+}
+const deputyLine = () => S.me.deputyUntil ? `<p class="cap" style="display:flex;gap:8px;align-items:baseline;margin:6px 4px 0"><span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex:none"></span>Замещаете редактора до ${esc(new Date(S.me.deputyUntil).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}))} — «Неделя» и «Люди» открыты на это время</p>` : '';
+const heroHead = (n, sub) => `<div class="hero2"><span class="av">${esc(S.me.name[0] || '·')}</span><div class="fig">${n}</div><div class="cap">${sub}</div>`;
+const today = () => new Date().toLocaleDateString('ru-RU', {weekday: 'long', day: 'numeric', month: 'long'});
+
+// «Сегодня» (M1, M4): the day's card, then the reels in work as chats, then one's own tasks.
+function drawToday() {
+  const review = S.reels.filter((r) => r.status === 'review');
+  const mine = left();
+  const n = review.length + mine.length;
+  root.innerHTML = `<div class="scr" style="padding-bottom:150px">${deputyLine()}
+    ${heroHead(n ? `${n} ${plural(n, 'дело', 'дела', 'дел')}` : 'Всё спокойно', `${esc(S.me.name.split(' ')[0])} · ${today()}`)}
+      <div class="acts"><button class="act" id="nr"><span>${ic('spark', 24)}</span>Новый ролик</button><button class="act alt" id="drop"><span>${ic('upload', 24)}</span>Скинуть</button>${mine.length ? `<button class="act alt" data-task="${mine[0].id}"><span>${ic('video', 24)}</span>Снять</button>` : ''}</div></div>
+    ${review.length ? `<div class="lh">Ждут решения</div><div class="grp">${review.map((r) => `<div class="li"><span class="ti" style="${tint()}">${ic('film', 22)}</span><span class="tx"><b>${esc(r.title)}</b><span>${r.version ? esc(r.version) + ' · ' : ''}у редактора</span></span><button class="lk" style="width:auto;height:36px;font-size:15px" data-reel="${esc(r.id)}">посмотреть</button></div>`).join('')}</div>` : ''}
+    <div class="lh">Выпуски · Студия</div>${S.reels.length ? reelRows(S.reels.slice(0, 12)) : '<p class="sub">Пока нет выпусков — начните «Новый ролик».</p>'}
+    ${mine.length ? `<div class="lh">Моё задание</div><div class="grp">${mine.map((t) => `<button class="li" data-task="${t.id}"><span class="ti" style="${tint()}">${ic('video', 22)}</span><span class="tx"><b>${esc(t.title)}</b><span>${t.seconds} секунд · до ${esc(dueG(S.due))}</span></span>${ic('chev', 20, 'var(--mut)', 2.5)}</button>`).join('')}</div>` : ''}
+  </div>${tabs()}`;
+  $('#nr').onclick = () => go('new1', {});
+  $('#drop').onclick = dropSheet;
+}
+
+// «Неделя» (LE1): this week by days; an empty rhythm slot asks to be filled.
+function drawWeek() {
+  const D = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const ST = {published: 'вышел', done: 'готов', review: 'согласование', work: 'готовится', none: 'готовится'};
+  const holes = S.plan.filter((d) => d.slot).length;
+  root.innerHTML = `<div class="scr" style="padding-bottom:110px">${deputyLine()}<h1 style="margin-top:10px">Неделя</h1><p class="sub">${holes ? `${holes} ${plural(holes, 'пустое место', 'пустых места', 'пустых мест')} в ритме` : 'По плану всё заполнено'}</p>
+    <div class="grp" style="margin-top:14px">${S.plan.map((d) => `<div class="li"><span class="ti" style="${tint()};flex-direction:column;font-size:12px;font-weight:700;line-height:14px">${D[d.day - 1]}<b style="font-size:16px">${d.date}</b></span><span class="tx">${d.items.length ? d.items.map((x) => `<b>${esc(x.title)}</b><span>${x.kind === 'reel' ? 'рилс' : 'пост'}${x.time ? ' · ' + esc(x.time) : ''}${x.status ? ' · ' + ST[x.status] : ''}</span>`).join('') : `<b style="color:var(--mut);font-weight:500">${d.slot ? 'Пусто' : '—'}</b>${d.slot ? '<span>заполнить из идей — в чате проекта</span>' : ''}</span>`}</span></div>`).join('')}</div>
+    <p class="cap" style="margin-top:12px">План и календарь целиком — в веб-студии.</p>
+  </div>${tabs()}`;
+}
+
+// «Люди» (LE2): tasks by person and who has been quiet.
+function drawPeople() {
+  const P = S.people || {tasks: [], quiet: []};
+  const ST = {sent: ['снято', 'o'], todo: ['ждём', 'm'], redo: ['переснять', 'b']};
+  root.innerHTML = `<div class="scr" style="padding-bottom:110px">${deputyLine()}<h1 style="margin-top:10px">Люди</h1><p class="sub">Задания и кто давно молчит</p>
+    <div class="lh">Задания · ${P.tasks.length}</div>${P.tasks.length ? `<div class="grp">${P.tasks.map((x) => `<div class="li"><span class="ti" style="${tint()}">${ic('user', 22)}</span><span class="tx"><b>${esc(x.who)} · ${esc(x.title)}</b><span>до ${esc(dueG(x.due))}</span></span><span class="st ${(ST[x.status] || ST.todo)[1]}">${(ST[x.status] || ST.todo)[0]}</span></div>`).join('')}</div>` : '<p class="sub">Личных заданий нет — их дают в веб-студии, «Задания людям».</p>'}
+    ${P.quiet.length ? `<div class="lh">Давно молчат</div><div class="grp">${P.quiet.map((x) => `<div class="li"><span class="ti" style="${tint()}">${ic('clock', 22)}</span><span class="tx"><b>${esc(x.name)}</b><span>${x.days} ${plural(x.days, 'день', 'дня', 'дней')} без материалов</span></span></div>`).join('')}</div>` : ''}
+  </div>${tabs()}`;
+}
+
+// «Моё» (M5): what happened with what I sent; for «Сам собирает» — my reels as chats and «Новый ролик».
+function drawMine() {
+  drawReels();
+  if (!S.me.studio) return;
+  $('.scr').insertAdjacentHTML('beforeend', `<div class="lh">Студия · выпуски</div>${S.reels.length ? reelRows(S.reels.slice(0, 12)) : ''}<button class="sb2" id="nr" style="margin-top:12px">${ic('spark', 22)}Новый ролик</button>`);
+  $('#nr').onclick = () => go('new1', {});
+}
 
 function drawStudio() {
   root.innerHTML = `<div class="scr"><h1 style="margin-top:10px">Студия</h1><p class="sub">Все выпуски — как чаты: версия, правки словами, редактор, скачать</p>
@@ -1178,7 +1268,7 @@ function drawProfile() {
   const p = S.profile;
   const kv = (k, icon, v, title, val) => `<div class="kv"><span class="ti" style="${tint(v)}">${ic(icon, 22)}</span><span class="tx"><b>${title}</b><span>${esc(val)}</span></span><button class="eb2" data-k="${k}" aria-label="Изменить: ${title}">${ic('pen', 18)}</button></div>`;
   root.innerHTML = `<div class="scr">
-    <div class="greet" style="margin-top:10px"><span class="av" style="width:56px;height:56px;font-size:21px">${esc(S.me.name[0] || '·')}</span><div><div style="font-size:22px;font-weight:700;letter-spacing:-0.02em">${esc(S.me.name)}</div><div class="d">${S.me.role === 'owner' ? 'владелец · ведёте сами' : 'ведущий'}</div></div></div>
+    <div class="greet" style="margin-top:10px"><span class="av" style="width:56px;height:56px;font-size:21px">${esc(S.me.name[0] || '·')}</span><div><div style="font-size:22px;font-weight:700;letter-spacing:-0.02em">${esc(S.me.name)}</div><div style="display:flex;gap:6px;margin-top:4px">${[S.me.editor ? 'редактор' : 'участник', S.me.role === 'owner' ? 'владелец' : '', S.me.deputyUntil ? 'замещает' : '', S.me.onCamera ? 'в кадре' : ''].filter(Boolean).map((x) => `<span style="background:#F0F0F0;color:#525252;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600">${x}</span>`).join('')}</div></div></div>
     <div class="note" style="margin-top:18px"><span class="lab">Лицо в кадре</span><span style="font-size:17px;line-height:24px">${p.consent === false ? 'Разрешение отозвано. Новые ролики с вами не собираем.' : 'Разрешено: Инстаграм и Телеграм проекта'}</span><span class="cap">Можно отозвать в любой момент — редактор узнает сразу.</span>
       <div style="display:flex;gap:8px;margin-top:4px"><button class="sb2" id="cons" style="height:44px;font-size:15px;${p.consent === false ? '' : 'color:var(--bad)'}">${p.consent === false ? 'Разрешить снова' : 'Отозвать'}</button></div></div>
     <div class="grp" style="margin-top:16px">
@@ -1222,7 +1312,7 @@ root.addEventListener('click', (e) => {
   const rl = e.target.closest('[data-reel]');
   if (rl && !stack.length) { E = null; return go('chat', {id: rl.dataset.reel}); }
   const ed = e.target.closest('[data-ed]');
-  if (ed && !stack.length) { E = null; tab = 'studio'; return go('ed', {id: ed.dataset.ed}); }
+  if (ed && !stack.length) { E = null; return go('ed', {id: ed.dataset.ed}); }
 });
 
 (async () => {
@@ -1233,7 +1323,7 @@ root.addEventListener('click', (e) => {
     S = await api('/api/app/state');
     // «✎ Открыть редактор» under a version in the bot chat opens /app?ed=<reel>.
     const ed = new URLSearchParams(location.search).get('ed');
-    if (ed && S.me.studio) { tab = 'studio'; stack = [{screen: 'ed', arg: {id: ed}}]; }
+    if (ed && S.me.studio) stack = [{screen: 'ed', arg: {id: ed}}];
     draw();
   }
   catch (e) { root.innerHTML = `<div class="err"><h1 class="t2">Не получилось открыть</h1><p class="sub">${esc(e.message)}</p></div>`; }
