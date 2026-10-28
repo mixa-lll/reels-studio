@@ -187,6 +187,23 @@ h1.t2{font-size:22px;line-height:28px}
 .act span{width:52px;height:52px;border-radius:50%;background:var(--btn);color:#fff;display:grid;place-items:center}
 .act.alt span{background:var(--sec2);color:var(--acc)}
 
+
+/* Т2: a new reel by the rubric's template (SR2, SR3) */
+.rub{display:flex;flex-direction:column;gap:8px;text-align:left;background:var(--card);box-shadow:var(--shadow);border-radius:18px;padding:16px;border:2px solid transparent;width:100%;color:var(--ink);margin-top:10px}
+.rub.on{border-color:var(--ink)}
+.rub b{font-size:18px;display:flex;align-items:center;gap:10px}.rub b i{width:12px;height:12px;border-radius:4px;flex:none}
+.rub .sub{font-size:15px;line-height:21px}
+.snum{display:flex;gap:4px;flex-wrap:wrap}.snum span{min-width:26px;height:26px;border-radius:8px;background:var(--sec2);font-size:12px;font-weight:700;display:grid;place-items:center;padding:0 6px}
+.drop{display:flex;flex-direction:column;align-items:center;gap:8px;border:2px dashed var(--line);border-radius:20px;padding:28px 16px;margin-top:16px;background:var(--card);color:var(--ink);width:100%;font-size:17px;font-weight:600}
+.ups{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+.ups div{aspect-ratio:1;border-radius:12px;background:var(--sec2) center/cover;position:relative;overflow:hidden}
+.ups div i{position:absolute;left:0;bottom:0;height:4px;background:var(--acc)}
+.ups div span{position:absolute;inset:0;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff;background:rgba(0,0,0,.35)}
+.lay{display:flex;gap:12px;align-items:center;background:var(--card);box-shadow:var(--shadow);border-radius:16px;padding:10px;margin-top:8px}
+.lay .th{width:54px;height:72px;border-radius:10px;background:var(--sec2) center/cover;flex:none;display:grid;place-items:center;color:var(--mut)}
+.lay.miss{box-shadow:none;border:2px dashed #F5B700;background:transparent}
+.lay.skip{opacity:.45}
+.lay .n{width:24px;height:24px;border-radius:50%;background:var(--ink);color:var(--card);font-size:12px;font-weight:700;display:grid;place-items:center;flex:none}
 /* «Студия»: the reel editor (SE1–SE5) */
 .estg{display:flex;gap:6px;margin:14px 0 4px;border-bottom:1px solid var(--line)}
 .estg button{flex:1;height:44px;border:0;background:none;color:var(--mut);font-size:16px;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -273,7 +290,7 @@ function draw() {
   window.scrollTo(0, 0);
   const top = stack.at(-1);
   if (!top) return ({tasks: drawTasks, studio: S.me.studio ? drawStudio : drawTasks, reels: drawReels, profile: drawProfile})[tab]();
-  return ({task: drawTask, edit: drawEdit, parts: drawParts, review: drawReview, done: drawDone, ed: drawEd, mark: drawMark, comments: drawComments})[top.screen](top.arg);
+  return ({task: drawTask, edit: drawEdit, parts: drawParts, review: drawReview, done: drawDone, ed: drawEd, mark: drawMark, comments: drawComments, new1: drawNew1, new2: drawNew2, lay: drawLay})[top.screen](top.arg);
 }
 
 // ---------- Задания ----------
@@ -782,7 +799,8 @@ function drawStudio() {
   root.innerHTML = `<div class="scr"><h1 style="margin-top:10px">Студия</h1><p class="sub">Смотрите версию и останавливайте в любой момент — Claude соберёт следующую по вашим комментариям</p>
     <div class="lh">Выпуски</div>
     ${S.reels.length ? `<div class="grp">${S.reels.slice(0, 20).map((r) => `<button class="li" data-reel="${esc(r.id)}"><span class="ti" style="${tint('--v')}">${ic('film', 22)}</span><span class="tx"><b>${esc(r.title)}</b><span>${r.version ? `версия ${r.version.slice(1)}` : 'ещё нет версии'}</span></span>${ic('chev', 20)}</button>`).join('')}</div>` : '<p class="sub">Пока нет выпусков.</p>'}
-  </div>${tabs()}`;
+  </div><div class="foot tabbed"><button class="bb" id="newReel">${ic('spark', 22)}Новый ролик</button></div>${tabs()}`;
+  $('#newReel').onclick = () => go('new1', {});
 }
 
 async function drawEd({id}) {
@@ -794,11 +812,13 @@ async function drawEd({id}) {
   const st = [['script', 'Сценарий'], ['scenes', 'Сцены'], ['video', 'Ролик']];
   root.innerHTML = `<div class="scr" style="padding-bottom:170px">
     <span class="d">${E.version ? `Смотрю ${esc(E.version)}` : 'Версии ещё нет'}</span><h1 class="t2" style="margin-top:2px">${esc(E.reel?.title || id)}</h1>
+    ${E.layout ? `<button class="sb2" style="height:44px;font-size:15px;margin-top:8px" id="toLay">${ic('list', 18)}Сцены шаблона «${esc(E.layout.name)}»${E.working ? ' · Claude работает…' : ''}</button>` : ''}
     <div class="estg" role="tablist">${st.map(([k, l]) => `<button role="tab" data-st="${k}" class="${E.stage === k ? 'on' : ''}">${l}${countOf(k) ? `<i>${countOf(k)}</i>` : ''}</button>`).join('')}</div>
     <div id="stage"></div>
   </div><div class="foot"><button class="bb" id="cms" ${n ? '' : 'disabled'}>${ic('msg', 22)}${n ? `Комментарии · ${n} → собрать ${esc(E.nextV)}` : 'Комментариев пока нет'}</button></div>`;
   root.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => { E.stage = b.dataset.st; haptic(); drawEd({id}); }));
   $('#cms').onclick = () => go('comments', {id});
+  $('#toLay')?.addEventListener('click', () => go('lay', {id}));
   ({script: stageScript, scenes: stageScenes, video: stageVideo})[E.stage]($('#stage'));
 }
 
@@ -989,6 +1009,110 @@ async function drawComments({id}) {
     try { const r = await api('/api/app/reel/build', {method: 'POST', json: {reel: id}}); E.edits = r.edits; haptic('ok'); drawComments({id}); }
     catch (e) { $('#build').disabled = false; alert(e.message); }
   });
+}
+
+
+// ---------- Студия: новый ролик по шаблону рубрики (Т2: SR2, SR3; TEMPLATES.md) ----------
+let NEW = null;
+async function drawNew1() {
+  if (!NEW?.rubrics) {
+    root.innerHTML = '<div class="scr center"><p class="sub" style="margin-top:80px">Загружаем рубрики…</p></div>';
+    try { NEW = {...(await api('/api/app/rubrics')), pick: null, tpl: null, title: ''}; } catch (e) { root.innerHTML = `<div class="err"><h1 class="t2">Не открылось</h1><p class="sub">${esc(e.message)}</p></div>`; return; }
+  }
+  const T = (id) => NEW.templates.find((x) => x.id === id);
+  const nums = (t) => `<div class="snum">${t.scenes.map((x, i) => `<span>${x.lock ? '🔒' : i + 1}${x.repeat ? '…' : ''}</span>`).join('')}</div>`;
+  const rub = NEW.rubrics.find((x) => x.id === NEW.pick);
+  const tpl = T(NEW.tpl || rub?.template);
+  root.innerHTML = `<div class="scr" style="padding-bottom:170px"><span class="d">новый ролик · шаг 1 из 3</span><h1 class="t2" style="margin-top:2px">Какая рубрика?</h1>
+    <p class="sub">У каждой — свой шаблон. По нему Claude разложит ваш материал.</p>
+    <input class="f" id="ttl" style="margin-top:14px" placeholder="О чём ролик — по желанию" value="${esc(NEW.title)}" aria-label="О чём ролик">
+    ${NEW.rubrics.map((x) => { const t = T(x.template); return `<button class="rub ${NEW.pick === x.id ? 'on' : ''}" data-rub="${esc(x.id)}"><b><i style="background:${esc(x.color || '#A3A3A3')}"></i>${esc(x.name)}</b><span class="sub">${t ? `шаблон «${esc(t.name)}» · ${esc(t.about)}` : 'шаблона нет — выберите ниже'}</span>${t ? nums(t) : ''}</button>`; }).join('')}
+    ${rub && !rub.template || !NEW.rubrics.length ? `<div class="lh">Шаблон</div><div class="opt">${NEW.templates.map((t) => `<button data-tpl="${esc(t.id)}" class="${NEW.tpl === t.id ? 'on' : ''}">${esc(t.name)}</button>`).join('')}</div>${tpl ? `<p class="cap" style="margin-top:8px">${esc(tpl.about)} · подходит для: ${esc(tpl.fits)}</p>` : ''}` : ''}
+  </div><div class="foot"><button class="bb" id="nx" ${tpl ? '' : 'disabled'}>${tpl ? `Дальше: шаблон «${esc(tpl.name)}»` : NEW.pick ? 'Выберите шаблон' : 'Выберите рубрику'}</button></div>`;
+  $('#ttl').oninput = (e) => { NEW.title = e.target.value; };
+  root.querySelectorAll('[data-rub]').forEach((b) => (b.onclick = () => { NEW.pick = b.dataset.rub; NEW.tpl = null; haptic(); drawNew1(); }));
+  root.querySelectorAll('[data-tpl]').forEach((b) => (b.onclick = () => { NEW.tpl = b.dataset.tpl; haptic(); drawNew1(); }));
+  $('#nx').onclick = async () => {
+    $('#nx').disabled = true;
+    try { const r = await api('/api/app/new', {method: 'POST', json: {rubric: NEW.pick, template: NEW.tpl || undefined, title: NEW.title}}); NEW.id = r.id; NEW.files = []; S.reels.unshift({id: r.id, title: NEW.title || tpl.name, version: null}); go('new2', {id: r.id, tpl: tpl.name}); }
+    catch (e) { $('#nx').disabled = false; alert(e.message); }
+  };
+}
+
+// One file to the reel's materials, with progress (fetch has none for uploads).
+function upFile(id, file, onp) {
+  return new Promise((ok, fail) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', `/api/app/reel/upload?id=${encodeURIComponent(id)}&name=${encodeURIComponent(file.name)}`);
+    x.setRequestHeader('x-tg-init', tg?.initData || '');
+    x.upload.onprogress = (e) => e.lengthComputable && onp(e.loaded / e.total);
+    x.onload = () => (x.status < 300 ? ok(JSON.parse(x.responseText)) : fail(new Error(JSON.parse(x.responseText || '{}').error || 'Не загрузилось')));
+    x.onerror = () => fail(new Error('Нет связи'));
+    x.send(file);
+  });
+}
+
+// SR3, step 2: throw in everything at once — photos, takes, screenshots.
+function drawNew2({id, tpl}) {
+  const files = NEW?.id === id ? NEW.files : [];
+  root.innerHTML = `<div class="scr" style="padding-bottom:190px"><span class="d">«${esc(tpl || '')}» · шаг 2 из 3</span><h1 class="t2" style="margin-top:2px">Накидайте материал</h1>
+    <p class="sub">Все фото и видео разом — Claude сам разложит их по сценам и скажет, чего не хватает.</p>
+    <label class="drop">${ic('upload', 30)}Добавить фото и видео<span class="cap">можно сразу много · до 300 МБ каждый</span><input type="file" id="fl" accept="image/*,video/*" multiple hidden></label>
+    <div class="ups" id="ups">${files.map((f) => `<div style="${f.url ? `background-image:url(${f.url})` : ''}"><span>${f.done ? '✓' : ''}</span></div>`).join('')}</div>
+    <textarea id="nt" style="margin-top:14px;min-height:80px;font-size:16px;line-height:23px" placeholder="Что важно — суммы, порядок, что на каком фото (по желанию)" aria-label="Пояснение"></textarea>
+  </div><div class="foot"><button class="bb" id="go" ${files.some((f) => f.done) ? '' : 'disabled'}>${ic('spark', 22)}Разложить по сценам</button></div>`;
+  $('#fl').onchange = async (e) => {
+    const list = [...e.target.files];
+    const ups = $('#ups');
+    for (const file of list) {
+      const item = {name: file.name, url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null, done: false};
+      files.push(item);
+      const el = document.createElement('div');
+      if (item.url) el.style.backgroundImage = `url(${item.url})`;
+      el.innerHTML = `<span>${file.type.startsWith('video/') ? '▶' : ''}</span><i style="width:0"></i>`;
+      ups.append(el);
+      try { await upFile(id, file, (q) => { el.querySelector('i').style.width = `${Math.round(q * 100)}%`; }); item.done = true; el.querySelector('span').textContent = '✓'; el.querySelector('i').remove(); }
+      catch (er) { el.querySelector('span').textContent = '!'; alert(`${file.name}: ${er.message}`); }
+      $('#go').disabled = !files.some((f) => f.done);
+    }
+    e.target.value = '';
+  };
+  $('#go').onclick = async () => {
+    $('#go').disabled = true;
+    try { await api('/api/app/reel/layout', {method: 'POST', json: {reel: id, note: $('#nt').value}}); stack.pop(); stack.pop(); E = null; go('lay', {id}); }
+    catch (e) { $('#go').disabled = false; alert(e.message); }
+  };
+}
+
+// SR3, step 3: the template's scenes with the material laid out; what is missing; «Собрать v1».
+let layTimer = null;
+async function drawLay({id}) {
+  clearTimeout(layTimer);
+  try { await loadEd(id); } catch (e) { root.innerHTML = `<div class="err"><h1 class="t2">Не открылось</h1><p class="sub">${esc(e.message)}</p></div>`; return; }
+  const L = E.layout;
+  const sc = L?.scenes || [];
+  const miss = sc.filter((x) => x.need && !x.skip);
+  const working = E.working;
+  root.innerHTML = `<div class="scr" style="padding-bottom:200px"><span class="d">«${esc(L?.name || '')}» · шаг 3 из 3</span><h1 class="t2" style="margin-top:2px">Материал по сценам</h1>
+    <p class="sub">${working ? 'Claude смотрит материал и раскладывает по сценам…' : !sc.length ? 'Сцен пока нет — разложите материал.' : miss.length ? `Не хватает: ${miss.map((x) => x.label.toLowerCase()).join(', ')}.` : 'Всё на месте — можно собирать.'}</p>
+    ${sc.map((x, i) => `<div class="lay ${x.need ? 'miss' : ''} ${x.skip ? 'skip' : ''}"><span class="n">${i + 1}</span><span class="th" style="${x.media && !x.video ? `background-image:url(${x.media})` : ''}">${x.video ? ic('video', 20) : x.lock ? '🔒' : x.need ? '+' : ''}</span>
+      <span class="tx"><b style="font-size:16px">${esc(x.label)}${x.amount != null ? ` · ${esc(x.amount.toLocaleString('ru-RU'))}` : ''}</b><span>${esc(x.need ? `нужно: ${x.need}` : x.lock ? 'из шаблона' : x.text || '')}${x.dur ? ` · ${x.dur} с` : ''}</span></span>
+      ${x.need && !working ? `<label class="lk" style="width:auto;height:36px;font-size:15px">добавить<input type="file" accept="image/*,video/*" multiple hidden data-add></label>` : ''}</div>`).join('')}
+    ${working ? '<p class="cap" style="margin-top:12px">Обычно это минута-две. Экран обновится сам.</p>' : ''}
+  </div><div class="foot">${working ? '' : sc.length ? `<button class="bb" id="bld">${ic('wand', 22)}Собрать ${esc(E.nextV)} · около минуты</button>${miss.length ? `<button class="sb2" id="bldSkip">Собрать без ${miss.length > 1 ? 'этих сцен' : `сцены ${sc.indexOf(miss[0]) + 1}`}</button>` : ''}` : `<button class="bb" id="relay">${ic('spark', 22)}Разложить по сценам</button>`}</div>`;
+  if (working) { layTimer = setTimeout(() => { if (stack.at(-1)?.screen === 'lay') drawLay({id}); }, 4000); return; }
+  root.querySelectorAll('[data-add]').forEach((inp) => (inp.onchange = async (e) => {
+    for (const f of e.target.files) await upFile(id, f, () => {}).catch((er) => alert(er.message));
+    await api('/api/app/reel/layout', {method: 'POST', json: {reel: id, note: 'Добавил материал для недостающих сцен.'}}).catch((er) => alert(er.message));
+    drawLay({id});
+  }));
+  const render = async (skipMissing) => {
+    try { await api('/api/app/reel/render', {method: 'POST', json: {reel: id, skipMissing}}); haptic('ok'); stack.pop(); go('ed', {id}); }
+    catch (e) { alert(e.message); }
+  };
+  $('#bld')?.addEventListener('click', () => render(false));
+  $('#bldSkip')?.addEventListener('click', () => render(true));
+  $('#relay')?.addEventListener('click', async () => { try { await api('/api/app/reel/layout', {method: 'POST', json: {reel: id}}); drawLay({id}); } catch (e) { alert(e.message); } });
 }
 
 // ---------- Профиль ----------
