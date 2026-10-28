@@ -1327,8 +1327,9 @@ function tplBlock(cur, list) {
   const t = list.find((x) => x.id === cur.template);
   const scenes = (x) => x.scenes.map((s) => `<span class="tchip mb" title="${esc(s.kind)}">${s.lock ? '🔒 ' : ''}${esc({hook: 'Хук', photo: 'Кадр', clip: 'В кадре', base: 'Основа', item: 'Пункт', total: 'Итог', tip: 'Совет', compare: 'Сравнение', question: 'Вопрос', answer: 'Ответ', fact: 'Факт', cta: 'Призыв'}[s.kind] || s.kind)}${s.repeat ? ` ×${s.repeat[0]}–${s.repeat[1]}` : ''}</span>`).join(' ');
   return `<div class="blk"><span class="lbl">Шаблон ролика</span>
-    <div class="row" style="gap: 10px"><select class="f" id="tplSel" data-rubric="${esc(cur.id)}" style="width: auto">${['', ...list.map((x) => x.id)].map((id) => `<option value="${esc(id)}" ${id === (cur.template || '') ? 'selected' : ''}>${id ? esc(list.find((x) => x.id === id).name) : 'Без шаблона — Claude пишет ролик целиком'}</option>`).join('')}</select>${t ? `<span class="small muted">${esc(t.about)}</span>` : ''}</div>
-    ${t ? `<div class="row" style="gap: 6px; flex-wrap: wrap">${scenes(t)}</div><span class="small muted">Новый ролик рубрики собирается из этих сцен: материал раскладывается по ним, 🔒 берутся из рубрики. Подходит для: ${esc(t.fits)}.</span>` : '<span class="small muted">С шаблоном ролик собирается быстрее и всегда в виде рубрики.</span>'}</div>`;
+    <div class="row" style="gap: 10px"><select class="f" id="tplSel" data-rubric="${esc(cur.id)}" style="width: auto"><option value="" ${cur.template ? '' : 'selected'}>Без шаблона — Claude пишет ролик целиком</option>
+      <optgroup label="Готовые форматы студии">${list.map((x) => `<option value="${esc(x.id)}" ${x.id === cur.template ? 'selected' : ''}>${esc(x.name)} — для: ${esc(x.fits)}</option>`).join('')}</optgroup></select>${t ? `<span class="small muted">${esc(t.about)}</span>` : ''}</div>
+    ${t ? `<div class="row" style="gap: 6px; flex-wrap: wrap">${scenes(t)}</div><span class="small muted">Новый ролик рубрики собирается из этих сцен: материал раскладывается по ним, 🔒 берутся из рубрики. Подходит для: ${esc(t.fits)}.</span>` : '<span class="small muted">С шаблоном ролик собирается быстрее и всегда в виде рубрики. Шаблоны — готовые форматы студии, одинаковые во всех проектах; их можно не выбирать.</span>'}</div>`;
 }
 
 async function vKnowledge(tab = 'overview', sel) {
