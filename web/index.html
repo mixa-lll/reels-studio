@@ -119,6 +119,16 @@
   .vph { background: var(--soft); color: var(--muted); display: grid; place-items: center; text-align: center; padding: 24px; font-size: 13px; }
   .rinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
   .blk { display: flex; flex-direction: column; gap: 6px; }
+
+  /* «Как увидят» (NX0–NX7): the release inside each platform's interface, before publishing */
+  .nx-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .nx-row:first-of-type { border-top: 0; }
+  .nx-st { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .nx-st.w { color: var(--amber); } .nx-st.ok { color: var(--green); }
+  .nx-ov { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 60; display: grid; place-items: center; padding: 20px; }
+  .nx-box { background: var(--bg); border-radius: 18px; width: min(900px, 100%); max-height: calc(100vh - 40px); overflow: auto; display: grid; grid-template-columns: minmax(260px, 380px) 1fr; gap: 24px; padding: 24px; }
+  @media (max-width: 720px) { .nx-box { grid-template-columns: 1fr; } }
+  .nx-warn { background: #FFF7E6; color: #7A4B00; border-radius: 12px; padding: 10px 12px; font-size: 13.5px; line-height: 1.45; display: flex; flex-direction: column; gap: 8px; }
   .vwrap { position: relative; } .vwrap video { display: block; }
   .pinlayer { position: absolute; inset: 0 0 48px 0; cursor: crosshair; z-index: 2; }
   .pinlayer .pin { position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px; border-radius: 50%; background: #2F6FEB; color: #fff; font-size: 10px; display: grid; place-items: center; box-shadow: 0 0 0 4px rgba(47,111,235,.35); }
@@ -268,6 +278,7 @@
   }
   .mob { display: none !important; }
 </style>
+<script src="/preview.js"></script>
 </head>
 <body>
 <div class="app">
@@ -307,6 +318,7 @@ const ICON = {
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>',
   tg: '<path d="m22 3-9.5 18-2.5-7.5L3 11z"></path><path d="M10 13.5 22 3"></path>',
   web: '<rect x="2.5" y="4" width="19" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle>',
   cam: '<path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"></path><rect x="2" y="6" width="14" height="12" rx="3"></rect>',
   up: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m17 8-5-5-5 5M12 3v12"></path>',
   folder2: '<path d="M3 7h6l2 2h10v10H3Z"></path>',
@@ -753,6 +765,13 @@ function stagePublish(id, data) {
       <div class="row" style="gap: 10px"><label class="small muted" for="pubAt">Когда</label><input class="f" type="datetime-local" id="pubAt" value="${local}" style="width: auto"><select class="f" id="pubCap" style="width: auto">${caps.map((c, i) => `<option value="${i}">${esc(c.platform || 'Подпись ' + (i + 1))}</option>`).join('')}</select><button type="button" class="btn primary" id="pubGo">Запланировать</button></div></div>` : ''}
     ${data.outbox?.length ? `<div class="blk"><span class="lbl">Запланировано</span>${data.outbox.map((o) => `<div class="li"><span style="flex: 1">${new Date(o.at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})} · ${esc(o.version)}${o.platform ? ' · ' + esc(o.platform) : ''}</span><span class="small muted">${o.sent ? (o.error ? 'не ушло: ' + esc(o.error) : 'отправлено в Телеграм') : 'ждёт · ' + esc(o.by)}</span>${!o.sent && canEdit() ? `<button type="button" class="btn" data-cancel="${esc(o.id)}">Отменить</button>` : ''}</div>`).join('')}</div>` : ''}
   </div>`;
+  if (cur) {
+    const vid = cur.files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
+    const cover = cur.files.find((f) => f.kind === 'cover' || f.kind === 'thumb');
+    nxBlock(host.querySelector('.page'), {caps, kind: 'reel', seen: pub.seen, ask: canEdit() ? (t) => chatOf().say(t, 'Исправить: ' + t.slice(0, 60)) : null,
+      base: {kind: 'reel', media: vid ? {type: 'video', url: vid.url} : null, cover: cover?.url, name: projName(), reel: data.template, grid: (OV?.reels || []).filter((r) => r.id !== id && r.thumb).slice(0, 8).map((r) => ({url: r.thumb, kind: 'reel'}))},
+      onSeen: async (key) => { await post('/api/reel/seen', {reel: id, key}); drawStage(id, 'publish'); }});
+  }
   if (cur) $('#dlTop').innerHTML = cur.files.filter((f) => ['copy', 'cover'].includes(f.kind)).map((f) => `<a class="btn" href="${f.url}&dl=1">${f.kind === 'cover' ? 'Обложка' : 'Видео ' + esc(cur.v)} ↓</a>`).join('');
   host.querySelectorAll('textarea.f').forEach((t, i) => (t.oninput = () => { host.querySelector(`[data-len="${i}"]`).textContent = t.value.length; }));
   $('#mkCaps')?.addEventListener('click', () => chatOf().say('Напиши подписи к этому рилсу для каждой площадки и проверку перед выкладкой в publish.json.', 'Написать подписи'));
@@ -763,6 +782,65 @@ function stagePublish(id, data) {
     drawStage(id, 'publish');
   });
   host.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = async () => { await post('/api/publish/cancel', {id: b.dataset.cancel}); drawStage(id, 'publish'); }));
+}
+
+// ---------- «Как увидят» (NX0–NX7): the release in the platform's own interface, before «Выложить» ----------
+// One row per platform from the captions; each opens the platform's frames (web/preview.js) with
+// the zones, the warnings and «Исправить» (a request to Claude); looking marks the row «видел».
+function nxViews(platform, kind) {
+  const ig = /insta/i.test(platform || ''), tg = /телеграм|telegram|канал|\btg\b/i.test(platform || '');
+  if (tg) return [['telegram', 'Светлая тема', {theme: 'light'}], ['telegram', 'Тёмная тема', {theme: 'dark'}]];
+  if (ig && kind === 'reel') return [['reels', 'Reels', {}], ['grid', 'Сетка профиля', {}], ['story', 'История-анонс', {}]];
+  if (ig) return [[kind === 'carousel' ? 'carousel' : 'feed', kind === 'carousel' ? 'Карусель в ленте' : 'Лента', {}], ['grid', 'Сетка профиля', {}]];
+  return [[kind === 'reel' ? 'reels' : 'feed', 'Как в ленте', {}]];
+}
+function nxBlock(host, {caps, kind, base, seen, onSeen, ask}) {
+  if (!window.Preview) return;
+  const rows = caps.map((c, i) => {
+    const views = nxViews(c.platform, kind);
+    const warn = views.reduce((n, [v, , o]) => n + Preview.checks(v, {...base, ...o, caption: c.text, platform: c.platform}).length, 0);
+    const key = `${c.platform || 'Площадка'}`;
+    return {c, i, views, warn, key, seen: seen?.[key]};
+  });
+  const box = document.createElement('div');
+  box.className = 'blk';
+  box.innerHTML = `<span class="lbl">Как увидят · пролистай каждую площадку как подписчик</span>
+    ${rows.map((r) => `<div class="nx-row"><span style="flex: 1; min-width: 0"><b>${esc(r.c.platform || 'Площадка')}</b>${r.c.account ? ` <span class="small muted">${esc(r.c.account)}</span>` : ''}<div class="small muted">${r.views.map((v) => v[1]).join(' · ')}</div></span>
+      <span class="nx-st ${r.warn ? 'w' : r.seen ? 'ok' : ''}">${r.warn ? `⚠ ${r.warn}` : r.seen ? '✓ видел' : ''}</span><button type="button" class="btn" data-nx="${r.i}">${svg('eye', 14)}${r.seen ? 'Ещё раз' : 'Открыть'}</button></div>`).join('')}
+    ${rows.some((r) => !r.seen) ? '<span class="small muted">Отметка «видел» ставится, когда открыл площадку и пролистал её.</span>' : ''}`;
+  host.prepend(box);
+  box.querySelectorAll('[data-nx]').forEach((b) => (b.onclick = () => nxOpen(rows[Number(b.dataset.nx)], base, onSeen, ask)));
+}
+function nxOpen(row, base, onSeen, ask) {
+  let at = 0, zones = true, slide = 0;
+  const ov = document.createElement('div');
+  ov.className = 'nx-ov';
+  const draw = () => {
+    const [v, label, o] = row.views[at];
+    const opts = {...base, ...o, caption: row.c.text, platform: row.c.platform, account: row.c.account || base.account, zones, slide};
+    const warns = Preview.checks(v, opts);
+    ov.innerHTML = `<div class="nx-box" role="dialog" aria-label="Как увидят: ${esc(row.c.platform || '')}"><div>${Preview.frame(v, opts)}</div>
+      <div style="display: flex; flex-direction: column; gap: 14px; min-width: 0"><div class="row"><b style="font-size: 18px; flex: 1">${esc(row.c.platform || 'Площадка')}</b><button type="button" class="btn" id="nxX" aria-label="Закрыть">✕</button></div>
+        <div class="tabs" style="margin: 0">${row.views.map((x, i) => `<button type="button" class="${i === at ? 'on' : ''}" data-v="${i}">${esc(x[1])}</button>`).join('')}</div>
+        ${['reels', 'story'].includes(v) ? `<label class="row small" style="gap: 8px"><input type="checkbox" id="nxZ" ${zones ? 'checked' : ''}>Зоны «не ставить текст» — штриховкой</label>` : ''}
+        ${v === 'carousel' && (base.slides || []).length > 1 ? `<div class="row" style="gap: 6px"><button type="button" class="btn" id="nxPrev">‹</button><span class="small muted">слайд ${slide + 1} из ${base.slides.length}</span><button type="button" class="btn" id="nxNext">›</button></div>` : ''}
+        ${['reels', 'story', 'grid'].includes(v) && base.kind === 'reel' && !base.reel?.template && ask ? `<div class="small muted" style="display: flex; flex-direction: column; gap: 6px">Ролик собран без шаблона — где стоят плашки, по геометрии не узнать.<button type="button" class="btn" id="nxAsk" style="align-self: flex-start">Попросить Claude проверить зоны</button></div>` : ''}
+        ${warns.map((w, i) => `<div class="nx-warn"><span>⚠ ${esc(w.text)}</span>${ask ? `<div class="row" style="gap: 8px"><button type="button" class="btn" data-fix="${i}">Исправить</button><span class="small">или выложить так</span></div>` : ''}</div>`).join('') || '<div class="small" style="color: var(--green)">✓ По геометрии всё на месте: текст вне интерфейса площадки, подпись читается.</div>'}
+        <span class="small muted">Интерфейс нарисован студией для предпросмотра; цифры лайков и просмотров — для примера.</span>
+        <div class="row" style="margin-top: auto; gap: 8px"><button type="button" class="btn primary" id="nxOk">✓ Видел</button>${at < row.views.length - 1 ? '<button type="button" class="btn" id="nxNx">Дальше: ' + esc(row.views[at + 1][1]) + '</button>' : ''}</div></div></div>`;
+    ov.querySelector('#nxX').onclick = () => ov.remove();
+    ov.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { at = Number(b.dataset.v); slide = 0; draw(); }));
+    ov.querySelector('#nxZ')?.addEventListener('change', (e) => { zones = e.target.checked; draw(); });
+    ov.querySelector('#nxPrev')?.addEventListener('click', () => { slide = Math.max(0, slide - 1); draw(); });
+    ov.querySelector('#nxNext')?.addEventListener('click', () => { slide = Math.min(base.slides.length - 1, slide + 1); draw(); });
+    ov.querySelector('#nxNx')?.addEventListener('click', () => { at++; slide = 0; draw(); });
+    ov.querySelectorAll('[data-fix]').forEach((b) => (b.onclick = () => { ask(warns[Number(b.dataset.fix)].fix); ov.remove(); }));
+    ov.querySelector('#nxAsk')?.addEventListener('click', () => { ask(`Проверь текущую версию по зонам площадки «${row.c.platform}» (${label}): ${Preview.ZONES[v === 'grid' ? 'reels' : v]?.map((z) => `${z.label} — ${Math.round(z.x0 * 100)}–${Math.round(z.x1 * 100)}% по ширине, ${Math.round(z.y0 * 100)}–${Math.round(z.y1 * 100)}% по высоте`).join('; ') || 'сетка режет кадр до 3:4, видно 12–88 % высоты'}. Посмотри кадры, где текст или плашки заходят в эти зоны, и предложи, как сдвинуть.`); ov.remove(); });
+    ov.querySelector('#nxOk').onclick = async () => { await onSeen(row.key); ov.remove(); };
+  };
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  document.body.append(ov);
+  draw();
 }
 
 // ---------- posts (POSTS.md, web/posts.mjs) ----------
@@ -912,6 +990,9 @@ function postPublish(id, data, host, save) {
     ${data.outbox?.length ? `<div class="blk"><span class="lbl">Запланировано</span>${data.outbox.map((o) => `<div class="li"><span style="flex: 1">${new Date(o.at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})}${o.platform ? ' · ' + esc(o.platform) : ''}</span><span class="small muted">${o.sent ? (o.error ? 'не ушло: ' + esc(o.error) : 'отправлено в Телеграм') : 'ждёт · ' + esc(o.by)}</span>${!o.sent && canEdit() ? `<button type="button" class="btn" data-cancel="${esc(o.id)}">Отменить</button>` : ''}</div>`).join('')}</div>` : ''}
   </div>`;
   const current = () => caps.map((c, i) => ({...c, text: $('#cap' + i).value, at: host.querySelector(`[data-at="${i}"]`)?.value || c.at}));
+  nxBlock(host.querySelector('.page'), {caps, kind: p.kind === 'carousel' ? 'carousel' : 'post', seen: p.seen, ask: canEdit() ? (t) => chatOf().say(t, 'Исправить: ' + t.slice(0, 60)) : null,
+    base: {media: pics[0] ? {type: 'image', url: pics[0].url} : null, slides: pics.map((f) => f.url), cover: pics[0]?.url, name: projName(), grid: (OV?.reels || []).filter((r) => r.thumb).slice(0, 8).map((r) => ({url: r.thumb, kind: 'reel'}))},
+    onSeen: async (key) => { await save({seen: {...p.seen, [key]: {by: ME?.name, at: Date.now()}}}); drawPost(id, 'publish'); }});
   host.querySelectorAll('[data-cap]').forEach((t) => (t.oninput = () => { host.querySelector(`[data-len="${t.dataset.cap}"]`).textContent = t.value.length; }));
   $('#mkCaps')?.addEventListener('click', () => chatOf().say('Напиши подписи для Instagram RU, Instagram EN (своя версия, не перевод) и Телеграм-канала (длиннее, без хэштегов), проверку перед выкладкой и «что после» в post.json.', 'Написать подписи'));
   $('#capSave')?.addEventListener('click', async () => { await save({captions: current()}); toast('Сохранено'); });
