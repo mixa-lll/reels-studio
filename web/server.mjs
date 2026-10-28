@@ -438,7 +438,7 @@ const buildFromApp = (p, r, text, shown, who) => {
   job = startTurn(p, r, `(from ${who}, mini app)\n${text}`, () => {});
   return true;
 };
-const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: () => job && {p: job.p, key: job.key}});
+const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, saveAccess, logFile: () => LOG, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: () => job && {p: job.p, key: job.key}});
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
