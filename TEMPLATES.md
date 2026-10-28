@@ -39,6 +39,7 @@ The catalog — scene kinds and templates — is `template/src/templates/catalog
 - `dur` — seconds of the scene; defaults by kind (hook 2, photo 3, clip 5, item 3, total 3, cta 2…). A clip lasts as long as the phrase in it.
 - `text` — the plate (one short line); `note` — a smaller line under it. `place`: `top`, `middle`, `bottom` (default) or `under-face` (default for a person in frame). **Nothing over a face**: put plates on clips under the face or at the top.
 - `total` sums the base and the items itself (or takes `amount`). `compare` has `a` and `b` (`label`, `amount`, `media`) and `win`.
+- A scene still without material keeps `"need": "what it needs"` and no `media` (the mini app shows it as missing); `"skip": true` leaves it out of the render («Собрать без сцены»).
 - 🔒 scenes (`total`, `cta`) come from the rubric: the cta text from its rules or the last reel of the rubric; do not drop them.
 - `theme`: take colors and font from the project's design system (`design-system/tokens.json`) when it has one; fonts: `Manrope` or `Unbounded`.
 
@@ -49,3 +50,7 @@ The catalog — scene kinds and templates — is `template/src/templates/catalog
 3. Write `reel.json`. If a scene has no material, say which one and what it needs (the catalog's `need`), and offer to build without it.
 4. Check: `npx tsc --noEmit` in the project folder, then render as usual (REELS.md step 6, `--draft` first). A still of any frame: `npx remotion still src/index.ts Reel <png> --frame=<n>`.
 5. Comments for the next version (`edits.json`) change the data: a scene's `dur`, `text`, `place`, `media`, its order. Changing the template means re-laying the same material by the new template's scenes into a new version; the old one stays.
+
+## From the mini app (Т2)
+
+«Студия › Новый ролик»: the person picks the rubric (its template) and throws in all material at once; it lands in `sources/` and the server copies it into `project/public/`. You get «разложи материал по шаблону»: write `reel.json` and do **not** render — they look at the layout and tap «Собрать v1» (or «Собрать без сцены N»), which comes as a separate request.

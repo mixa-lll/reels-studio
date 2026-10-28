@@ -21,6 +21,9 @@ export type Scene = {
   win?: 'a' | 'b';
   // where the plate sits: top, bottom (default), or under the face (lower third, above the chin line)
   place?: 'top' | 'middle' | 'bottom' | 'under-face';
+  // a scene still waiting for material: what it needs; «Собрать без сцены» sets skip
+  need?: string;
+  skip?: boolean;
 };
 export type ReelData = {
   template: string | null;
@@ -39,7 +42,8 @@ const fontOf = (name?: string) => name === 'Unbounded' ? unbounded('normal', {we
   : manrope('normal', {weights: ['500', '600', '700', '800'], subsets: ['latin', 'cyrillic']}).fontFamily;
 
 export const sceneSeconds = (s: Scene) => s.dur ?? DUR[s.kind] ?? 3;
-export const templateFrames = (d: ReelData) => Math.max(1, Math.round(d.scenes.reduce((n, s) => n + sceneSeconds(s), 0) * (d.fps ?? 30)));
+const shown = (d: ReelData) => d.scenes.filter((s) => !s.skip);
+export const templateFrames = (d: ReelData) => Math.max(1, Math.round(shown(d).reduce((n, s) => n + sceneSeconds(s), 0) * (d.fps ?? 30)));
 
 const theme = (d: ReelData) => ({bg: '#0E0F12', ink: '#FFFFFF', accent: '#F5B700', plate: '#FFFFFF', plateInk: '#171717', ...d.theme, font: fontOf(d.theme?.font)});
 type Th = ReturnType<typeof theme>;
@@ -158,7 +162,8 @@ function SceneView({s, i, d, t, total}: {s: Scene; i: number; d: ReelData; t: Th
 /** A short fade between scenes; the cut lands on the scene's first frame. */
 const Fade = ({children}: {children: React.ReactNode}) => <AbsoluteFill style={{opacity: useIn(0, 6)}}>{children}</AbsoluteFill>;
 
-export const TemplateReel = ({d}: {d: ReelData}) => {
+export const TemplateReel = ({d: all}: {d: ReelData}) => {
+  const d = {...all, scenes: shown(all)};
   const t = theme(d);
   const fps = d.fps ?? 30;
   let from = 0, total = 0;

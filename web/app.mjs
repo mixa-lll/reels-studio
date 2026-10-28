@@ -6,10 +6,10 @@
 // Data per project: projects/<p>/host/tasks.json (tasks), host/profiles.json (per person),
 // takes go to the project's inbox like anything else sent to the bot. Until the editor
 // side exists, a project without tasks.json gets demo tasks (seeded: true).
-import {spawn} from 'node:child_process';
+import {execFileSync, spawn} from 'node:child_process';
 import {createHmac, randomBytes} from 'node:crypto';
 import {appendFileSync, copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
-import {join, relative} from 'node:path';
+import {basename, extname, join, relative} from 'node:path';
 import {ffCommand} from '../bot/media.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {isEditor} from '../bot/roles.mjs';
@@ -19,6 +19,9 @@ const MAX_TAKE = 300 * 1024 * 1024;
 const readJson = (f, fallback) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return fallback; } };
 const writeJson = (f, v) => { writeFileSync(`${f}.tmp`, JSON.stringify(v, null, 2)); renameSync(`${f}.tmp`, f); };
 const id = () => randomBytes(9).toString('base64url');
+const LAT = {а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ы: 'y', э: 'e', ю: 'yu', я: 'ya'};
+const slugOf = (t) => String(t || '').toLowerCase().replace(/[а-яё]/g, (c) => LAT[c] ?? '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').split('-').slice(0, 5).join('-') || 'reel';
+const MEDIA = /\.(jpe?g|png|webp|mp4|mov|webm|m4v)$/i;
 
 // The take is shot as clips (one per phrase, or one for the whole text, cut where the
 // host restarted a phrase); the server trims, joins and evens them out into one
@@ -101,14 +104,16 @@ const REWRITES = {
 };
 
 // A video with byte ranges, so the phone can seek.
+const TYPE = {'.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'};
 function streamFile(req, res, f) {
+  const type = TYPE[extname(f).toLowerCase()] || 'application/octet-stream';
   const size = statSync(f).size, range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
   if (range) {
     const a = range[1] ? Number(range[1]) : 0, z = range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
-    res.writeHead(206, {'content-type': 'video/mp4', 'content-range': `bytes ${a}-${z}/${size}`, 'accept-ranges': 'bytes', 'content-length': z - a + 1, 'cache-control': 'no-store'});
+    res.writeHead(206, {'content-type': type, 'content-range': `bytes ${a}-${z}/${size}`, 'accept-ranges': 'bytes', 'content-length': z - a + 1, 'cache-control': 'no-store'});
     return createReadStream(f, {start: a, end: z}).pipe(res);
   }
-  res.writeHead(200, {'content-type': 'video/mp4', 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store'});
+  res.writeHead(200, {'content-type': type, 'content-length': size, 'accept-ranges': 'bytes', 'cache-control': 'no-store'});
   return createReadStream(f).pipe(res);
 }
 
@@ -175,7 +180,7 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
     if (req.method === 'GET' && url.pathname === '/app/v') {
       const rel = url.searchParams.get('f') || '';
       const f = join(PROJECTS, rel);
-      if (url.searchParams.get('k') !== sign(rel) || relative(PROJECTS, f).startsWith('..') || !/^[\w-]+\/reels\/[\w-]+\/versions\/v\d+\/[^/]+\.mp4$/.test(rel) || !existsSync(f)) { res.writeHead(404); return res.end(); }
+      if (url.searchParams.get('k') !== sign(rel) || relative(PROJECTS, f).startsWith('..') || !/^[\w-]+\/reels\/[\w-]+\/(versions\/v\d+|project\/public|sources)\/[^/]+\.(mp4|mov|webm|jpe?g|png|webp)$/i.test(rel) || !existsSync(f)) { res.writeHead(404); return res.end(); }
       return streamFile(req, res, f);
     }
     if (req.method === 'GET' && url.pathname === '/app') {
@@ -198,7 +203,7 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
         profile: {langs: 'русский, английский', when: 'вт и чт после 15:00', where: 'кабинет 204, у окна', speed: 1, size: 'large', consent: true, ...prof}});
     }
     let b = {};
-    if (req.method === 'POST' && !['/api/app/take', '/api/app/clip', '/api/app/reel/voice'].includes(url.pathname)) {
+    if (req.method === 'POST' && !['/api/app/take', '/api/app/clip', '/api/app/reel/voice', '/api/app/reel/upload'].includes(url.pathname)) {
       let s = '';
       for await (const chunk of req) s += chunk;
       try { b = JSON.parse(s || '{}'); } catch {}
@@ -323,6 +328,37 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
       writeJson(join(hostDir(p), 'profiles.json'), all);
       return json(200, {profile: cur});
     }
+    // ---------- Т2: a new reel by the rubric's template (SR2, SR3; TEMPLATES.md) ----------
+    const catalog = () => readJson(join(BOT, 'template', 'src', 'templates', 'catalog.json'), {kinds: {}, templates: []});
+    if (req.method === 'GET' && url.pathname === '/api/app/rubrics') {
+      if (!me.studio) return json(403, {});
+      const cat = catalog();
+      const rubs = readJson(join(PROJECTS, p, 'strategy.json'), {}).rubrics || [];
+      return json(200, {rubrics: rubs.map((x) => ({id: x.id, name: x.name, color: x.color, about: x.about, template: x.template || null})), templates: cat.templates, kinds: cat.kinds});
+    }
+    if (req.method === 'POST' && url.pathname === '/api/app/new') {
+      if (!me.studio) return json(403, {});
+      const cat = catalog();
+      const st = readJson(join(PROJECTS, p, 'strategy.json'), {});
+      const rub = (st.rubrics || []).find((x) => x.id === b.rubric) || null;
+      const tpl = cat.templates.find((x) => x.id === (b.template || rub?.template));
+      if (!tpl) return json(400, {error: 'Выберите шаблон'});
+      const title = String(b.title || '').trim().slice(0, 120) || `${tpl.name}${rub ? ' · ' + rub.name : ''}`;
+      let dir;
+      try {
+        dir = execFileSync(process.execPath, [join(BOT, 'scripts', 'new-reel.mjs'), slugOf(title)], {cwd: BOT, env: {...process.env, REELS_STUDIO: join(PROJECTS, p)}, encoding: 'utf8', timeout: 60_000}).trim().split('\n').pop();
+      } catch (e) { return json(500, {error: 'Не получилось создать выпуск'}); }
+      const rid = basename(dir);
+      writeFileSync(join(dir, 'README.md'), `# ${rid.slice(0, 2)} «${title}»\n\nStatus: in work\nRubric: ${rub ? rub.name : '—'}\nTemplate: ${tpl.name} (${tpl.id}), TEMPLATES.md\nStarted: mini app, ${me.name}, ${new Date().toISOString().slice(0, 10)}\n${b.about ? `\n## Idea\n\n${String(b.about).slice(0, 1000)}\n` : ''}`);
+      writeJson(join(dir, 'project', 'src', 'reel.json'), {template: tpl.id, scenes: []});
+      if (rub) {
+        const plan = readJson(join(PROJECTS, p, 'plan.json'), {});
+        plan.rubric = {...plan.rubric, [`reel:${rid}`]: rub.id};
+        writeJson(join(PROJECTS, p, 'plan.json'), plan);
+      }
+      log?.(me.name, `начал ролик «${title}» по шаблону «${tpl.name}» в мини-приложении`);
+      return json(200, {id: rid});
+    }
     // ---------- «Студия»: the reel editor (SE1–SE5) — comments at every stage → «Собрать vN» ----------
     if (url.pathname.startsWith('/api/app/reel')) {
       if (!me.studio) return json(403, {error: 'Студия открыта редакторам и тем, у кого отметка «Сам собирает»'});
@@ -333,12 +369,26 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
       const cur = vdirs.at(-1) || null;
       const nextV = cur ? `v${Number(cur.slice(1)) + 1}` : 'v1';
       const scenes = readJson(join(dir, 'scenes.json'), []);
+      const signed = (rel) => `/app/v?f=${encodeURIComponent(rel)}&k=${sign(rel)}`;
+      const pub = join(dir, 'project', 'public');
+      // The template's layout (reel.json): each scene with its material and what is still missing.
+      const layout = () => {
+        const d = readJson(join(dir, 'project', 'src', 'reel.json'), null);
+        if (!d?.template) return null;
+        const cat = catalog();
+        const tpl = cat.templates.find((x) => x.id === d.template);
+        const thumb = (m) => m?.file && existsSync(join(pub, m.file)) ? signed(relative(PROJECTS, join(pub, m.file))) : null;
+        return {template: d.template, name: tpl?.name || d.template, scenes: (d.scenes || []).map((x) => ({kind: x.kind, label: cat.kinds[x.kind]?.label || x.kind, text: x.text || x.a?.label || '', amount: x.amount,
+          media: thumb(x.media) || thumb(x.a?.media), video: MEDIA.test(x.media?.file || '') && /\.(mp4|mov|webm|m4v)$/i.test(x.media.file), need: x.media || x.a || ['total', 'cta'].includes(x.kind) ? null : x.need || cat.kinds[x.kind]?.need || null,
+          lock: ['total', 'cta'].includes(x.kind), skip: !!x.skip, dur: x.dur ?? null}))};
+      };
+      const sources = () => existsSync(join(dir, 'sources')) ? readdirSync(join(dir, 'sources')).filter((f) => MEDIA.test(f) && !f.startsWith('voice-')) : [];
       if (req.method === 'GET' && url.pathname === '/api/app/reel') {
         // The smallest video of the current version: the draft plays faster on a phone.
         const vids = cur ? readdirSync(join(dir, 'versions', cur)).filter((f) => /\.mp4$/i.test(f)).map((f) => ({f, size: statSync(join(dir, 'versions', cur, f)).size})).sort((a, z) => a.size - z.size) : [];
         const rel = vids[0] && relative(PROJECTS, join(dir, 'versions', cur, vids[0].f));
         return json(200, {reel: reels(p).find((x) => x.id === rid), version: cur, nextV, video: rel ? `/app/v?f=${encodeURIComponent(rel)}&k=${sign(rel)}` : null,
-          scenes: Array.isArray(scenes) ? scenes : [], edits: readEdits(dir), busy: busy()});
+          scenes: Array.isArray(scenes) ? scenes : [], edits: readEdits(dir), busy: !!busy(), working: busy()?.key === rid, layout: layout()});
       }
       if (req.method === 'POST' && url.pathname === '/api/app/reel/edits') {
         if (b.action === 'send') return json(400, {});
@@ -354,6 +404,46 @@ export function makeApp({BOT, PROJECTS, PAGE, access, reels, log, reelDir, build
         const f = join(dir, 'sources', `voice-${Date.now()}.${/mp4|aac/.test(req.headers['content-type'] || '') ? 'm4a' : 'webm'}`);
         writeFileSync(f, Buffer.concat(chunks));
         return json(200, {text: (await transcribe(f, 'ru').catch(() => null)) || ''});
+      }
+      // Material in bulk: each file goes to the reel's sources/ as it is.
+      if (req.method === 'POST' && url.pathname === '/api/app/reel/upload') {
+        const name = basename(String(url.searchParams.get('name') || 'file')).replace(/[^\w.\-а-яё ]/gi, '_').replace(/^\.+/, '') || 'file';
+        if (!MEDIA.test(name) && !/\.(heic|heif)$/i.test(name)) return json(400, {error: 'Нужны фото или видео'});
+        mkdirSync(join(dir, 'sources'), {recursive: true});
+        let f = join(dir, 'sources', name);
+        for (let i = 2; existsSync(f); i++) f = join(dir, 'sources', name.replace(/(\.[^.]*)?$/, `-${i}$1`));
+        let size = 0;
+        const out = [];
+        for await (const c of req) { size += c.length; if (size > MAX_TAKE) return json(413, {error: 'Файл больше 300 МБ'}); out.push(c); }
+        writeFileSync(f, Buffer.concat(out));
+        return json(200, {file: basename(f), count: sources().length});
+      }
+      // Claude lays the material out by the template's scenes (reel.json), without rendering yet.
+      if (req.method === 'POST' && url.pathname === '/api/app/reel/layout') {
+        const d = readJson(join(dir, 'project', 'src', 'reel.json'), null);
+        if (!d?.template) return json(400, {error: 'У выпуска нет шаблона'});
+        const files = sources();
+        if (!files.length) return json(400, {error: 'Сначала добавьте материал'});
+        if (busy()) return json(429, {error: 'Claude сейчас занят. Попробуйте через пару минут.'});
+        mkdirSync(pub, {recursive: true});
+        for (const f of files) if (!existsSync(join(pub, f))) copyFileSync(join(dir, 'sources', f), join(pub, f));
+        const tpl = catalog().templates.find((x) => x.id === d.template);
+        const text = `Новый ролик по шаблону «${tpl?.name || d.template}» (TEMPLATES.md). Материал уже скопирован в project/public/: ${files.join(', ')}.${b.note ? ` Что сказал человек: ${String(b.note).slice(0, 500)}` : ''}\n` +
+          'Посмотри каждый файл, разложи материал по сценам шаблона в project/src/reel.json (тексты плашек и суммы — из идеи в README и того, что видно на материале). Сцене без материала оставь "need": что нужно, без media. ' +
+          'НЕ рендери: человек посмотрит раскладку и нажмёт «Собрать v1». Ответь одной-двумя строками: что куда легло и чего не хватает.';
+        if (!build(p, rid, text, `Разложить материал по шаблону · файлов: ${files.length}`, me.name)) return json(429, {error: 'Claude сейчас занят.'});
+        return json(200, {started: true});
+      }
+      if (req.method === 'POST' && url.pathname === '/api/app/reel/render') {
+        const f = join(dir, 'project', 'src', 'reel.json');
+        const d = readJson(f, null);
+        if (!d?.template || !d.scenes?.length) return json(400, {error: 'Сначала разложите материал'});
+        if (busy()) return json(429, {error: 'Claude сейчас занят. Попробуйте через пару минут.'});
+        // «Собрать без сцены N»: scenes still waiting for material are left out of this version.
+        if (b.skipMissing) { d.scenes = d.scenes.map((x) => (!x.media && !x.a && !['total', 'cta'].includes(x.kind) ? {...x, skip: true} : x)); writeJson(f, d); }
+        if (!build(p, rid, `Собери ${nextV} черновиком по project/src/reel.json (TEMPLATES.md, REELS.md шаги 5–7). Сцены со "skip": true рендер пропустит сам.`, `Собрать ${nextV}${b.skipMissing ? ' без недостающих сцен' : ''}`, me.name)) return json(429, {error: 'Claude сейчас занят.'});
+        notify(`🎬 ${me.name} собирает ${nextV} «${reels(p).find((x) => x.id === rid)?.title || rid}» по шаблону из мини-приложения.`);
+        return json(200, {started: true});
       }
       if (req.method === 'POST' && url.pathname === '/api/app/reel/build') {
         const open = readEdits(dir).filter((x) => x.state === 'open');
