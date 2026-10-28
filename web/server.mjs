@@ -380,6 +380,8 @@ function ownerPerson() {
 // Role and flags of a new person, from an invite or the invite form.
 const personFields = (x) => ({role: x.role === 'editor' ? 'editor' : 'member', onCamera: !!x.onCamera, web: x.role === 'editor' || x.web === true,
   deputyUntil: /^\d{4}-\d{2}-\d{2}$/.test(x.deputyUntil || '') ? x.deputyUntil : null});
+// Six digits to type into the bot by hand, unique among live invites.
+const newPin = (a) => { for (;;) { const pin = String(100000 + randomBytes(4).readUInt32BE(0) % 900000); if (!a.invites.some((x) => x.pin === pin && x.expires > Date.now())) return pin; } };
 const inviteLinks = (inv) => ({web: inv.web ? `/invite/${inv.code}` : null, telegram: inv.telegram && botUsername() ? `https://t.me/${botUsername()}?start=inv_${inv.code}` : null});
 function whoIs(req) {
   const sid = /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie || '')?.[1];
@@ -805,7 +807,7 @@ createServer(async (req, res) => {
     const target = a.people.find((y) => y.id === b.id);
     const mayTouch = (x) => x && x.id !== me.id && (!x.isOwner || me.isOwner);
     if (b.action === 'invite' && b.name?.trim() && ['editor', 'member'].includes(b.role)) {
-      const inv = {code: id(), name: b.name.trim().slice(0, 60), note: String(b.note || '').slice(0, 80), ...personFields(b), expires: Date.now() + 7 * 864e5, claimed: []};
+      const inv = {code: id(), pin: newPin(a), name: b.name.trim().slice(0, 60), note: String(b.note || '').slice(0, 80), ...personFields(b), expires: Date.now() + 7 * 864e5, claimed: []};
       inv.telegram = !!botUsername();
       inv.web = inv.role === 'editor' || b.web === true || !inv.telegram;
       a.invites.push(inv);
@@ -815,7 +817,7 @@ createServer(async (req, res) => {
     }
     // A fresh sign-in link for someone already in the team (new phone, lost sign-in).
     if (b.action === 'relink' && target && (mayTouch(target) || target.id === me.id)) {
-      const inv = {code: id(), name: target.name, person: target.id, role: target.role, expires: Date.now() + 7 * 864e5, claimed: [], telegram: !!botUsername(), web: isEditor(target) || target.web === true};
+      const inv = {code: id(), pin: newPin(a), name: target.name, person: target.id, role: target.role, expires: Date.now() + 7 * 864e5, claimed: [], telegram: !!botUsername(), web: isEditor(target) || target.web === true};
       a.invites.push(inv);
       saveAccess(a);
       return json(200, {invite: {...inv, link: inviteLinks(inv)}});
