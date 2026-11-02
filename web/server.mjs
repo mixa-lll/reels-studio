@@ -1033,6 +1033,8 @@ createServer(async (req, res) => {
         bot: x.isOwner ? tg.find((t) => t.owner) || null : x.telegram ? {username: x.telegram.username, seen: x.telegram.seen || x.added} : null})),
       invites: a.invites.filter((x) => x.expires > Date.now()).map((x) => ({...x, link: inviteLinks(x)})),
       bot: botUsername(), me: me.id,
+      // Only the owner sees the bot's owner link, and only while the bot has no owner yet.
+      ownerLink: me.isOwner && botUsername() && process.env.OWNER_CODE && !readJson(join(BOT, 'data', 'state.json'), {}).ownerId ? `https://t.me/${botUsername()}?start=${process.env.OWNER_CODE}` : null,
       log: read(LOG).split('\n').filter(Boolean).slice(-40).map((l) => JSON.parse(l)).reverse(),
     });
   }
