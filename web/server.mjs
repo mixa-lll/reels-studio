@@ -8,7 +8,7 @@
 // tools in ALLOWED run, and DENIED keeps it away from this server's own files.
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
-import {randomBytes} from 'node:crypto';
+import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
@@ -40,6 +40,8 @@ const ALLOWED = [
   'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
   ...['new-reel', 'render', 'ffmpeg', 'beats', 'loudnorm'].map((s) => `Bash(node scripts/${s}.mjs:*)`),
   `Bash(node ${SEND}:*)`,
+  // The agent runs in BOT and often calls it by the short path.
+  `Bash(node ${relative(BOT, SEND)}:*)`,
   'Bash(npx tsc:*)',
 ];
 // People, invites and the log are shared with the Telegram bot (bot/members.mjs).
@@ -141,7 +143,7 @@ function versions(p, r) {
     const vdir = join(dir, 'versions', v);
     const files = readdirSync(vdir).filter((f) => statSync(join(vdir, f)).isFile()).map((f) => {
       const full = join(vdir, f);
-      const kind = /\.(mp4|mov|webm)$/i.test(f) ? (/1080p|master/i.test(f) ? 'master' : 'copy') : /cover\.png$/i.test(f) ? 'cover' : /thumb\.jpg$/i.test(f) ? 'thumb' : 'other';
+      const kind = /^raw/i.test(f) ? 'other' : /\.(mp4|mov|webm)$/i.test(f) ? (/1080p|1440p|master/i.test(f) ? 'master' : 'copy') : /cover\.png$/i.test(f) ? 'cover' : /thumb\.jpg$/i.test(f) ? 'thumb' : 'other';
       return {name: f, kind, size: statSync(full).size, url: mediaUrl(full)};
     });
     const archived = readJson(join(vdir, 'ARCHIVED.json'), null);
@@ -356,7 +358,9 @@ function startTurn(p, k, text, send) {
 function mediaPath(p) {
   try {
     const real = realpathSync(p);
-    return real.startsWith(PROJECTS + '/') && statSync(real).isFile() ? real : null;
+    // A project may be a link to a folder elsewhere (My Gudauri → Рилсы/студия).
+    const roots = [PROJECTS, ...readdirSync(PROJECTS).map((n) => { try { return realpathSync(join(PROJECTS, n)); } catch { return null; } }).filter(Boolean)];
+    return roots.some((r) => real.startsWith(r + '/')) && statSync(real).isFile() ? real : null;
   } catch { return null; }
 }
 function mediaUrl(p) { return `/media?p=${encodeURIComponent(p)}`; }
@@ -414,7 +418,8 @@ function whoIs(req) {
   const person = s && a.people.find((x) => x.id === s.person);
   if (!person) return null;
   if (Date.now() - s.seen > 60_000) { s.seen = Date.now(); saveAccess(a); }
-  return {...person, sid};
+  const {pw, ...rest} = person;
+  return {...rest, sid, hasPassword: !!pw?.hash};
 }
 // The bot's chats as sessions: the owner's, and each member's; the bot itself keeps
 // the owner's last turn and who it is working for right now.
@@ -440,10 +445,37 @@ button{width:100%;min-height:48px;border:0;border-radius:12px;background:#D7261A
 @media (prefers-color-scheme:dark){body{background:#161615;color:#EDECE8}main{background:#201F1D;border-color:#33312E}p{color:#9A978F}}</style></head><body><main>${inner}</main></body></html>`);
 }
 
-async function body(req) {
+async function rawBody(req) {
   let s = '';
   for await (const chunk of req) s += chunk;
-  try { return JSON.parse(s || '{}'); } catch { return {}; }
+  return s;
+}
+async function body(req) {
+  try { return JSON.parse((await rawBody(req)) || '{}'); } catch { return {}; }
+}
+
+// ---------- passwords ----------
+// Each person has their own password (scrypt, in access.json as pw: {salt, hash}); the owner sets
+// them in «Команда», anyone can change their own. Ten wrong tries from one address lock it for 15 min.
+const hashPassword = (pw) => { const salt = randomBytes(16).toString('hex'); return {salt, hash: scryptSync(pw, salt, 32).toString('hex')}; };
+const checkPassword = (person, pw) => {
+  if (!person?.pw?.hash || !pw) return false;
+  const want = Buffer.from(person.pw.hash, 'hex');
+  const got = scryptSync(pw, person.pw.salt, 32);
+  return got.length === want.length && timingSafeEqual(got, want);
+};
+const tries = new Map();
+const tooMany = (ip) => { const t = tries.get(ip); return !!t && t.n >= 10 && Date.now() - t.at < 15 * 60_000; };
+const failed = (ip) => { const t = tries.get(ip); tries.set(ip, t && Date.now() - t.at < 15 * 60_000 ? {n: t.n + 1, at: t.at} : {n: 1, at: Date.now()}); };
+function loginPage(res, error = '', who = '') {
+  const people = access().people.filter((x) => x.pw?.hash && (isEditor(x) || x.web === true));
+  invitePage(res, error ? 401 : 200, people.length
+    ? `<h1>Вход в студию</h1><p>Выбери себя и введи свой пароль.</p>${error ? `<p style="color:#D7261A">${escHtml(error)}</p>` : ''}
+      <form method="post" action="/login" style="display:flex;flex-direction:column;gap:10px">
+        <select name="who" required style="min-height:46px;border-radius:12px;border:1px solid #D9D8D3;padding:0 12px;font:inherit;background:transparent;color:inherit">${people.map((x) => `<option value="${escHtml(x.id)}" ${x.id === who ? 'selected' : ''}>${escHtml(x.name)}</option>`).join('')}</select>
+        <input type="password" name="password" required autocomplete="current-password" placeholder="Пароль" style="min-height:46px;border-radius:12px;border:1px solid #D9D8D3;padding:0 12px;font:inherit;background:transparent;color:inherit">
+        <button type="submit">Войти</button></form>`
+    : '<h1>Нужен вход</h1><p>Пароли ещё никому не заданы. Владелец задаёт их в студии: Настройки › Команда.</p>');
 }
 
 const APP_PAGE = join(HERE, 'app.html');
@@ -473,7 +505,9 @@ createServer(async (req, res) => {
   if (invite) {
     const a = access();
     const inv = a.invites.find((x) => x.code === invite && x.expires > Date.now() && x.web !== false && !x.claimed?.includes('web'));
-    if (!inv) return invitePage(res, 410, '<h1>Ссылка уже не работает</h1><p>Приглашение использовано или истекло. Попроси новое.</p>');
+    // Reopening a used invite in the browser that already signed in with it just opens the studio.
+    if (!inv && whoIs(req)) return go('/');
+    if (!inv) return invitePage(res, 410, '<h1>Ссылка уже не работает</h1><p>Приглашение использовано или истекло. Если ты уже входил с этого браузера — открой <a href="/">студию</a>. Иначе попроси новое приглашение.</p>');
     // Opening the link only shows a button: link previews in messengers fetch it by
     // themselves, and a GET that signed in would let them use up the invite.
     if (req.method !== 'POST') return invitePage(res, 200, `<h1>Привет, ${escHtml(inv.name)}!</h1><p>Тебя пригласили в студию ${inv.role === 'editor' ? 'редактором' : 'участником'}.</p><form method="post"><button type="submit">Войти</button></form>`);
@@ -495,8 +529,35 @@ createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/preview.js') { res.writeHead(200, {'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache'}); return res.end(readFileSync(join(HERE, 'preview.js'))); }
   if (url.pathname === '/app' || url.pathname.startsWith('/api/app/') || url.pathname.startsWith('/app/take/') || url.pathname === '/app/v') return miniApp(req, res, url);
 
+  // Sign-in by password: pick yourself from the list, type your own password. Links (key,
+  // invites) still work, but a link opened in Telegram's browser does not follow into Safari.
+  if (url.pathname === '/login' && req.method === 'POST') {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    if (tooMany(ip)) return loginPage(res, 'Слишком много попыток. Подожди 15 минут.');
+    const f = new URLSearchParams(await rawBody(req));
+    const person = access().people.find((x) => x.id === f.get('who'));
+    if (!person || !checkPassword(person, f.get('password') || '')) { failed(ip); return loginPage(res, 'Неверный пароль.', f.get('who')); }
+    log(person.name, 'вошёл по паролю');
+    return go('/', cookie(req, newSession(person.id, req)));
+  }
+
   const me = whoIs(req);
-  if (!me) { res.writeHead(404, {'content-type': 'text/plain; charset=utf-8'}); return res.end('Not found'); }
+  if (!me) {
+    if (url.pathname.startsWith('/api/') || url.pathname === '/media') { res.writeHead(401, {'content-type': 'text/plain; charset=utf-8'}); return res.end('Нужен вход'); }
+    return loginPage(res);
+  }
+  if (req.method === 'POST' && url.pathname === '/api/password') {
+    const b = await body(req);
+    const a = access();
+    const target = a.people.find((x) => x.id === (b.id || me.id));
+    // Your own password, or anyone's for the owner.
+    if (!target || (target.id !== me.id && !me.isOwner)) return json(403, {});
+    if (typeof b.password !== 'string' || b.password.length < 6) return json(400, {error: 'Пароль — минимум 6 символов'});
+    target.pw = hashPassword(b.password);
+    saveAccess(a);
+    log(me.name, target.id === me.id ? 'сменил свой пароль' : `задал пароль: ${target.name}`);
+    return json(200, {ok: true});
+  }
   // owner = the flag; editor = editors and deputies; anyone signed in may read their own things.
   const can = (role) => role === 'owner' ? me.isOwner === true : role === 'editor' ? isEditor(me) : true;
   // Members see only their part (D4): their tasks, sending material, what they sent.
@@ -764,7 +825,7 @@ createServer(async (req, res) => {
   // (bot/outbox.mjs); the person then posts it from the phone.
   if (req.method === 'POST' && url.pathname === '/api/publish') {
     if (!can('editor')) return json(403, {});
-    const {reel, post, at, caption, platform, lang} = await body(req);
+    const {reel, post, at, caption, platform, lang, version: wantV} = await body(req);
     const when = Date.parse(at);
     if (!Number.isFinite(when)) return json(400, {error: 'нет времени'});
     let files, version = '', what = reel;
@@ -775,10 +836,13 @@ createServer(async (req, res) => {
       if (!pdir) return json(404, {});
     } else {
       const dir = reelDir(p, reel);
-      const cur = dir && versions(p, reel)[0];
+      // The version the owner picked (a reel may have RU and EN variants), its master when built.
+      const all = dir ? versions(p, reel) : [];
+      const cur = all.find((v) => v.v === wantV) || all[0];
       if (!cur) return json(400, {error: 'нет версии'});
-      const pick = (k) => cur.files.find((f) => f.kind === k)?.name;
-      files = [pick('copy') || pick('master'), pick('cover')].filter(Boolean).map((f) => join(dir, 'versions', cur.v, f));
+      // Telegram takes at most 50 MB from a bot: a bigger master stays on the page («Скачать мастер»).
+      const pick = (k) => cur.files.filter((f) => f.kind === k && f.size < 49e6).sort((a, b) => b.size - a.size)[0]?.name;
+      files = [pick('master') || pick('copy'), pick('cover')].filter(Boolean).map((f) => join(dir, 'versions', cur.v, f));
       version = cur.v;
     }
     const items = readJson(OUTBOX, []);
@@ -964,11 +1028,13 @@ createServer(async (req, res) => {
     const a = access();
     const tg = telegramSessions(a);
     return json(200, {
-      people: peopleOf(a, p).map((x) => ({...x, editorNow: isEditor(x),
+      people: peopleOf(a, p).map(({pw, ...x}) => ({...x, hasPassword: !!pw?.hash, editorNow: isEditor(x),
         devices: a.sessions.filter((s) => s.person === x.id).map((s) => ({id: s.id, device: s.device, created: s.created, seen: s.seen, mine: s.id === me.sid})),
         bot: x.isOwner ? tg.find((t) => t.owner) || null : x.telegram ? {username: x.telegram.username, seen: x.telegram.seen || x.added} : null})),
       invites: a.invites.filter((x) => x.expires > Date.now()).map((x) => ({...x, link: inviteLinks(x)})),
       bot: botUsername(), me: me.id,
+      // Only the owner sees the bot's owner link, and only while the bot has no owner yet.
+      ownerLink: me.isOwner && botUsername() && process.env.OWNER_CODE && !readJson(join(BOT, 'data', 'state.json'), {}).ownerId ? `https://t.me/${botUsername()}?start=${process.env.OWNER_CODE}` : null,
       log: read(LOG).split('\n').filter(Boolean).slice(-40).map((l) => JSON.parse(l)).reverse(),
     });
   }

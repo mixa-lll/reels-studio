@@ -5,3 +5,6 @@ studio/
 .DS_Store
 projects/
 web/data/
+relay/.dev.vars
+relay/.wrangler/
+backups/

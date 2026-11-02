@@ -798,6 +798,10 @@ function stagePublish(id, data) {
   const pub = data.publish || {};
   const caps = Array.isArray(pub.captions) && pub.captions.length ? pub.captions : [{platform: 'Instagram', text: section(data.readme, 'Подпись').trim() || section(data.readme, 'Caption').trim()}];
   const cur = data.versions[0];
+  // Every version that still has a video can be published; the newest one with a master goes first.
+  const isMaster = (v) => v.files.some((f) => f.kind === 'master');
+  const pubVers = data.versions.filter((v) => v.files.some((f) => f.kind === 'master' || f.kind === 'copy'));
+  const pubDefault = pubVers.find(isMaster) || pubVers[0];
   const host = $('#reelHost');
   const d = new Date(Date.now() + 3600e3); d.setMinutes(0, 0, 0);
   const local = new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
@@ -810,8 +814,8 @@ function stagePublish(id, data) {
     ${!pub.captions ? `<p class="small muted">Подписи Claude пишет в publish.json — попроси в чате справа: «напиши подписи для RU и EN».${canEdit() ? ' <button type="button" class="btn" id="mkCaps" style="margin-left: 6px">Написать подписи</button>' : ''}</p>` : ''}
     ${Array.isArray(pub.checks) && pub.checks.length ? `<div class="blk"><span class="lbl">Перед выкладкой</span>${pub.checks.map((c) => `<div class="row" style="gap: 10px"><span style="color: ${c.ok ? 'var(--green)' : 'var(--amber)'}; font-weight: 700">${c.ok ? '✓' : '!'}</span><span>${esc(c.text)}</span></div>`).join('')}</div>` : ''}
     ${cur && canEdit() ? `<div class="card" style="display: flex; flex-direction: column; gap: 12px"><b>Прислать пакет в Телеграм</b>
-      <span class="small muted">В нужное время бот пришлёт тебе подпись, видео ${esc(cur.v)} и обложку — выложишь с телефона за минуту.</span>
-      <div class="row" style="gap: 10px"><label class="small muted" for="pubAt">Когда</label><input class="f" type="datetime-local" id="pubAt" value="${local}" style="width: auto"><select class="f" id="pubCap" style="width: auto">${caps.map((c, i) => `<option value="${i}">${esc(c.platform || 'Подпись ' + (i + 1))}</option>`).join('')}</select><button type="button" class="btn primary" id="pubGo">Запланировать</button></div></div>` : ''}
+      <span class="small muted">В нужное время бот пришлёт тебе подпись, видео выбранной версии и обложку — выложишь с телефона за минуту. Мастер больше 50 МБ Телеграм от бота не пропускает — его скачай кнопкой «Скачать мастер».</span>
+      <div class="row" style="gap: 10px; flex-wrap: wrap"><label class="small muted" for="pubAt">Когда</label><input class="f" type="datetime-local" id="pubAt" value="${local}" style="width: auto"><select class="f" id="pubVer" style="width: auto">${pubVers.map((v) => `<option value="${esc(v.v)}" ${v === pubDefault ? 'selected' : ''}>${esc(v.v)}${isMaster(v) ? ' · мастер' : ''}</option>`).join('')}</select><select class="f" id="pubCap" style="width: auto">${caps.map((c, i) => `<option value="${i}">${esc(c.platform || 'Подпись ' + (i + 1))}</option>`).join('')}</select><button type="button" class="btn primary" id="pubGo">Запланировать</button></div></div>` : ''}
     ${data.outbox?.length ? `<div class="blk"><span class="lbl">Запланировано</span>${data.outbox.map((o) => `<div class="li"><span style="flex: 1">${new Date(o.at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})} · ${esc(o.version)}${o.platform ? ' · ' + esc(o.platform) : ''}</span><span class="small muted">${o.sent ? (o.error ? 'не ушло: ' + esc(o.error) : 'отправлено в Телеграм') : 'ждёт · ' + esc(o.by)}</span>${!o.sent && canEdit() ? `<button type="button" class="btn" data-cancel="${esc(o.id)}">Отменить</button>` : ''}</div>`).join('')}</div>` : ''}
   </div>`;
   if (cur) {
@@ -821,12 +825,16 @@ function stagePublish(id, data) {
       base: {kind: 'reel', media: vid ? {type: 'video', url: vid.url} : null, cover: cover?.url, name: projName(), reel: data.template, grid: (OV?.reels || []).filter((r) => r.id !== id && r.thumb).slice(0, 8).map((r) => ({url: r.thumb, kind: 'reel'}))},
       onSeen: async (key) => { await post('/api/reel/seen', {reel: id, key}); drawStage(id, 'publish'); }});
   }
-  if (cur) $('#dlTop').innerHTML = cur.files.filter((f) => ['copy', 'cover'].includes(f.kind)).map((f) => `<a class="btn" href="${f.url}&dl=1">${f.kind === 'cover' ? 'Обложка' : 'Видео ' + esc(cur.v)} ↓</a>`).join('');
+  // A master button per version that has one (RU v1, EN v2…), then the current copy and cover.
+  const masterOf = (v) => v.files.filter((f) => f.kind === 'master').sort((a, b) => b.size - a.size)[0];
+  const masters = data.versions.filter(isMaster);
+  if (cur) $('#dlTop').innerHTML = masters.map((v) => `<a class="btn primary" href="${masterOf(v).url}&dl=1">Скачать мастер ${esc(v.v)} ↓</a>`).join('') +
+    cur.files.filter((f) => ['copy', 'cover'].includes(f.kind)).map((f) => `<a class="btn" href="${f.url}&dl=1">${f.kind === 'cover' ? 'Обложка' : 'Видео ' + esc(cur.v)} ↓</a>`).join('');
   host.querySelectorAll('textarea.f').forEach((t, i) => (t.oninput = () => { host.querySelector(`[data-len="${i}"]`).textContent = t.value.length; }));
   $('#mkCaps')?.addEventListener('click', () => chatOf().say('Напиши подписи к этому рилсу для каждой площадки и проверку перед выкладкой в publish.json.', 'Написать подписи'));
   $('#pubGo')?.addEventListener('click', async () => {
     const i = Number($('#pubCap').value);
-    const it = await post('/api/publish', {reel: id, at: new Date($('#pubAt').value).toISOString(), caption: $('#cap' + i).value, platform: caps[i].platform}).catch(() => null);
+    const it = await post('/api/publish', {reel: id, version: $('#pubVer').value, at: new Date($('#pubAt').value).toISOString(), caption: $('#cap' + i).value, platform: caps[i].platform}).catch(() => null);
     toast(it ? 'Запланировано — бот пришлёт пакет в Телеграм' : 'Не получилось запланировать');
     drawStage(id, 'publish');
   });
@@ -1176,12 +1184,21 @@ async function renderVersions(id, data) {
   const fileLinks = (v) => files(v).map((f) => `<a class="chip" href="${f.url}&dl=1">${kindName[f.kind]} · ${mb(f.size)} ↓</a>`).join('');
   const video = (v) => v.files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
   const thumb = (v) => v.files.find((f) => f.kind === 'thumb' || f.kind === 'cover');
-  const cur = vs[0], prev = vs.find((v) => v.state === 'previous' && video(v)), old = vs.filter((v) => v !== cur && v !== prev);
+  // A reel can have several finished variants (e.g. RU v1 and EN v2): every version that still has
+  // its video is a full row with its own master; the rest are snapshots that can be rebuilt.
+  const cur = vs[0], prev = vs.find((v) => v.state === 'previous' && video(v)), live = vs.filter((v) => v !== cur && video(v)), old = vs.filter((v) => v !== cur && !video(v));
+  const hasMaster = (v) => v.files.some((f) => f.kind === 'master');
+  const masterBtn = (v) => canEdit() && !hasMaster(v) ? `<button type="button" class="btn" data-master="${esc(v.v)}">Собрать мастер 1440p</button>` : '';
+  const vNote = (v) => { const n = versionNote(data.readme, v.v); return n ? `<span class="small" style="flex-basis: 100%; line-height: 1.5">${esc(n)}</span>` : ''; };
   const note = cur && versionNote(data.readme, cur.v);
   const nextV = cur ? 'v' + (Number(cur.v.replace(/\D/g, '')) + 1) : 'v1';
   const script = section(data.readme, 'Сценарий');
-  const dl = cur && files(cur).find((f) => f.kind === 'copy') || cur && files(cur)[0];
-  $('#dlTop').innerHTML = dl ? `<a class="btn primary" href="${dl.url}&dl=1">Скачать ${esc(cur.v)}</a>` : '';
+  // The top button gives the master of the newest accepted version (the biggest file, 1440p over 1080p);
+  // until a version is accepted it gives the current review copy.
+  const mv = vs.find((v) => v.files.some((f) => f.kind === 'master'));
+  const master = mv && mv.files.filter((f) => f.kind === 'master').sort((a, b) => b.size - a.size)[0];
+  const dl = master || cur && files(cur).find((f) => f.kind === 'copy') || cur && files(cur)[0];
+  $('#dlTop').innerHTML = dl ? `<a class="btn primary" href="${dl.url}&dl=1">${master ? `Скачать мастер${mv !== cur ? ' ' + esc(mv.v) : ''}` : `Скачать ${esc(cur.v)}`}</a>` : '';
   el.innerHTML = `<div class="rvid">${cur && video(cur)
       ? `<div class="vwrap"><video id="rv" src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video><div class="pinlayer" id="pinL" hidden></div></div>
         ${canEdit() ? `<form class="ecomp" id="eComp"><div class="row" style="gap: 6px"><b id="eT" class="tcx">0:00</b><span class="small muted">правка к ${esc(nextV)}</span></div>
@@ -1189,20 +1206,21 @@ async function renderVersions(id, data) {
           <div class="row" style="gap: 6px"><button type="button" class="btn" id="eMic" title="Сказать голосом">🎙 Голосом</button><button type="button" class="btn" id="ePt" title="Показать место на кадре">◎ Точка на кадре</button><button type="submit" class="btn primary" style="margin-left: auto">Добавить</button></div>
           <span class="small muted" id="eHint">Останови видео в нужный момент — правка привяжется к секунде</span></form>` : `<span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`}
         ${prev ? `<a class="btn" href="#/reel/${esc(id)}/compare">Сравнить с ${esc(prev.v)}</a>` : ''}
-        ${canEdit() && !cur.files.some((f) => f.kind === 'master') ? `<button type="button" class="btn primary" id="acceptV">Принять ${esc(cur.v)} — собрать мастер 1080p</button>` : ''}`
+        ${canEdit() && !cur.files.some((f) => f.kind === 'master') ? `<button type="button" class="btn primary" id="acceptV">Принять ${esc(cur.v)} — собрать мастер 1440p</button>` : ''}`
       : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}</div>
     <div class="rinfo">
       ${cur ? editsBlock(data.edits || [], cur, nextV) : ''}
       ${note ? `<div class="blk"><span class="lbl">Что в ${esc(cur.v)}</span><span style="font-size: 15px; line-height: 1.55">${esc(note)}</span></div>` : ''}
       <div class="blk"><span class="lbl">Версии · ${vs.length}</span>
         ${!cur ? '<p class="small muted">Версий пока нет. Напиши в чате справа, что снять или смонтировать.</p>' : `
-        <div class="li" style="border-top: 0"><b style="font-weight: 600">${esc(cur.v)} · текущая</b><span class="small muted">${ago(cur.at)}</span><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(cur)}</div></div>`}
-        ${prev ? `<div class="li"><b style="font-weight: 600">${esc(prev.v)}</b><span class="small muted">${ago(prev.at)} · лёгкая копия, мастер удалён ради места</span><details style="flex-basis: 100%"><summary class="small">Смотреть для сравнения</summary><video src="${video(prev).url}" controls playsinline preload="none" style="width: 220px; border-radius: 10px; margin-top: 8px; background: #000"></video></details><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(prev)}</div></div>` : ''}
+        <div class="li" style="border-top: 0"><b style="font-weight: 600">${esc(cur.v)} · текущая</b><span class="small muted">${ago(cur.at)}${hasMaster(cur) ? ' · мастер готов' : ''}</span><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(cur)}${masterBtn(cur)}</div></div>`}
+        ${live.map((v) => `<div class="li"><b style="font-weight: 600">${esc(v.v)}</b><span class="small muted">${ago(v.at)}${hasMaster(v) ? ' · мастер готов' : ''}</span>${vNote(v)}<details style="flex-basis: 100%"><summary class="small">Смотреть</summary><video src="${video(v).url}" controls playsinline preload="none" style="width: 220px; border-radius: 10px; margin-top: 8px; background: #000"></video></details><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(v)}${masterBtn(v)}</div></div>`).join('')}
         ${old.map((v) => `<div class="li"><div class="th" style="width: 28px; height: 50px; ${thumb(v) ? `background-image: url('${thumb(v).url}')` : ''}"></div><span style="flex: 1"><b style="font-weight: 600">${esc(v.v)}</b> <span class="small muted">· ${ago(v.at)} · кадр и снимок проекта${v.archived ? ` · освобождено ${mb(v.archived.freed)}` : ''}</span></span>${canEdit() ? `<button type="button" class="btn" data-rebuild="${esc(v.v)}">Пересобрать</button>` : ''}</div>`).join('')}
         <a class="small muted" href="#/settings/files" style="padding-top: 8px">Место на сервере →</a></div>
       ${script.trim() ? `<div class="blk"><span class="lbl">Сценарий</span><div class="md" style="font-size: 14px">${md(script)}</div></div>` : ''}
     </div>`;
-  $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1080p этой версии (без --draft) и скажи, когда будет готов.`, `Принять ${cur.v}`));
+  $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1440p этой версии (без --draft, 1440×2560, CRF 15) и скажи, когда будет готов.`, `Принять ${cur.v}`));
+  el.querySelectorAll('[data-master]').forEach((b) => (b.onclick = () => chatOf().say(`Собери мастер 1440p версии ${b.dataset.master} (без --draft, 1440×2560, CRF 15) из её снимка проекта versions/${b.dataset.master}/project-snapshot, если он есть, и скажи, когда будет готов. Текущую версию не трогай.`, `Мастер ${b.dataset.master}`)));
   const rv = $('#rv'), form = $('#eComp');
   if (rv && form) wireEdits(id, rv, form, cur, nextV);
   el.querySelectorAll('[data-erm]').forEach((b) => (b.onclick = async () => { await post('/api/reel/edits', {reel: id, action: 'remove', id: b.dataset.erm}); renderVersions(id); }));
@@ -1558,7 +1576,9 @@ async function vTeam(sub) {
       <div class="ttbl"><div class="ttr h"><span>Человек</span><span>Роль</span><span>Где работает</span><span>Был</span></div>
         ${a.people.map((x) => `<a class="ttr" href="#/settings/team/${esc(x.id)}"><span class="row" style="gap: 10px; flex-wrap: nowrap">${avatar(x.name)}<span style="min-width: 0"><b style="font-weight: 600">${esc(x.name)}${x.id === a.me ? ' (вы)' : ''}</b><div class="small muted">${x.isOwner ? 'главный аккаунт · вход по ключу' : esc(x.note || (x.groups || []).join(', ') || '')}</div></span></span><span class="row" style="gap: 5px">${teamChips(x)}</span><span class="row" style="gap: 5px">${where(x)}</span><span class="small muted">${ago2(Math.max(x.bot?.seen || 0, ...x.devices.map((d) => d.seen || 0)))}</span></a>`).join('')}</div>
       ${approvers.length ? `<div class="small" style="line-height: 1.5"><b>Согласуют по ссылке:</b> ${approvers.map((r) => `${esc(r.approve.name)} — рубрика <a href="#/knowledge/rubrics/${esc(r.id)}">«${esc(r.name)}»</a>`).join('; ')}. Это не аккаунт: ссылка на неделю приходит по правилу рубрики, входить не нужно.</div>` : ''}
-      <div class="card" style="display: flex; gap: 12px; align-items: center; background: var(--side)"><span>${svg('key', 18)}</span><span class="small" style="line-height: 1.5"><b>Паролей нет.</b> Каждый входит по одноразовой ссылке: в Телеграме бот узнаёт человека по аккаунту, в браузере ссылка ставит вход на этом устройстве. Устройства видны и закрываются в карточке человека.</span></div>
+      <div class="card" style="display: flex; flex-direction: column; gap: 6px"><div class="row" style="gap: 10px"><span>${svg('key', 18)}</span><b>Пароли для входа в браузере</b></div>
+        <span class="small muted" style="line-height: 1.5">На странице входа человек выбирает себя и вводит свой пароль — работает в любом браузере, в том числе после Телеграма. Пароль может задать владелец или сам человек себе. Ссылки-приглашения тоже работают.</span>
+        ${a.people.filter((x) => x.editorNow || x.web).map((x) => `<div class="li" style="padding: 8px 0"><span style="flex: 1"><b style="font-weight: 600">${esc(x.name)}${x.id === a.me ? ' (вы)' : ''}</b> <span class="small muted">· ${x.hasPassword ? 'пароль задан' : 'пароля нет'}</span></span>${ME?.isOwner || x.id === a.me ? `<button type="button" class="btn" data-pw="${esc(x.id)}" data-pwname="${esc(x.name)}">${x.hasPassword ? 'Сменить пароль' : 'Задать пароль'}</button>` : ''}</div>`).join('')}</div>
     </div>
     <div style="flex: 0 0 300px; display: flex; flex-direction: column; gap: 14px">
       <div class="card" style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Ждут входа · ${a.invites.length}</span>${a.invites.map((i) => `<div class="li" style="padding: 8px 0"><span style="flex: 1"><b>${esc(i.name)}</b> <span class="small muted">· ${i.role === 'editor' ? 'редактор' : 'участник'} · ${i.web ? 'бот + веб' : 'только бот'}</span></span><button type="button" class="btn" data-show="${esc(i.code)}">Как подключить</button><button type="button" class="btn" data-cancel="${esc(i.code)}">Отозвать</button></div>`).join('') || '<span class="small muted">Никого.</span>'}</div><div id="invShow"></div>
@@ -1566,6 +1586,14 @@ async function vTeam(sub) {
     </div></div></div>`;
   view.querySelectorAll('[data-cancel]').forEach((b) => (b.onclick = async () => { await post('/api/access', {action: 'cancel', code: b.dataset.cancel}); route(); }));
   view.querySelectorAll('[data-show]').forEach((b) => (b.onclick = () => { $('#invShow').innerHTML = linkBox(a.invites.find((i) => i.code === b.dataset.show)); wireCopy($('#invShow')); $('#invShow').scrollIntoView({behavior: 'smooth', block: 'nearest'}); }));
+  view.querySelectorAll('[data-pw]').forEach((b) => (b.onclick = async () => {
+    const pw = prompt(`Новый пароль для «${b.dataset.pwname}» (минимум 6 символов). Передай его человеку лично.`);
+    if (pw == null) return;
+    if (pw.length < 6) return toast('Пароль — минимум 6 символов');
+    const r = await post('/api/password', {id: b.dataset.pw, password: pw}).catch(() => null);
+    toast(r?.ok ? 'Пароль сохранён' : 'Не получилось сохранить');
+    route();
+  }));
 }
 
 function teamInvite(a) {
@@ -1618,8 +1646,13 @@ function teamPerson(a, pid) {
           <div class="row"><span class="seg">${[['editor', 'Редактор'], ['member', 'Участник']].map(([k, t]) => `<button type="button" data-role="${k}" class="${x.role === k ? 'on' : ''}" ${locked || self || (x.isOwner && k === 'member') ? 'disabled' : ''}>${t}</button>`).join('')}</span><span class="small muted">роль меняется сразу</span></div>
           ${x.role === 'member' ? `<label class="tflag"><input type="checkbox" id="depOn" ${x.deputyUntil ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><b>Замещает редактора</b><span class="small muted">Права редактора до даты включительно, потом снова участник. Команду и подписку не трогает.</span>${x.deputyUntil ? `<input class="f" type="date" id="depUntil" value="${esc(x.deputyUntil)}" style="width: auto; margin-top: 6px">` : ''}</span></label>` : ''}
           ${x.role === 'editor' ? `<label class="tflag"><input type="checkbox" id="ownOn" ${x.isOwner ? 'checked' : ''} ${isOwner() && !self ? '' : 'disabled'}><span><b>Владелец</b><span class="small muted">Подписка, роли, сигналы владельцу. Ставит и снимает только владелец.</span></span></label>` : ''}</div>
-        <div class="card tcard2"><span class="lbl">Как входит · паролей нет</span>
-          ${x.bot ? `<div class="li"><span>${svg('tg', 18)}</span><span style="flex: 1"><b>Телеграм${x.bot.username ? ' · @' + esc(x.bot.username) : ''}</b><div class="small muted">последний раз ${ago2(x.bot.seen)}</div></span>${!locked && !self && !x.isOwner ? '<button type="button" class="btn" id="tgOff">Отключить бот</button>' : ''}</div>` : '<div class="li small muted">Бот не подключён.</div>'}
+        <div class="card tcard2"><span class="lbl">Как входит</span>
+          <div class="li" style="flex-wrap: wrap; gap: 8px"><span>${svg('key', 18)}</span><span style="flex: 1; min-width: 200px"><b>Пароль · ${x.hasPassword ? 'задан' : 'не задан'}</b><div class="small muted">Вход в браузере: на странице входа выбрать «${esc(x.name)}» и ввести пароль. Задать может владелец или сам человек; посмотреть старый нельзя — он хранится зашифрованным, можно только задать новый.</div></span>
+            ${isOwner() || self ? `<form id="pwForm" class="row" style="flex-basis: 100%; gap: 8px"><input class="f" id="pwNew" type="text" autocomplete="new-password" minlength="6" placeholder="Новый пароль, от 6 символов" style="flex: 1; min-width: 180px"><button type="submit" class="btn primary">${x.hasPassword ? 'Сменить пароль' : 'Задать пароль'}</button></form>` : ''}</div>
+          ${x.bot ? `<div class="li"><span>${svg('tg', 18)}</span><span style="flex: 1"><b>Телеграм${x.bot.username ? ' · @' + esc(x.bot.username) : ''}</b><div class="small muted">последний раз ${ago2(x.bot.seen)}</div></span>${!locked && !self && !x.isOwner ? '<button type="button" class="btn" id="tgOff">Отключить бот</button>' : ''}</div>`
+            // Not connected yet: the owner gets the bot's owner link, anyone else a Telegram invite.
+            : `<div class="li" style="flex-wrap: wrap; gap: 8px"><span>${svg('tg', 18)}</span><span style="flex: 1; min-width: 200px"><b>Телеграм-бот не подключён</b><div class="small muted">${a.bot ? `Бот студии — @${esc(a.bot)}. Человек открывает ссылку в Телеграме и жмёт Start — бот узнаёт его и пускает с его ролью.` : 'Бот студии сейчас не запущен.'}</div></span>
+              ${x.isOwner && self && a.ownerLink ? `<a class="btn primary" href="${esc(a.ownerLink)}" target="_blank" rel="noopener">Подключить бота</a>` : a.bot && !locked && !x.isOwner ? '<button type="button" class="btn primary" id="tgLink">Подключить Телеграм-бот</button>' : ''}<div id="tgOut" style="flex-basis: 100%"></div></div>`}
           ${x.devices.map((d) => `<div class="li"><span>${svg('web', 18)}</span><span style="flex: 1"><b>${esc(d.device)}${d.mine ? ' · это устройство' : ''}</b><div class="small muted">веб · вход ${new Date(d.created).toLocaleDateString('ru', {day: 'numeric', month: 'short'})} · ${ago2(d.seen)}</div></span>${d.mine || locked ? '' : `<button type="button" class="btn" data-end="${esc(d.id)}">Завершить</button>`}</div>`).join('') || (ed || x.web ? '<div class="li small muted">В веб ещё не входил.</div>' : '')}
           ${x.role === 'member' ? `<label class="tflag"><input type="checkbox" id="webOn" ${x.web ? 'checked' : ''} ${locked ? 'disabled' : ''}><span><b>Веб на компьютере</b><span class="small muted">Без этого у участника только бот; выключение закрывает его входы в веб.</span></span></label>` : ''}
           <div class="row" style="padding-top: 6px">${locked ? '' : '<button type="button" class="btn" id="relink">Новая ссылка входа</button><span class="small muted" style="flex: 1">если сменил телефон или потерял вход</span>'}${!locked && !self && !x.isOwner ? '<button type="button" class="btn danger" id="rm">Убрать из команды</button>' : ''}</div>
@@ -1642,7 +1675,23 @@ function teamPerson(a, pid) {
   $('#tgOff')?.addEventListener('click', async () => { if (confirm(`Отключить бот у ${x.name}?`)) { await post('/api/access', {action: 'end-telegram', id: x.id}); route(); } });
   view.querySelectorAll('[data-end]').forEach((b) => (b.onclick = async () => { await post('/api/access', {action: 'end', session: b.dataset.end}); route(); }));
   $('#rm')?.addEventListener('click', async () => { if (confirm(`Убрать ${x.name} из команды? Входы закроются.`)) { await post('/api/access', {action: 'remove', id: x.id}); location.hash = '#/settings/team'; } });
+  $('#tgLink')?.addEventListener('click', async () => {
+    const r = await post('/api/access', {action: 'relink', id: x.id}).catch(() => null);
+    if (!r?.invite?.link?.telegram) return toast('Не получилось сделать ссылку');
+    $('#tgOut').innerHTML = `<div class="card" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px"><b>Ссылка на бота для ${esc(x.name)}</b><span class="small muted">Одноразовая, 7 дней. Перешли человеку — он откроет её в Телеграме и нажмёт Start.</span><div class="row" style="gap: 8px"><input class="f" readonly value="${esc(r.invite.link.telegram)}" style="flex: 1"><button type="button" class="btn primary" id="tgCopy">Скопировать</button></div></div>`;
+    $('#tgLink').disabled = true;
+    $('#tgOut').scrollIntoView({block: 'center'});
+    $('#tgCopy').onclick = async () => { try { await navigator.clipboard.writeText(r.invite.link.telegram); toast('Скопировано'); } catch { toast('Выдели ссылку и скопируй'); } };
+  });
   $('#relink')?.addEventListener('click', async () => { const r = await post('/api/access', {action: 'relink', id: x.id}).catch(() => null); if (r?.invite) { $('#relOut').innerHTML = linkBox(r.invite); wireCopy($('#relOut')); } });
+  $('#pwForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pw = $('#pwNew').value;
+    if (pw.length < 6) return toast('Пароль — минимум 6 символов');
+    const r = await post('/api/password', {id: x.id, password: pw}).catch(() => null);
+    toast(r?.ok ? (self ? 'Пароль сохранён' : `Пароль сохранён — передай его ${x.name} лично`) : 'Не получилось сохранить');
+    route();
+  });
 }
 
 // How to save a Telegram channel or chat as an archive for the project chat (bot/tgexport.mjs reads it).
@@ -1881,6 +1930,7 @@ window.addEventListener('hashchange', route);
   await loadMe();
   route();
 })();
+
 </script>
 </body>
 </html>
