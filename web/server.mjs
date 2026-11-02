@@ -202,8 +202,13 @@ function retain(p, r) {
   let freed = 0;
   vs.slice(0, -1).forEach((v, i, older) => {
     const vdir = join(dir, 'versions', v);
-    const videos = readdirSync(vdir).filter((f) => /\.(mp4|mov|webm)$/i.test(f)).map((f) => ({f, size: statSync(join(vdir, f)).size})).sort((a, b) => a.size - b.size);
+    // A master is a deliverable, not a draft: a reel can have several finished variants
+    // (RU v1, EN v2), so masters are never archived — only review copies are.
+    const keep = readdirSync(vdir).some((f) => /1440p|1080p|master/i.test(f));
+    const videos = readdirSync(vdir).filter((f) => /\.(mp4|mov|webm)$/i.test(f) && !/1440p|1080p|master/i.test(f)).map((f) => ({f, size: statSync(join(vdir, f)).size})).sort((a, b) => a.size - b.size);
     if (!videos.length) return;
+    // With its master kept, a version stays fully usable: its light copy stays too, for watching.
+    if (keep) return;
     const previous = i === older.length - 1;
     let drop = [];
     if (accepted && pol.finalOnly) drop = videos;
