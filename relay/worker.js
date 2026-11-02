@@ -16,7 +16,7 @@ const CHUNK = 256 * 1024;
 
 export default {
   async fetch(req, env) {
-    const stub = env.RELAY.get(env.RELAY.idFromName('mac-v2'));
+    const stub = env.RELAY.get(env.RELAY.idFromName('mac-v3'));
     return stub.fetch(req);
   },
 };
@@ -147,10 +147,13 @@ export class Relay {
     if (m.t === 'head') {
       const noBody = [101, 204, 205, 304].includes(m.status);
       if (noBody) { this.settle(m.id, new Response(null, {status: m.status, headers: m.headers})); this.pending.delete(m.id); return; }
-      const {readable, writable} = new TransformStream(undefined, {highWaterMark: 4});
-      p.writer = writable.getWriter();
       const headers = new Headers();
       for (const [k, v] of m.headers) headers.append(k, v);
+      // A known length keeps Content-Length on the way out: phones show download progress and
+      // size only with it (a plain stream would go out chunked, without a size).
+      const len = Number(headers.get('content-length'));
+      const {readable, writable} = len > 0 && !headers.get('content-encoding') ? new FixedLengthStream(len) : new TransformStream(undefined, {highWaterMark: 4});
+      p.writer = writable.getWriter();
       this.settle(m.id, new Response(readable, {status: m.status, headers}));
     } else if (m.t === 'end') {
       this.pending.delete(m.id);

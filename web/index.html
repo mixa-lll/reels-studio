@@ -816,7 +816,7 @@ function stagePublish(id, data) {
     return `<div class="card" style="display: flex; gap: 14px; align-items: flex-start">
       <div style="flex: none; width: 66px; aspect-ratio: 9 / 16; border-radius: 10px; background: var(--soft) center / cover no-repeat; ${cover ? `background-image: url('${cover.url}')` : ''}"></div>
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
-        <div class="row" style="gap: 8px; flex-wrap: wrap"><b>${esc(v.v)}${v === cur ? ' · текущая' : ''}</b>${master ? `<span class="small" style="color: var(--green); font-weight: 600">✓ мастер ${res}</span>` : `<span class="small" style="color: var(--amber); font-weight: 600">${copy ? 'мастер не собран' : 'видео не сохранено — можно пересобрать'}</span>`}</div>
+        <div class="row" style="gap: 8px; flex-wrap: wrap"><b>${esc(vName(v))}${v === cur ? ' · текущая' : ''}</b>${master ? `<span class="small" style="color: var(--green); font-weight: 600">✓ мастер ${res}</span>` : `<span class="small" style="color: var(--amber); font-weight: 600">${copy ? 'мастер не собран' : 'видео не сохранено — можно пересобрать'}</span>`}</div>
         ${note ? `<span class="small" style="line-height: 1.45">${esc(note)}</span>` : ''}
         <div class="row" style="gap: 8px; flex-wrap: wrap; margin-top: 4px">
           ${master ? `<a class="btn primary" href="${master.url}&dl=1">Скачать мастер ${esc(v.v)} · ${mb(master.size)} ↓</a>` : canEdit() ? `<button type="button" class="btn primary" data-pubmaster="${esc(v.v)}">Собрать мастер 1440p</button>` : ''}
@@ -836,7 +836,7 @@ function stagePublish(id, data) {
     ${Array.isArray(pub.checks) && pub.checks.length ? `<div class="blk"><span class="lbl">Перед выкладкой</span>${pub.checks.map((c) => `<div class="row" style="gap: 10px"><span style="color: ${c.ok ? 'var(--green)' : 'var(--amber)'}; font-weight: 700">${c.ok ? '✓' : '!'}</span><span>${esc(c.text)}</span></div>`).join('')}</div>` : ''}
     ${cur && canEdit() ? `<div class="card" style="display: flex; flex-direction: column; gap: 12px"><b>Прислать пакет в Телеграм</b>
       <span class="small muted">В нужное время бот пришлёт тебе подпись, видео выбранной версии и обложку — выложишь с телефона за минуту. Мастер больше 50 МБ Телеграм от бота не пропускает — его скачай кнопкой «Скачать мастер».</span>
-      <div class="row" style="gap: 10px; flex-wrap: wrap"><label class="small muted" for="pubAt">Когда</label><input class="f" type="datetime-local" id="pubAt" value="${local}" style="width: auto"><select class="f" id="pubVer" style="width: auto">${pubVers.map((v) => `<option value="${esc(v.v)}" ${v === pubDefault ? 'selected' : ''}>${esc(v.v)}${isMaster(v) ? ' · мастер' : ''}</option>`).join('')}</select><select class="f" id="pubCap" style="width: auto">${caps.map((c, i) => `<option value="${i}">${esc(c.platform || 'Подпись ' + (i + 1))}</option>`).join('')}</select><button type="button" class="btn primary" id="pubGo">Запланировать</button></div></div>` : ''}
+      <div class="row" style="gap: 10px; flex-wrap: wrap"><label class="small muted" for="pubAt">Когда</label><input class="f" type="datetime-local" id="pubAt" value="${local}" style="width: auto"><select class="f" id="pubVer" style="width: auto">${pubVers.map((v) => `<option value="${esc(v.v)}" ${v === pubDefault ? 'selected' : ''}>${esc(vName(v))}${isMaster(v) ? ' · мастер' : ''}</option>`).join('')}</select><select class="f" id="pubCap" style="width: auto">${caps.map((c, i) => `<option value="${i}">${esc(c.platform || 'Подпись ' + (i + 1))}</option>`).join('')}</select><button type="button" class="btn primary" id="pubGo">Запланировать</button></div></div>` : ''}
     ${data.outbox?.length ? `<div class="blk"><span class="lbl">Запланировано</span>${data.outbox.map((o) => `<div class="li"><span style="flex: 1">${new Date(o.at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'})} · ${esc(o.version)}${o.platform ? ' · ' + esc(o.platform) : ''}</span><span class="small muted">${o.sent ? (o.error ? 'не ушло: ' + esc(o.error) : 'отправлено в Телеграм') : 'ждёт · ' + esc(o.by)}</span>${!o.sent && canEdit() ? `<button type="button" class="btn" data-cancel="${esc(o.id)}">Отменить</button>` : ''}</div>`).join('')}</div>` : ''}
   </div>`;
   if (cur) {
@@ -1196,6 +1196,10 @@ function wireEdits(id, rv, form, cur, nextV) {
   };
 }
 
+// Which version the «Монтаж» player shows, per reel: the current one unless another variant is picked.
+const VIEWV = {};
+const vName = (v) => `${v.v}${v.variant ? ' · ' + v.variant : ''}`;
+
 async function renderVersions(id, data) {
   data ||= await api('/api/reel?reel=' + encodeURIComponent(id));
   const el = $('#vers');
@@ -1212,37 +1216,53 @@ async function renderVersions(id, data) {
   const hasMaster = (v) => v.files.some((f) => f.kind === 'master');
   const masterBtn = (v) => canEdit() && !hasMaster(v) ? `<button type="button" class="btn" data-master="${esc(v.v)}">Собрать мастер 1440p</button>` : '';
   const vNote = (v) => { const n = versionNote(data.readme, v.v); return n ? `<span class="small" style="flex-basis: 100%; line-height: 1.5">${esc(n)}</span>` : ''; };
-  const note = cur && versionNote(data.readme, cur.v);
+  const sel = vs.find((v) => v.v === VIEWV[id]) || cur;
+  const note = sel && versionNote(data.readme, sel.v);
   const nextV = cur ? 'v' + (Number(cur.v.replace(/\D/g, '')) + 1) : 'v1';
   const script = section(data.readme, 'Сценарий');
   // The top button gives the master of the newest accepted version (the biggest file, 1440p over 1080p);
   // until a version is accepted it gives the current review copy.
-  const mv = vs.find((v) => v.files.some((f) => f.kind === 'master'));
+  const mv = sel && hasMaster(sel) ? sel : vs.find((v) => v.files.some((f) => f.kind === 'master'));
   const master = mv && mv.files.filter((f) => f.kind === 'master').sort((a, b) => b.size - a.size)[0];
   const dl = master || cur && files(cur).find((f) => f.kind === 'copy') || cur && files(cur)[0];
-  $('#dlTop').innerHTML = dl ? `<a class="btn primary" href="${dl.url}&dl=1">${master ? `Скачать мастер${mv !== cur ? ' ' + esc(mv.v) : ''}` : `Скачать ${esc(cur.v)}`}</a>` : '';
-  el.innerHTML = `<div class="rvid">${cur && video(cur)
+  $('#dlTop').innerHTML = dl ? `<a class="btn primary" href="${dl.url}&dl=1">${master ? `Скачать мастер ${esc(vName(mv))}` : `Скачать ${esc(cur.v)}`}</a>` : '';
+  // Variants switcher above the player: every version, the current one first.
+  const switcher = vs.length > 1 ? `<div class="row" style="gap: 6px; flex-wrap: wrap">${vs.map((v) => `<button type="button" class="btn${v === sel ? ' primary' : ''}" data-viewv="${esc(v.v)}" style="min-height: 34px; padding: 0 12px">${esc(vName(v))}${v === cur ? ' · текущая' : ''}${video(v) ? '' : ' · нет видео'}${hasMaster(v) ? ' ✓' : ''}</button>`).join('')}</div>` : '';
+  const nameBtn = (v) => canEdit() ? `<button type="button" class="btn" data-vlabel="${esc(v.v)}" data-cur="${esc(v.variant || '')}">${v.variant ? 'Переименовать вариант' : 'Назвать вариант (RU, EN…)'}</button>` : '';
+  el.innerHTML = `<div class="rvid">${switcher}${sel && sel !== cur
+      ? `${video(sel) ? `<div class="vwrap"><video src="${video(sel).url}" controls playsinline preload="metadata" ${thumb(sel) ? `poster="${thumb(sel).url}"` : ''}></video></div>` : `<div class="vph" style="${thumb(sel) ? `background: #000 center / contain no-repeat url('${thumb(sel).url}'); color: #fff` : ''}">Видео ${esc(sel.v)} не сохранено — можно пересобрать</div>`}
+        <span class="small muted" style="text-align: center">Смотришь ${esc(vName(sel))}. Правки пишутся к текущей ${esc(cur.v)}.</span>
+        <div class="row" style="gap: 8px; flex-wrap: wrap; justify-content: center">${hasMaster(sel) ? '' : masterBtn(sel)}${nameBtn(sel)}<button type="button" class="btn" data-viewv="${esc(cur.v)}">К текущей ${esc(cur.v)}</button></div>`
+      : cur && video(cur)
       ? `<div class="vwrap"><video id="rv" src="${video(cur).url}" controls playsinline preload="metadata" ${thumb(cur) ? `poster="${thumb(cur).url}"` : ''}></video><div class="pinlayer" id="pinL" hidden></div></div>
         ${canEdit() ? `<form class="ecomp" id="eComp"><div class="row" style="gap: 6px"><b id="eT" class="tcx">0:00</b><span class="small muted">правка к ${esc(nextV)}</span></div>
           <textarea class="f" id="eText" rows="2" placeholder="Что поменять в этот момент — словами или голосом"></textarea>
           <div class="row" style="gap: 6px"><button type="button" class="btn" id="eMic" title="Сказать голосом">🎙 Голосом</button><button type="button" class="btn" id="ePt" title="Показать место на кадре">◎ Точка на кадре</button><button type="submit" class="btn primary" style="margin-left: auto">Добавить</button></div>
           <span class="small muted" id="eHint">Останови видео в нужный момент — правка привяжется к секунде</span></form>` : `<span class="small muted" style="text-align: center">${esc(cur.v)} · ${ago(cur.at)}</span>`}
         ${prev ? `<a class="btn" href="#/reel/${esc(id)}/compare">Сравнить с ${esc(prev.v)}</a>` : ''}
-        ${canEdit() && !cur.files.some((f) => f.kind === 'master') ? `<button type="button" class="btn primary" id="acceptV">Принять ${esc(cur.v)} — собрать мастер 1440p</button>` : ''}`
+        ${canEdit() && !cur.files.some((f) => f.kind === 'master') ? `<button type="button" class="btn primary" id="acceptV">Принять ${esc(cur.v)} — собрать мастер 1440p</button>` : ''}
+        ${vs.length > 1 || cur.variant ? `<div class="row" style="justify-content: center">${nameBtn(cur)}</div>` : ''}`
       : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}</div>
     <div class="rinfo">
       ${cur ? editsBlock(data.edits || [], cur, nextV) : ''}
-      ${note ? `<div class="blk"><span class="lbl">Что в ${esc(cur.v)}</span><span style="font-size: 15px; line-height: 1.55">${esc(note)}</span></div>` : ''}
+      ${note ? `<div class="blk"><span class="lbl">Что в ${esc(vName(sel))}</span><span style="font-size: 15px; line-height: 1.55">${esc(note)}</span></div>` : ''}
       <div class="blk"><span class="lbl">Версии · ${vs.length}</span>
         ${!cur ? '<p class="small muted">Версий пока нет. Напиши в чате справа, что снять или смонтировать.</p>' : `
-        <div class="li" style="border-top: 0"><b style="font-weight: 600">${esc(cur.v)} · текущая</b><span class="small muted">${ago(cur.at)}${hasMaster(cur) ? ' · мастер готов' : ''}</span><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(cur)}${masterBtn(cur)}</div></div>`}
-        ${live.map((v) => `<div class="li"><b style="font-weight: 600">${esc(v.v)}</b><span class="small muted">${ago(v.at)}${hasMaster(v) ? ' · мастер готов' : ''}</span>${vNote(v)}<details style="flex-basis: 100%"><summary class="small">Смотреть</summary><video src="${video(v).url}" controls playsinline preload="none" style="width: 220px; border-radius: 10px; margin-top: 8px; background: #000"></video></details><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(v)}${masterBtn(v)}</div></div>`).join('')}
+        <div class="li" style="border-top: 0"><b style="font-weight: 600">${esc(vName(cur))} · текущая</b><span class="small muted">${ago(cur.at)}${hasMaster(cur) ? ' · мастер готов' : ''}</span><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(cur)}${masterBtn(cur)}</div></div>`}
+        ${live.map((v) => `<div class="li"><b style="font-weight: 600">${esc(vName(v))}</b><span class="small muted">${ago(v.at)}${hasMaster(v) ? ' · мастер готов' : ''}</span>${vNote(v)}<details style="flex-basis: 100%"><summary class="small">Смотреть</summary><video src="${video(v).url}" controls playsinline preload="none" style="width: 220px; border-radius: 10px; margin-top: 8px; background: #000"></video></details><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(v)}${masterBtn(v)}</div></div>`).join('')}
         ${old.map((v) => `<div class="li"><div class="th" style="width: 28px; height: 50px; ${thumb(v) ? `background-image: url('${thumb(v).url}')` : ''}"></div><span style="flex: 1"><b style="font-weight: 600">${esc(v.v)}</b> <span class="small muted">· ${ago(v.at)} · кадр и снимок проекта${v.archived ? ` · освобождено ${mb(v.archived.freed)}` : ''}</span></span>${canEdit() ? `<button type="button" class="btn" data-rebuild="${esc(v.v)}">Пересобрать</button>` : ''}</div>`).join('')}
         <a class="small muted" href="#/settings/files" style="padding-top: 8px">Место на сервере →</a></div>
       ${script.trim() ? `<div class="blk"><span class="lbl">Сценарий</span><div class="md" style="font-size: 14px">${md(script)}</div></div>` : ''}
     </div>`;
   $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1440p этой версии (без --draft, 1440×2560, CRF 15) и скажи, когда будет готов.`, `Принять ${cur.v}`));
   el.querySelectorAll('[data-master]').forEach((b) => (b.onclick = () => chatOf().say(`Собери мастер 1440p версии ${b.dataset.master} (без --draft, 1440×2560, CRF 15) из её снимка проекта versions/${b.dataset.master}/project-snapshot. Если снимка нет — восстанови эту версию по README (что в ней было) и сохранённым файлам проекта (например, тексты на другом языке) во временной копии project/, не трогая текущую версию. Скажи, когда будет готов.`, `Мастер ${b.dataset.master}`)));
+  el.querySelectorAll('[data-viewv]').forEach((b) => (b.onclick = () => { VIEWV[id] = b.dataset.viewv === cur.v ? null : b.dataset.viewv; renderVersions(id, data); }));
+  el.querySelectorAll('[data-vlabel]').forEach((b) => (b.onclick = async () => {
+    const label = prompt(`Как назвать вариант ${b.dataset.vlabel}? Например: RU, EN, короткая. Пусто — снять метку.`, b.dataset.cur || '');
+    if (label == null) return;
+    await post('/api/reel/variant', {reel: id, v: b.dataset.vlabel, label}).catch(() => null);
+    renderVersions(id);
+  }));
   const rv = $('#rv'), form = $('#eComp');
   if (rv && form) wireEdits(id, rv, form, cur, nextV);
   el.querySelectorAll('[data-erm]').forEach((b) => (b.onclick = async () => { await post('/api/reel/edits', {reel: id, action: 'remove', id: b.dataset.erm}); renderVersions(id); }));
@@ -1947,6 +1967,62 @@ async function route() {
 }
 $('#menuBtn').onclick = () => document.body.classList.toggle('menu');
 document.addEventListener('click', (e) => { if (document.body.classList.contains('menu') && !e.target.closest('nav.side, #menuBtn')) document.body.classList.remove('menu'); });
+// ---------- downloads on a phone ----------
+// Telegram's in-app browser cannot download at all, and on an iPhone a plain download lands in
+// «Files», not «Photos». So on a phone a video download is fetched here with a progress bar,
+// then «Сохранить в Фото» opens the system share sheet (Save Video); in Telegram — how to get out.
+const inTelegram = () => !!window.TelegramWebviewProxy || /Telegram/i.test(navigator.userAgent);
+const onPhone = () => /iPhone|iPad|Android/i.test(navigator.userAgent);
+function sheet(html) {
+  document.querySelector('#dlSheet')?.remove();
+  const el = document.createElement('div');
+  el.id = 'dlSheet';
+  el.style.cssText = 'position: fixed; inset: auto 12px 12px 12px; z-index: 60; padding: 16px; border-radius: 16px; background: var(--card, #fff); color: inherit; box-shadow: 0 10px 40px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 10px; font-size: 15px';
+  el.innerHTML = html + '<button type="button" class="btn" id="dlClose">Закрыть</button>';
+  document.body.append(el);
+  el.querySelector('#dlClose').onclick = () => el.remove();
+  return el;
+}
+document.addEventListener('click', async (e) => {
+  const a = e.target.closest('a[href*="/media?"][href*="dl=1"]');
+  if (!a || !onPhone()) return;
+  const name = decodeURIComponent(new URL(a.href, location.href).searchParams.get('p') || '').split('/').pop();
+  if (!/\.(mp4|mov)$/i.test(name)) return;
+  e.preventDefault();
+  if (inTelegram()) {
+    const el = sheet('<b>В браузере Телеграма файлы не скачиваются</b><span class="small">Нажми <b>⋯</b> вверху справа → <b>«Открыть в Safari»</b> (или в браузере) и войди своим паролем — там скачивание работает.</span><button type="button" class="btn primary" id="dlCopy">Скопировать адрес студии</button>');
+    el.querySelector('#dlCopy').onclick = async () => { try { await navigator.clipboard.writeText(location.origin + '/' + location.hash); toast('Скопировано — вставь в Safari'); } catch { toast(location.origin); } };
+    return;
+  }
+  const el = sheet(`<b>${esc(name)}</b><div style="height: 8px; border-radius: 4px; background: var(--soft, #eee); overflow: hidden"><div id="dlBar" style="height: 100%; width: 0; background: var(--green, #2a2)"></div></div><span class="small" id="dlTxt">Загружаю…</span>`);
+  try {
+    const r = await fetch(a.href);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const total = Number(r.headers.get('content-length')) || 0;
+    const reader = r.body.getReader();
+    const parts = [];
+    let got = 0;
+    for (;;) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      parts.push(value);
+      got += value.length;
+      if (!el.isConnected) return reader.cancel();
+      el.querySelector('#dlBar').style.width = total ? Math.round(got / total * 100) + '%' : '50%';
+      el.querySelector('#dlTxt').textContent = `Загружено ${mb(got)}${total ? ' из ' + mb(total) : ''}`;
+    }
+    const file = new File(parts, name, {type: 'video/mp4'});
+    const url = URL.createObjectURL(file);
+    el.querySelector('#dlTxt').textContent = 'Готово. Сохрани видео:';
+    const go = document.createElement('div');
+    go.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap';
+    go.innerHTML = (navigator.canShare?.({files: [file]}) ? '<button type="button" class="btn primary" id="dlShare">Сохранить в Фото / Поделиться</button>' : '') + `<a class="btn" href="${url}" download="${esc(name)}">Сохранить в Файлы</a>`;
+    el.querySelector('#dlClose').before(go);
+    el.querySelector('#dlShare')?.addEventListener('click', () => navigator.share({files: [file]}).catch(() => {}));
+  } catch (err) {
+    el.querySelector('#dlTxt').textContent = 'Не получилось загрузить: ' + err.message + '. Попробуй ещё раз.';
+  }
+});
 window.addEventListener('hashchange', route);
 (async () => {
   await loadMe();

@@ -147,7 +147,9 @@ function versions(p, r) {
       return {name: f, kind, size: statSync(full).size, url: mediaUrl(full)};
     });
     const archived = readJson(join(vdir, 'ARCHIVED.json'), null);
-    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, archived, at: statSync(vdir).mtimeMs};
+    // A variant (RU, EN, short cut…) is a finished parallel version, not a draft: versions/vN/variant.json.
+    const variant = readJson(join(vdir, 'variant.json'), null)?.label || null;
+    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, archived, variant, at: statSync(vdir).mtimeMs};
   }).reverse();
 }
 
@@ -204,7 +206,7 @@ function retain(p, r) {
     const vdir = join(dir, 'versions', v);
     // A master is a deliverable, not a draft: a reel can have several finished variants
     // (RU v1, EN v2), so masters are never archived — only review copies are.
-    const keep = readdirSync(vdir).some((f) => /1440p|1080p|master/i.test(f));
+    const keep = readdirSync(vdir).some((f) => /1440p|1080p|master/i.test(f)) || existsSync(join(vdir, 'variant.json'));
     const videos = readdirSync(vdir).filter((f) => /\.(mp4|mov|webm)$/i.test(f) && !/1440p|1080p|master/i.test(f)).map((f) => ({f, size: statSync(join(vdir, f)).size})).sort((a, b) => a.size - b.size);
     if (!videos.length) return;
     // With its master kept, a version stays fully usable: its light copy stays too, for watching.
@@ -737,6 +739,18 @@ createServer(async (req, res) => {
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
   // point on the frame; «Собрать vN» hands the open ones to the reel chat (edits.json).
+  // Names a version as a variant («RU», «EN», «короткая»), or clears the name.
+  if (req.method === 'POST' && url.pathname === '/api/reel/variant') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir || !/^v\d+$/.test(b.v || '') || !existsSync(join(dir, 'versions', b.v))) return json(404, {});
+    const label = String(b.label || '').trim().slice(0, 24);
+    const f = join(dir, 'versions', b.v, 'variant.json');
+    if (label) writeJson(f, {label, by: me.name, at: Date.now()}); else rmSync(f, {force: true});
+    log(me.name, label ? `назвал ${b.v} ролика ${b.reel} вариантом «${label}»` : `снял метку варианта с ${b.v} ролика ${b.reel}`);
+    return json(200, {ok: true});
+  }
   if (req.method === 'POST' && url.pathname === '/api/reel/edits') {
     if (!can('editor')) return json(403, {});
     const b = await body(req);
