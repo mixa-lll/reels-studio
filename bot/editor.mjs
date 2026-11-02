@@ -20,8 +20,8 @@ const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 const when = (s) => { const d = new Date(s); return `${DAYS[(d.getDay() + 6) % 7]} ${d.getDate()} ${d.toLocaleDateString('ru-RU', {month: 'short'}).replace('.', '')}, ${s.slice(11, 16)}`; };
 const plural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
 
-export const KEYS = {keyboard: [[{text: '📥 Входящие'}, {text: '📅 Неделя'}], [{text: '👥 Люди'}, {text: '☰ Ещё'}]], resize_keyboard: true, is_persistent: true};
-export const LABELS = {'📥 Входящие': 'inbox', '📅 Неделя': 'week', '👥 Люди': 'people', '☰ Ещё': 'more'};
+export const KEYS = {keyboard: [[{text: '🎬 Ролики'}, {text: '📥 Входящие'}], [{text: '📅 Неделя'}, {text: '👥 Люди'}, {text: '☰ Ещё'}]], resize_keyboard: true, is_persistent: true};
+export const LABELS = {'🎬 Ролики': 'reels', '📥 Входящие': 'inbox', '📅 Неделя': 'week', '👥 Люди': 'people', '☰ Ещё': 'more'};
 
 /** `studio()` — the active project's folder; `app(text, hash)` — a mini app button or null. */
 export function editor({tg, studio, app}) {

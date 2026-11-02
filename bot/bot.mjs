@@ -3,6 +3,7 @@
 // One owner, one agent turn at a time; messages that arrive mid-turn join it at once.
 import {createSandbox, isTest, listSandboxes, removeSandbox, sandboxName} from './sandbox.mjs';
 import {editor as makeEditor, KEYS as EDITOR_KEYS, LABELS as EDITOR_LABELS} from './editor.mjs';
+import {listReels, reelsUi} from './reels.mjs';
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
@@ -190,6 +191,10 @@ for (const ev of ['uncaughtException', 'unhandledRejection']) {
   });
 }
 const state = loadState();
+// «🎬 Ролики» (bot/reels.mjs): the reel the chat is working on, pinned on top with quick actions.
+const panelOrigin = process.env.MINIAPP_URL ? new URL(process.env.MINIAPP_URL).origin : null;
+const reels = reelsUi({tg, studio, project: () => state.project, state, save: saveState, send: (p) => enqueue(p), root: ROOT,
+  panel: (folder) => (panelOrigin ? `${panelOrigin}/#/reel/${encodeURIComponent(folder)}` : null)});
 // Team texts: members invited from the web version (bot/members.mjs).
 const TEAM = {
   ru: {
@@ -718,7 +723,11 @@ async function runTurn(prompt, retried = false) {
     delete state.pending;
     return saveState(state);
   }
+  const reelsBefore = new Set(listReels(studio()).map((r) => r.folder));
   const res = await runWithStatus(prompt, T.accepted, {open: true});
+  // A reel Claude has just created becomes the focus; the pinned card shows new versions.
+  const born = listReels(studio()).find((r) => !reelsBefore.has(r.folder));
+  await (born ? reels.setFocus(state.chatId, born.folder) : reels.refresh()).catch(() => {});
   delete state.pending;
   saveState(state);
   if (res.cancelled && (res.reason === 'stalled' || res.reason === 'overtime')) {
@@ -1040,6 +1049,7 @@ async function onMessage(msg) {
     await tg.call('sendMessage', {chat_id: state.chatId, text: '👋', reply_markup: HOME_KEYS, disable_notification: true}).catch(() => {});
     return ed.today(state.chatId);
   }
+  if (cmd === 'reels') return reels.list(state.chatId);
   if (cmd === 'inbox') return ed.inbox(state.chatId);
   if (cmd === 'week') return ed.week(state.chatId);
   if (cmd === 'people') return ed.people(state.chatId);
@@ -1128,7 +1138,7 @@ async function onMessage(msg) {
     if (result) enqueue(result);
     return;
   }
-  if (prompt) batch(prompt);
+  if (prompt) batch(await reels.framePrompt(state.chatId, prompt, msg));
 }
 
 // Albums and quick follow-ups arrive as separate messages; wait a moment and hand
@@ -1181,6 +1191,7 @@ async function onButton(q) {
   if (q.from.id !== state.ownerId && who?.role !== 'editor') return;
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
+  if (/^(rl|rla|rx|rn)$|^r[spvm]:/.test(q.data)) return reels.onButton(q).catch((e) => console.error('reels', e));
   if (q.data.startsWith('set:')) return onSettings(q);
   if (q.data.startsWith('tst:')) return who ? null : onTestButton(q);
   if (q.data.startsWith('p:')) return onProjectButton(q);
