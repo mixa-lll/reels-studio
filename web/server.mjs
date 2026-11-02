@@ -283,6 +283,9 @@ function startTurn(p, k, text, send) {
   const args = ['-p', `${preamble(p, k)}\n\n${text}`, '--output-format', 'stream-json', '--verbose',
     '--allowedTools', ALLOWED.join(','), '--disallowedTools', DENIED.join(','),
     '--setting-sources', 'project,local', '--strict-mcp-config', '--mcp-config', emptyMcp,
+    // A project may be a link to a folder outside the studio (My Gudauri → Рилсы/студия): Claude
+    // resolves links, so that real folder must be allowed too or every write there is refused.
+    ...(realProject(studio) ? ['--add-dir', realProject(studio)] : []),
     ...(/^[\w-]{8,}$/.test(meta.session || '') ? ['--resume', meta.session] : [])];
   rmSync(STATUS, {force: true});
   let offset = existsSync(EVENTS) ? statSync(EVENTS).size : 0;
@@ -362,6 +365,10 @@ function startTurn(p, k, text, send) {
 
 // ---------- media ----------
 
+// The real folder behind a project that is a link, or null for an ordinary folder.
+function realProject(dir) {
+  try { const real = realpathSync(dir); return real !== dir ? real : null; } catch { return null; }
+}
 function mediaPath(p) {
   try {
     const real = realpathSync(p);
