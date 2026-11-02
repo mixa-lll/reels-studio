@@ -10,7 +10,7 @@
 //   node bot/projects.mjs archive <slug>               move an inactive one to projects/.archive/
 // --carry: the owner's request that led here, in their words with file paths; the new
 // project's first turn starts from it.
-import {cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync} from 'node:fs';
+import {cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, rmSync, writeFileSync} from 'node:fs';
 import {join, relative} from 'node:path';
 import {parseArgs} from 'node:util';
 import {DATA, FIRST_PROJECT, GLOBAL_KEYS, PROJECTS, ROOT, loadState} from './config.mjs';
@@ -44,7 +44,7 @@ export const projectName = (slug) => readJson(join(dir(slug), 'settings.json')).
 export function listProjects() {
   if (!existsSync(PROJECTS)) return [];
   return readdirSync(PROJECTS, {withFileTypes: true})
-    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .filter((d) => (d.isDirectory() || (d.isSymbolicLink() && statSync(join(PROJECTS, d.name)).isDirectory())) && !d.name.startsWith('.'))
     .map((d) => ({slug: d.name, name: projectName(d.name), created: readJson(join(dir(d.name), 'settings.json')).created ?? ''}))
     .sort((a, b) => (a.slug === FIRST_PROJECT ? -1 : b.slug === FIRST_PROJECT ? 1 : a.created.localeCompare(b.created)))
     .map(({slug, name}) => ({slug, name}));
