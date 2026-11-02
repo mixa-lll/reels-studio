@@ -24,7 +24,7 @@ const frame = (id, bytes) => {
   return out;
 };
 
-let backoff = 1000;
+let backoff = 300;
 
 function connect() {
   const ws = new WebSocket(RELAY, {headers: {authorization: `Bearer ${SECRET}`}});
@@ -37,8 +37,8 @@ function connect() {
 
   ws.addEventListener('open', () => {
     log('relay up', RELAY);
-    backoff = 1000;
-    ping = setInterval(() => send('ping'), 25_000);
+    backoff = 300;
+    ping = setInterval(() => send("ping"), 15_000);
   });
 
   ws.addEventListener('message', ({data}) => {
@@ -89,7 +89,7 @@ function connect() {
     jobs.clear();
     log('relay down:', why, `— retry in ${backoff / 1000}s`);
     setTimeout(connect, backoff);
-    backoff = Math.min(backoff * 2, 60_000);
+    backoff = Math.min(backoff * 2, 10_000);
   };
   let closed = false;
   ws.addEventListener('close', (e) => { if (!closed) { closed = true; down(`close ${e.code} ${e.reason}`); } });

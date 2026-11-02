@@ -16,15 +16,15 @@ const CHUNK = 256 * 1024;
 
 export default {
   async fetch(req, env) {
-    const stub = env.RELAY.get(env.RELAY.idFromName('mac'));
+    const stub = env.RELAY.get(env.RELAY.idFromName('mac-v2'));
     return stub.fetch(req);
   },
 };
 
-const offline = () => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Студия недоступна</title><body style="font:16px/1.5 system-ui;padding:40px 20px;max-width:560px;margin:auto;color:#222">
-<h1 style="font-size:22px">Мак сейчас не на связи</h1><p>Студия работает на компьютере Миши. Похоже, он выключен, спит или без интернета. Попробуйте позже.</p>`,
-  {status: 503, headers: {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '30'}});
+const offline = (why = '') => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="5"><title>Студия недоступна</title><body style="font:16px/1.5 system-ui;padding:40px 20px;max-width:560px;margin:auto;color:#222">
+<h1 style="font-size:22px">Мак сейчас не на связи</h1><p>Студия работает на компьютере Миши. Похоже, он выключен, спит или без интернета. Страница сама обновится, как только он появится.</p>`,
+  {status: 503, headers: {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'retry-after': '30', 'x-relay': why}});
 
 const frame = (id, bytes) => {
   const out = new Uint8Array(4 + bytes.byteLength);
@@ -42,8 +42,9 @@ export class Relay {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
   }
 
+  // The newest open socket: after a redeploy or a quick reconnect stale ones may still be listed.
   mac() {
-    return this.ctx.getWebSockets('mac')[0];
+    return this.ctx.getWebSockets('mac').filter((w) => w.readyState === WebSocket.OPEN).at(-1);
   }
 
   async fetch(req) {
@@ -57,8 +58,14 @@ export class Relay {
       this.ctx.acceptWebSocket(server, ['mac']);
       return new Response(null, {status: 101, webSocket: client});
     }
-    const ws = this.mac();
-    if (!ws) return offline();
+    // The Mac's socket drops now and then and comes back within seconds: wait for it a little
+    // before telling the browser the Mac is offline.
+    let ws = this.mac();
+    for (let waited = 0; !ws && waited < 15_000; waited += 250) {
+      await new Promise((r) => setTimeout(r, 250));
+      ws = this.mac();
+    }
+    if (!ws) return offline("no-socket");
 
     const id = this.seq++;
     const headers = Object.fromEntries(req.headers);
@@ -87,12 +94,12 @@ export class Relay {
         if (buf.length) ws.send(frame(id, buf));
         ws.send(JSON.stringify({t: 'reqend', id}));
       }
-    } catch {
+    } catch (e) {
       this.pending.delete(id);
-      return offline();
+      return offline('send-failed');
     }
 
-    const timer = setTimeout(() => this.settle(id, offline()), 60_000);
+    const timer = setTimeout(() => this.settle(id, offline('timeout')), 60_000);
     const out = await res;
     clearTimeout(timer);
     return out;
@@ -108,7 +115,7 @@ export class Relay {
 
   failAll(why) {
     for (const [id, p] of this.pending) {
-      if (!p.settled) this.settle(id, offline());
+      if (!p.settled) this.settle(id, offline('fail-all:' + why));
       else p.writer?.abort(why).catch(() => {});
     }
     this.pending.clear();
