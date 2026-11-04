@@ -15,3 +15,20 @@
 - Ответ «не на связи» несёт заголовок `x-relay` с причиной (`no-socket`, `send-failed`, `timeout`, `fail-all:…`).
 - Если после `wrangler deploy` поведение старое (2 нояб.: старый экземпляр Durable Object жил со старым
   кодом и мёртвым сокетом) — смени имя в `idFromName('mac-v3')` на следующее и перезапусти агент.
+
+## Один бот на несколько студий (диспетчер, 4 нояб.)
+
+Telegram отдаёт обновления бота только одному читателю, поэтому две студии с одним ключом мешали
+друг другу (409). Теперь бот работает через вебхук: Telegram → `https://reels.mygudauri.org/__tg` →
+Worker → `Router` (чей человек) → `TgQueue` нужной студии → её бот по сокету `/__tgsocket`.
+
+- Студии — секрет `NODES`: `{"misha": {"secret", "host": "reels.mygudauri.org", "name": "Миши", "default": true, "users": []}, "seva": {..., "host": "seva.reels.mygudauri.org", "users": [tg id Севы]}}`.
+  Ещё секреты: `TG_WEBHOOK_SECRET` (его же — `secret_token` в `setWebhook`), `TELEGRAM_BOT_TOKEN` (для «компьютер не на связи»).
+- Кто чей: ссылка `t.me/<бот>?start=<node>--<что-угодно>` закрепляет человека за студией (приглашения и ссылка
+  владельца из панели такие сами, если в `.env` есть `TG_RELAY` и `RELAY_NODE`); `?start=<node>--` — просто переключить.
+  Иначе — по `users` в `NODES`, иначе студия по умолчанию.
+- Компьютер спит → обновления ждут в `TgQueue` (до подтверждения ботом), человек один раз в полчаса получает «не на связи».
+- Студия на компьютере: в `.env` `TG_RELAY=wss://reels.mygudauri.org/__tgsocket`, `RELAY_NODE=<node>`, `RELAY_SECRET=<её secret>`,
+  `MINIAPP_URL=https://<её host>/app`; агент `relay/agent.mjs` (launchd) — для веба. Бот в этом режиме не вызывает getUpdates.
+- Новый host (например `seva.reels.mygudauri.org`) — DNS-запись в зоне mygudauri.org (proxied) + маршрут в `wrangler.jsonc`.
+- Вернуть старый режим (одна студия, опрос): `deleteWebhook`, убрать `TG_RELAY` из `.env`, перезапустить бота.
