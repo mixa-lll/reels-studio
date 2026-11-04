@@ -72,6 +72,16 @@
   .pv-more{color:#2481CC;font-weight:600}
   .pv-bars{position:absolute;left:8px;right:8px;top:8px;display:flex;gap:3px;z-index:3}.pv-bars i{flex:1;height:2.5px;border-radius:2px;background:rgba(255,255,255,.4)}.pv-bars i.on{background:#fff}
   .pv-sh{position:absolute;left:10px;right:10px;top:18px;display:flex;align-items:center;gap:8px;z-index:3;font-weight:600;font-size:13px}
+  .pv-ip{position:relative;flex:none;box-sizing:border-box;background:linear-gradient(150deg,#C9CBCE 0%,#6E7176 22%,#A9ACB0 48%,#55585D 74%,#B5B8BC 100%);box-shadow:0 40px 80px -20px rgba(15,23,42,.45),0 12px 24px rgba(15,23,42,.18)}
+  .pv-ip>i{position:absolute;width:4px;background:#7C7F84;border-radius:2px}
+  .pv-ip-b{width:100%;height:100%;box-sizing:border-box;background:#050506}
+  .pv-ip-s{position:relative;width:100%;height:100%;overflow:hidden;background:#000}.pv-ip-s.lt{background:#fff}
+  .pv-ip .pv{max-width:none;width:100%;height:100%;aspect-ratio:auto;border-radius:0;box-shadow:none;margin:0}
+  .pv-ip .pv.feed,.pv-ip .pv.tg{padding-top:44px;box-sizing:border-box}
+  .pv-sb{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;font:600 14px -apple-system,"SF Pro Text",system-ui,sans-serif;z-index:6;box-sizing:border-box;pointer-events:none}
+  .pv-sbr{display:flex;gap:5px;align-items:center}
+  .pv-di{position:absolute;left:50%;transform:translateX(-50%);border-radius:20px;background:#000;z-index:7}
+  .pv-hi{position:absolute;left:50%;transform:translateX(-50%);height:4.5px;border-radius:3px;z-index:7}
   .pv-reply{position:absolute;left:10px;right:10px;bottom:14px;display:flex;align-items:center;gap:10px;z-index:3}.pv-reply span{flex:1;border:1px solid rgba(255,255,255,.6);border-radius:999px;padding:9px 14px;font-size:13px}`;
   if (!document.getElementById('pv-css')) { const st = document.createElement('style'); st.id = 'pv-css'; st.textContent = CSS; document.head.append(st); }
 
@@ -149,5 +159,20 @@
     return out;
   }
 
-  window.Preview = {ZONES, GRID, VIEWS, frame, checks, plates};
+  // The frame inside an iPhone: titanium edge, side buttons, Dynamic Island, status bar, home
+  // indicator. o: {w: width in px (330 by default), light: a light screen (dark status bar), time}.
+  function phone(inner, o = {}) {
+    const w = o.w || 330, k = w / 330, fg = o.light ? '#0A0A0A' : '#fff';
+    const px = (n) => `${Math.round(n * k * 10) / 10}px`;
+    const side = [['left', 118, 30], ['left', 168, 52], ['left', 230, 52], ['right', 190, 82]].map(([s, t, h]) => `<i style="${s}:-${px(3)};top:${px(t)};height:${px(h)}"></i>`).join('');
+    const bars = [7, 5, 2.5, 0].map((y, i) => `<rect x="${i * 4.5}" y="${y}" width="3" height="${11 - y}" rx="1" fill="${fg}"/>`).join('');
+    return `<div class="pv-ip" style="width:${w}px;height:${Math.round(w * 2.17)}px;border-radius:${px(58)};padding:${px(3)}">${side}
+      <div class="pv-ip-b" style="border-radius:${px(55)};padding:${px(9)}"><div class="pv-ip-s ${o.light ? 'lt' : ''}" style="border-radius:${px(46)}">${inner}
+        <div class="pv-sb" style="height:${px(46)};padding:${px(6)} ${px(26)} 0 ${px(30)};color:${fg}"><span>${esc(o.time || '18:00')}</span><span class="pv-sbr"><svg width="17" height="11" viewBox="0 0 17 11" aria-hidden="true">${bars}</svg><svg width="15" height="11" viewBox="0 0 15 11" aria-hidden="true"><path d="M7.5 2.2c2.1 0 4 .8 5.4 2.2l1.1-1.1A9.2 9.2 0 0 0 7.5.6 9.2 9.2 0 0 0 1 3.3l1.1 1.1a7.6 7.6 0 0 1 5.4-2.2zm0 3.2c1.2 0 2.3.5 3.1 1.3l1.1-1.1A6 6 0 0 0 7.5 3.8a6 6 0 0 0-4.2 1.8l1.1 1.1c.8-.8 1.9-1.3 3.1-1.3zm0 3.2c-.4 0-.8.2-1.1.5L7.5 10.2l1.1-1.1a1.6 1.6 0 0 0-1.1-.5z" fill="${fg}"/></svg><span style="width:25px;height:12px;border:1.2px solid ${fg};border-radius:4px;padding:1.5px;display:inline-flex;box-sizing:border-box;opacity:.9"><span style="flex:0 0 78%;background:${fg};border-radius:1.5px"></span></span></span></div>
+        <span class="pv-di" style="top:${px(11)};width:${px(98)};height:${px(29)}"></span><span class="pv-hi" style="bottom:${px(7)};width:${px(118)};background:${fg}"></span></div></div></div>`;
+  }
+  // Which views are drawn on a light screen (a dark status bar).
+  const light = (kind, o = {}) => ['feed', 'carousel', 'grid'].includes(kind) || (kind === 'telegram' && o.theme !== 'dark');
+
+  window.Preview = {ZONES, GRID, VIEWS, frame, checks, plates, phone, light};
 })();

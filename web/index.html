@@ -363,6 +363,36 @@
   body.peeking main { margin-right: 460px; transition: margin .18s ease; }
   .peeked { outline: 2px solid var(--ink); outline-offset: 1px; }
   @media (max-width: 900px) { #peek { width: 100%; } body.peeking main { margin-right: 0; } }
+  /* the release header (LR0): crumb and title, then five stages across with a line under each */
+  .rcrumb { color: var(--muted); text-decoration: none; font-size: 13px; white-space: nowrap; }
+  .rcrumb:hover { color: var(--ink); }
+  .rhead .slash { color: #D4D4D4; }
+  .trk { display: flex; gap: 4px; padding: 10px 14px 0; border-bottom: 1px solid var(--line); flex: none; background: #fff; }
+  .sg { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 0 10px 10px; text-decoration: none; color: var(--muted); position: relative; border-radius: 8px 8px 0 0; }
+  a.sg:hover { background: #FAFAFA; }
+  .sg .bar { height: 3px; border-radius: 2px; background: #EDEDED; overflow: hidden; display: block; }
+  .sg .bar i { display: block; height: 3px; }
+  .sg .nm { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
+  .sg .note { font-size: 12px; color: #8B8B8B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+  .sg.fut .nm { color: #A3A3A3; font-weight: 500; } .sg.fut .note { color: #B5B5B5; }
+  .sg.now .nm, .sg.view .nm { color: var(--ink); }
+  .sg.view, a.sg.view:hover { background: #F5F5F5; }
+  .sg.view::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; background: var(--ink); border-radius: 2px; }
+  .sg .o { width: 16px; height: 16px; border-radius: 50%; flex: none; display: inline-grid; place-items: center; font-size: 9px; box-sizing: border-box; }
+  .sg .o span { width: 6px; height: 6px; border-radius: 50%; }
+  .sg .o.d { background: var(--ink); color: #fff; } .sg .o.f { border: 1.5px solid #D4D4D4; }
+  .trk.cmp { padding: 8px 8px 0; gap: 2px; } .trk.cmp .sg { padding: 0 8px 9px; gap: 6px; } .trk.cmp .nm { font-size: 12px; } .trk.cmp .note { font-size: 11px; } .trk.cmp .o { display: none; }
+  .rback { display: flex; align-items: center; gap: 12px; margin: 12px 24px 0; padding: 9px 14px; border-radius: 10px; background: #EFF4FE; color: #1E3A8A; font-size: 13.5px; }
+  @media (max-width: 720px) { .trk { overflow-x: auto; } .sg { min-width: 92px; } }
+  .pk-h { height: 52px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 20px; border-bottom: 1px solid var(--line); }
+  .pk-foot { flex: none; border-top: 1px solid var(--line); padding: 12px 16px 12px 20px; display: flex; gap: 8px; align-items: center; background: #fff; }
+  .pk-mini { flex: none; width: 186px; height: 404px; position: relative; overflow: visible; }
+  .pk-mini > div { position: absolute; left: 0; top: 0; transform: scale(.565); transform-origin: 0 0; }
+  /* «Как увидят» right on the page: the platforms as tabs, two phones side by side */
+  .nx-live { display: flex; flex-direction: column; gap: 18px; padding: 20px 24px 26px; border-radius: 16px; background: radial-gradient(120% 90% at 30% 20%, #FFFFFF 0%, #F1F1EF 60%, #E9E9E6 100%); border: 1px solid var(--line); }
+  .nx-phones { display: flex; gap: 28px; flex-wrap: wrap; }
+  .nx-ph { border: 0; background: none; padding: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; cursor: pointer; font: inherit; color: var(--muted); }
+  .nx-ph:hover .pv-ip { transform: translateY(-2px); } .nx-ph .pv-ip { transition: transform .15s ease; }
   .lline { width: 22px; height: 1.5px; background: #E5E5E5; } .lline.done { background: var(--ink); }
 </style>
 <script src="/preview.js"></script>
@@ -402,6 +432,7 @@ const chatMd = (s) => esc(s).replace(/```\w*\n?([\s\S]*?)```/g, '<pre>$1</pre>')
 const STATUS = {work: 'В работе', review: 'На ревью', none: 'Без статуса', done: 'Готовы', published: 'Опубликованы'};
 const ICON = {
   panel: '<rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path>',
+  expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"></path>',
   panelR: '<rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M15 4v16"></path>',
   chat2: '<path d="M4 5h16v11H8l-4 4Z"></path>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>',
@@ -941,8 +972,34 @@ function wireLifeBar(root, onChange) {
   }));
 }
 
-// A release's header (LeanRelease): one low row — rubric, title, the five stages as tabs, date and
-// rubric chips, download; a second thin row only when a stage has several screens.
+// What each stage of a release says under its name: what came of it, where it is now, what is ahead.
+function stageNote(x, s, i, k) {
+  const need = x.need || [], got = need.filter((n) => n.done).length;
+  const reel = x.ref?.kind === 'reel' ? OV?.reels.find((y) => y.id === x.ref.id) : null;
+  if (i < k) return {idea: x.created ? new Date(x.created).toLocaleDateString('ru', {day: 'numeric', month: 'short'}) : 'есть', material: need.length ? `кадров: ${need.length}` : 'собран', build: reel?.version || 'собран', ready: 'одобрен'}[s] || '';
+  if (i === k) return {idea: x.proposed ? 'предложение Claude' : 'ждёт «что снять»', material: need.length ? `снято ${got} из ${need.length}` : 'собираем', build: reel?.version ? `${reel.version} ждёт вас` : 'собирается', ready: 'проверка перед выходом', published: 'вышло'}[s] || '';
+  return {material: 'что снять', build: 'соберёт Claude', ready: 'проверка', published: x.at ? whenText(x.at) : 'без даты'}[s] || '';
+}
+// The five stages across (LR0): passed — black line and a tick, now — the stage's colour and how far
+// it got, open — highlighted and underlined, ahead — grey but clickable. `cmp` is the side panel's.
+function stageTrack(x, {viewing = x.stage, href = null, cmp = false} = {}) {
+  const k = LIFE.findIndex(([s]) => s === x.stage);
+  const need = x.need || [];
+  const prog = x.stage === 'material' && need.length ? need.filter((n) => n.done).length / need.length : 0.55;
+  return `<nav class="trk ${cmp ? 'cmp' : ''}" aria-label="Этапы выпуска">${LIFE.map(([s, t], i) => {
+    const col = LIFE_COLOR[s];
+    const fill = i < k ? '<i style="width: 100%; background: var(--ink)"></i>' : i === k ? `<i style="width: ${Math.max(8, Math.round(prog * 100))}%; background: ${col}"></i>` : '';
+    const o = i < k ? '<span class="o d">✓</span>' : i === k ? `<span class="o" style="border: 2px solid ${col}"><span style="background: ${col}"></span></span>` : '<span class="o f"></span>';
+    let note = esc(stageNote(x, s, i, k));
+    if (i === k) note = cmp ? `<b style="color: ${col}">${note}</b>` : `<b style="color: ${col}">сейчас</b>${note ? ' · ' + note : ''}`;
+    const tag = href ? 'a' : 'span';
+    return `<${tag} class="sg ${i < k ? 'done' : i === k ? 'now' : 'fut'} ${s === viewing ? 'view' : ''}" ${href ? `href="${href(s)}"` : ''} ${s === viewing ? 'aria-current="step"' : ''} title="${t}"><span class="bar">${fill}</span><span class="nm">${o}${t}</span><span class="note">${note}</span></${tag}>`;
+  }).join('')}</nav>`;
+}
+// Where a stage of a release opens on its full page.
+const stageHref = (x) => x.ref?.kind === 'reel' ? (s) => `#/reel/${x.ref.id}/${REEL_STEPS[s][0]}` : x.ref?.kind === 'post' ? (s) => `#/post/${x.ref.id}/${POST_STEPS(x.format)[s][0]}` : null;
+// A release's header (LR0): a crumb, the title, rubric and date in one row; the five stages under
+// it; a strip when an earlier stage is open; the screens of a stage with several of them.
 async function relHead(kind, id, steps, tab, base, title) {
   await loadItems().catch(() => null);
   const x = ITEMS?.items.find((y) => y.ref?.kind === kind && y.ref.id === id);
@@ -950,22 +1007,31 @@ async function relHead(kind, id, steps, tab, base, title) {
   const viewing = LIFE.map(([s]) => s).find((s) => steps[s].includes(tab) && (s === x.stage || !LIFE.some(([o]) => o === x.stage && steps[o].includes(tab)))) || x.stage;
   const r = itemRubric(x);
   const ed = canEdit();
+  const k = LIFE.findIndex(([s]) => s === x.stage), v = LIFE.findIndex(([s]) => s === viewing);
+  const back = v < k ? `<div class="rback">${svg('eye', 15)}<span style="flex: 1">Вы смотрите этап «${LIFE[v][1]}». Выпуск уже на этапе «${LIFE[k][1]}».</span><a class="ln-btn s" href="${base}${steps[x.stage][0]}">К этапу «${LIFE[k][1]}» →</a></div>` : '';
   const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
   return `<div class="rhead" data-item="${x.id}">
-    <a href="#/all" class="muted" title="Выпуски" aria-label="Выпуски" style="display: inline-flex">${svg(FMT_ICON[x.format], 16)}</a>
-    <b class="rtitle" title="${esc(title)}">${esc(title)}</b>
-    <span class="lbar mini">${lifeBarFor(x, {controls: false, href: (s) => base + steps[s][0], viewing}).replace(/^<div class="lbar"[^>]*>/, '').replace(/<span style="flex: 1"><\/span>[\s\S]*<\/div>$/, '')}</span>
+    <a href="#/all" class="rcrumb">‹ Выпуски</a><span class="slash">/</span>
+    <span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b class="rtitle" title="${esc(title)}">${esc(title)}</b>
+    <span class="small muted" style="display: inline-flex; align-items: center; gap: 5px">${svg(FMT_ICON[x.format], 14)}${FMT_NAME[x.format]}</span>
     <span style="flex: 1"></span>
     ${ed ? `<select class="rchip" data-f="rubric" aria-label="Рубрика"><option value="">без рубрики</option>${ITEMS.rubrics.map((y) => `<option value="${esc(y.id)}" ${r?.id === y.id ? 'selected' : ''}>${esc(y.name)}</option>`).join('')}</select>
       <input class="rchip" data-f="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">`
     : `${r ? `<span class="small">${esc(r.name)}</span>` : ''}<span class="small muted">${whenText(x.at)}</span>`}
-    <span id="dlTop" class="row" style="gap: 8px"></span></div>${subs}`;
+    <span id="dlTop" class="row" style="gap: 8px"></span>
+    <button type="button" class="ln-btn g s" data-side="${x.id}" title="Открыть сбоку" aria-label="Открыть сбоку">${svg('panelR', 16)}</button></div>
+    ${stageTrack(x, {viewing, href: (s) => base + steps[s][0]})}${back}${subs}`;
 }
 function wireRelHead(root, redraw) {
   root.querySelectorAll('.rhead [data-f]').forEach((el) => (el.onchange = async () => {
     await post('/api/items/set', {id: el.closest('.rhead').dataset.item, [el.dataset.f]: el.value || null});
     await loadItems(); toast('Сохранено'); redraw?.();
   }));
+  // «Открыть сбоку»: back to the list the release came from, with it open in the side panel.
+  root.querySelector('.rhead [data-side]')?.addEventListener('click', (e) => {
+    sessionStorage.setItem('peekNext', e.currentTarget.dataset.side);
+    if (history.length > 1) history.back(); else location.hash = '#/all';
+  });
 }
 
 // Боковая панель выпуска: from the Plan, Releases, Today or a rubric a release opens on the right,
@@ -983,24 +1049,32 @@ async function peek(id) {
   const reel = x.ref?.kind === 'reel' ? OV?.reels.find((y) => y.id === x.ref.id) : null;
   const need = x.need || [];
   const sibs = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id) : [];
-  el.innerHTML = `<div class="ln-top" style="padding: 0 16px 0 20px"><span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</b>
-      <a class="ln-btn s" href="${itemHref(x)}" id="peekFull">${svg('panel', 13)}Открыть полностью</a><button type="button" class="ln-btn g s" id="peekClose" aria-label="Закрыть">✕</button></div>
+  const phone = x.thumb && window.Preview && ['build', 'ready', 'published'].includes(x.stage);
+  const look = phone ? Preview.phone(Preview.frame(x.format === 'reel' ? 'reels' : 'feed', {media: {type: 'image', url: x.thumb}, caption: x.idea?.about || x.title, name: projName()}), {light: x.format !== 'reel'}) : '';
+  const full = stageHref(x);
+  el.innerHTML = `<div class="pk-h"><span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; margin-left: 4px">${esc(x.title)}</b>
+      <a class="ln-btn g s" href="${itemHref(x)}" id="peekFull" title="На весь экран" aria-label="На весь экран">${svg('expand', 16)}</a><button type="button" class="ln-btn g s" id="peekClose" title="Закрыть · Esc" aria-label="Закрыть">✕</button></div>
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 12px 20px 2px">
+      <span class="ln-pill" style="cursor: default; padding: 4px 10px; font-size: 12px">${svg(FMT_ICON[x.format], 13)}${FMT_NAME[x.format]}</span>
+      ${canEdit() ? `<select class="rchip" data-pf="rubric" aria-label="Рубрика"><option value="">без рубрики</option>${ITEMS.rubrics.map((y) => `<option value="${esc(y.id)}" ${r?.id === y.id ? 'selected' : ''}>${esc(y.name)}</option>`).join('')}</select>
+        <input class="rchip" data-pf="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">
+        <select class="rchip" data-pf="stage" aria-label="Этап">${LIFE.map(([s, t]) => `<option value="${s}" ${s === x.stage ? 'selected' : ''}>${t}</option>`).join('')}</select>` : `<span class="small muted">${r ? esc(r.name) + ' · ' : ''}${whenText(x.at)}</span>`}
+      ${x.proposed ? '<span class="small muted">предложение Claude</span>' : ''}
+    </div>
+    ${stageTrack(x, {cmp: true, href: full})}
     <div style="flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 18px">
-      <div class="lbar mini" style="padding: 0; border: 0; flex-wrap: wrap">${lifeBarFor(x, {controls: false}).replace(/^<div class="lbar"[^>]*>/, '').replace(/<span style="flex: 1"><\/span>[\s\S]*<\/div>$/, '')}</div>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
-        <span class="ln-pill" style="cursor: default">${svg(FMT_ICON[x.format], 13)}${FMT_NAME[x.format]}</span>
-        ${canEdit() ? `<select class="rchip" data-pf="rubric" aria-label="Рубрика"><option value="">без рубрики</option>${ITEMS.rubrics.map((y) => `<option value="${esc(y.id)}" ${r?.id === y.id ? 'selected' : ''}>${esc(y.name)}</option>`).join('')}</select>
-          <input class="rchip" data-pf="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">
-          <select class="rchip" data-pf="stage" aria-label="Этап">${LIFE.map(([s, t]) => `<option value="${s}" ${s === x.stage ? 'selected' : ''}>${t}</option>`).join('')}</select>` : `<span class="small muted">${r ? esc(r.name) + ' · ' : ''}${whenText(x.at)}</span>`}
-        ${x.proposed ? '<span class="small muted">предложение Claude</span>' : ''}
-      </div>
-      ${x.thumb ? `<a href="${itemHref(x)}" style="display: block; width: ${x.format === 'reel' ? 180 : 260}px; aspect-ratio: ${x.format === 'reel' ? '9 / 16' : '4 / 5'}; border-radius: 12px; background: #E5E5E5 center / cover url('${x.thumb}')" aria-label="Открыть"></a>` : ''}
-      ${reel?.version ? `<span class="small muted">${esc(reel.version)} · ${STATUS[reel.status] || ''}</span>` : ''}
+      ${phone ? `<div style="display: flex; gap: 16px; align-items: flex-start"><a class="pk-mini" href="${full ? full(x.stage === 'build' ? 'build' : 'ready') : itemHref(x)}" aria-label="Как увидят"><div>${look}</div></a>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.5; padding-top: 4px">
+          ${reel?.version ? `<b style="font-weight: 600">${esc(reel.version)}${STATUS[reel.status] ? ' · ' + STATUS[reel.status] : ''}</b>` : ''}
+          <span class="muted">${x.stage === 'build' ? 'Так выглядит текущая версия. Проверьте её и отправьте в «Готово».' : x.stage === 'ready' ? `Так выпуск увидят подписчики${x.at ? ' — ' + whenText(x.at) : ''}. Подписи, сетка профиля и Телеграм — на весь экран.` : 'Так он вышел.'}</span>
+          ${full ? `<a href="${full(x.stage === 'build' ? 'build' : 'ready')}" style="color: var(--ink); font-weight: 500">${x.stage === 'build' ? 'Открыть сборку' : 'Как увидят — все площадки'} →</a>` : ''}</div></div>`
+      : x.thumb ? `<a href="${itemHref(x)}" style="display: block; width: ${x.format === 'reel' ? 180 : 260}px; aspect-ratio: ${x.format === 'reel' ? '9 / 16' : '4 / 5'}; border-radius: 12px; background: #E5E5E5 center / cover url('${x.thumb}')" aria-label="Открыть"></a>` : ''}
+      ${!phone && reel?.version ? `<span class="small muted">${esc(reel.version)} · ${STATUS[reel.status] || ''}</span>` : ''}
       ${x.idea?.about || x.idea?.hook ? `<div><div class="ln-lh">Идея</div><div style="padding-top: 10px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55">${x.idea.about ? `<div><span class="muted">О чём:</span> ${esc(x.idea.about)}</div>` : ''}${x.idea.hook ? `<div><span class="muted">Крючок:</span> ${esc(x.idea.hook)}</div>` : ''}${(x.idea.flow || []).length ? `<div><span class="muted">Ход:</span> ${x.idea.flow.map(esc).join(' · ')}</div>` : ''}</div></div>` : ''}
       ${need.length ? `<div><div class="ln-lh">Что нужно · снято ${need.filter((n) => n.done).length} из ${need.length}</div>${need.map((n) => `<div class="ln-li" style="padding: 9px 2px"><span style="width: 16px; height: 16px; border-radius: 5px; flex: none; ${n.done ? 'background: var(--ink); color: #fff' : 'border: 1.5px solid #D4D4D4'}; display: grid; place-items: center; font-size: 10px">${n.done ? '✓' : ''}</span><span style="flex: 1">${esc(n.text)}</span>${n.have ? `<span class="s">${esc(n.have)}</span>` : ''}</div>`).join('')}</div>` : ''}
       ${sibs.length ? `<div><div class="ln-lh">Из того же материала</div>${sibs.map((y) => `<a class="ln-li" href="${itemHref(y)}" data-peek="${y.id}">${svg(FMT_ICON[y.format], 15)}<span style="flex: 1">${esc(y.title)}</span>${sdot(y.stage)}</a>`).join('')}</div>` : ''}
-      ${x.proposed && canEdit() ? '<button type="button" class="ln-btn p" id="peekTake" style="align-self: flex-start">Взять в план</button>' : ''}
-    </div>`;
+    </div>
+    <div class="pk-foot">${x.proposed && canEdit() ? '<button type="button" class="ln-btn p" id="peekTake" style="flex: 1; justify-content: center; height: 38px">Взять в план</button>' : ''}<a class="ln-btn ${x.proposed && canEdit() ? '' : 'p'}" href="${itemHref(x)}" style="${x.proposed && canEdit() ? '' : 'flex: 1; '}justify-content: center; height: 38px">${svg('expand', 14)}Открыть на весь экран</a></div>`;
   const close = () => { el.remove(); document.body.classList.remove('peeking'); view.querySelectorAll('.peeked').forEach((a) => a.classList.remove('peeked')); if (peek.folded) { foldSide(false); peek.folded = false; } };
   $('#peekClose').onclick = close;
   el.querySelectorAll('[data-pf]').forEach((f) => (f.onchange = async () => { await post('/api/items/set', {id: x.id, [f.dataset.pf]: f.value || null}); await loadItems(); toast('Сохранено'); peek(x.id); }));
@@ -1288,9 +1362,23 @@ function nxBlock(host, {caps, kind, base, seen, onSeen, ask}) {
     ${rows.some((r) => !r.seen) ? '<span class="small muted">Отметка «видел» ставится, когда открыл площадку и пролистал её.</span>' : ''}`;
   host.prepend(box);
   box.querySelectorAll('[data-nx]').forEach((b) => (b.onclick = () => nxOpen(rows[Number(b.dataset.nx)], base, onSeen, ask)));
+  if (!rows.length || !Preview.phone) return;
+  const live = document.createElement('div');
+  live.className = 'nx-live';
+  let pick = 0;
+  const draw = () => {
+    const row = rows[pick];
+    live.innerHTML = `<div class="row" style="gap: 12px; flex-wrap: wrap">${rows.length > 1 ? `<span class="ln-seg">${rows.map((r, i) => `<button type="button" class="${i === pick ? 'on' : ''}" data-pick="${i}">${esc(r.c.platform || 'Площадка')}</button>`).join('')}</span>` : `<b>${esc(row.c.platform || 'Как увидят')}</b>`}
+      <span class="small muted">Так увидят подписчики${row.c.account ? ' ' + esc(row.c.account) : ''}. Нажмите на телефон — зоны и проверка.</span></div>
+      <div class="nx-phones">${row.views.slice(0, 2).map(([v, label, o], j) => { const opts = {...base, ...o, caption: row.c.text, platform: row.c.platform, account: row.c.account || base.account}; return `<button type="button" class="nx-ph" data-vi="${j}" aria-label="${esc(label)}">${Preview.phone(Preview.frame(v, opts), {light: Preview.light(v, o)})}<span class="small">${esc(label)}</span></button>`; }).join('')}</div>`;
+    live.querySelectorAll('[data-pick]').forEach((b) => (b.onclick = () => { pick = Number(b.dataset.pick); draw(); }));
+    live.querySelectorAll('[data-vi]').forEach((b) => (b.onclick = () => nxOpen(rows[pick], base, onSeen, ask, Number(b.dataset.vi))));
+  };
+  draw();
+  host.prepend(live);
 }
-function nxOpen(row, base, onSeen, ask) {
-  let at = 0, zones = true, slide = 0;
+function nxOpen(row, base, onSeen, ask, start = 0) {
+  let at = start, zones = true, slide = 0;
   const ov = document.createElement('div');
   ov.className = 'nx-ov';
   const draw = () => {
@@ -2544,6 +2632,8 @@ async function route() {
     else if ((m = /^#\/item\/([\w-]+)/.exec(h))) await vItem(m[1]);
     else if ((m = /^#\/post\/([\w-]+)(?:\/(\w+))?/.exec(h))) await vPost(m[1], m[2]);
     else await vToday();
+    const next = sessionStorage.getItem('peekNext');
+    if (next) { sessionStorage.removeItem('peekNext'); peek(next); }
   } catch (e) {
     view.innerHTML = `<div class="page"><p class="muted">Не получилось загрузить: ${esc(e.message)}. <a href="#/">На главную</a></p></div>`;
   }
@@ -2607,6 +2697,8 @@ document.addEventListener('click', async (e) => {
   }
 });
 window.addEventListener('hashchange', route);
+// «Открыть сбоку» goes back in history; a page restored from the back-forward cache runs no route.
+window.addEventListener('pageshow', (e) => { if (e.persisted && sessionStorage.getItem('peekNext')) route(); });
 (async () => {
   await loadMe();
   route();
