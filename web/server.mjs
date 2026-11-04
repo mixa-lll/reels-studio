@@ -700,6 +700,47 @@ createServer(async (req, res) => {
     ].map((x) => ({...x, at: at[x.key] || x.at || null, rubric: rubric[x.key] || x.rubric || null}));
     return json(200, {strategy: readJson(join(studio, 'strategy.json'), {}), items, events: plan.events || [], templates: templates().templates});
   }
+  // Рубрика и ритм (handbook/LEAN.md, кусок 8): a rubric is a simple group — name, color,
+  // formula (about), usual format and day; platforms carry a weekly count; days off. Fields the
+  // old Strategy screens use (share, rules, series…) stay as they are.
+  if (req.method === 'POST' && url.pathname === '/api/strategy/edit') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const f = join(studio, 'strategy.json');
+    const st = readJson(f, {});
+    const str = (v, n) => String(v ?? '').trim().slice(0, n);
+    if (b.rubric) {
+      st.rubrics ||= [];
+      let r = st.rubrics.find((x) => x.id === b.rubric.id);
+      if (!r) {
+        const name = str(b.rubric.name, 60);
+        if (!name) return json(400, {});
+        const id = (name.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 30) || 'r') + '-' + Date.now().toString(36).slice(-3);
+        r = {id, name, color: '#737373'};
+        st.rubrics.push(r);
+      }
+      if (b.rubric.remove) st.rubrics = st.rubrics.filter((x) => x !== r);
+      for (const [k, n] of [['name', 60], ['about', 200], ['format', 20], ['day', 20]]) if (b.rubric[k] !== undefined) r[k] = str(b.rubric[k], n);
+      if (/^#[0-9a-f]{6}$/i.test(b.rubric.color || '')) r.color = b.rubric.color;
+      writeJson(f, st);
+      log(me.name, `рубрика «${r.name}»${b.rubric.remove ? ' удалена' : ''}`);
+      return json(200, {rubric: r});
+    }
+    if (b.platform) {
+      const pl = (st.platforms || []).find((x) => x.id === b.platform.id);
+      if (!pl) return json(404, {});
+      if (Number.isFinite(b.platform.perWeek)) pl.perWeek = Math.max(0, Math.min(21, Math.round(b.platform.perWeek)));
+      writeJson(f, st);
+      return json(200, {platform: pl});
+    }
+    if (Array.isArray(b.daysOff)) {
+      st.rhythm ||= {};
+      st.rhythm.daysOff = b.daysOff.map(Number).filter((d) => d >= 1 && d <= 7);
+      writeJson(f, st);
+      return json(200, {});
+    }
+    return json(400, {});
+  }
   // A rubric's template (TEMPLATES.md): which of template/src/templates its reels are built by.
   if (req.method === 'POST' && url.pathname === '/api/strategy/template') {
     if (!can('editor')) return json(403, {});
