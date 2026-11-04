@@ -166,7 +166,7 @@
   .strip button span { position: absolute; left: 4px; bottom: 4px; font-size: 10px; background: #fff; border-radius: 4px; padding: 1px 5px; }
   .srow { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
   .srow.drag { opacity: .4; } .srow .h { cursor: grab; color: var(--muted); }
-  .pweekwrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px 6px; }
+  .pweekwrap { flex: none; overflow-x: auto; margin: 0 -4px; padding: 0 4px 6px; }
   .pweek { display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: 10px; }
   .pday { min-height: 320px; border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; background: #fff; }
   .pday .dh { display: flex; align-items: baseline; gap: 6px; padding-bottom: 4px; color: var(--muted); font-size: 13px; }
@@ -306,6 +306,10 @@
   .lstep .c { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #D4D4D4; display: grid; place-items: center; font-size: 10px; }
   .lstep.done { color: var(--ink2); } .lstep.done .c { background: var(--ink); border-color: var(--ink); color: #fff; }
   .lstep.on { color: var(--ink); font-weight: 700; } .lstep.on .c { border: 2px solid var(--ink); } .lstep.on .c::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); }
+  .pmonth { flex: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .pmonth .pchip { padding: 5px 7px; gap: 2px; font-size: 12px; }
+  .pmonth .pchip b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; min-width: 0; }
+  .pmonth .pchip > span { min-width: 0; }
   .lline { width: 22px; height: 1.5px; background: #E5E5E5; } .lline.done { background: var(--ink); }
 </style>
 <script src="/preview.js"></script>
@@ -1499,55 +1503,90 @@ async function vKnowledge(tab = 'overview', sel) {
 }
 
 // Календарь (CleanPlan): a week of reels and posts from plan.json, empty rhythm slots, events; drag to a day.
-async function vPlan(offset = 0) {
+// План (LeanPlan, LeanPlanDraft): ideas on dates first, each with its stage; Claude can lay out
+// two weeks of ideas, they come in as proposals (dashed) to take or replace.
+async function vPlan(offset = 0, month = false) {
   title('План');
-  const plan = await api('/api/plan');
+  const [plan] = await Promise.all([api('/api/plan'), loadItems()]);
   const st = plan.strategy || {}, slots = st.rhythm?.slots || [];
-  const now = new Date(); const mon = new Date(now); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) + offset * 7);
-  const days = Array.from({length: 7}, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const onDay = (d) => plan.items.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((a, b) => a.at.localeCompare(b.at));
-  const href = (x) => x.kind === 'reel' ? '#/reel/' + x.id : '#/post/' + x.id;
-  const chip = (x) => `<a class="pchip" draggable="true" data-key="${esc(x.key)}" href="${href(x)}" style="border-left-color: ${rubricColor(st, x.rubric)}"><span style="display: flex; gap: 5px; align-items: center">${svg(x.kind, 12)}<b>${esc(x.title)}</b></span><span class="muted">${x.at ? esc(x.at.slice(11, 16)) : ''}${x.rubric ? ' · ' + esc(rubricName(st, x.rubric)) : ''}</span></a>`;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let days;
+  if (month) {
+    const first = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
+    const weeks = Math.ceil((((first.getDay() + 6) % 7) + new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()) / 7);
+    days = Array.from({length: weeks * 7}, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
+  } else {
+    const mon = new Date(today); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) + offset * 7);
+    days = Array.from({length: 7}, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+  }
+  const inMonth = (d) => !month || d.getMonth() === new Date(today.getFullYear(), today.getMonth() + offset, 1).getMonth();
+  const all = ITEMS.items;
+  const onDay = (d) => all.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
+  const color = (x) => itemRubric(x)?.color || '#A3A3A3';
+  const chip = (x) => `<a class="pchip" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" style="border-left-color: ${esc(color(x))}; ${x.stage === 'idea' ? 'border-style: dashed; border-left-style: solid;' : ''} ${x.proposed ? 'background: var(--side);' : ''}">
+    <span style="display: flex; gap: 5px; align-items: center">${svg(FMT_ICON[x.format] || 'reel', 12)}<b>${esc(x.title)}</b></span>
+    <span style="display: flex; gap: 6px; align-items: center">${x.proposed ? '<span class="small muted">предложение</span>' : sdot(x.stage)}${month ? '' : `<span class="muted">${esc((x.at || '').slice(11, 16))}</span>`}</span>
+    ${x.proposed && canEdit() && !month ? `<span class="row" style="gap: 4px"><button type="button" class="btn" data-take="${x.id}" style="min-height: 26px; font-size: 12px; padding: 0 8px">Взять</button><button type="button" class="btn" data-other="${x.id}" style="min-height: 26px; font-size: 12px; padding: 0 8px">Другую</button></span>` : ''}</a>`;
   const gaps = [];
-  const cells = days.map((d, i) => {
+  const cells = days.map((d) => {
     const items = onDay(d);
-    const free = slots.filter((s) => Number(s.day) === i + 1 && !items.some((x) => (x.rubric === s.rubric || rubricName(st, x.rubric) === rubricName(st, s.rubric))));
+    const wd = (d.getDay() + 6) % 7;
+    const free = month || d < today ? [] : slots.filter((s) => Number(s.day) === wd + 1 && !items.some((x) => x.rubric === s.rubric || itemRubric(x)?.name === rubricName(st, s.rubric)));
     free.forEach((s) => gaps.push([d, s]));
     const ev = (plan.events || []).concat(st.events || []).filter((e) => e.date === ymd(d));
-    const today = ymd(d) === ymd(new Date());
-    return `<div class="pday${today ? ' today' : ''}" data-day="${ymd(d)}"><div class="dh"><b>${d.getDate()}</b><span>${DAYS[i].toLowerCase()}${today ? ' · сегодня' : ''}</span></div>
+    const isToday = ymd(d) === ymd(today);
+    return `<div class="pday${isToday ? ' today' : ''}" data-day="${ymd(d)}" style="${month ? 'min-height: 130px; padding: 8px;' : ''}${inMonth(d) ? '' : ' opacity: .45;'}"><div class="dh"><b style="${month ? 'font-size: 14px' : ''}">${d.getDate()}</b><span>${month ? '' : DAYS[wd].toLowerCase()}${isToday ? ' · сегодня' : ''}</span></div>
       ${ev.map((e) => `<span class="small" style="background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}
       ${items.map(chip).join('')}
       ${free.map((s) => `<button type="button" class="pslot" data-fill="${ymd(d)}|${esc(s.time || '')}|${esc(rubricName(st, s.rubric))}|${esc(s.kind || '')}" style="border-color: ${rubricColor(st, s.rubric)}"><span style="display: flex; gap: 5px; align-items: center">${svg(s.kind || 'photo', 12)}${esc(rubricName(st, s.rubric))}</span><span class="muted">${esc(s.time || '')} · пусто</span></button>`).join('')}</div>`;
   }).join('');
-  const undated = plan.items.filter((x) => !x.at && !['done', 'published'].includes(x.status)).slice(0, 12);
-  const range = `${days[0].getDate()} ${days[0].toLocaleDateString('ru', {month: 'long'}).replace(/ь$/, 'я')} – ${days[6].getDate()} ${days[6].toLocaleDateString('ru', {month: 'long'})}`;
-  const filled = slots.length - gaps.length;
-  view.innerHTML = `<div class="work"><div class="rmain"><div class="chead" style="padding: 0 28px; min-height: 56px"><b style="font-size: 14px">План</b><span class="row" style="gap: 4px; margin-left: 12px"><a class="btn" href="#/plan/${offset - 1}" aria-label="Прошлая неделя">‹</a><a class="btn" href="#/plan">Сегодня</a><a class="btn" href="#/plan/${offset + 1}" aria-label="Следующая неделя">›</a></span><span class="muted" style="margin-left: 10px">${range}</span><span style="flex: 1"></span>${slots.length ? `<span class="small muted">заполнено ${filled} из ${slots.length} мест</span>` : '<a class="btn" href="#/knowledge/rhythm">Задать ритм недели</a>'}<a class="btn" href="#/knowledge" style="margin-left: 8px" title="Площадки, рубрики и ритм">${svg('sliders', 15)}<span>Площадки и рубрики</span></a></div>
+  const undated = all.filter((x) => !x.at && !x.proposed && x.stage !== 'published');
+  const pitchesNoDate = all.filter((x) => x.proposed && !x.at).length;
+  const shown = all.filter((x) => x.at && x.at.slice(0, 10) >= ymd(days[0]) && x.at.slice(0, 10) <= ymd(days.at(-1)) && !x.proposed);
+  const count = (s) => shown.filter((x) => x.stage === s).length;
+  const mname = (d) => d.toLocaleDateString('ru', {month: 'long'});
+  const range = month ? `${mname(new Date(today.getFullYear(), today.getMonth() + offset, 1))[0].toUpperCase()}${mname(new Date(today.getFullYear(), today.getMonth() + offset, 1)).slice(1)}`
+    : `${days[0].getDate()} ${mname(days[0]).replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я')} – ${days[6].getDate()} ${mname(days[6]).replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я')}`;
+  const base = month ? '#/plan/m/' : '#/plan/';
+  const rubs = ITEMS.rubrics.map((r) => { const n = shown.filter((x) => itemRubric(x)?.id === r.id).length; return `<a class="li" href="#/rubric/${esc(r.id)}" style="text-decoration: none; flex-direction: column; align-items: stretch; gap: 3px"><span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}<span class="small muted" style="margin-left: auto; font-weight: 400">${n}</span></span>${r.about ? `<span class="small muted" style="padding-left: 16px">${esc(r.about)}</span>` : ''}</a>`; }).join('');
+  view.innerHTML = `<div class="work"><div class="rmain"><div class="chead" style="padding: 0 28px; min-height: 56px"><b style="font-size: 14px">План</b>
+      <nav class="seg" aria-label="Вид" style="margin-left: 14px"><a href="#/plan" class="${month ? '' : 'on'}">Неделя</a><a href="#/plan/m" class="${month ? 'on' : ''}">Месяц</a></nav>
+      <span class="row" style="gap: 4px; margin-left: 12px"><a class="btn" href="${base}${offset - 1}" aria-label="Назад">‹</a><a class="btn" href="${base.slice(0, -1)}">Сейчас</a><a class="btn" href="${base}${offset + 1}" aria-label="Вперёд">›</a></span><span class="muted" style="margin-left: 10px">${range}</span>
+      <span class="row small" style="gap: 12px; margin-left: 16px">${LIFE.slice(0, 4).map(([k]) => `${sdot(k)}<span class="muted">${count(k)}</span>`).join('')}</span>
+      <span style="flex: 1"></span>${canEdit() ? '<button type="button" class="btn primary" id="lay">Расписать идеи на 2 недели</button>' : ''}<a class="btn" href="#/knowledge" style="margin-left: 8px" title="Площадки, рубрики и ритм">${svg('sliders', 15)}</a></div>
       <div style="flex: 1; overflow-y: auto; padding: 22px 28px; display: flex; flex-direction: column; gap: 22px">
-        <div class="pweekwrap"><div class="pweek">${cells}</div></div>
-        <div class="small muted">${(st.rubrics || []).map((x) => `<span style="display: inline-flex; align-items: center; gap: 5px; margin-right: 14px"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${esc(x.color || '#A3A3A3')}"></span>${esc(x.name)}</span>`).join('')} пунктир — пустое место, клик — чем заполнить; перетащи выпуск на нужный день</div>
+        ${month ? `<div style="flex: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; font-size: 12px; color: var(--muted)">${DAYS.map((d) => `<span style="padding-left: 8px">${d.toLowerCase()}</span>`).join('')}</div><div class="pmonth" style="margin-top: -16px">${cells}</div>` : `<div class="pweekwrap"><div class="pweek">${cells}</div></div>`}
+        <div class="small muted">пунктир — пока только идея, серым — предложение Claude; перетащи выпуск на другой день или в «Без даты»</div>
         <div class="split" style="gap: 24px">
-          <div class="blk" style="flex: 1"><span class="lbl">Требует внимания · ${gaps.length + undated.length ? gaps.length : 0}</span>${gaps.map(([d, s]) => `<div class="li"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${rubricColor(st, s.rubric)}"></span><span style="flex: 1">Пустое место: ${esc(rubricName(st, s.rubric))}</span><span class="small muted">${DAYS[(d.getDay() + 6) % 7].toLowerCase()} ${esc(s.time || '')}</span></div>`).join('') || '<span class="small muted">Всё на месте.</span>'}</div>
-          <div class="blk pdrop" style="flex: 1" data-day=""><span class="lbl">Без даты · ${undated.length}</span><div style="display: flex; flex-direction: column; gap: 6px">${undated.map(chip).join('') || '<span class="small muted">Пусто.</span>'}</div></div>
+          <div class="blk pdrop" style="flex: 1" data-day=""><span class="lbl">Без даты · ${undated.length}</span><div style="display: flex; flex-direction: column; gap: 6px">${undated.slice(0, 6).map(chip).join('') || '<span class="small muted">Пусто.</span>'}</div>${undated.length > 6 ? `<a class="small" href="#/all" style="margin-top: 6px">Ещё ${undated.length - 6} — в Выпусках →</a>` : ''}${pitchesNoDate ? `<a class="small" href="#/all/proposed" style="margin-top: 8px">Ещё ${pitchesNoDate} предложений Claude без даты →</a>` : ''}</div>
+          <div class="blk" style="flex: 1"><span class="lbl">Рубрики · ${month ? 'в этом месяце' : 'на этой неделе'}</span>${rubs || '<span class="small muted">Рубрик пока нет — <a href="#/knowledge/rubrics">задать</a>.</span>'}</div>
+          ${gaps.length ? `<div class="blk" style="flex: 1"><span class="lbl">Пустые места по ритму · ${gaps.length}</span>${gaps.map(([d, s]) => `<div class="li"><span class="rsq" style="background: ${rubricColor(st, s.rubric)}"></span><span style="flex: 1">${esc(rubricName(st, s.rubric))}</span><span class="small muted">${DAYS[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()} ${esc(s.time || '')}</span></div>`).join('')}</div>` : ''}
         </div></div></div>
     <aside class="chatcol" aria-label="Чат плана"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат плана</b></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
-  const box = chatBox('_project', {onDone: () => { sidebar(); vPlan(offset); }});
+  const redraw = () => vPlan(offset, month);
+  const box = chatBox('_project', {onDone: () => { sidebar(); redraw(); }});
   $('#chatHost').append(box);
-  view.querySelectorAll('[data-fill]').forEach((b) => (b.onclick = () => { const [d, t, r, k] = b.dataset.fill.split('|'); box.say(`Чем заполнить пустое место ${d} ${t}: рубрика «${r}»${k ? ', ' + KIND[k] : ''}? Предложи 2–3 варианта из идей и выпусков в работе.`, `Чем заполнить: ${r}, ${d.slice(5)} ${t}`); }));
+  const from = new Date(Math.max(days[0], today)), to = new Date(from); to.setDate(from.getDate() + 13);
+  $('#lay')?.addEventListener('click', () => box.say(
+    `Распиши идеи на две недели, с ${ymd(from)} по ${ymd(to)}: по площадкам, рубрикам и ритму из strategy.json, не повторяя то, что уже вышло или стоит в плане. Это только концепции — снимать пока ничего не надо. Каждую идею добавь в ideas.md в раздел «My ideas», как обычно (Format:, Hook:, Plot:), и ещё две строки: «Date: YYYY-MM-DDTHH:MM» и «Rubric: <id рубрики из strategy.json>». Потом коротко перечисли их здесь.`,
+    'Расписать идеи на 2 недели'));
+  view.querySelectorAll('[data-fill]').forEach((b) => (b.onclick = () => { const [d, t, r, k] = b.dataset.fill.split('|'); box.say(`Предложи идею на ${d} ${t}: рубрика «${r}»${k ? ', ' + KIND[k] : ''}. Добавь её в ideas.md в «My ideas» со строками «Date: ${d}T${t || '19:00'}» и «Rubric: …».`, `Идея на ${d.slice(5)}: ${r}`); }));
+  view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.preventDefault(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); redraw(); }));
+  view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); const x = all.find((y) => y.id === b.dataset.other); box.say(`Замени идею «${x.title}» на ${(x.at || '').slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric:.`, `Другую вместо «${x.title}»`); }));
   let drag = null;
-  view.querySelectorAll('.pchip').forEach((c) => { c.ondragstart = () => { drag = c.dataset.key; }; });
+  view.querySelectorAll('.pchip').forEach((c) => { c.ondragstart = () => { drag = c.dataset.id; }; });
   view.querySelectorAll('.pday, .pdrop').forEach((d) => {
     d.ondragover = (e) => { e.preventDefault(); d.classList.add('over'); };
     d.ondragleave = () => d.classList.remove('over');
     d.ondrop = async (e) => {
       e.preventDefault(); d.classList.remove('over');
       if (!drag || !canEdit()) return;
-      const it = plan.items.find((x) => x.key === drag);
+      const it = all.find((x) => x.id === drag);
       const time = it?.at?.slice(11, 16) || slots.find((s) => s.rubric === it?.rubric)?.time || '19:00';
-      await post('/api/plan/set', {key: drag, at: d.dataset.day ? `${d.dataset.day}T${time}` : ''});
-      vPlan(offset);
+      await post('/api/items/set', {id: drag, at: d.dataset.day ? `${d.dataset.day}T${time}` : null});
+      redraw();
     };
   });
 }
@@ -2024,7 +2063,7 @@ async function route() {
     else if ((m = /^#\/chat\/(_project)/.exec(h))) await vChat(m[1]);
     else if (h === '#/new') await vNew();
     else if ((m = /^#\/knowledge(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vKnowledge(m[1], m[2]);
-    else if ((m = /^#\/plan(?:\/(-?\d+))?$/.exec(h))) await vPlan(Number(m[1] || 0));
+    else if ((m = /^#\/plan(\/m)?(?:\/(-?\d+))?$/.exec(h))) await vPlan(Number(m[2] || 0), !!m[1]);
     else if ((m = /^#\/rubric\/([\w-]+)/.exec(h))) await vRubric(m[1]);
     else if ((m = /^#\/settings(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vSettings(m[1], m[2]);
     else if ((m = /^#\/memory(?:\/(\w+))?/.exec(h))) await vMemory(m[1]);
