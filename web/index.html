@@ -639,31 +639,69 @@ function chatBox(key, {onDone, onRebind} = {}) {
 let view = $('#view');
 const title = (t) => { $('#topTitle').textContent = t; document.title = t + ' · Рилсы'; };
 
+// Сегодня (LeanToday): the week by stages, and what waits for you, from the content items.
 async function vToday() {
   title('Сегодня');
-  const review = OV.reels.filter((r) => r.status === 'review');
-  const work = OV.reels.filter((r) => r.status === 'work');
+  await loadItems().catch(() => (ITEMS = {items: [], rubrics: []}));
   const recent = [...OV.reels].sort((x, y) => y.updated - x.updated).slice(0, 4);
   const h = new Date().getHours();
   const hello = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер';
-  const line = (r, tag, note) => `<a class="wl" href="#/reel/${r.id}"><i class="dot s-${r.status}"></i><span>${esc(r.num)} ${esc(r.title)}</span><span class="small muted">${note}</span><span class="r"><span class="tag">${tag}</span>&nbsp;&nbsp;${ago(r.updated)}</span></a>`;
-  const waiting = [...review.map((r) => line(r, 'ревью', r.version ? esc(r.version) + ' готова — посмотри' : '')), ...work.map((r) => line(r, 'в работе', OV.busy?.key === r.id ? 'Claude работает…' : 'монтаж'))];
-  view.innerHTML = `<div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 72px 20px 40px">
-    <div style="width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 30px">
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const mon = new Date(today); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  const week = Array.from({length: 7}, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+  const mine = ITEMS.items.filter((x) => !x.proposed);
+  const dayOf = (x) => x.at?.slice(0, 10);
+  const inDays = (x) => x.at ? Math.round((new Date(x.at.slice(0, 10)) - today) / 864e5) : null;
+  const dayName = (x) => { const n = inDays(x); return n === 0 ? 'сегодня' : n === 1 ? 'завтра' : n < 0 ? 'дата прошла' : new Date(x.at).toLocaleDateString('ru', {weekday: 'short', day: 'numeric'}); };
+  const onWeek = mine.filter((x) => dayOf(x) >= ymd(week[0]) && dayOf(x) <= ymd(week[6]));
+  // What waits: a new version to look at, material to send, an idea close to its date, a ready one to post.
+  const review = new Set(OV.reels.filter((r) => r.status === 'review').map((r) => r.id));
+  const ver = Object.fromEntries(OV.reels.map((r) => [r.id, r.version]));
+  const waits = [];
+  for (const x of mine) {
+    const n = inDays(x);
+    const missing = (x.need || []).filter((y) => !y.done);
+    if (x.stage === 'build' && x.ref?.kind === 'reel' && review.has(x.ref.id)) waits.push([2, x, `${ver[x.ref.id] || 'версия'} собрана — посмотреть`, 'сборка']);
+    else if (x.stage === 'material' && (missing.length || n !== null && n <= 7)) waits.push([1, x, missing.length ? `не хватает: ${missing.slice(0, 2).map((y) => y.text).join(', ')}${missing.length > 2 ? ` и ещё ${missing.length - 2}` : ''}` : 'материал — пришли, что есть', 'материал']);
+    else if (x.stage === 'idea' && n !== null && n >= 0 && n <= 7) waits.push([n <= 3 ? 1 : 3, x, `идея на ${dayName(x)} — пора решить, что снять`, 'идея']);
+    else if (x.stage === 'ready' && n !== null && n <= 2) waits.push([n < 0 ? 0 : 3, x, n < 0 ? 'готово, дата прошла — выложить' : `готово, выйдет ${dayName(x)}`, 'готово']);
+  }
+  waits.sort((p, q) => p[0] - q[0] || String(p[1].at || '9').localeCompare(String(q[1].at || '9')));
+  const pitches = ITEMS.items.filter((x) => x.proposed && x.at && inDays(x) >= 0 && inDays(x) <= 14).length;
+  const wline = ([, x, note, tag]) => `<a class="wl" href="${itemHref(x)}"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="display: inline-flex; gap: 6px; align-items: center">${svg(FMT_ICON[x.format], 14)}${esc(x.title)}</span><span class="small muted">${esc(note)}</span><span class="r"><span class="tag">${tag}</span>${x.at ? '&nbsp;&nbsp;' + dayName(x) : ''}</span></a>`;
+  const dayCell = (d) => {
+    const list = onWeek.filter((x) => dayOf(x) === ymd(d));
+    const isToday = ymd(d) === ymd(today);
+    const head = `<span class="small" style="color: ${isToday ? 'var(--ink)' : 'var(--muted)'}; font-weight: ${isToday ? 700 : 500}">${DAYS[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()}</span>`;
+    if (!list.length) return `<div style="flex: 1; min-width: 0; border: 1px dashed #D4D4D4; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-height: 104px; background: #FCFCFC">${head}${d >= today && canEdit() ? `<button type="button" class="small" data-day="${ymd(d)}" style="margin-top: auto; border: 0; background: none; padding: 0; text-align: left; color: var(--blue); font-weight: 600; cursor: pointer">Предложить идею</button>` : ''}</div>`;
+    const x = list[0];
+    return `<a href="${itemHref(x)}" style="flex: 1; min-width: 0; border: 1px ${x.stage === 'idea' ? 'dashed #D4D4D4' : 'solid var(--line)'}; ${isToday ? 'border-color: var(--ink);' : ''} border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 5px; min-height: 104px; text-decoration: none; color: var(--ink)">${head}
+      <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span></span>
+      <span class="small muted">${FMT_NAME[x.format].toLowerCase()}${list.length > 1 ? ` · ещё ${list.length - 1}` : ''}</span><span style="margin-top: auto">${sdot(x.stage)}</span></a>`;
+  };
+  const ideaN = onWeek.filter((x) => x.stage === 'idea').length, matN = mine.filter((x) => x.stage === 'material').length;
+  view.innerHTML = `<div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 56px 20px 40px">
+    <div style="width: 100%; max-width: 820px; display: flex; flex-direction: column; gap: 28px">
       <div style="display: flex; flex-direction: column; gap: 6px"><h1 style="font-size: 30px">${hello}, ${esc(ME.name)}</h1>
-        <div class="muted" style="font-size: 15px">${review.length ? `${review.length} ${review.length === 1 ? 'выпуск ждёт' : 'выпуска ждут'} твоего решения` : 'Ничего не ждёт решения'} · ${OV.reels.length} выпусков · ${OV.ideasCount} идей в запасе</div></div>
+        <div class="muted" style="font-size: 15px">${onWeek.length ? `На неделе ${onWeek.length} ${onWeek.length === 1 ? 'выпуск' : onWeek.length < 5 ? 'выпуска' : 'выпусков'}${ideaN ? `, ${ideaN} пока ${ideaN === 1 ? 'идея' : 'идеи'}` : ''}` : 'На этой неделе в плане пусто'}${matN ? ` · ждут материала: ${matN}` : ''}</div></div>
       ${canEdit() ? `<form class="box" id="todayForm" style="padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px">
-        <textarea id="todayIn" rows="2" placeholder="Скажи, что сделать — или скинь фото и видео" style="border: 0; resize: none; font-size: 15px; outline: none; padding: 0"></textarea>
+        <textarea id="todayIn" rows="2" placeholder="Скажи идею, попроси предложить — или скинь фото и видео" style="border: 0; resize: none; font-size: 15px; outline: none; padding: 0"></textarea>
         <div class="row" style="color: var(--muted); gap: 8px"><a href="#/new" class="icon" style="width: 30px; height: 30px; border: 0" title="Новый выпуск" aria-label="Новый выпуск">${svg('plus')}</a><span class="small">Ответ — в чате проекта</span><button type="submit" class="icon go" style="margin-left: auto; width: 32px; height: 32px" aria-label="Отправить">↑</button></div></form>
-      <div class="row" style="gap: 8px; margin-top: -14px">${['Предложи 3 идеи на неделю', 'Что снять на неделе', 'Разбери, что зашло'].map((t) => `<button type="button" class="chip" data-say="${esc(t)}">${t}</button>`).join('')}</div>` : ''}
-      <div><div class="lh">Ждёт тебя<a href="#/all">все выпуски</a></div>${waiting.join('') || '<p class="small muted">Пусто — можно начинать новое.</p>'}</div>
+      <div class="row" style="gap: 8px; margin-top: -14px"><button type="button" class="chip" id="layWeek">Расписать идеи на 2 недели</button>${['Что снять на этой неделе', 'Предложи 3 идеи в пустые дни'].map((t) => `<button type="button" class="chip" data-say="${esc(t)}">${t}</button>`).join('')}</div>` : ''}
+      <div><div class="lh">Эта неделя<a href="#/plan">открыть План</a></div><div style="display: flex; gap: 8px; padding-top: 12px">${week.map(dayCell).join('')}</div></div>
+      <div><div class="lh">Ждёт тебя<a href="#/all">все выпуски</a></div>${waits.slice(0, 8).map(wline).join('') || '<p class="small muted">Пусто — можно начинать новое.</p>'}
+        ${pitches ? `<a class="wl" href="#/plan/1"><span class="muted">◌</span><span>${pitches} ${pitches === 1 ? 'предложение' : pitches < 5 ? 'предложения' : 'предложений'} Claude на ближайшие две недели</span><span class="small muted">взять или заменить</span><span class="r"><span class="tag">план</span></span></a>` : ''}</div>
       <div><div class="lh">Недавнее</div>${recent.map((r) => `<a class="wl" href="#/reel/${r.id}"><span class="muted">◌</span><span>${esc(r.num)} ${esc(r.title)}</span><span class="small muted">${STATUS[r.status]}${r.version ? ' · ' + esc(r.version) : ''}</span><span class="r">${ago(r.updated)}</span></a>`).join('')}</div>
     </div></div>`;
-  const go = (text) => { if (!text.trim()) return; sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown: text})); location.hash = '#/chat/_project'; };
+  const go = (text, shown = text) => { if (!text.trim()) return; sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown})); location.hash = '#/chat/_project'; };
   $('#todayForm')?.addEventListener('submit', (e) => { e.preventDefault(); go($('#todayIn').value); });
   $('#todayIn')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); go(e.target.value); } });
-  view.querySelectorAll('[data-say]').forEach((b) => (b.onclick = () => go(b.dataset.say)));
+  view.querySelectorAll('[data-say]').forEach((b) => (b.onclick = () => go(b.dataset.say + (b.dataset.say.includes('идеи') ? '. Каждую добавь в ideas.md в «My ideas» со строками «Date: YYYY-MM-DDTHH:MM» и «Rubric: <id рубрики>».' : ''), b.dataset.say)));
+  view.querySelectorAll('[data-day]').forEach((b) => (b.onclick = () => go(`Предложи идею на ${b.dataset.day} по рубрикам и ритму из strategy.json. Добавь её в ideas.md в «My ideas» со строками «Date: ${b.dataset.day}T19:00» и «Rubric: <id рубрики>».`, `Идея на ${b.dataset.day.slice(5)}`)));
+  $('#layWeek')?.addEventListener('click', () => { const to = new Date(today); to.setDate(today.getDate() + 13); go(layIdeasText(ymd(today), ymd(to)), 'Расписать идеи на 2 недели'); });
 }
+const layIdeasText = (from, to) => `Распиши идеи на две недели, с ${from} по ${to}: по площадкам, рубрикам и ритму из strategy.json, не повторяя то, что уже вышло или стоит в плане. Это только концепции — снимать пока ничего не надо. Каждую идею добавь в ideas.md в раздел «My ideas», как обычно (Format:, Hook:, Plot:), и ещё две строки: «Date: YYYY-MM-DDTHH:MM» и «Rubric: <id рубрики из strategy.json>». Потом коротко перечисли их здесь.`;
 
 // «Все выпуски» with the format switch inside (решение 2026-10-28): Все · Рилсы · Посты.
 // Единицы контента (web/items.mjs): one item per format, idea → material → build → ready → published.
@@ -1569,9 +1607,7 @@ async function vPlan(offset = 0, month = false) {
   const box = chatBox('_project', {onDone: () => { sidebar(); redraw(); }});
   $('#chatHost').append(box);
   const from = new Date(Math.max(days[0], today)), to = new Date(from); to.setDate(from.getDate() + 13);
-  $('#lay')?.addEventListener('click', () => box.say(
-    `Распиши идеи на две недели, с ${ymd(from)} по ${ymd(to)}: по площадкам, рубрикам и ритму из strategy.json, не повторяя то, что уже вышло или стоит в плане. Это только концепции — снимать пока ничего не надо. Каждую идею добавь в ideas.md в раздел «My ideas», как обычно (Format:, Hook:, Plot:), и ещё две строки: «Date: YYYY-MM-DDTHH:MM» и «Rubric: <id рубрики из strategy.json>». Потом коротко перечисли их здесь.`,
-    'Расписать идеи на 2 недели'));
+  $('#lay')?.addEventListener('click', () => box.say(layIdeasText(ymd(from), ymd(to)), 'Расписать идеи на 2 недели'));
   view.querySelectorAll('[data-fill]').forEach((b) => (b.onclick = () => { const [d, t, r, k] = b.dataset.fill.split('|'); box.say(`Предложи идею на ${d} ${t}: рубрика «${r}»${k ? ', ' + KIND[k] : ''}. Добавь её в ideas.md в «My ideas» со строками «Date: ${d}T${t || '19:00'}» и «Rubric: …».`, `Идея на ${d.slice(5)}: ${r}`); }));
   view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.preventDefault(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); redraw(); }));
   view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); const x = all.find((y) => y.id === b.dataset.other); box.say(`Замени идею «${x.title}» на ${(x.at || '').slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric:.`, `Другую вместо «${x.title}»`); }));
