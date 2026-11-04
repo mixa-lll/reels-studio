@@ -580,7 +580,21 @@ createServer(async (req, res) => {
     const mine = projects().filter((x) => me.isOwner || (me.project ? x.slug === me.project : !x.test));
     const pp = mine.some((x) => x.slug === p) ? p : mine[0]?.slug || 'main';
     return json(200, {me: {name: me.name, role: isEditor(me) ? 'editor' : 'member', isOwner: !!me.isOwner, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera, test: !!me.test},
-      team: peopleOf(a, pp).length, projects: mine, project: pp, plan: planAccess(projectSettings(pp)), test: isTestProject(pp)});
+      team: peopleOf(a, pp).length, projects: mine, project: pp, plan: planAccess(projectSettings(pp)), test: isTestProject(pp),
+      modules: projectSettings(pp).modules || {}, bot: botUsername()});
+  }
+  // Модули (handbook/LEAN.md, кусок 12): the base is always on; people, staff, approval and branches
+  // are switched on when there is a reason, and only then add their items to the sidebar.
+  if (req.method === 'POST' && url.pathname === '/api/modules') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    if (!['camera', 'staff', 'approve', 'branches'].includes(b.key) || !projectDir(p)) return json(400, {});
+    const f = join(PROJECTS, p, 'settings.json');
+    const st = readJson(f, {});
+    st.modules = {...st.modules, [b.key]: !!b.on};
+    writeJson(f, st);
+    log(me.name, `модуль ${b.key}: ${b.on ? 'включён' : 'выключен'}`);
+    return json(200, {modules: st.modules});
   }
   // ---------- test accounts (bot/sandbox.mjs): a whole pretend client to try a scenario ----------
   if (url.pathname === '/api/sandbox') {
