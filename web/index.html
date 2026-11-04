@@ -465,6 +465,42 @@
   .ttrack { display: flex; gap: 3px; height: 64px; margin: 12px 0 6px; }
   .ttrack span { border-radius: 8px; color: #fff; padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; overflow: hidden; }
   .ttrack b { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ttrack i { font-style: normal; font-size: 11px; opacity: .85; }
+  .jbox { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 3px; margin-bottom: 6px; display: flex; flex-direction: column; }
+  .jhead { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 8px 2px; cursor: pointer; text-align: left; } .jhead .n { margin-left: auto; font-weight: 400; }
+  .jrow { display: flex; align-items: flex-start; gap: 8px; border-radius: 8px; }
+  .jrow + .jrow { border-top: 1px solid #F0F0F0; } .jbox .jrow { cursor: pointer; }
+  .jmain { flex: 1; min-width: 0; display: flex; gap: 9px; align-items: flex-start; padding: 8px; text-decoration: none; color: var(--ink); border-radius: 8px; }
+  .jmain:hover { background: #F7F7F7; }
+  .jtx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .jtx b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jtx > span:not(.jbar) { font-size: 12px; color: var(--muted); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .jtx > span.jfull { -webkit-line-clamp: 6; }
+  .jrow.ask .jtx > span:not(.jbar) { color: #8A5A00; }
+  .jrow.error .jtx > span:not(.jbar) { color: #B42318; }
+  .jbar { display: block; height: 3px; border-radius: 2px; background: #EBEBEB; overflow: hidden; } .jbar i { display: block; height: 3px; background: #2F6FEB; transition: width .6s ease; }
+  .jsrc { display: flex; margin-top: 2px; flex: none; }
+  .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #D4E2FB; border-top-color: #2F6FEB; flex: none; display: inline-block; margin-top: 1px; animation: jspin 0.9s linear infinite; }
+  @keyframes jspin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+  .spin.q { animation: none; border-color: #E5E5E5; border-top-color: #A3A3A3; border-style: dashed; }
+  .jrow.queue .jtx b { color: var(--ink2); } #jobsPop .jrow.interrupted { background: #FFF8EB; border-color: #F3DDB3; }
+  .jrow.interrupted .jtx > span:not(.jbar) { color: #8A5A00; }
+  .jic { width: 15px; height: 15px; flex: none; display: grid; place-items: center; margin-top: 1px; } .jic.ok { color: #2E8A4F; } .jic.warn { color: #B7791F; }
+  .jic.err { border-radius: 50%; background: #B42318; color: #fff; font-size: 10px; font-weight: 700; }
+  .jrow.done.fresh, .jbox:has(.jrow.done) { border-color: #CFE6D7; }
+  .jfold > span { white-space: nowrap; }
+  .jfold { width: 100%; border: 1px solid var(--line); background: #fff; font: inherit; cursor: pointer; margin-bottom: 6px; }
+  .jfold.wait { background: #FFF8EB; border-color: #F3DDB3; color: var(--ink); }
+  .jring { display: none; width: 30px; height: 30px; border-radius: 50%; border: 0; margin: 4px auto 8px; font: inherit; font-size: 11px; font-weight: 700; color: var(--ink); cursor: pointer;
+    background: radial-gradient(closest-side, var(--side) 76%, transparent 78%), conic-gradient(#2F6FEB calc(var(--p) * 1%), #D4E2FB 0); }
+  body.side-mini #jobsBox .jbox, body.side-mini #jobsBox .jfold { display: none; } body.side-mini #jobsBox .jring { display: grid; place-items: center; }
+  #jobsPop { position: fixed; left: 258px; bottom: 64px; z-index: 50; width: 380px; max-height: 70vh; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.14); padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+  body.side-mini #jobsPop { left: 74px; }
+  #jobsPop .jrow { border: 1px solid var(--line); border-radius: 10px; align-items: center; padding-right: 8px; } #jobsPop .jrow.ask { background: #FFF8EB; border-color: #F3DDB3; } #jobsPop .jrow + .jrow { border-top: 1px solid var(--line); }
+  #jobsPop .jstop { flex: none; }
+  .jold { display: flex; gap: 9px; align-items: flex-start; padding: 7px 4px; text-decoration: none; color: var(--ink); border-bottom: 1px solid #F0F0F0; }
+  .jbusy { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #2F6FEB; } .jbusy .spin { width: 11px; height: 11px; margin: 0; }
+  @media (max-width: 900px) { #jobsPop { left: 12px; right: 12px; width: auto; bottom: 12px; } }
 </style>
 <script src="/preview.js"></script>
 </head>
@@ -510,6 +546,7 @@ const ICON = {
   chat2: '<path d="M4 5h16v11H8l-4 4Z"></path>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>',
   tg: '<path d="m22 3-9.5 18-2.5-7.5L3 11z"></path><path d="M10 13.5 22 3"></path>',
+  phone: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"></rect><path d="M11 18.5h2"></path>',
   web: '<rect x="2.5" y="4" width="19" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle>',
   check: '<path d="M20 6 9 17l-5-5"></path>',
@@ -583,6 +620,7 @@ async function sidebar() {
     ${modOn('staff') && feat('inbox') ? item('#/inbox', 'inbox', 'Входящие', OV.inbox ? `<span class="bdg">${OV.inbox}</span>` : '') : ''}
     ${modOn('staff') && feat('tasks') ? item('#/tasks', 'people', 'Задания людям') : ''}
     <div style="margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 2px">
+      <div id="jobsBox"></div>
       ${item('#/settings', 'sliders', 'Настройки')}
       <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${roleName(ME)}</span></div>
     </div>`;
@@ -641,7 +679,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (text) { $('.stext', st).textContent = text; $('.shint', st).textContent = /рендер/i.test(text) ? 'Это нормально: монтаж идёт на сервере. Страницу можно закрыть — версия появится сама.' : ''; }
     el.querySelectorAll('.btns button, .keys button, .go').forEach((b) => (b.disabled = on));
   };
-  $('button', st).onclick = () => post('/api/stop');
+  $('button', st).onclick = () => post('/api/stop', {key});
   const buttons = (list, under) => {
     const box = document.createElement('div'); box.className = 'btns';
     for (const label of list) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = () => say(`(pressed button "${label}" under: "${short(under)}")`, label); box.append(b); }
@@ -702,14 +740,14 @@ function chatBox(key, {onDone, onRebind} = {}) {
     d.scrollIntoView({block: 'end'});
     if (m.from === 'bot' && canEdit()) showKeys(m.keys || []);
   };
-  async function say(text, shown) {
+  async function say(text, shown, task) {
     if (busy || !text.trim()) return;
     showKeys([]);
     render({from: 'me', text: shown || text});
     setBusy(true, 'Думаю…');
     try {
-      const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown})});
-      if (r.status === 429) throw new Error('Claude сейчас занят в другом чате — дождись, пока он закончит');
+      const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown, task})});
+      if (r.status === 409) throw new Error('Claude ещё работает над этим выпуском — дождись ответа или останови задачу в «Claude делает» слева');
       if (!r.ok) throw new Error('Ошибка ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '';
@@ -865,7 +903,7 @@ async function vStartDone() {
   $('#chatHost').append(box);
   await box.ready;
   const ask = sessionStorage.getItem('startAsk:' + P);
-  if (ask) { sessionStorage.removeItem('startAsk:' + P); const {text, shown} = JSON.parse(ask); box.say(text, shown); }
+  if (ask) { sessionStorage.removeItem('startAsk:' + P); const {text, shown} = JSON.parse(ask); box.say(text, shown, {kind: 'memory', title: 'Первая память'}); }
 }
 
 // Сегодня (LeanToday): the week by stages, and what waits for you, from the content items.
@@ -900,14 +938,14 @@ async function vToday() {
   }
   waits.sort((p, q) => p[0] - q[0] || String(p[1].at || '9').localeCompare(String(q[1].at || '9')));
   const pitches = ITEMS.items.filter((x) => x.proposed && x.at && inDays(x) >= 0 && inDays(x) <= 14).length;
-  const wline = ([, x, note, tag]) => `<a class="wl" href="${itemHref(x)}" data-peek="${x.id}"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="display: inline-flex; gap: 6px; align-items: center">${svg(FMT_ICON[x.format], 14)}${esc(x.title)}</span><span class="small muted">${esc(note)}</span><span class="r"><span class="tag">${tag}</span>${x.at ? '&nbsp;&nbsp;' + dayName(x) : ''}</span></a>`;
+  const wline = ([, x, note, tag]) => `<a class="wl" href="${itemHref(x)}" data-peek="${x.id}"${jref(x)}><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="display: inline-flex; gap: 6px; align-items: center">${svg(FMT_ICON[x.format], 14)}${esc(x.title)}</span><span class="small muted">${esc(note)}</span><span class="r"><span class="tag">${tag}</span>${x.at ? '&nbsp;&nbsp;' + dayName(x) : ''}</span></a>`;
   const dayCell = (d) => {
     const list = onWeek.filter((x) => dayOf(x) === ymd(d));
     const isToday = ymd(d) === ymd(today);
     const head = `<span class="small" style="color: ${isToday ? 'var(--ink)' : 'var(--muted)'}; font-weight: ${isToday ? 700 : 500}">${DAYS[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()}</span>`;
     if (!list.length) return `<div style="flex: 1; min-width: 0; border: 1px dashed #D4D4D4; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-height: 104px; background: #FCFCFC">${head}${d >= today && canEdit() ? `<button type="button" class="small" data-day="${ymd(d)}" style="margin-top: auto; border: 0; background: none; padding: 0; text-align: left; color: var(--blue); font-weight: 600; cursor: pointer">Предложить идею</button>` : ''}</div>`;
     const x = list[0];
-    return `<a href="${itemHref(x)}" data-peek="${x.id}" style="flex: 1; min-width: 0; border: 1px ${x.stage === 'idea' ? 'dashed #D4D4D4' : 'solid var(--line)'}; ${isToday ? 'border-color: var(--ink);' : ''} border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 5px; min-height: 104px; text-decoration: none; color: var(--ink)">${head}
+    return `<a href="${itemHref(x)}" data-peek="${x.id}"${jref(x)} style="flex: 1; min-width: 0; border: 1px ${x.stage === 'idea' ? 'dashed #D4D4D4' : 'solid var(--line)'}; ${isToday ? 'border-color: var(--ink);' : ''} border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 5px; min-height: 104px; text-decoration: none; color: var(--ink)">${head}
       <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span></span>
       <span class="small muted">${FMT_NAME[x.format].toLowerCase()}${list.length > 1 ? ` · ещё ${list.length - 1}` : ''}</span><span style="margin-top: auto">${sdot(x.stage)}</span></a>`;
   };
@@ -945,12 +983,13 @@ const itemRubric = (x) => (ITEMS?.rubrics || []).find((r) => r.id === x.rubric |
 const itemHref = (x) => x.ref?.kind === 'reel' ? '#/reel/' + x.ref.id : x.ref?.kind === 'post' ? '#/post/' + x.ref.id : '#/item/' + x.id;
 const sdot = (s) => `<span class="sdot" style="color: ${LIFE_COLOR[s]}"><i style="${s === 'idea' ? 'border: 1.5px dashed ' + LIFE_COLOR[s] : 'background: ' + LIFE_COLOR[s]}"></i>${LIFE.find(([k]) => k === s)?.[1] || ''}</span>`;
 const whenText = (at) => at ? new Date(at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short'}) : 'без даты';
+const jref = (x) => (x.ref?.kind === 'reel' || x.ref?.kind === 'post' ? ` data-jref="${x.ref.kind}:${esc(x.ref.id)}"` : '');
 function itemCard(x) {
   const r = itemRubric(x);
   const need = x.need || [];
   const extra = x.stage === 'material' && need.length ? ` · снято ${need.filter((n) => n.done).length} из ${need.length}` : '';
   const sib = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id).length : 0;
-  return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}" data-peek="${x.id}">
+  return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}" data-peek="${x.id}"${jref(x)}>
     <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)}${extra}${sib ? ` · ещё ${sib} из того же материала` : ''}${x.missing ? ' · папка пропала' : ''}</span></a>`;
@@ -1850,7 +1889,7 @@ async function vChat(key) {
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Очистить общий чат?')) { await post('/api/chat/reset', {key}); vChat(key); } });
   // What was typed on «Сегодня» (or asked from another page) goes out as the first message here.
   const pending = sessionStorage.getItem('firstMsg:' + key);
-  if (pending) { sessionStorage.removeItem('firstMsg:' + key); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
+  if (pending) { sessionStorage.removeItem('firstMsg:' + key); const {text, shown, task} = JSON.parse(pending); await box.ready; box.say(text, shown, task); }
 }
 
 // Новый выпуск (LeanNew): two doors — Claude proposes, or you have an idea or material. Every
@@ -1986,7 +2025,7 @@ async function vPlan(offset = 0, month = true) {
   }
   const all = ITEMS.items;
   const onDay = (d) => all.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
-  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
+  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}"${jref(x)} title="${esc(x.title)}">
       <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
       <span class="m">${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}</span>
       ${x.proposed && canEdit() ? `<span class="m" style="gap: 8px"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</a>`;
@@ -2123,13 +2162,13 @@ async function vPlanDraft() {
     b.oninput = () => { b.parentElement.querySelector('.bpct').textContent = b.value + ' %'; };
     b.onchange = () => post('/api/strategy/edit', {rubric: {id: b.dataset.share, share: Number(b.value)}}).then(() => vPlanDraft());
   });
-  $('#bGo')?.addEventListener('click', () => { opt.wish = $('#bWish').value.trim(); keep(); box.say(buildText(), `${list.length ? 'Пересобрать' : 'Собрать'} контент-план · ${range}`); });
+  $('#bGo')?.addEventListener('click', () => { opt.wish = $('#bWish').value.trim(); keep(); box.say(buildText(), `${list.length ? 'Пересобрать' : 'Собрать'} контент-план · ${range}`, {kind: 'plan', title: `Собрать контент-план · ${range}`, source: 'plan'}); });
   view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.stopPropagation(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); vPlanDraft(); }));
   view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); const x = list.find((y) => y.id === b.dataset.other); box.say(`Замени идею «${x.title}» на ${x.at.slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric: и новой строкой Why:.`, `Другую вместо «${x.title}»`); }));
   $('#takeAll')?.addEventListener('click', async (e) => { e.target.disabled = true; for (const x of list) await post('/api/items/set', {id: x.id, take: true}); toast(`Взято ${list.length}`); location.hash = '#/plan'; });
   await box.ready;
   const ask = sessionStorage.getItem('planAsk');
-  if (ask) { sessionStorage.removeItem('planAsk'); const {text, shown} = JSON.parse(ask); box.say(text, shown); }
+  if (ask) { sessionStorage.removeItem('planAsk'); const {text, shown, task} = JSON.parse(ask); box.say(text, shown, task); }
   else if (sessionStorage.getItem('planLay')) { sessionStorage.removeItem('planLay'); if (ed) $('#bGo')?.focus(); }
 }
 
@@ -2259,7 +2298,7 @@ async function vRubric(id, tab = 'overview', sub) {
   $('#rShare')?.addEventListener('change', (e) => save({share: Number(e.target.value)}));
   $('#rLook')?.addEventListener('change', (e) => save({look: e.target.value}));
   $('#rDel')?.addEventListener('click', async () => { if (!confirm(`Удалить рубрику «${r.name}»? Выпуски останутся, просто без рубрики.`)) return; await post('/api/strategy/edit', {rubric: {id: r.id, remove: true}}); location.hash = '#/plan'; });
-  $('#rAsk')?.addEventListener('click', () => { sessionStorage.setItem('planAsk', JSON.stringify({text: `Предложи 3 идеи в рубрику «${r.name}» (id ${r.id}${r.about ? ', формула: ' + r.about : ''}${r.format ? ', обычно ' + FMT_NAME[r.format].toLowerCase() : ''}) на ближайшие две недели, по её шаблону, правилам и референсам из strategy.json, не повторяя её прошлые выпуски. Каждую добавь в ideas.md в «My ideas» со строками «Date: YYYY-MM-DDTHH:MM», «Rubric: ${r.id}» и «Why: <почему в этот день>».`, shown: `3 идеи в «${r.name}»`})); location.hash = '#/plan/draft'; });
+  $('#rAsk')?.addEventListener('click', () => { sessionStorage.setItem('planAsk', JSON.stringify({text: `Предложи 3 идеи в рубрику «${r.name}» (id ${r.id}${r.about ? ', формула: ' + r.about : ''}${r.format ? ', обычно ' + FMT_NAME[r.format].toLowerCase() : ''}) на ближайшие две недели, по её шаблону, правилам и референсам из strategy.json, не повторяя её прошлые выпуски. Каждую добавь в ideas.md в «My ideas» со строками «Date: YYYY-MM-DDTHH:MM», «Rubric: ${r.id}» и «Why: <почему в этот день>».`, shown: `3 идеи в «${r.name}»`, task: {kind: 'plan', title: `3 идеи в «${r.name}»`, source: 'plan'}})); location.hash = '#/plan/draft'; });
   view.querySelectorAll('#rNew, #tNew').forEach((b) => b.addEventListener('click', () => sessionStorage.setItem('newRubric', r.id)));
   // Шаблоны
   $('#tUse')?.addEventListener('click', async (e) => { await post('/api/strategy/template', {rubric: r.id, template: e.target.dataset.t || null}); toast(e.target.dataset.t ? 'Шаблон в рубрике' : 'Шаблон убран'); redraw(); });
@@ -2287,7 +2326,7 @@ async function vRubric(id, tab = 'overview', sub) {
     drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); addFiles([...e.dataTransfer.files]); };
     $('#refLink').onsubmit = async (e) => { e.preventDefault(); const u = $('#refUrl').value.trim(); if (!/^https?:\/\//.test(u)) return toast('Нужна ссылка с https://'); await ref({add: {url: u, name: ''}}); sessionStorage.removeItem('refSel:' + r.id); redraw(); };
   }
-  $('#refStudy')?.addEventListener('click', () => memSay(`Разбери референсы рубрики «${r.name}» (strategy.json → rubrics → ${r.id} → refs): открой каждую ссылку или файл и заполни у каждого takes (hook, edit, plates, delivery, sound, cover), note — как это будет у нас, skip — чего не копируем. Отмеченное мной не снимай. Потом напиши refsSummary рубрики в 2–4 строки и коротко повтори здесь.`, `Разобрать референсы «${r.name}»`));
+  $('#refStudy')?.addEventListener('click', () => memSay(`Разбери референсы рубрики «${r.name}» (strategy.json → rubrics → ${r.id} → refs): открой каждую ссылку или файл и заполни у каждого takes (hook, edit, plates, delivery, sound, cover), note — как это будет у нас, skip — чего не копируем. Отмеченное мной не снимай. Потом напиши refsSummary рубрики в 2–4 строки и коротко повтори здесь.`, `Разобрать референсы «${r.name}»`, {kind: 'material', title: `Разобрать референсы «${r.name}»`}));
   $('#refTpl')?.addEventListener('click', () => $('#tByRefs') ? $('#tByRefs').click() : memSay(`По референсам рубрики «${r.name}» (strategy.json → rubrics → ${r.id} → refs) предложи, как обновить её шаблон ролика ${tpl ? `«${tpl.name}»` : '(выбери подходящий из template/src/templates/catalog.json)'}: длина сцен, первая секунда, плашки. Каталог шаблонов не меняй; если нужен другой шаблон — скажи какой.`, `Шаблон «${r.name}» по референсам`));
   // Правила
   const setRules = (list) => save({rules: list}, true);
@@ -2345,7 +2384,7 @@ const normTok = (t) => {
   return {...t, colors, fonts, radii, site: t.site || ''};
 };
 const briefGaps = (text) => { const parts = briefParts(text); return BRIEF.filter(([, , re]) => !parts.some((p) => re.test(p.head) && p.body)); };
-const memSay = (text, shown) => { sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown})); location.hash = '#/chat/_project'; };
+const memSay = (text, shown, task) => { sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown, task})); location.hash = '#/chat/_project'; };
 async function vBrief() {
   const m = await api('/api/memory');
   const parts = briefParts(m.brief);
@@ -2364,7 +2403,7 @@ async function vBrief() {
       ${m.sources.slice(0, 8).map((x) => `<div class="ln-li" style="padding: 9px 2px; font-size: 13px">${svg(x.kind === 'link' ? 'globe' : x.kind === 'voice' ? 'mic' : 'clip', 14)}<span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.name)}</span><span class="r">${new Date(x.at).toLocaleDateString('ru', {day: 'numeric', month: 'short'})}</span></div>`).join('') || '<span class="small muted">Источники появятся, когда вы что-то загрузите или ответите голосом.</span>'}
       ${canEdit() && m.links[0] ? `<button type="button" class="ln-btn" id="bReread" style="align-self: flex-start">${svg('globe', 14)}Перечитать сайт</button>` : ''}
       <span class="small muted" style="margin-top: auto; line-height: 1.5">Правится словами в <a href="#/chat/_project">чате проекта</a>: «мы ещё делаем фотосессии на склоне» — Claude допишет нужный раздел.</span></aside></div>`;
-  $('#bReread')?.addEventListener('click', () => memSay(`Перечитай сайт ${m.links[0]} и обнови brief.md по разделам (## Кто мы, Для кого, Что продаём, …) и facts.json. Скажи коротко, что поменялось.`, 'Перечитать сайт'));
+  $('#bReread')?.addEventListener('click', () => memSay(`Перечитай сайт ${m.links[0]} и обнови brief.md по разделам (## Кто мы, Для кого, Что продаём, …) и facts.json. Скажи коротко, что поменялось.`, 'Перечитать сайт', {kind: 'facts', title: 'Перечитать сайт'}));
 }
 
 // Память › Обзор (M1): what Claude knows, the gaps, and one place to drop anything in.
@@ -2400,7 +2439,7 @@ async function vMemHub() {
   const send = async (files) => {
     const got = [];
     for (const f of files) { const r = await fetch(`/api/upload?project=${encodeURIComponent(P)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f}).then((x) => x.json()).catch(() => null); if (r?.path) { got.push(r.path); await post('/api/memory/set', {source: {kind: 'file', name: f.name}}); } }
-    if (got.length) memSay(`Я загрузил в память: ${got.join(', ')}.\n${sort}`, `Загрузил: ${files.map((f) => f.name).join(', ')}`);
+    if (got.length) memSay(`Я загрузил в память: ${got.join(', ')}.\n${sort}`, `Загрузил: ${files.map((f) => f.name).join(', ')}`, {kind: 'material', title: 'Разобрать материал'});
   };
   const drop = $('#mDrop');
   if (drop) {
@@ -2408,7 +2447,7 @@ async function vMemHub() {
     drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
     drop.ondragleave = () => drop.classList.remove('over');
     drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); send([...e.dataTransfer.files]); };
-    $('#mLink').onsubmit = async (e) => { e.preventDefault(); const u = $('#mLinkIn').value.trim(); if (!u) return; await post('/api/memory/set', {source: {kind: 'link', name: u}}); memSay(`Прочитай ${u}.\n${sort}`, `Прочитать ${u}`); };
+    $('#mLink').onsubmit = async (e) => { e.preventDefault(); const u = $('#mLinkIn').value.trim(); if (!u) return; await post('/api/memory/set', {source: {kind: 'link', name: u}}); memSay(`Прочитай ${u}.\n${sort}`, `Прочитать ${u}`, {kind: 'material', title: 'Прочитать ссылку'}); };
   }
 }
 
@@ -2424,7 +2463,7 @@ async function vQuestions() {
   </div></div>`;
   view.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = async () => { await post('/api/memory/set', {removeQuestion: b.dataset.rm}); vMemory('questions'); }));
   $('#qAdd')?.addEventListener('submit', async (e) => { e.preventDefault(); const t = $('#qIn').value.trim(); if (!t) return; await post('/api/memory/set', {question: {text: t}}); vMemory('questions'); });
-  $('#qIdeas')?.addEventListener('click', () => memSay('Посмотри вопросы клиентов в memory.json → questions и предложи 4–6 выпусков, которые на них отвечают: в ideas.md «My ideas» с Format:/Hook:/Plot:, Date: и Rubric:.', 'Идеи из вопросов клиентов'));
+  $('#qIdeas')?.addEventListener('click', () => memSay('Посмотри вопросы клиентов в memory.json → questions и предложи 4–6 выпусков, которые на них отвечают: в ideas.md «My ideas» с Format:/Hook:/Plot:, Date: и Rubric:.', 'Идеи из вопросов клиентов', {kind: 'plan', title: 'Идеи из вопросов клиентов'}));
 }
 
 // Ответить голосом (M4): guiding questions one by one; the answer is dictated (the browser's own
@@ -2473,7 +2512,7 @@ async function vAsk(start) {
       at = next < 0 ? Math.min(at + 1, ASK.length - 1) : next;
       draw();
     };
-    $('#aSort')?.addEventListener('click', () => memSay(`Вот мои ответы на вопросы о проекте:\n${m.answers.map((x) => `— ${x.question || x.q}: ${x.text}`).join('\n')}\nРазложи их по памяти: brief.md по разделам (## Кто мы, Для кого, Что продаём, Чем отличаемся, Сезон, Площадки, Что работает, Цели на сезон, Чего не обещаем, Чьи аккаунты нравятся), голос и правила — в strategy.json → voice и PLAYBOOK.md, цифры и даты — в facts.json, вопросы клиентов — в memory.json → questions. Покажи коротко, что куда записал.`, 'Разложить ответы по памяти'));
+    $('#aSort')?.addEventListener('click', () => memSay(`Вот мои ответы на вопросы о проекте:\n${m.answers.map((x) => `— ${x.question || x.q}: ${x.text}`).join('\n')}\nРазложи их по памяти: brief.md по разделам (## Кто мы, Для кого, Что продаём, Чем отличаемся, Сезон, Площадки, Что работает, Цели на сезон, Чего не обещаем, Чьи аккаунты нравятся), голос и правила — в strategy.json → voice и PLAYBOOK.md, цифры и даты — в facts.json, вопросы клиентов — в memory.json → questions. Покажи коротко, что куда записал.`, 'Разложить ответы по памяти', {kind: 'memory', title: 'Разложить ответы по памяти'}));
   };
   function listen() {
     rec = new SR(); rec.lang = 'ru-RU'; rec.continuous = true; rec.interimResults = true;
@@ -3099,12 +3138,95 @@ new MutationObserver(decorateChat).observe(document.getElementById('view'), {chi
 document.body.classList.toggle('side-mini', UI.get('side') === 'mini');
 document.body.classList.toggle('chat-mini', UI.get('chat') === 'mini');
 
+// Задачи Claude (handbook/LEAN.md, кусок 16; холст L26–L27): «Claude делает» in the column above
+// Настройки while something runs — from the web, the bot, the phone or the Plan. One task is a row
+// with what it does now, a bar and the time left; several fold into one line; a folded column shows
+// a ring with their number. A click opens the list with «Недавние» and «Остановить» on each.
+let JOBS = {active: [], recent: []}, jobsTimer = null;
+const JOB_SRC = {web: ['web', 'запущено: веб'], bot: ['tg', 'запущено: бот'], phone: ['phone', 'запущено: телефон'], plan: ['cal', 'запущено: План']};
+const jobHref = (t) => t.ref?.kind === 'reel' ? '#/reel/' + t.ref.id : t.ref?.kind === 'post' ? '#/post/' + t.ref.id : t.kind === 'plan' ? '#/plan/draft' : t.key === '_ds' ? '#/memory/ds' : t.key && t.key !== '_project' && !t.key.startsWith('new-') ? '#/reel/' + t.key : '#/chat/_project';
+const jobIcon = (t) => t.state === 'run' ? '<i class="spin"></i>' : t.state === 'queue' ? '<i class="spin q"></i>' : t.state === 'ask' || t.state === 'interrupted' ? `<span class="jic warn">${svg('flag', 14)}</span>` : t.state === 'error' ? '<span class="jic err">!</span>' : `<span class="jic ok">${svg('check', 14)}</span>`;
+const jobLine = (t) => t.state === 'run' ? `${esc(t.now)}${t.left && !/осталось/.test(t.now) ? ' · ' + esc(t.left) : ''}` : t.state === 'queue' ? esc(t.now) : t.state === 'interrupted' ? `прервано: ${esc(t.note || '')}` : t.state === 'ask' ? `нужен ответ: ${esc(t.note || '')}` : t.state === 'error' ? `не вышло: ${esc(t.note || 'ошибка')}` : `готово${t.note ? ' — ' + esc(t.note) : ''}`;
+const jobAgo = (ms) => { const m = Math.round((Date.now() - ms) / 60e3); return m < 1 ? 'только что' : m < 60 ? `${m} мин назад` : m < 1440 ? `${Math.round(m / 60)} ч назад` : new Date(ms).toLocaleDateString('ru', {day: 'numeric', month: 'short'}); };
+function jobRow(t, full) {
+  const [ic, tip] = JOB_SRC[t.source] || JOB_SRC.web;
+  return `<div class="jrow ${t.state}"><a href="${jobHref(t)}" class="jmain">${jobIcon(t)}<span class="jtx"><b>${esc(t.title)}</b><span class="${full ? 'jfull' : ''}">${jobLine(t)}</span>${t.state === 'run' ? `<span class="jbar"><i style="width: ${t.pct || 0}%"></i></span>` : ''}</span><span class="muted jsrc" title="${tip}${t.who ? ' · ' + esc(t.who) : ''}">${svg(ic, 13)}</span></a>
+    ${!full || !canEdit() ? '' : t.state === 'run' ? (t.canStop ? `<button type="button" class="ln-btn s jstop" data-jstop="${esc(t.id)}">Остановить</button>` : t.source === 'bot' ? '<span class="small muted jstop" style="white-space: nowrap">остановить в боте</span>' : '')
+      : t.state === 'queue' ? `<button type="button" class="ln-btn s jstop" data-jstop="${esc(t.id)}" data-q="1">Убрать</button>`
+      : t.state === 'interrupted' ? `<span class="jstop" style="display: flex; gap: 4px"><button type="button" class="ln-btn s p" data-jre="${esc(t.id)}">Перезапустить</button><button type="button" class="ln-btn s g" data-jstop="${esc(t.id)}" data-q="1" aria-label="Закрыть">✕</button></span>` : ''}</div>`;
+}
+function drawJobs() {
+  const box = $('#jobsBox');
+  if (!box) return;
+  const act = JOBS.active, run = act.filter((t) => t.state === 'run'), wait = act.filter((t) => t.state === 'ask' || t.state === 'interrupted').length, queued = act.filter((t) => t.state === 'queue').length;
+  if (!act.length) { box.innerHTML = ''; box.dataset.html = ''; return; }
+  const pct = run.length ? Math.round(run.reduce((n, t) => n + (t.pct || 0), 0) / run.length) : 100;
+  const ring = `<button type="button" class="jring" data-jopen title="Claude делает · ${act.length}" aria-label="Задачи Claude: ${act.length}" style="--p: ${pct}">${act.length}</button>`;
+  const html = act.length < 3 && !wait
+    ? `<div class="jbox"><button type="button" class="jhead" data-jopen>Claude делает<span class="n">${act.length}</span></button>${act.map((t) => jobRow(t, false)).join('')}</div>${ring}`
+    : `<button type="button" class="nav jfold ${wait ? 'wait' : ''}" data-jopen>${run.length ? '<i class="spin"></i>' : jobIcon(act[0])}<span>Claude делает · ${act.length}</span>${wait ? `<span class="bdg" style="background: #B7791F">${wait} ждёт</span>` : `<span class="n">${queued ? `${queued} в очереди` : pct + '%'}</span>`}</button>${ring}`;
+  // Redrawn every few seconds: only when something changed, and opened on press, so a click
+  // that lands during a redraw is not lost.
+  if (box.dataset.html !== html) { box.dataset.html = html; box.innerHTML = html; }
+  box.onpointerdown = (e) => { if (!e.target.closest('[data-jopen]') || e.target.closest('a')) return; e.preventDefault(); $('#jobsPop') ? $('#jobsPop').remove() : openJobs(); };
+  box.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-jopen]')) { e.preventDefault(); openJobs(); } };
+}
+function openJobs() {
+  $('#jobsPop')?.remove();
+  const el = document.createElement('div');
+  el.id = 'jobsPop';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', 'Задачи Claude');
+  const paint = () => {
+    el.innerHTML = `<div style="display: flex; align-items: baseline; gap: 8px"><b style="font-size: 15px">Задачи Claude</b><span class="small muted">из веба, бота и телефона</span><button type="button" class="ln-btn s g" id="jClose" style="margin-left: auto" aria-label="Закрыть">✕</button></div>
+      ${JOBS.active.map((t) => jobRow(t, true)).join('') || '<p class="small muted" style="margin: 4px 0">Сейчас Claude ничего не делает.</p>'}
+      ${JOBS.recent.length ? `<div class="lbl" style="padding-top: 8px">Недавние</div>${JOBS.recent.map((t) => `<a class="jold" href="${jobHref(t)}">${jobIcon(t)}<span class="jtx"><b>${esc(t.title)}</b><span>${t.state === 'error' ? 'не вышло: ' + esc(t.note || 'ошибка') : t.state === 'ask' ? 'спрашивал: ' + esc(t.note || '') : esc(t.note || 'готово')} · ${jobAgo(t.finishedAt)}</span></span></a>`).join('')}` : ''}
+      <span class="small muted">Задача — долгая работа Claude: сборка, рендер, план, разбор материала, память. Короткие ответы видны в самом чате.${JOBS.limits ? ` Одновременно до ${JOBS.limits.claude} задач Claude и ${JOBS.limits.render} рендеров, остальные ждут в очереди; над одним выпуском — одна задача.` : ''}</span>`;
+    el.querySelector('#jClose').onclick = () => el.remove();
+    el.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => el.remove()));
+    el.querySelectorAll('[data-jstop]').forEach((b) => (b.onclick = async () => { if (!b.dataset.q && !confirm('Остановить эту задачу?')) return; b.disabled = true; await post('/api/jobs/stop', {id: b.dataset.jstop}).catch(() => toast('Не получилось')); pollJobs(); }));
+    el.querySelectorAll('[data-jre]').forEach((b) => (b.onclick = async () => { b.disabled = true; await post('/api/jobs/restart', {id: b.dataset.jre}).then(() => toast('Перезапущено')).catch((e) => toast(e.status === 409 ? 'Над этим выпуском уже идёт задача' : 'Не получилось перезапустить')); pollJobs(); }));
+  };
+  el.paint = paint;
+  paint();
+  document.body.append(el);
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#jobsPop')?.remove(); });
+document.addEventListener('click', (e) => { const p = $('#jobsPop'); if (p && !e.target.closest('#jobsPop, #jobsBox')) p.remove(); });
+// «собирается · 62%» on a release's card in Выпуски, План and Сегодня: cards carry data-jref.
+function paintJobRefs() {
+  const by = {};
+  for (const t of JOBS.active) if (t.state === 'run' && t.ref) by[t.ref.kind + ':' + t.ref.id] = t;
+  document.querySelectorAll('[data-jref]').forEach((c) => {
+    const t = by[c.dataset.jref];
+    let s = c.querySelector(':scope > .jbusy');
+    if (!t) { s?.remove(); return; }
+    const v = `${t.kind === 'render' ? 'рендер' : 'собирается'} · ${t.pct || 0}%`;
+    if (s?.dataset.v === v) return;
+    if (!s) { s = document.createElement('span'); s.className = 'jbusy'; c.append(s); }
+    s.dataset.v = v;
+    s.innerHTML = `<i class="spin"></i>${v}`;
+  });
+}
+async function pollJobs() {
+  clearTimeout(jobsTimer);
+  if (!ME || isMember()) return;
+  jobsTimer = -1; // one loop: route() starts it only while nothing is scheduled
+  try { JOBS = await api('/api/jobs'); } catch {}
+  drawJobs();
+  paintJobRefs();
+  $('#jobsPop')?.paint();
+  jobsTimer = setTimeout(pollJobs, JOBS.active.length ? 3000 : 12000);
+}
+new MutationObserver(() => { if (JOBS.active.length) paintJobRefs(); }).observe(document.querySelector('#view') || document.body, {childList: true, subtree: true});
+
 async function route() {
   document.body.classList.remove('menu');
   const h = location.hash || '#/';
   try {
     await sidebar();
     foldSide(document.body.classList.contains('side-mini'));
+    drawJobs();
     let m;
     view = $('#view');
     if (isMember()) await vMember(h);
@@ -3132,6 +3254,7 @@ async function route() {
     else await vToday();
     const next = sessionStorage.getItem('peekNext');
     if (next) { sessionStorage.removeItem('peekNext'); peek(next); }
+    if (!jobsTimer) pollJobs(); else paintJobRefs();
   } catch (e) {
     view.innerHTML = `<div class="page"><p class="muted">Не получилось загрузить: ${esc(e.message)}. <a href="#/">На главную</a></p></div>`;
   }

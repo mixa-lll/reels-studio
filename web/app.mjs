@@ -539,7 +539,7 @@ export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, sandb
         const vids = cur ? readdirSync(join(dir, 'versions', cur)).filter((f) => /\.mp4$/i.test(f)).map((f) => ({f, size: statSync(join(dir, 'versions', cur, f)).size})).sort((a, z) => a.size - z.size) : [];
         const rel = vids[0] && relative(PROJECTS, join(dir, 'versions', cur, vids[0].f));
         return json(200, {reel: reels(p).find((x) => x.id === rid), version: cur, nextV, video: rel ? `/app/v?f=${encodeURIComponent(rel)}&k=${sign(rel)}` : null,
-          scenes: Array.isArray(scenes) ? scenes : [], edits: readEdits(dir), busy: !!busy(), working: busy()?.key === rid, layout: layout(),
+          scenes: Array.isArray(scenes) ? scenes : [], edits: readEdits(dir), busy: !!busy(p, rid), working: !!busy(p, rid), layout: layout(),
           // Every version for «v1 ↔ v2» and the downloads: the review copy and, once accepted, the 1080p master.
           versions: vdirs.map((v) => {
             const vd = join(dir, 'versions', v);
@@ -571,17 +571,17 @@ export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, sandb
           const rel = abs && relative(PROJECTS, decodeURIComponent(abs));
           return rel && !rel.startsWith('..') && /^[\w-]+\/reels\/[\w-]+\/(versions\/v\d+|project\/public|sources)\/[^/]+\.(mp4|mov|webm|jpe?g|png|webp)$/i.test(rel) ? signed(rel) : null;
         };
-        const working = busy()?.key === rid;
+        const working = !!busy(p, rid);
         const msgs = chat.history(p, rid).slice(-60).map((m) => ({from: m.from, kind: m.kind, text: m.text || m.caption || '', by: m.by, at: m.at,
           ...(m.kind === 'file' ? {url: fileUrl(m.url), name: m.name, ext: m.ext} : {})}));
-        return json(200, {messages: msgs, working, status: working ? chat.meta(p, rid).status || '' : '', busy: !!busy()});
+        return json(200, {messages: msgs, working, status: working ? chat.meta(p, rid).status || '' : '', busy: working});
       }
       // «Правка словами»: a message to the reel's chat; Claude answers there and on the web page.
       if (req.method === 'POST' && url.pathname === '/api/app/reel/say') {
         const text = String(b.text || '').trim().slice(0, 2000);
         if (!text) return json(400, {});
-        if (busy()) return json(429, {error: busy().key === rid ? 'Claude ещё работает над этим выпуском — дождитесь ответа.' : 'Claude сейчас занят другим выпуском. Попробуйте через пару минут.'});
-        if (!build(p, rid, text, text, me.name)) return json(429, {error: 'Claude сейчас занят.'});
+        if (busy(p, rid)) return json(429, {error: 'Claude ещё работает над этим выпуском — дождитесь ответа.'});
+        if (!build(p, rid, text, text, me.name)) return json(429, {error: 'Claude ещё работает над этим выпуском — дождитесь ответа.'});
         return json(200, {started: true});
       }
       // «Отправить на согласование»: the current version goes to the owner in the bot chat.
@@ -612,32 +612,32 @@ export function makeApp({BOT, PROJECTS, PAGE, access, saveAccess, logFile, sandb
         if (!d?.template) return json(400, {error: 'У выпуска нет шаблона'});
         const files = sources();
         if (!files.length) return json(400, {error: 'Сначала добавьте материал'});
-        if (busy()) return json(429, {error: 'Claude сейчас занят. Попробуйте через пару минут.'});
+        if (busy(p, rid)) return json(429, {error: 'Claude ещё работает над этим выпуском — дождитесь ответа.'});
         mkdirSync(pub, {recursive: true});
         for (const f of files) if (!existsSync(join(pub, f))) copyFileSync(join(dir, 'sources', f), join(pub, f));
         const tpl = catalog().templates.find((x) => x.id === d.template);
         const text = `Новый ролик по шаблону «${tpl?.name || d.template}» (TEMPLATES.md). Материал уже скопирован в project/public/: ${files.join(', ')}.${b.note ? ` Что сказал человек: ${String(b.note).slice(0, 500)}` : ''}\n` +
           'Посмотри каждый файл, разложи материал по сценам шаблона в project/src/reel.json (тексты плашек и суммы — из идеи в README и того, что видно на материале). Сцене без материала оставь "need": что нужно, без media. ' +
           'НЕ рендери: человек посмотрит раскладку и нажмёт «Собрать v1». Ответь одной-двумя строками: что куда легло и чего не хватает.';
-        if (!build(p, rid, text, `Разложить материал по шаблону · файлов: ${files.length}`, me.name)) return json(429, {error: 'Claude сейчас занят.'});
+        if (!build(p, rid, text, `Разложить материал по шаблону · файлов: ${files.length}`, me.name)) return json(429, {error: 'Claude ещё работает над этим выпуском — дождитесь ответа.'});
         return json(200, {started: true});
       }
       if (req.method === 'POST' && url.pathname === '/api/app/reel/render') {
         const f = join(dir, 'project', 'src', 'reel.json');
         const d = readJson(f, null);
         if (!d?.template || !d.scenes?.length) return json(400, {error: 'Сначала разложите материал'});
-        if (busy()) return json(429, {error: 'Claude сейчас занят. Попробуйте через пару минут.'});
+        if (busy(p, rid)) return json(429, {error: 'Claude ещё работает над этим выпуском — дождитесь ответа.'});
         // «Собрать без сцены N»: scenes still waiting for material are left out of this version.
         if (b.skipMissing) { d.scenes = d.scenes.map((x) => (!x.media && !x.a && !['total', 'cta'].includes(x.kind) ? {...x, skip: true} : x)); writeJson(f, d); }
-        if (!build(p, rid, `Собери ${nextV} черновиком по project/src/reel.json (TEMPLATES.md, REELS.md шаги 5–7). Сцены со "skip": true рендер пропустит сам.`, `Собрать ${nextV}${b.skipMissing ? ' без недостающих сцен' : ''}`, me.name)) return json(429, {error: 'Claude сейчас занят.'});
+        if (!build(p, rid, `Собери ${nextV} черновиком по project/src/reel.json (TEMPLATES.md, REELS.md шаги 5–7). Сцены со "skip": true рендер пропустит сам.`, `Собрать ${nextV}${b.skipMissing ? ' без недостающих сцен' : ''}`, me.name)) return json(429, {error: 'Claude ещё работает над этим выпуском — дождитесь ответа.'});
         notify(`🎬 ${me.name} собирает ${nextV} «${reels(p).find((x) => x.id === rid)?.title || rid}» по шаблону из мини-приложения.`);
         return json(200, {started: true});
       }
       if (req.method === 'POST' && url.pathname === '/api/app/reel/build') {
         const open = readEdits(dir).filter((x) => x.state === 'open');
         if (!open.length) return json(400, {error: 'Нет комментариев'});
-        if (busy()) return json(429, {error: 'Claude сейчас занят другим выпуском. Попробуйте через пару минут.'});
-        if (!build(p, rid, buildRequest(open, scenes, nextV), `Собрать ${nextV} · комментариев: ${open.length}`, me.name)) return json(429, {error: 'Claude сейчас занят. Попробуйте через пару минут.'});
+        if (busy(p, rid)) return json(429, {error: 'Claude ещё работает над этим выпуском — дождитесь ответа.'});
+        if (!build(p, rid, buildRequest(open, scenes, nextV), `Собрать ${nextV} · комментариев: ${open.length}`, me.name)) return json(429, {error: 'Claude ещё работает над этим выпуском — дождитесь ответа.'});
         changeEdits(dir, {action: 'send', forV: nextV}, me.name);
         notify(`🛠 ${me.name} собирает ${nextV} «${reels(p).find((x) => x.id === rid)?.title || rid}» из мини-приложения: комментариев ${open.length}.`);
         return json(200, {edits: readEdits(dir), nextV});
