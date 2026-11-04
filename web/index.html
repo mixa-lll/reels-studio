@@ -342,6 +342,10 @@
   .ln-door { flex: 1; border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; background: #fff; text-align: left; font: inherit; cursor: pointer; color: var(--ink); }
   .ln-door.on { border: 2px solid var(--ink); padding: 15px; }
   .ln-aside { flex: 0 0 290px; border-left: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 14px; background: #FCFCFC; overflow-y: auto; }
+  a.lstep { text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; }
+  a.lstep:hover { color: var(--ink); }
+  .lstep.view { border-bottom-color: var(--ink); }
+  .lsub { display: flex; gap: 4px; padding: 8px 28px 0; }
   .lline { width: 22px; height: 1.5px; background: #E5E5E5; } .lline.done { background: var(--ink); }
 </style>
 <script src="/preview.js"></script>
@@ -871,9 +875,35 @@ async function lifeBar(kind, id) {
   if (!x) return '';
   return lifeBarFor(x);
 }
-function lifeBarFor(x, {controls = true} = {}) {
+// One navigation for a reel or post (LeanRelease): the five stages are the tabs; a stage with
+// more than one screen (Материал: сценарий и материалы) shows them underneath.
+const REEL_STEPS = {idea: ['idea'], material: ['script', 'materials'], build: ['edit'], ready: ['publish'], published: ['publish']};
+const POST_STEPS = (k) => ({idea: ['idea'], material: ['text'], build: k === 'carousel' ? ['struct', 'slides'] : ['text'], ready: ['publish'], published: ['publish']});
+const STEP_NAME = {idea: 'Идея', script: 'Сценарий', materials: 'Материалы', edit: 'Монтаж', publish: 'Выкладка', text: 'Текст и фото', struct: 'Структура', slides: 'Слайды'};
+async function lifeNav(kind, id, steps, tab, base) {
+  await loadItems().catch(() => null);
+  const x = ITEMS?.items.find((y) => y.ref?.kind === kind && y.ref.id === id);
+  if (!x) return '';
+  const viewing = LIFE.map(([s]) => s).find((s) => steps[s].includes(tab) && (s === x.stage || !LIFE.some(([o]) => o === x.stage && steps[o].includes(tab)))) || x.stage;
+  const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
+  return lifeBarFor(x, {href: (s) => base + steps[s][0], viewing}) + subs;
+}
+// The «Идея» screen of a reel or post that already has its folder: the concept, editable.
+function drawIdea(host, kind, id) {
+  const x = ITEMS?.items.find((y) => y.ref?.kind === kind && y.ref.id === id);
+  if (!x) { host.innerHTML = '<p class="muted" style="padding: 28px">Идея не записана.</p>'; return; }
+  const ed = canEdit();
+  const area = (f, label, v, rows, ph) => `<label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}</span><textarea class="f" data-i="${f}" rows="${rows}" placeholder="${ph}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.55; resize: vertical">${esc(v || '')}</textarea></label>`;
+  host.innerHTML = `<div style="max-width: 760px; padding: 26px 28px; display: flex; flex-direction: column; gap: 16px">
+    ${area('about', 'О чём', x.idea?.about, 3, 'Одна-две фразы: о чём выпуск')}
+    ${area('hook', 'Крючок — первые 2 секунды', x.idea?.hook, 2, 'Фраза или кадр, на котором остаются')}
+    ${area('flow', 'Ход — по строке на шаг', (x.idea?.flow || []).join('\n'), 4, '1 · …\n2 · …')}
+    <p class="small muted" style="margin: 0">Идея — первый этап. Сценарий и что снять — на этапе «Материал»; правки сохраняются сами.</p></div>`;
+  host.querySelectorAll('[data-i]').forEach((el) => (el.onchange = () => { const v = (k) => host.querySelector(`[data-i="${k}"]`).value; post('/api/items/set', {id: x.id, idea: {about: v('about'), hook: v('hook'), flow: v('flow').split('\n').map((l) => l.trim()).filter(Boolean)}}).then(() => toast('Сохранено')); }));
+}
+function lifeBarFor(x, {controls = true, href = null, viewing = null} = {}) {
   const k = LIFE.findIndex(([s]) => s === x.stage);
-  const steps = LIFE.map(([s, t], i) => `<span class="lstep ${i < k ? 'done' : i === k ? 'on' : ''}"><span class="c">${i < k ? '✓' : ''}</span>${t}</span>${i < 4 ? `<span class="lline ${i < k ? 'done' : ''}"></span>` : ''}`).join('');
+  const steps = LIFE.map(([s, t], i) => { const tag = href ? 'a' : 'span'; return `<${tag} class="lstep ${i < k ? 'done' : i === k ? 'on' : ''} ${s === viewing ? 'view' : ''}" ${href ? `href="${href(s)}"` : ''}><span class="c">${i < k ? '✓' : ''}</span>${t}</${tag}>${i < 4 ? `<span class="lline ${i < k ? 'done' : ''}"></span>` : ''}`; }).join('');
   const r = itemRubric(x);
   const sibs = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id) : [];
   return `<div class="lbar" data-item="${x.id}">${steps}
@@ -984,9 +1014,10 @@ async function vReel(id, tab) {
   const data = isNew ? null : await api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null);
   const r = data?.reel;
   if (r && (!tab || tab === 'files')) tab = tab === 'files' ? 'materials' : stageAt(r);
+  const nav = r ? await lifeNav('reel', id, REEL_STEPS, tab, `#/reel/${id}/`) : '';
   title(r ? `${r.num} ${r.title}` : 'Новый выпуск');
-  const head = `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Все выпуски</a> › ${esc(projName())}</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
-      ${stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>${r ? await lifeBar('reel', id) : ''}`;
+  const head = `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Выпуски</a> › рилс</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
+      ${r && nav ? '' : stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>${nav}`;
   const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
   const chatName = {script: 'Чат сценария', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
   // A reel that exists: its stage in the middle, its chat as a column on the right (CleanReel, CleanText…).
@@ -1001,7 +1032,8 @@ async function vReel(id, tab) {
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id, tab); } });
   wireLifeBar(view);
-  if (r) drawStage(id, tab, data);
+  if (r && tab === 'idea') drawIdea($('#reelHost'), 'reel', id);
+  else if (r) drawStage(id, tab, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
   if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
@@ -1208,25 +1240,26 @@ async function vPost(id, stage) {
   const p = data.post;
   const stages = postStages(p.kind);
   const at = data.summary?.stage === 'done' ? 'publish' : data.summary?.stage;
-  if (!stages.some(([k]) => k === stage)) stage = stages.some(([k]) => k === at) ? at : stages[0][0];
+  if (stage !== 'idea' && !stages.some(([k]) => k === stage)) stage = stages.some(([k]) => k === at) ? at : stages[0][0];
   const atI = stages.findIndex(([k]) => k === at);
+  const nav = await lifeNav('post', id, POST_STEPS(p.kind), stage, `#/post/${id}/`);
   title(p.title || 'Пост');
-  const chatName = {text: 'Чат поста', struct: 'Чат карусели', slides: 'Чат карусели', publish: 'Чат выкладки'}[stage];
+  const chatName = {idea: 'Чат поста', text: 'Чат поста', struct: 'Чат карусели', slides: 'Чат карусели', publish: 'Чат выкладки'}[stage];
   view.innerHTML = `<div class="work"><div class="rmain">
-    <div class="chead"><div style="flex: 1; min-width: 220px"><div class="small muted"><a href="#/all/posts">Посты</a> › ${esc(projName())}</div><h1 style="font-size: 20px; display: flex; align-items: center; gap: 10px">${esc(p.title || 'Пост')} ${kindBadge(p.kind)}</h1></div>
-      <nav class="stg" aria-label="Этапы">${stages.map(([k, t], i) => `<a href="#/post/${esc(id)}/${k}" class="${k === stage ? 'on' : i < atI ? 'done' : ''}">${t}</a>`).join('')}</nav>
+    <div class="chead"><div style="flex: 1; min-width: 220px"><div class="small muted"><a href="#/all">Выпуски</a> › ${esc((KIND[p.kind] || 'пост').toLowerCase())}</div><h1 style="font-size: 20px; display: flex; align-items: center; gap: 10px">${esc(p.title || 'Пост')} ${kindBadge(p.kind)}</h1></div>
+      ${nav ? '' : `<nav class="stg" aria-label="Этапы">${stages.map(([k, t], i) => `<a href="#/post/${esc(id)}/${k}" class="${k === stage ? 'on' : i < atI ? 'done' : ''}">${t}</a>`).join('')}</nav>`}
       ${canEdit() ? `<select class="f" id="kindSel" aria-label="Тип поста" style="width: auto; min-height: 36px">${[['text', 'Текст'], ['photo', 'С фото'], ['carousel', 'Карусель']].map(([k, t]) => `<option value="${k}" ${k === p.kind ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}</div>
-    ${await lifeBar('post', id)}
+    ${nav}
     <div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
     <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
       <div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span><span class="chip">этот пост</span></div>
       <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   wireLifeBar(view);
-  const box = chatBox('post-' + id, {onDone: () => { sidebar(); drawPost(id, stage); }});
+  const box = chatBox('post-' + id, {onDone: () => { sidebar(); if (stage !== 'idea') drawPost(id, stage); }});
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат поста заново? Тексты и картинки останутся.')) { await post('/api/chat/reset', {key: 'post-' + id}); vPost(id, stage); } });
   $('#kindSel')?.addEventListener('change', async (e) => { await post('/api/post/save', {post: id, patch: {kind: e.target.value}}); location.hash = '#/post/' + id; vPost(id); });
-  drawPost(id, stage, data);
+  if (stage === 'idea') drawIdea($('#reelHost'), 'post', id); else drawPost(id, stage, data);
   const pending = sessionStorage.getItem('firstMsg:post-' + id);
   if (pending) { sessionStorage.removeItem('firstMsg:post-' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
