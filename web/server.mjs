@@ -423,7 +423,9 @@ const personFields = (x) => ({role: x.role === 'editor' ? 'editor' : 'member', o
   deputyUntil: /^\d{4}-\d{2}-\d{2}$/.test(x.deputyUntil || '') ? x.deputyUntil : null});
 // Six digits to type into the bot by hand, unique among live invites.
 const newPin = (a) => { for (;;) { const pin = String(100000 + randomBytes(4).readUInt32BE(0) % 900000); if (!a.invites.some((x) => x.pin === pin && x.expires > Date.now())) return pin; } };
-const inviteLinks = (inv) => ({web: inv.web ? `/invite/${inv.code}` : null, telegram: inv.telegram && botUsername() ? `https://t.me/${botUsername()}?start=inv_${inv.code}` : null});
+// With one bot for several studios (relay dispatcher) a link carries its studio: «<node>--» in front.
+const startOf = (payload) => `${process.env.RELAY_NODE && process.env.TG_RELAY ? `${process.env.RELAY_NODE}--` : ''}${payload}`;
+const inviteLinks = (inv) => ({web: inv.web ? `/invite/${inv.code}` : null, telegram: inv.telegram && botUsername() ? `https://t.me/${botUsername()}?start=${startOf(`inv_${inv.code}`)}` : null});
 function whoIs(req) {
   const sid = /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie || '')?.[1];
   if (!sid) return null;
@@ -1060,7 +1062,7 @@ createServer(async (req, res) => {
       invites: a.invites.filter((x) => x.expires > Date.now()).map((x) => ({...x, link: inviteLinks(x)})),
       bot: botUsername(), me: me.id,
       // Only the owner sees the bot's owner link, and only while the bot has no owner yet.
-      ownerLink: me.isOwner && botUsername() && process.env.OWNER_CODE && !readJson(join(BOT, 'data', 'state.json'), {}).ownerId ? `https://t.me/${botUsername()}?start=${process.env.OWNER_CODE}` : null,
+      ownerLink: me.isOwner && botUsername() && process.env.OWNER_CODE && !readJson(join(BOT, 'data', 'state.json'), {}).ownerId ? `https://t.me/${botUsername()}?start=${startOf(process.env.OWNER_CODE)}` : null,
       log: read(LOG).split('\n').filter(Boolean).slice(-40).map((l) => JSON.parse(l)).reverse(),
     });
   }

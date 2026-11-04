@@ -7,7 +7,8 @@ import {fileURLToPath} from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 try { process.loadEnvFile(join(ROOT, '.env')); } catch {}
-const RELAY = process.env.RELAY_URL || 'wss://reels.mygudauri.org/__relay';
+// RELAY_NODE: which studio this computer is (misha, seva…) when several share the relay.
+const RELAY = `${process.env.RELAY_URL || 'wss://reels.mygudauri.org/__relay'}${process.env.RELAY_NODE ? `?node=${encodeURIComponent(process.env.RELAY_NODE)}` : ''}`;
 const SECRET = process.env.RELAY_SECRET;
 const PORT = Number(process.env.PORT || 8080);
 if (!SECRET) throw new Error('RELAY_SECRET is not set in .env');
@@ -61,7 +62,15 @@ function connect() {
   function start(m) {
     const headers = {...m.headers, host: `127.0.0.1:${PORT}`};
     delete headers['accept-encoding']; // keep bodies plain; Cloudflare compresses for the browser
-    const req = request({host: '127.0.0.1', port: PORT, method: m.method, path: m.path, headers}, (res) => {
+    // A header Node will not send (non-ASCII value) must fail this one request, not the agent.
+    for (const [k, v] of Object.entries(headers)) if (/[^\t\x20-\x7e\x80-\xff]/.test(String(v))) delete headers[k];
+    let req;
+    try {
+      req = request({host: '127.0.0.1', port: PORT, method: m.method, path: m.path, headers}, (res) => onResponse(res));
+    } catch (e) {
+      return fail(m.id, e);
+    }
+    function onResponse(res) {
       const job = jobs.get(m.id);
       if (!job) return res.destroy();
       job.res = res;
@@ -77,7 +86,7 @@ function connect() {
       });
       res.on('end', () => { send(JSON.stringify({t: 'end', id: m.id})); jobs.delete(m.id); });
       res.on('error', (e) => fail(m.id, e));
-    });
+    }
     req.on('error', (e) => fail(m.id, e));
     jobs.set(m.id, {req, res: null, inflight: 0});
     if (!m.body) req.end();

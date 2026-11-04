@@ -4,6 +4,7 @@
 import {createSandbox, isTest, listSandboxes, removeSandbox, sandboxName} from './sandbox.mjs';
 import {editor as makeEditor, KEYS as EDITOR_KEYS, LABELS as EDITOR_LABELS} from './editor.mjs';
 import {listReels, reelsUi} from './reels.mjs';
+import {relayUpdates} from './tgrelay.mjs';
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
@@ -1427,6 +1428,20 @@ for (const prompt of unbatched) batch(prompt);
 let offset = state.offset ?? 0;
 let handling = Promise.resolve();
 let conflicts = 0;
+// One update, handled in order but off the receiving loop.
+function takeUpdate(u) {
+  offset = u.update_id + 1;
+  state.offset = offset;
+  saveState(state);
+  const m = u.message ?? u.edited_message;
+  if (m) handling = handling.then(() => onMessage(m)).catch((e) => console.error('message', e));
+  if (u.callback_query) handling = handling.then(() => onButton(u.callback_query)).catch((e) => console.error('button', e));
+}
+// One bot for several studios (bot/tgrelay.mjs): updates come from the relay, never from getUpdates.
+if (process.env.TG_RELAY) {
+  await relayUpdates({url: process.env.TG_RELAY, node: process.env.RELAY_NODE, secret: process.env.RELAY_SECRET,
+    onUpdate: takeUpdate, alive: () => { lastPoll = Date.now(); }, seen: (id) => id < offset});
+}
 for (;;) {
   try {
     const updates = await tg.call('getUpdates', {offset, timeout: 50, allowed_updates: ['message', 'edited_message', 'callback_query']});
