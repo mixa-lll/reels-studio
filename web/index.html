@@ -148,7 +148,7 @@
   .tcx { font-size: 12px; font-weight: 700; color: #2F6FEB; background: #EEF4FE; border-radius: 6px; padding: 2px 7px; border: 0; }
   .enum { width: 24px; height: 24px; border-radius: 50%; background: #2F6FEB; color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; flex: none; }
   .enum.done { background: var(--green); }
-  .lbl { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .02em; text-transform: uppercase; }
+  .lbl { font-size: 12px; color: var(--muted); font-weight: 500; }
   aside.chatcol { width: 380px; flex: none; border-left: 1px solid var(--line); display: flex; flex-direction: column; height: 100vh; }
   aside.chatcol .log, aside.chatcol form.send, aside.chatcol .keys, aside.chatcol .status, aside.chatcol .ctx { padding-left: 16px; padding-right: 16px; }
   aside.chatcol .msg { max-width: 92%; }
@@ -166,7 +166,7 @@
   .strip button span { position: absolute; left: 4px; bottom: 4px; font-size: 10px; background: #fff; border-radius: 4px; padding: 1px 5px; }
   .srow { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
   .srow.drag { opacity: .4; } .srow .h { cursor: grab; color: var(--muted); }
-  .pweekwrap { overflow-x: auto; margin: 0 -4px; padding: 0 4px 6px; }
+  .pweekwrap { flex: none; overflow-x: auto; margin: 0 -4px; padding: 0 4px 6px; }
   .pweek { display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: 10px; }
   .pday { min-height: 320px; border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; background: #fff; }
   .pday .dh { display: flex; align-items: baseline; gap: 6px; padding-bottom: 4px; color: var(--muted); font-size: 13px; }
@@ -289,6 +289,60 @@
   }
   .mob { display: none !important; }
 .testbar{display:block;margin:0 0 10px;padding:7px 10px;border-radius:9px;background:#2F6FEB;color:#fff;font-size:13px;font-weight:600;text-decoration:none}
+  /* Основа: выпуски по этапам (handbook/LEAN.md, кусок 3) */
+  .lboard { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 10px; align-items: start; overflow-x: auto; }
+  .lcol { background: var(--side); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+  .lcolh { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; font-size: 13px; }
+  .icard { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--ink); }
+  .icard:hover { border-color: #D4D4D4; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+  .icard.idea { border-style: dashed; border-color: #D4D4D4; }
+  .icard b { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .ich { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink2); }
+  .rsq { width: 8px; height: 8px; border-radius: 3px; flex: none; display: inline-block; }
+  .sdot { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .sdot i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .lbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 28px; border-bottom: 1px solid var(--line); background: #fff; font-size: 13px; }
+  .lstep { display: inline-flex; align-items: center; gap: 7px; color: #A3A3A3; }
+  .lstep .c { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #D4D4D4; display: grid; place-items: center; font-size: 10px; }
+  .lstep.done { color: var(--ink2); } .lstep.done .c { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .lstep.on { color: var(--ink); font-weight: 700; } .lstep.on .c { border: 2px solid var(--ink); } .lstep.on .c::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); }
+  .pmonth { flex: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .pmonth .pchip { padding: 5px 7px; gap: 2px; font-size: 12px; }
+  .pmonth .pchip b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; min-width: 0; }
+  .pmonth .pchip > span { min-width: 0; }
+  .ln-top { height: 52px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .ln-top b { color: var(--ink); font-weight: 600; font-size: 14px; }
+  .ln-seg { display: inline-flex; gap: 2px; background: #F4F4F4; border-radius: 10px; padding: 3px; }
+  .ln-seg a, .ln-seg button { padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); text-decoration: none; border: 0; background: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .ln-seg .on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .ln-lh { display: flex; align-items: baseline; font-size: 12px; color: var(--muted); font-weight: 500; padding: 0 2px 8px; border-bottom: 1px solid var(--line); }
+  .ln-lh a { margin-left: auto; color: var(--muted); text-decoration: none; font-weight: 400; }
+  .ln-li { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid #F0F0F0; font-size: 14px; color: var(--ink); text-decoration: none; }
+  .ln-li .s { color: var(--muted); font-size: 13px; }
+  .ln-li .r { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; display: flex; gap: 8px; align-items: center; }
+  .ln-btn { height: 34px; border-radius: 9px; border: 1px solid var(--line); background: #fff; padding: 0 13px; font: inherit; font-size: 13px; font-weight: 500; color: var(--ink); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; cursor: pointer; }
+  .ln-btn.p { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .ln-btn.g { border-color: transparent; color: var(--muted); }
+  .ln-btn.s { height: 28px; padding: 0 9px; font-size: 12px; }
+  .ln-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid #F0F0F0; border-left: 1px solid #F0F0F0; }
+  .ln-cell { border-right: 1px solid #F0F0F0; border-bottom: 1px solid #F0F0F0; padding: 7px; display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 118px; }
+  .ln-cell.out { background: #FCFCFC; } .ln-cell.out .dn { opacity: .5; }
+  .ln-cell.today { background: #FAFBFF; }
+  .ln-cell.over { background: #F4F4F4; }
+  .ln-cell .dn { font-size: 12px; color: var(--muted); width: 22px; height: 22px; display: grid; place-items: center; }
+  .ln-cell.today .dn { color: #fff; background: #2F6FEB; border-radius: 999px; font-weight: 600; }
+  .ln-chip { display: flex; flex-direction: column; gap: 3px; background: #F5F5F5; border: 1px solid transparent; border-radius: 6px; padding: 5px 7px; text-decoration: none; color: var(--ink); min-width: 0; cursor: pointer; }
+  .ln-chip.idea { background: #fff; border: 1px dashed #D4D4D4; }
+  .ln-chip .t { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; min-width: 0; }
+  .ln-chip .t span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ln-chip .m { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); }
+  .ln-act { border: 0; background: none; padding: 0; font: inherit; font-size: 11px; font-weight: 600; color: #2F6FEB; cursor: pointer; }
+  .ln-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; color: var(--ink2); background: #fff; white-space: nowrap; cursor: pointer; text-decoration: none; }
+  .ln-pill.on { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+  .ln-door { flex: 1; border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; gap: 12px; align-items: flex-start; background: #fff; text-align: left; font: inherit; cursor: pointer; color: var(--ink); }
+  .ln-door.on { border: 2px solid var(--ink); padding: 15px; }
+  .ln-aside { flex: 0 0 290px; border-left: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; gap: 14px; background: #FCFCFC; overflow-y: auto; }
+  .lline { width: 22px; height: 1.5px; background: #E5E5E5; } .lline.done { background: var(--ink); }
 </style>
 <script src="/preview.js"></script>
 </head>
@@ -386,7 +440,7 @@ async function sidebar() {
   if (isMember()) return memberSidebar();
   OV = await api('/api/overview');
   const cur = location.hash || '#/';
-  const on = (h) => (h === '#/' ? cur === '#/' : cur.startsWith(h) || (h === '#/all' && /^#\/(reel|post)\//.test(cur))) ? 'on' : '';
+  const on = (h) => (h === '#/' ? cur === '#/' : cur.startsWith(h) || (h === '#/all' && /^#\/(reel|post|new)\b/.test(cur)) || (h === '#/plan' && /^#\/(knowledge|rubric)\b/.test(cur))) ? 'on' : '';
   const item = (h, i, t, n = '') => `<a class="nav ${on(h)}" href="${h}" title="${t}">${svg(i)}<span>${t}</span>${n}</a>`;
   const initials = projName().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   $('#side').innerHTML = `
@@ -396,16 +450,13 @@ async function sidebar() {
     ${TEST ? `<a class="testbar" href="#/settings/tests">Тестовый аккаунт${PLAN?.mode ? '' : ' · расскажите о проекте в чате «Сегодня»'}</a>` : ''}
     <button type="button" class="srch" id="srchBtn">${svg('search', 15)}<span>Поиск</span><kbd>⌘K</kbd></button>
     ${item('#/', 'home', 'Сегодня')}
-    ${item('#/all', 'board', 'Все выпуски', `<span class="n">${OV.reels.length}</span>`)}
+    ${item('#/all', 'board', 'Выпуски', `<span class="n">${OV.reels.length + (OV.posts || []).length}</span>`)}
+    ${item('#/plan', 'cal', 'План')}
+    ${item('#/memory', 'idea', 'Память')}
     ${TEAM > 1 && feat('inbox') ? item('#/inbox', 'inbox', 'Входящие', OV.inbox ? `<span class="bdg">${OV.inbox}</span>` : '') : ''}
-    <div class="gh">План</div>
-    ${item('#/plan', 'cal', 'Календарь')}
     ${TEAM > 1 && feat('tasks') ? item('#/tasks', 'people', 'Задания людям') : ''}
-    ${item('#/new', 'idea', 'Идеи', `<span class="n">${OV.ideasCount}</span>`)}
-    ${item('#/knowledge', 'target', 'Стратегия')}
-    ${(OV.rubrics || []).length ? `<div class="gh">Рубрики</div>${OV.rubrics.map((x) => `<a class="nav ${cur === '#/rubric/' + x.id ? 'on' : ''}" href="#/rubric/${esc(x.id)}" title="${esc(x.name)}"><span style="width: 16px; display: grid; place-items: center"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${esc(x.color || '#737373')}"></span></span><span>${esc(x.name)}</span><span class="n">${x.n || ''}</span></a>`).join('')}` : ''}
     <div style="margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 2px">
-      ${item('#/settings', 'sliders', 'Настройки проекта')}
+      ${item('#/settings', 'sliders', 'Настройки')}
       <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${roleName(ME)}</span></div>
     </div>`;
   $('#projSel').onchange = async (e) => { P = e.target.value; localStorage.setItem('project', P); await loadMe(); location.hash = '#/'; route(); };
@@ -418,7 +469,9 @@ function search() {
   const items = [
     ...OV.reels.map((r) => [`${r.num} ${r.title}`, '#/reel/' + r.id, STATUS[r.status]]),
     ...(OV.posts || []).map((x) => [x.title, '#/post/' + x.id, KIND[x.kind]]),
-    ['Сегодня', '#/', ''], ['Все выпуски', '#/all', ''], ['Идеи', '#/new', ''], ['Стратегия', '#/knowledge', ''], ['Настройки проекта', '#/settings', ''],
+    ['Сегодня', '#/', ''], ['Выпуски', '#/all', ''], ['План', '#/plan', ''], ['Память', '#/memory', ''], ['Настройки', '#/settings', ''],
+    ['Идеи', '#/new', ''], ['Стратегия: площадки, рубрики, ритм', '#/knowledge', ''],
+    ...(OV.rubrics || []).map((x) => [x.name, '#/rubric/' + x.id, 'рубрика']),
   ];
   const d = document.createElement('div');
   d.id = 'srch';
@@ -618,81 +671,228 @@ function chatBox(key, {onDone, onRebind} = {}) {
 let view = $('#view');
 const title = (t) => { $('#topTitle').textContent = t; document.title = t + ' · Рилсы'; };
 
+// Сегодня (LeanToday): the week by stages, and what waits for you, from the content items.
 async function vToday() {
   title('Сегодня');
-  const review = OV.reels.filter((r) => r.status === 'review');
-  const work = OV.reels.filter((r) => r.status === 'work');
+  await loadItems().catch(() => (ITEMS = {items: [], rubrics: []}));
   const recent = [...OV.reels].sort((x, y) => y.updated - x.updated).slice(0, 4);
   const h = new Date().getHours();
   const hello = h < 5 ? 'Доброй ночи' : h < 12 ? 'Доброе утро' : h < 18 ? 'Добрый день' : 'Добрый вечер';
-  const line = (r, tag, note) => `<a class="wl" href="#/reel/${r.id}"><i class="dot s-${r.status}"></i><span>${esc(r.num)} ${esc(r.title)}</span><span class="small muted">${note}</span><span class="r"><span class="tag">${tag}</span>&nbsp;&nbsp;${ago(r.updated)}</span></a>`;
-  const waiting = [...review.map((r) => line(r, 'ревью', r.version ? esc(r.version) + ' готова — посмотри' : '')), ...work.map((r) => line(r, 'в работе', OV.busy?.key === r.id ? 'Claude работает…' : 'монтаж'))];
-  view.innerHTML = `<div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 72px 20px 40px">
-    <div style="width: 100%; max-width: 680px; display: flex; flex-direction: column; gap: 30px">
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const mon = new Date(today); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  const week = Array.from({length: 7}, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+  const mine = ITEMS.items.filter((x) => !x.proposed);
+  const dayOf = (x) => x.at?.slice(0, 10);
+  const inDays = (x) => x.at ? Math.round((new Date(x.at.slice(0, 10)) - today) / 864e5) : null;
+  const dayName = (x) => { const n = inDays(x); return n === 0 ? 'сегодня' : n === 1 ? 'завтра' : n < 0 ? 'дата прошла' : new Date(x.at).toLocaleDateString('ru', {weekday: 'short', day: 'numeric'}); };
+  const onWeek = mine.filter((x) => dayOf(x) >= ymd(week[0]) && dayOf(x) <= ymd(week[6]));
+  // What waits: a new version to look at, material to send, an idea close to its date, a ready one to post.
+  const review = new Set(OV.reels.filter((r) => r.status === 'review').map((r) => r.id));
+  const ver = Object.fromEntries(OV.reels.map((r) => [r.id, r.version]));
+  const waits = [];
+  for (const x of mine) {
+    const n = inDays(x);
+    const missing = (x.need || []).filter((y) => !y.done);
+    if (x.stage === 'build' && x.ref?.kind === 'reel' && review.has(x.ref.id)) waits.push([2, x, `${ver[x.ref.id] || 'версия'} собрана — посмотреть`, 'сборка']);
+    else if (x.stage === 'material' && (missing.length || n !== null && n <= 7)) waits.push([1, x, missing.length ? `не хватает: ${missing.slice(0, 2).map((y) => y.text).join(', ')}${missing.length > 2 ? ` и ещё ${missing.length - 2}` : ''}` : 'материал — пришли, что есть', 'материал']);
+    else if (x.stage === 'idea' && n !== null && n >= 0 && n <= 7) waits.push([n <= 3 ? 1 : 3, x, `идея на ${dayName(x)} — пора решить, что снять`, 'идея']);
+    else if (x.stage === 'ready' && n !== null && n <= 2) waits.push([n < 0 ? 0 : 3, x, n < 0 ? 'готово, дата прошла — выложить' : `готово, выйдет ${dayName(x)}`, 'готово']);
+  }
+  waits.sort((p, q) => p[0] - q[0] || String(p[1].at || '9').localeCompare(String(q[1].at || '9')));
+  const pitches = ITEMS.items.filter((x) => x.proposed && x.at && inDays(x) >= 0 && inDays(x) <= 14).length;
+  const wline = ([, x, note, tag]) => `<a class="wl" href="${itemHref(x)}"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="display: inline-flex; gap: 6px; align-items: center">${svg(FMT_ICON[x.format], 14)}${esc(x.title)}</span><span class="small muted">${esc(note)}</span><span class="r"><span class="tag">${tag}</span>${x.at ? '&nbsp;&nbsp;' + dayName(x) : ''}</span></a>`;
+  const dayCell = (d) => {
+    const list = onWeek.filter((x) => dayOf(x) === ymd(d));
+    const isToday = ymd(d) === ymd(today);
+    const head = `<span class="small" style="color: ${isToday ? 'var(--ink)' : 'var(--muted)'}; font-weight: ${isToday ? 700 : 500}">${DAYS[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()}</span>`;
+    if (!list.length) return `<div style="flex: 1; min-width: 0; border: 1px dashed #D4D4D4; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-height: 104px; background: #FCFCFC">${head}${d >= today && canEdit() ? `<button type="button" class="small" data-day="${ymd(d)}" style="margin-top: auto; border: 0; background: none; padding: 0; text-align: left; color: var(--blue); font-weight: 600; cursor: pointer">Предложить идею</button>` : ''}</div>`;
+    const x = list[0];
+    return `<a href="${itemHref(x)}" style="flex: 1; min-width: 0; border: 1px ${x.stage === 'idea' ? 'dashed #D4D4D4' : 'solid var(--line)'}; ${isToday ? 'border-color: var(--ink);' : ''} border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 5px; min-height: 104px; text-decoration: none; color: var(--ink)">${head}
+      <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span></span>
+      <span class="small muted">${FMT_NAME[x.format].toLowerCase()}${list.length > 1 ? ` · ещё ${list.length - 1}` : ''}</span><span style="margin-top: auto">${sdot(x.stage)}</span></a>`;
+  };
+  const ideaN = onWeek.filter((x) => x.stage === 'idea').length, matN = mine.filter((x) => x.stage === 'material').length;
+  view.innerHTML = `<div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 56px 20px 40px">
+    <div style="width: 100%; max-width: 820px; display: flex; flex-direction: column; gap: 28px">
       <div style="display: flex; flex-direction: column; gap: 6px"><h1 style="font-size: 30px">${hello}, ${esc(ME.name)}</h1>
-        <div class="muted" style="font-size: 15px">${review.length ? `${review.length} ${review.length === 1 ? 'выпуск ждёт' : 'выпуска ждут'} твоего решения` : 'Ничего не ждёт решения'} · ${OV.reels.length} выпусков · ${OV.ideasCount} идей в запасе</div></div>
+        <div class="muted" style="font-size: 15px">${onWeek.length ? `На неделе ${onWeek.length} ${onWeek.length === 1 ? 'выпуск' : onWeek.length < 5 ? 'выпуска' : 'выпусков'}${ideaN ? `, ${ideaN} пока ${ideaN === 1 ? 'идея' : 'идеи'}` : ''}` : 'На этой неделе в плане пусто'}${matN ? ` · ждут материала: ${matN}` : ''}</div></div>
       ${canEdit() ? `<form class="box" id="todayForm" style="padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px">
-        <textarea id="todayIn" rows="2" placeholder="Скажи, что сделать — или скинь фото и видео" style="border: 0; resize: none; font-size: 15px; outline: none; padding: 0"></textarea>
+        <textarea id="todayIn" rows="2" placeholder="Скажи идею, попроси предложить — или скинь фото и видео" style="border: 0; resize: none; font-size: 15px; outline: none; padding: 0"></textarea>
         <div class="row" style="color: var(--muted); gap: 8px"><a href="#/new" class="icon" style="width: 30px; height: 30px; border: 0" title="Новый выпуск" aria-label="Новый выпуск">${svg('plus')}</a><span class="small">Ответ — в чате проекта</span><button type="submit" class="icon go" style="margin-left: auto; width: 32px; height: 32px" aria-label="Отправить">↑</button></div></form>
-      <div class="row" style="gap: 8px; margin-top: -14px">${['Предложи 3 идеи на неделю', 'Что снять на неделе', 'Разбери, что зашло'].map((t) => `<button type="button" class="chip" data-say="${esc(t)}">${t}</button>`).join('')}</div>` : ''}
-      <div><div class="lh">Ждёт тебя<a href="#/all">все выпуски</a></div>${waiting.join('') || '<p class="small muted">Пусто — можно начинать новое.</p>'}</div>
+      <div class="row" style="gap: 8px; margin-top: -14px"><button type="button" class="chip" id="layWeek">Расписать идеи на 2 недели</button>${['Что снять на этой неделе', 'Предложи 3 идеи в пустые дни'].map((t) => `<button type="button" class="chip" data-say="${esc(t)}">${t}</button>`).join('')}</div>` : ''}
+      <div><div class="lh">Эта неделя<a href="#/plan">открыть План</a></div><div style="display: flex; gap: 8px; padding-top: 12px">${week.map(dayCell).join('')}</div></div>
+      <div><div class="lh">Ждёт тебя<a href="#/all">все выпуски</a></div>${waits.slice(0, 8).map(wline).join('') || '<p class="small muted">Пусто — можно начинать новое.</p>'}
+        ${pitches ? `<a class="wl" href="#/plan/draft"><span class="muted">◌</span><span>${pitches} ${pitches === 1 ? 'предложение' : pitches < 5 ? 'предложения' : 'предложений'} Claude на ближайшие две недели</span><span class="small muted">взять или заменить</span><span class="r"><span class="tag">план</span></span></a>` : ''}</div>
       <div><div class="lh">Недавнее</div>${recent.map((r) => `<a class="wl" href="#/reel/${r.id}"><span class="muted">◌</span><span>${esc(r.num)} ${esc(r.title)}</span><span class="small muted">${STATUS[r.status]}${r.version ? ' · ' + esc(r.version) : ''}</span><span class="r">${ago(r.updated)}</span></a>`).join('')}</div>
     </div></div>`;
-  const go = (text) => { if (!text.trim()) return; sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown: text})); location.hash = '#/chat/_project'; };
+  const go = (text, shown = text) => { if (!text.trim()) return; sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown})); location.hash = '#/chat/_project'; };
   $('#todayForm')?.addEventListener('submit', (e) => { e.preventDefault(); go($('#todayIn').value); });
   $('#todayIn')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); go(e.target.value); } });
-  view.querySelectorAll('[data-say]').forEach((b) => (b.onclick = () => go(b.dataset.say)));
+  view.querySelectorAll('[data-say]').forEach((b) => (b.onclick = () => go(b.dataset.say + (b.dataset.say.includes('идеи') ? '. Каждую добавь в ideas.md в «My ideas» со строками «Date: YYYY-MM-DDTHH:MM» и «Rubric: <id рубрики>».' : ''), b.dataset.say)));
+  view.querySelectorAll('[data-day]').forEach((b) => (b.onclick = () => go(`Предложи идею на ${b.dataset.day} по рубрикам и ритму из strategy.json. Добавь её в ideas.md в «My ideas» со строками «Date: ${b.dataset.day}T19:00» и «Rubric: <id рубрики>».`, `Идея на ${b.dataset.day.slice(5)}`)));
+  $('#layWeek')?.addEventListener('click', () => { sessionStorage.setItem('planLay', '1'); location.hash = '#/plan/draft'; });
 }
+const layIdeasText = (from, to) => `Распиши идеи на две недели, с ${from} по ${to}: по площадкам, рубрикам и ритму из strategy.json, не повторяя то, что уже вышло или стоит в плане. Это только концепции — снимать пока ничего не надо. Каждую идею добавь в ideas.md в раздел «My ideas», как обычно (Format:, Hook:, Plot:), и ещё две строки: «Date: YYYY-MM-DDTHH:MM» и «Rubric: <id рубрики из strategy.json>». Потом коротко перечисли их здесь.`;
 
 // «Все выпуски» with the format switch inside (решение 2026-10-28): Все · Рилсы · Посты.
+// Единицы контента (web/items.mjs): one item per format, idea → material → build → ready → published.
+const LIFE = [['idea', 'Идея'], ['material', 'Материал'], ['build', 'Сборка'], ['ready', 'Готово'], ['published', 'Вышло']];
+const LIFE_COLOR = {idea: '#8B8B8B', material: '#B7791F', build: '#2F6FEB', ready: '#2E8A4F', published: '#171717'};
+const FMT_NAME = {reel: 'Рилс', post: 'Пост', carousel: 'Карусель', telegram: 'Телеграм', story: 'История'};
+const FMT_ICON = {reel: 'reel', post: 'photo', carousel: 'carousel', telegram: 'text', story: 'story'};
+let ITEMS = null;
+const loadItems = async () => (ITEMS = await api('/api/items'));
+const itemRubric = (x) => (ITEMS?.rubrics || []).find((r) => r.id === x.rubric || r.name === x.rubric);
+const itemHref = (x) => x.ref?.kind === 'reel' ? '#/reel/' + x.ref.id : x.ref?.kind === 'post' ? '#/post/' + x.ref.id : '#/item/' + x.id;
+const sdot = (s) => `<span class="sdot" style="color: ${LIFE_COLOR[s]}"><i style="${s === 'idea' ? 'border: 1.5px dashed ' + LIFE_COLOR[s] : 'background: ' + LIFE_COLOR[s]}"></i>${LIFE.find(([k]) => k === s)?.[1] || ''}</span>`;
+const whenText = (at) => at ? new Date(at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short'}) : 'без даты';
+function itemCard(x) {
+  const r = itemRubric(x);
+  const need = x.need || [];
+  const extra = x.stage === 'material' && need.length ? ` · снято ${need.filter((n) => n.done).length} из ${need.length}` : '';
+  const sib = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id).length : 0;
+  return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}">
+    <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
+    <b>${esc(x.title)}</b>
+    <span class="small muted">${whenText(x.at)}${extra}${sib ? ` · ещё ${sib} из того же материала` : ''}${x.missing ? ' · папка пропала' : ''}</span></a>`;
+}
+// Выпуски (LeanAll): five columns by stage; format and rubric are filters, Claude's pitches a separate list.
 async function vAll(fmt = 'all') {
-  title('Все выпуски');
-  const posts = OV.posts || [];
-  const used = OV.disk.total - OV.disk.free;
-  const st = await api('/api/storage').catch(() => null);
-  const parts = st ? [['версии', st.reels.reduce((n, r) => n + r.versions, 0)], ['исходники', st.reels.reduce((n, r) => n + r.sources, 0)], ['входящие', st.inbox || 0]].filter(([, n]) => n > 0) : [];
-  const seg = [['all', 'Все', '', OV.reels.length + posts.length], ['reels', 'Рилсы', 'reel', OV.reels.length], ['posts', 'Посты', 'photo', posts.length]]
-    .map(([k, t, i, n]) => `<a href="#/all${k === 'all' ? '' : '/' + k}" class="${k === fmt ? 'on' : ''}">${i ? svg(i, 14) : ''}${t} <span class="muted" style="font-weight: 400">${n}</span></a>`).join('');
-  view.innerHTML = `<div class="chead" style="padding: 0 28px; min-height: 56px"><b style="font-size: 14px">Все выпуски</b><nav class="seg" aria-label="Формат" style="margin-left: 12px">${seg}</nav><span style="flex: 1"></span>${canEdit() ? '<a class="btn primary" href="#/new">+ Новый выпуск</a>' : ''}</div>
-  <div class="page" style="padding: 26px 32px; gap: 26px" id="allBody"></div>`;
-  const body = $('#allBody');
-  const stats = `<div class="stats">
-      <div class="card"><span class="small muted">Ждут твоего решения</span><b>${OV.reels.filter((r) => r.status === 'review').length}</b></div>
-      <div class="card"><span class="small muted">Идей в запасе</span><b>${OV.ideasCount}</b></div>
-      <div class="card" style="flex: 2 1 320px"><div class="row small muted" style="justify-content: space-between"><span>Место на сервере</span><a href="#/settings/files">Разобрать</a></div><b>${mb(used)} <span class="small muted" style="font-weight: 400">из ${mb(OV.disk.total)}</span></b><div class="meter" style="margin-top: 8px"><i style="width: ${Math.round(used / OV.disk.total * 100)}%"></i></div>${parts.length ? `<span class="small muted" style="display: block; margin-top: 4px">${parts.map(([t, n]) => t + ' ' + mb(n)).join(' · ')}</span>` : ''}</div>
-    </div>`;
-  const reelCard = (r) => `<a class="rc" href="#/reel/${r.id}"><div class="th" ${r.thumb ? `style="background-image: url('${r.thumb}')"` : ''}></div><div style="min-width: 0; display: flex; flex-direction: column; gap: 3px"><b style="font-weight: 600; font-size: 14px">${esc(r.num)} · ${esc(r.title)}</b><span class="small muted">${r.version ? esc(r.version) + ' · ' : 'черновика ещё нет · '}${ago(r.updated)}</span>${OV.busy?.key === r.id ? '<span class="small" style="color: var(--amber)">Claude работает…</span>' : ''}</div></a>`;
-  // Reels: columns by the editor's stages (FmtReels).
-  const reelsBoard = () => {
-    const cols = [['script', 'Сценарий'], ['edit', 'Монтаж'], ['publish', 'Выкладка'], ['out', 'Вышли']];
-    const at = (r) => r.status === 'published' ? 'out' : stageAt(r);
-    return `<div class="board">${cols.map(([k, t]) => { const list = OV.reels.filter((r) => at(r) === k); return `<section class="col" aria-label="${t}"><div class="colh" style="font-size: 15px">${t} <span class="muted" style="font-weight: 400">${list.length}</span></div>${list.map(reelCard).join('') || '<p class="small muted">Пусто.</p>'}</section>`; }).join('')}</div>`;
-  };
-  const stageName = {text: 'Текст', struct: 'Структура', slides: 'Слайды', publish: 'Выкладка', done: 'Вышел'};
-  const postRow = (x) => `<a class="li" href="#/post/${x.id}" style="text-decoration: none; padding: 12px 0">${x.kind === 'carousel' && x.thumb ? `<span class="th" style="width: 44px; height: 55px; background-image: url('${x.thumb}')"></span>` : x.thumb ? `<span class="th" style="width: 44px; height: 55px; background-image: url('${x.thumb}')"></span>` : `<span class="th" style="width: 44px; height: 55px; background: var(--soft); display: grid; place-items: center; color: var(--muted)">${svg(x.kind, 18)}</span>`}
-      <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><b style="font-weight: 600; display: flex; align-items: center; gap: 7px"><span class="muted" style="display: inline-flex">${svg(x.kind, 15)}</span>${esc(x.title)}</b><span class="small muted">${KIND[x.kind]}${x.kind === 'carousel' && x.slides ? ' · ' + x.slides + ' слайдов' : ''}${x.rubric ? ' · ' + esc(x.rubric) : ''}</span></span>
-      <span class="small muted" style="width: 110px">${stageName[x.stage] || ''}</span><span class="small muted" style="width: 110px; text-align: right">${x.at ? new Date(x.at).toLocaleString('ru', {weekday: 'short', hour: '2-digit', minute: '2-digit'}) : 'без даты'}</span></a>`;
-  // Posts: how they land in the Instagram grid, and drafts by type (FmtPosts, FmtCarousels, AllFormats).
-  const postsView = (type) => {
-    const list = posts.filter((x) => !type || x.kind === type);
-    const grid = posts.filter((x) => x.kind !== 'text' && x.thumb).slice(0, 9);
-    const chips = [['', 'Все типы', '', posts.length], ['text', 'Текст · Телеграм', 'text'], ['photo', 'С фото', 'photo'], ['carousel', 'Карусели', 'carousel']]
-      .map(([k, t, i]) => `<button type="button" class="chip" data-type="${k}" style="display: inline-flex; align-items: center; gap: 6px; ${k === type ? 'background: var(--ink); color: #fff; border-color: var(--ink)' : ''}">${i ? svg(i, 14) : ''}${t} · ${k ? posts.filter((x) => x.kind === k).length : posts.length}</button>`).join('');
-    return `<div class="row" style="gap: 8px">${chips}<span class="small muted" style="margin-left: auto">один редактор: текст → картинки → выкладка</span></div>
-      <div class="split" style="gap: 36px">
-        <div style="flex: 0 0 300px; display: flex; flex-direction: column; gap: 10px"><span class="lbl">Как ляжет в сетку · Instagram</span>
-          <div class="igrid">${grid.map((x) => `<a href="#/post/${x.id}" style="background-image: url('${x.thumb}')">${x.at ? `<span class="when">${new Date(x.at).toLocaleDateString('ru', {weekday: 'short'})}</span>` : ''}</a>`).join('')}${Array.from({length: Math.max(0, 3 - grid.length)}, () => '<span><span class="when">пусто</span></span>').join('')}</div>
-          <span class="small muted">Посты с фото и карусели. Текстовые живут в Телеграме и в сетку не попадают.</span></div>
-        <div style="flex: 1; min-width: 0"><span class="lbl">Посты · ${list.length}</span>${list.map(postRow).join('') || '<p class="small muted">Пока нет. «+ Новый выпуск» → Пост или Карусель.</p>'}</div>
-      </div>`;
-  };
-  let type = '';
+  title('Выпуски');
+  fmt = {reels: 'reel', posts: 'post'}[fmt] || fmt;
+  await loadItems();
+  const mine = ITEMS.items.filter((x) => !x.proposed);
+  const pitches = ITEMS.items.filter((x) => x.proposed);
+  let rub = sessionStorage.getItem('allRubric') || '';
+  const fmts = [['all', 'Все форматы'], ...['reel', 'post', 'carousel', 'telegram'].map((k) => [k, FMT_NAME[k]])];
+  const n = (k) => mine.filter((x) => k === 'all' || x.format === k).length;
+  view.innerHTML = `<div class="ln-top"><b>Выпуски</b><span style="flex: 1"></span>${canEdit() ? `<a class="ln-btn p" href="#/new">${svg('plus', 14)}Новый выпуск</a>` : ''}</div>
+  <div style="flex: 1; overflow-y: auto; padding: 22px 28px; display: flex; flex-direction: column; gap: 16px">
+    <div class="row" style="gap: 8px; flex-wrap: wrap">${fmts.map(([k, t]) => `<a class="ln-pill ${k === fmt ? 'on' : ''}" href="#/all${k === 'all' ? '' : '/' + k}">${k === 'all' ? '' : svg(FMT_ICON[k], 14)}${t} · ${n(k)}</a>`).join('')}
+      <span style="width: 1px; height: 22px; background: var(--line); margin: 0 6px"></span>
+      <select class="ln-pill" id="rubSel" aria-label="Рубрика"><option value="">Рубрика: все</option>${ITEMS.rubrics.map((r) => `<option value="${esc(r.id)}" ${r.id === rub ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+      <a class="ln-pill ${fmt === 'proposed' ? 'on' : ''}" href="#/all/proposed" style="margin-left: auto">${svg('idea', 14)}Предложения Claude · ${pitches.length}</a></div>
+    <div id="allBody"></div></div>`;
   const draw = () => {
-    body.innerHTML = fmt === 'reels' ? reelsBoard() : fmt === 'posts' ? postsView(type)
-      : stats + `<section><h2 style="margin-bottom: 10px; display: flex; gap: 8px; align-items: center">${svg('reel')}Рилсы</h2>${reelsBoard()}</section><section><h2 style="margin-bottom: 10px; display: flex; gap: 8px; align-items: center">${svg('photo')}Посты</h2>${postsView('')}</section>`;
-    body.querySelectorAll('[data-type]').forEach((b) => (b.onclick = () => { type = b.dataset.type; draw(); }));
+    const pass = (x) => (!rub || x.rubric === rub || itemRubric(x)?.id === rub);
+    if (fmt === 'proposed') {
+      const list = pitches.filter(pass);
+      $('#allBody').innerHTML = `<p class="small muted" style="margin: 0 0 8px">Идеи из ideas.md, которые ещё никто не взял. Взятая идея встаёт в колонку «Идея», дату можно поставить в Плане.</p>` + (list.map((x) => `<div class="ln-li"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><a href="#/item/${x.id}" style="flex: 1; min-width: 0; text-decoration: none; color: var(--ink)"><b style="font-weight: 600">${esc(x.title)}</b><br><span class="small muted">${esc(x.idea?.hook || x.idea?.about || '').slice(0, 140)}</span></a>${x.at ? `<span class="small muted">${whenText(x.at)}</span>` : ''}<span class="small muted">${x.by === 'owner' ? 'твоя' : 'Claude'}</span>${canEdit() ? `<button type="button" class="ln-btn s" data-take="${x.id}">Взять</button>` : ''}</div>`).join('') || '<p class="small muted">Пусто.</p>');
+      $('#allBody').querySelectorAll('[data-take]').forEach((b) => (b.onclick = async () => { b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято — в колонке «Идея»'); vAll('proposed'); }));
+      return;
+    }
+    const list = mine.filter((x) => (fmt === 'all' || x.format === fmt) && pass(x));
+    const order = (a, b) => String(a.at || '9').localeCompare(String(b.at || '9'));
+    $('#allBody').innerHTML = `<div class="lboard">${LIFE.map(([k, t]) => { const col = list.filter((x) => x.stage === k).sort(order); return `<section class="lcol" aria-label="${t}"><div class="lcolh">${sdot(k)}<span class="muted" style="margin-left: auto">${col.length}</span></div>${col.map(itemCard).join('') || '<p class="small muted" style="padding: 4px">Пусто.</p>'}</section>`; }).join('')}</div>`;
   };
+  $('#rubSel').onchange = (e) => { rub = e.target.value; sessionStorage.setItem('allRubric', rub); draw(); };
   draw();
+}
+
+// The life of one item above its editor: five stages, rubric, date; stage and date change by hand.
+async function lifeBar(kind, id) {
+  await loadItems().catch(() => null);
+  const x = ITEMS?.items.find((y) => y.ref?.kind === kind && y.ref.id === id);
+  if (!x) return '';
+  return lifeBarFor(x);
+}
+function lifeBarFor(x, {controls = true} = {}) {
+  const k = LIFE.findIndex(([s]) => s === x.stage);
+  const steps = LIFE.map(([s, t], i) => `<span class="lstep ${i < k ? 'done' : i === k ? 'on' : ''}"><span class="c">${i < k ? '✓' : ''}</span>${t}</span>${i < 4 ? `<span class="lline ${i < k ? 'done' : ''}"></span>` : ''}`).join('');
+  const r = itemRubric(x);
+  const sibs = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id) : [];
+  return `<div class="lbar" data-item="${x.id}">${steps}
+    <span style="flex: 1"></span>
+    ${sibs.map((y) => `<a class="chip" href="${itemHref(y)}" style="text-decoration: none; display: inline-flex; gap: 6px; align-items: center">${svg(FMT_ICON[y.format], 13)}${FMT_NAME[y.format]} ${sdot(y.stage)}</a>`).join('')}
+    ${!controls ? '' : canEdit() ? `<select class="f" data-f="rubric" aria-label="Рубрика" style="width: auto; min-height: 32px; font-size: 13px"><option value="">Без рубрики</option>${ITEMS.rubrics.map((y) => `<option value="${esc(y.id)}" ${r?.id === y.id ? 'selected' : ''}>${esc(y.name)}</option>`).join('')}</select>
+      <input class="f" data-f="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}" style="width: auto; min-height: 32px; font-size: 13px">
+      <select class="f" data-f="stage" aria-label="Этап" style="width: auto; min-height: 32px; font-size: 13px">${LIFE.map(([s, t]) => `<option value="${s}" ${s === x.stage ? 'selected' : ''}>${t}</option>`).join('')}</select>`
+    : `${r ? `<span class="ich"><span class="rsq" style="background: ${esc(r.color)}"></span>${esc(r.name)}</span>` : ''}<span class="small muted">${whenText(x.at)}</span>`}</div>`;
+}
+function wireLifeBar(root, onChange) {
+  root.querySelectorAll('.lbar [data-f]').forEach((el) => (el.onchange = async () => {
+    const id = el.closest('.lbar').dataset.item;
+    await post('/api/items/set', {id, [el.dataset.f]: el.value || null});
+    await loadItems();
+    toast(el.dataset.f === 'stage' ? 'Этап поменян' : 'Сохранено');
+    onChange?.();
+  }));
+}
+
+// Starts work on an idea: a reel opens a new reel chat (its folder links back to the idea by
+// itself), a post, carousel or Telegram text gets its folder now. Returns where to go.
+async function startItem(y, {open = true} = {}) {
+  const brief = [`«${y.title}»`, y.idea?.about && `О чём: ${y.idea.about}`, y.idea?.hook && `Крючок: ${y.idea.hook}`, (y.idea?.flow || []).length && `Ход: ${y.idea.flow.join(' / ')}`].filter(Boolean).join('\n');
+  if (y.format === 'reel') {
+    await post('/api/items/set', {id: y.id, take: true, starting: true});
+    const key = 'new-' + Date.now();
+    sessionStorage.setItem('firstMsg:' + key, JSON.stringify({text: `Новый рилс по идее из плана:\n${brief}\nСначала сценарий и список того, что снять (scenes.json: need/status), — материал я пришлю.`, shown: `${y.title}\nИдея готова — что снять?`}));
+    return '#/reel/' + key;
+  }
+  const kind = {post: 'photo', carousel: 'carousel', telegram: 'text'}[y.format] || 'text';
+  const r = await post('/api/post/new', {kind, title: y.title});
+  await post('/api/items/set', {id: y.id, take: true, link: {kind: 'post', id: r.id}});
+  const ask = kind === 'carousel' ? `Новая карусель по идее из плана:\n${brief}\nРазбей тему на 5–7 слайдов и подбери шаблон каждому (POSTS.md).`
+    : kind === 'photo' ? `Новый пост с фото по идее из плана:\n${brief}\nСкажи, какие фото нужны; я загружу их на странице.` : `Новый текст в Телеграм по идее из плана:\n${brief}\nНапиши три варианта текста.`;
+  sessionStorage.setItem('firstMsg:post-' + r.id, JSON.stringify({text: ask, shown: y.title}));
+  return '#/post/' + r.id;
+}
+
+// A bare idea (LeanIdeaStage): the concept is written and talked over before anything is shot.
+async function vItem(id) {
+  await loadItems();
+  const x = ITEMS.items.find((y) => y.id === id);
+  if (!x) { view.innerHTML = '<div class="page"><p class="muted">Такого выпуска нет. <a href="#/all">Выпуски</a></p></div>'; return; }
+  if (x.ref?.kind === 'reel' || x.ref?.kind === 'post') return location.replace(itemHref(x));
+  title(x.title);
+  const ed = canEdit();
+  const r = itemRubric(x);
+  const field = (f, label, v, rows, ph) => `<label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}</span><textarea class="f" data-i="${f}" rows="${rows}" placeholder="${ph}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.55; resize: vertical">${esc(v || '')}</textarea></label>`;
+  const prop = (k, v) => `<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span class="muted" style="flex: 0 0 72px">${k}</span><span style="flex: 1; display: flex; justify-content: flex-end">${v}</span></div>`;
+  const sel = (f, opts, cur) => `<select class="f" data-i="${f}" ${ed ? '' : 'disabled'} style="width: auto; min-height: 30px; font-size: 13px; font-weight: 600; border-color: transparent; text-align: right">${opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  view.innerHTML = `<div class="work"><div class="rmain">
+    <div class="ln-top"><span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b>${esc(x.title)}</b><span>· ${r ? esc(r.name) + ' · ' : ''}${FMT_NAME[x.format].toLowerCase()} · ${whenText(x.at)}</span><span style="flex: 1"></span>${x.proposed ? '<span class="small muted">предложение</span>' : ''}</div>
+    ${x.proposed ? '' : lifeBarFor(x, {controls: false}).replace('class="lbar"', 'class="lbar" style="padding: 10px 24px"')}
+    <div style="flex: 1; overflow-y: auto; padding: 28px 40px; display: flex; gap: 32px; min-height: 0">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <span class="small muted">${x.by === 'Claude' ? 'Предложил Claude' : x.by === 'owner' ? 'Твоя идея' : x.by ? 'Добавил ' + esc(x.by) : 'Идея'}${x.takenBy ? ' · взял ' + esc(x.takenBy) : ''}</span>
+        <label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Название</span><input class="f" data-i="title" value="${esc(x.title)}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 15px"></label>
+        ${field('about', 'О чём', x.idea?.about, 3, 'Одна-две фразы: о чём выпуск')}
+        ${field('hook', 'Крючок — первые 2 секунды', x.idea?.hook, 2, 'Фраза или кадр, на котором остаются')}
+        ${field('flow', 'Ход — по строке на шаг', (x.idea?.flow || []).join('\n'), 4, '1 · …\n2 · …\n3 · …')}
+        ${ed ? `<div class="row" style="gap: 8px">${['Другой крючок', 'Короче, 15 секунд', 'Распиши ход', 'Сделать каруселью'].map((t) => `<button type="button" class="ln-pill" data-ask="${t}">${t}</button>`).join('')}</div>` : ''}
+      </div>
+      <div style="flex: 0 0 280px; display: flex; flex-direction: column; gap: 14px">
+        <div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+          ${prop('Рубрика', sel('rubric', [['', 'без рубрики'], ...ITEMS.rubrics.map((y) => [y.id, y.name])], r?.id || ''))}
+          ${prop('Формат', sel('format', Object.entries(FMT_NAME).filter(([k]) => k !== 'story'), x.format))}
+          ${prop('Дата', `<input class="f" data-i="at" type="datetime-local" value="${esc((x.at || '').slice(0, 16))}" ${ed ? '' : 'readonly'} style="width: auto; min-height: 30px; font-size: 13px; border-color: transparent">`)}
+        </div>
+        ${ed && x.proposed ? '<button type="button" class="ln-btn" id="iTake" style="height: 40px; justify-content: center">Взять в план</button>' : ''}
+        ${ed ? '<button type="button" class="ln-btn p" id="iGo" style="height: 44px; justify-content: center">Идея готова — что снять?</button>' : ''}
+        <span class="small muted" style="line-height: 1.5">Claude составит список кадров, выпуск перейдёт на этап «Материал». Правки сохраняются сами.</span>
+      </div>
+    </div></div>
+    <aside class="chatcol" aria-label="Обсудить идею"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Обсудить идею</b></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+  wireLifeBar(view, () => vItem(id));
+  const box = chatBox('_project', {onDone: () => { sidebar(); vItem(id); }});
+  $('#chatHost').append(box);
+  const save = async (patch) => { await post('/api/items/set', {id, ...patch}); };
+  view.querySelectorAll('[data-i]').forEach((el) => (el.onchange = () => {
+    const f = el.dataset.i;
+    if (['title', 'format', 'rubric', 'at'].includes(f)) return save({[f]: el.value || null}).then(() => ['rubric', 'at', 'format'].includes(f) && vItem(id));
+    const v = (k) => view.querySelector(`[data-i="${k}"]`).value;
+    save({idea: {about: v('about'), hook: v('hook'), flow: v('flow').split('\n').map((l) => l.trim()).filter(Boolean)}});
+  }));
+  // The idea lives in items.json; Claude edits it there, by its id.
+  view.querySelectorAll('[data-ask]').forEach((b) => (b.onclick = () => box.say(`Идея «${x.title}» (projects/${P}/items.json, элемент id ${x.id}, поле idea: about, hook, flow). ${b.dataset.ask}${b.dataset.ask === 'Сделать каруселью' ? ': поменяй format на carousel и перепиши ход под 5–7 слайдов' : ''}. Запиши результат в это поле и коротко скажи здесь, что поменял.`, b.dataset.ask)));
+  $('#iTake')?.addEventListener('click', async () => { await save({take: true}); toast('Взято в план'); vItem(id); });
+  $('#iGo')?.addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    await loadItems();
+    location.hash = await startItem(ITEMS.items.find((z) => z.id === id));
+  });
 }
 
 // Reel stages from the canvas (Сценарий · Материалы · Монтаж · Выкладка): each is a tab of the reel;
@@ -712,7 +912,7 @@ async function vReel(id, tab) {
   if (r && (!tab || tab === 'files')) tab = tab === 'files' ? 'materials' : stageAt(r);
   title(r ? `${r.num} ${r.title}` : 'Новый выпуск');
   const head = `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Все выпуски</a> › ${esc(projName())}</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
-      ${stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>`;
+      ${stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>${r ? await lifeBar('reel', id) : ''}`;
   const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
   const chatName = {script: 'Чат сценария', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
   // A reel that exists: its stage in the middle, its chat as a column on the right (CleanReel, CleanText…).
@@ -726,6 +926,7 @@ async function vReel(id, tab) {
   });
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id, tab); } });
+  wireLifeBar(view);
   if (r) drawStage(id, tab, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
   if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
@@ -941,10 +1142,12 @@ async function vPost(id, stage) {
     <div class="chead"><div style="flex: 1; min-width: 220px"><div class="small muted"><a href="#/all/posts">Посты</a> › ${esc(projName())}</div><h1 style="font-size: 20px; display: flex; align-items: center; gap: 10px">${esc(p.title || 'Пост')} ${kindBadge(p.kind)}</h1></div>
       <nav class="stg" aria-label="Этапы">${stages.map(([k, t], i) => `<a href="#/post/${esc(id)}/${k}" class="${k === stage ? 'on' : i < atI ? 'done' : ''}">${t}</a>`).join('')}</nav>
       ${canEdit() ? `<select class="f" id="kindSel" aria-label="Тип поста" style="width: auto; min-height: 36px">${[['text', 'Текст'], ['photo', 'С фото'], ['carousel', 'Карусель']].map(([k, t]) => `<option value="${k}" ${k === p.kind ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}</div>
+    ${await lifeBar('post', id)}
     <div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
     <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
       <div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span><span class="chip">этот пост</span></div>
       <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+  wireLifeBar(view);
   const box = chatBox('post-' + id, {onDone: () => { sidebar(); drawPost(id, stage); }});
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат поста заново? Тексты и картинки останутся.')) { await post('/api/chat/reset', {key: 'post-' + id}); vPost(id, stage); } });
@@ -1251,7 +1454,7 @@ async function renderVersions(id, data) {
         <div class="li" style="border-top: 0"><b style="font-weight: 600">${esc(vName(cur))} · текущая</b><span class="small muted">${ago(cur.at)}${hasMaster(cur) ? ' · мастер готов' : ''}</span><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(cur)}${masterBtn(cur)}</div></div>`}
         ${live.map((v) => `<div class="li"><b style="font-weight: 600">${esc(vName(v))}</b><span class="small muted">${ago(v.at)}${hasMaster(v) ? ' · мастер готов' : ''}</span>${vNote(v)}<details style="flex-basis: 100%"><summary class="small">Смотреть</summary><video src="${video(v).url}" controls playsinline preload="none" style="width: 220px; border-radius: 10px; margin-top: 8px; background: #000"></video></details><div class="row" style="flex-basis: 100%; gap: 8px">${fileLinks(v)}${masterBtn(v)}</div></div>`).join('')}
         ${old.map((v) => `<div class="li"><div class="th" style="width: 28px; height: 50px; ${thumb(v) ? `background-image: url('${thumb(v).url}')` : ''}"></div><span style="flex: 1"><b style="font-weight: 600">${esc(v.v)}</b> <span class="small muted">· ${ago(v.at)} · кадр и снимок проекта${v.archived ? ` · освобождено ${mb(v.archived.freed)}` : ''}</span></span>${canEdit() ? `<button type="button" class="btn" data-rebuild="${esc(v.v)}">Пересобрать</button>` : ''}</div>`).join('')}
-        <a class="small muted" href="#/settings/files" style="padding-top: 8px">Место на сервере →</a></div>
+        <a class="small muted" href="#/memory/files" style="padding-top: 8px">Место на сервере →</a></div>
       ${script.trim() ? `<div class="blk"><span class="lbl">Сценарий</span><div class="md" style="font-size: 14px">${md(script)}</div></div>` : ''}
     </div>`;
   $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1440p этой версии (без --draft, 1440×2560, CRF 15) и скажи, когда будет готов.`, `Принять ${cur.v}`));
@@ -1291,92 +1494,59 @@ async function vChat(key) {
   if (pending) { sessionStorage.removeItem('firstMsg:' + key); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
 
+// Новый выпуск (LeanNew): two doors — Claude proposes, or you have an idea or material. Every
+// format you tick becomes its own release with its own stages; they share only the group.
 async function vNew() {
   title('Новый выпуск');
-  const {ideas} = await api('/api/ideas');
-  let pick = null;
-  // EdNew: the type picks the editor; reels keep the idea list below, posts start from a topic.
-  const types = [['reel', 'Рилс', 'Видео 9:16 по сценарию. Снимаешь сам или из материалов.', '~1–2 дня · 4 этапа'],
-    ['text', 'Пост', 'Текст, можно с фото. Телеграм и Instagram. Быстрее всего.', '~10 минут · 2 этапа'],
-    ['carousel', 'Карусель', '5–7 слайдов из шаблонов дизайн-системы.', '~30 минут · 3 этапа'],
-    ['story', 'Сторис', 'Шаг выкладки поста или рилса: анонс собирается там.', 'в выкладке']];
-  view.innerHTML = `<div class="page">
-    <div class="row" style="justify-content: space-between"><div><div class="small muted"><a href="#/all">Все выпуски</a> › ${esc(projName())}</div><h1>Что делаем?</h1><div class="muted" style="font-size: 15px; margin-top: 4px">Тип определяет редактор. Не уверен — напиши тему, Claude предложит формат сам.</div></div>
-      <a class="btn" href="#/chat/_project" id="more">Попросить новые идеи</a></div>
-    <div class="row" style="gap: 14px; align-items: stretch">${types.map(([k, t, d, m], i) => `<button type="button" class="tcard ${i ? '' : 'on'}" data-kind="${k}" ${k === 'story' ? 'disabled' : ''}><span style="color: var(--ink)">${svg(k, 22)}</span><b style="font-size: 17px; font-weight: 600">${t}</b><span class="small" style="color: var(--ink2); line-height: 1.5">${d}</span><span class="small muted" style="margin-top: auto">${m}</span></button>`).join('')}</div>
-    <section id="postNew" class="card" style="display: none; flex-direction: column; gap: 14px; max-width: 820px">
-      <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Тема или пара слов<input class="f" id="pTopic" placeholder="«первый день смены» или «что взять в лагерь»"></label>
-      <div><div class="small muted" style="padding-bottom: 6px">Из чего</div><div class="row" style="gap: 8px" id="pFrom">${[['idea', 'Из идеи в бэклоге'], ['photos', 'Из своих фото'], ['scratch', 'С нуля']].map(([k, t], i) => `<button type="button" class="chip ${i === 2 ? 'on' : ''}" data-from="${k}" style="${i === 2 ? 'border-color: var(--ink); font-weight: 600' : ''}">${t}</button>`).join('')}</div></div>
-      <select class="f" id="pIdea" style="display: none">${ideas.map((x) => `<option>${esc(x.title.replace(/^[^\p{L}\d«"]+/u, ''))}</option>`).join('')}</select>
-      <div class="row"><button type="button" class="btn primary" id="pGo" style="min-height: 46px">Начать</button><span class="small muted" id="pHint">У поста будет свой чат: Claude напишет три варианта текста.</span></div>
-    </section>
-    <div class="split">
-      <section class="side2" style="display: flex; flex-direction: column; gap: 10px" aria-label="Идеи">
-        <label class="small muted" style="display: flex; flex-direction: column; gap: 6px">Своя идея<input class="f" id="own" placeholder="Опиши в двух словах или вставь ссылку"></label>
-        <div class="small muted" style="margin-top: 6px">Из бэклога · ${ideas.length}</div>
-        <div id="ideas" style="display: flex; flex-direction: column; gap: 8px; max-height: 64vh; overflow-y: auto"></div>
-      </section>
-      <section class="grow card" id="detail" style="display: flex; flex-direction: column; gap: 14px"></section>
-    </div></div>`;
-  const list = $('#ideas');
-  ideas.forEach((x, i) => {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'idea';
-    b.innerHTML = `<b style="font-weight: 600">${esc(x.title.replace(/^[^\p{L}\d«"]+/u, ''))}</b><div class="small muted">${esc(x.format || x.section)}</div>`;
-    b.onclick = () => { pick = x; list.querySelectorAll('.idea').forEach((y) => y.classList.remove('on')); b.classList.add('on'); $('#own').value = ''; detail(); };
-    list.append(b);
-    if (i === 0) { pick = x; b.classList.add('on'); }
-  });
-  $('#own').oninput = () => { if ($('#own').value.trim()) { pick = null; list.querySelectorAll('.idea').forEach((y) => y.classList.remove('on')); } detail(); };
-  function detail() {
-    const own = $('#own').value.trim();
-    const t = own || pick?.title.replace(/^[^\p{L}\d«"]+/u, '') || '';
-    $('#detail').innerHTML = !t ? '<p class="muted">Выбери идею слева или напиши свою.</p>' : `
-      <div><div class="small muted">Рилс ${String(Math.max(0, ...OV.reels.map((r) => Number(r.num))) + 1).padStart(2, '0')} · новый чат</div><h2 style="font-size: 22px; margin-top: 4px">${esc(t)}</h2></div>
-      ${pick && !own ? `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; font-size: 14px">
-        ${pick.hook ? `<div><div class="small muted">Хук</div>${esc(pick.hook)}</div>` : ''}${pick.plot ? `<div><div class="small muted">Сюжет</div>${esc(pick.plot.slice(0, 320))}${pick.plot.length > 320 ? '…' : ''}</div>` : ''}</div>` : ''}
-      <div style="border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px">
-        <div class="small muted" style="padding: 8px 0 2px">Новый чат начнётся с</div>
-        <div class="li"><span style="flex: 1">Бриф, правила и дизайн-система проекта</span><span class="small muted">всегда</span></div>
-        <label class="li"><span style="flex: 1">Взять вид рилса</span><select class="f" id="like" style="max-width: 260px"><option value="">— не нужно —</option>${OV.reels.map((r) => `<option value="${esc(r.id)}">${esc(r.num)} ${esc(r.title)}</option>`).join('')}</select></label>
-      </div>
-      <div class="row"><button type="button" class="btn primary" data-mode="now" style="min-height: 46px">Сделать сразу</button><button type="button" class="btn" data-mode="steps" style="min-height: 46px">Настроить по шагам: вид, музыка</button></div>
-      <p class="small muted" style="margin: 0">У рилса будет свой чат. Общее — правила, вкус, использованные треки — Claude записывает в проект, это видят все чаты.</p>`;
-    $('#detail').querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => start(b.dataset.mode, t, own)));
-  }
-  function start(mode, t, own) {
-    const key = 'new-' + Date.now();
-    const like = $('#like').value;
-    const text = [own ? `Новый рилс по моей идее: ${own}` : `Новый рилс по идее «${t}» из ideas.md.`,
-      like ? `Возьми вид (палитру, шрифты, плашки, переходы) рилса reels/${like}/.` : '',
-      mode === 'now' ? '(tapped keyboard button "🚀 Сделать сразу")' : '(tapped keyboard button "🎛 Настроить по шагам")'].filter(Boolean).join('\n');
-    sessionStorage.setItem('firstMsg:' + key, JSON.stringify({text, shown: `${t}\n${mode === 'now' ? 'Сделать сразу' : 'Настроить по шагам'}${like ? ' · вид как у ' + like.slice(0, 2) : ''}`}));
-    location.hash = '#/reel/' + key;
-  }
-  detail();
-  let kind = 'reel', from = 'scratch';
-  view.querySelectorAll('[data-kind]').forEach((b) => (b.onclick = () => {
-    kind = b.dataset.kind;
-    view.querySelectorAll('[data-kind]').forEach((x) => x.classList.toggle('on', x === b));
-    $('#postNew').style.display = kind === 'reel' ? 'none' : 'flex';
-    view.querySelector('.split').style.display = kind === 'reel' ? '' : 'none';
-    $('#pHint').textContent = kind === 'carousel' ? 'Claude разобьёт тему на слайды и подберёт шаблоны.' : 'У поста будет свой чат: Claude напишет три варианта текста.';
-  }));
-  $('#pFrom').querySelectorAll('[data-from]').forEach((b) => (b.onclick = () => {
-    from = b.dataset.from;
-    $('#pFrom').querySelectorAll('[data-from]').forEach((x) => { x.style.borderColor = x === b ? 'var(--ink)' : ''; x.style.fontWeight = x === b ? '600' : ''; });
-    $('#pIdea').style.display = from === 'idea' ? '' : 'none';
-  }));
-  $('#pGo').onclick = async () => {
-    const topic = from === 'idea' ? $('#pIdea').value : $('#pTopic').value.trim();
-    if (!topic) return $('#pTopic').focus();
-    const k = kind === 'carousel' ? 'carousel' : from === 'photos' ? 'photo' : 'text';
-    const {id} = await post('/api/post/new', {kind: k, title: topic});
-    const ask = k === 'carousel' ? `Новая карусель: «${topic}». Разбей тему на 5–7 слайдов и подбери шаблон каждому (POSTS.md).`
-      : k === 'photo' ? `Новый пост с фото: «${topic}». Я загружу фото на странице — выбери лучшее и напиши три варианта текста.`
-      : `Новый пост: «${topic}». Напиши три варианта текста в разных стилях, первым — стиль рубрики.`;
-    sessionStorage.setItem('firstMsg:post-' + id, JSON.stringify({text: ask, shown: topic}));
-    location.hash = '#/post/' + id;
+  await loadItems();
+  const pitches = ITEMS.items.filter((x) => x.proposed).length;
+  let formats = new Set(['reel']);
+  view.innerHTML = `<div class="ln-top"><a href="#/all" style="color: var(--muted); text-decoration: none">Выпуски</a><span>›</span><b>Новый выпуск</b><span style="flex: 1"></span><a class="ln-btn g" href="#/all">Отмена</a></div>
+  <div style="flex: 1; overflow-y: auto"><div style="max-width: 1060px; padding: 32px 72px; display: flex; flex-direction: column; gap: 22px">
+    <div style="display: flex; gap: 12px">
+      <button type="button" class="ln-door" id="nAsk"><span class="muted">${svg('idea', 20)}</span><span style="display: flex; flex-direction: column; gap: 4px"><b style="font-weight: 600">Предложи идеи</b><span class="small muted">Claude возьмёт рубрики и пустые дни плана${pitches ? ` · уже ждут ${pitches}` : ''}</span></span></button>
+      <div class="ln-door on"><span>${svg('clip', 20)}</span><span style="display: flex; flex-direction: column; gap: 4px"><b style="font-weight: 600">У меня есть идея или материал</b><span class="small muted">одна фраза; видео и фото — в чате выпуска</span></span></div>
+    </div>
+    <div class="box" style="padding: 16px; display: flex; flex-direction: column; gap: 10px; border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 8px 24px rgba(0,0,0,.04)">
+      <input class="f" id="nTitle" placeholder="Название в двух словах: «Первый снег на Садзеле»" style="border: 0; font-size: 17px; font-weight: 600; padding: 0">
+      <textarea class="f" id="nAbout" rows="3" placeholder="О чём, своими словами: «покажи, что уже катаются и что подъёмники с 20-го»" style="border: 0; resize: vertical; font-size: 15px; padding: 0"></textarea></div>
+    <div class="blk"><span class="lbl">Что из этого сделать · каждый формат станет отдельным выпуском</span>
+      <div class="row" style="gap: 8px" id="nFmts">${['reel', 'post', 'carousel', 'telegram'].map((k) => `<button type="button" class="ln-pill" data-f="${k}">${svg(FMT_ICON[k], 14)}${FMT_NAME[k]}</button>`).join('')}<span class="ln-pill" style="opacity: .5; cursor: default" title="Пока только предпросмотр в выкладке">${svg('story', 14)}История · скоро</span></div></div>
+    <div class="row" style="gap: 12px; flex-wrap: wrap">
+      <label class="blk" style="min-width: 220px"><span class="lbl">Рубрика</span><select class="f" id="nRub"><option value="">Claude определит</option>${ITEMS.rubrics.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('')}</select></label>
+      <label class="blk" style="min-width: 220px"><span class="lbl">Дата выхода</span><input class="f" id="nAt" type="datetime-local"></label></div>
+    <div class="blk"><span class="lbl" id="nWill"></span><div class="row" style="gap: 10px; align-items: stretch" id="nPrev"></div></div>
+    <div class="row" style="gap: 10px"><button type="button" class="ln-btn p" id="nStart" style="height: 44px; padding: 0 20px; font-size: 14px">Создать и начать</button><button type="button" class="ln-btn" id="nIdea" style="height: 44px">Только идеей — в план</button>
+      <span class="small muted" style="margin-left: 6px">«Начать» откроет чат первого выпуска: Claude скажет, что снять. Остальные ждут в колонке «Идея».</span></div>
+    ${pitches ? `<a class="small" href="#/all/proposed">Или возьми готовую — ${pitches} предложений Claude →</a>` : ''}
+  </div></div>`;
+  const draw = () => {
+    $('#nFmts').querySelectorAll('[data-f]').forEach((b) => { const on = formats.has(b.dataset.f); b.classList.toggle('on', on); b.innerHTML = `${svg(FMT_ICON[b.dataset.f], 14)}${FMT_NAME[b.dataset.f]}${on ? ' ✓' : ''}`; });
+    const t = $('#nTitle').value.trim() || 'Новый выпуск';
+    const list = [...formats];
+    $('#nWill').textContent = list.length > 1 ? `Будет создано ${list.length} отдельных выпуска — у каждого свои этапы и дата, общий только материал` : 'Будет создан один выпуск';
+    $('#nPrev').innerHTML = list.map((f) => `<div style="flex: 1; min-width: 180px; padding: 14px; border: 1px dashed #D4D4D4; border-radius: 12px; display: flex; flex-direction: column; gap: 8px"><span style="display: flex; gap: 8px; align-items: center">${svg(FMT_ICON[f], 16)}<b style="font-weight: 600">${esc(t)} · ${FMT_NAME[f].toLowerCase()}</b></span>${sdot('idea')}</div>`).join('');
+    $('#nStart').textContent = list.length > 1 ? `Создать ${list.length} и начать` : 'Создать и начать';
   };
+  $('#nFmts').querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { const f = b.dataset.f; if (formats.has(f) && formats.size > 1) formats.delete(f); else formats.add(f); draw(); }));
+  $('#nTitle').oninput = draw;
+  const create = async () => {
+    const title = $('#nTitle').value.trim() || $('#nAbout').value.trim().slice(0, 60);
+    if (!title) { $('#nTitle').focus(); return null; }
+    const {items} = await post('/api/items/new', {formats: [...formats], title, rubric: $('#nRub').value || null, at: $('#nAt').value || null, idea: {about: $('#nAbout').value.trim(), hook: '', flow: []}});
+    return items;
+  };
+  $('#nIdea').onclick = async () => { const items = await create(); if (!items) return; toast(items.length > 1 ? `${items.length} выпуска в колонке «Идея»` : 'Идея в плане'); location.hash = items.length > 1 ? '#/all' : '#/item/' + items[0].id; };
+  $('#nStart').onclick = async (e) => {
+    const items = await create(); if (!items) return;
+    e.target.disabled = true;
+    // The reel opens its chat; the posts get their folders and their first message waits in them.
+    const first = items.find((x) => x.format === 'reel') || items[0];
+    for (const x of items.filter((y) => y !== first && y.format !== 'reel')) await startItem(x);
+    location.hash = await startItem(first);
+  };
+  $('#nAsk').onclick = () => { sessionStorage.setItem('planLay', '1'); location.hash = '#/plan/draft'; };
+  draw();
 }
 
 // Стратегия (StratHub, StratPlatforms, StratRubrics, StratRhythm): strategy.json, edited through the project chat.
@@ -1435,58 +1605,112 @@ async function vKnowledge(tab = 'overview', sel) {
 }
 
 // Календарь (CleanPlan): a week of reels and posts from plan.json, empty rhythm slots, events; drag to a day.
-async function vPlan(offset = 0) {
-  title('Календарь');
-  const plan = await api('/api/plan');
-  const st = plan.strategy || {}, slots = st.rhythm?.slots || [];
-  const now = new Date(); const mon = new Date(now); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) + offset * 7);
-  const days = Array.from({length: 7}, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+// План (LeanPlan): ideas on dates first. A hairline month (or week) grid, each item with its rubric,
+// format and stage; ideas dashed, Claude's proposals marked. Rubrics on the right.
+async function vPlan(offset = 0, month = true) {
+  title('План');
+  const [plan] = await Promise.all([api('/api/plan'), loadItems()]);
+  const st = plan.strategy || {};
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const onDay = (d) => plan.items.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((a, b) => a.at.localeCompare(b.at));
-  const href = (x) => x.kind === 'reel' ? '#/reel/' + x.id : '#/post/' + x.id;
-  const chip = (x) => `<a class="pchip" draggable="true" data-key="${esc(x.key)}" href="${href(x)}" style="border-left-color: ${rubricColor(st, x.rubric)}"><span style="display: flex; gap: 5px; align-items: center">${svg(x.kind, 12)}<b>${esc(x.title)}</b></span><span class="muted">${x.at ? esc(x.at.slice(11, 16)) : ''}${x.rubric ? ' · ' + esc(rubricName(st, x.rubric)) : ''}</span></a>`;
-  const gaps = [];
-  const cells = days.map((d, i) => {
-    const items = onDay(d);
-    const free = slots.filter((s) => Number(s.day) === i + 1 && !items.some((x) => (x.rubric === s.rubric || rubricName(st, x.rubric) === rubricName(st, s.rubric))));
-    free.forEach((s) => gaps.push([d, s]));
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const first = new Date(today.getFullYear(), today.getMonth() + (month ? offset : 0), 1);
+  let days;
+  if (month) {
+    const start = new Date(first); start.setDate(1 - ((first.getDay() + 6) % 7));
+    const weeks = Math.ceil((((first.getDay() + 6) % 7) + new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()) / 7);
+    days = Array.from({length: weeks * 7}, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return d; });
+  } else {
+    const mon = new Date(today); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7) + offset * 7);
+    days = Array.from({length: 7}, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+  }
+  const all = ITEMS.items;
+  const onDay = (d) => all.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
+  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" title="${esc(x.title)}">
+      <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
+      <span class="m">${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}</span>
+      ${x.proposed && canEdit() ? `<span class="m" style="gap: 8px"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</a>`;
+  const cells = days.map((d) => {
+    const isToday = ymd(d) === ymd(today), out = month && d.getMonth() !== first.getMonth();
     const ev = (plan.events || []).concat(st.events || []).filter((e) => e.date === ymd(d));
-    const today = ymd(d) === ymd(new Date());
-    return `<div class="pday${today ? ' today' : ''}" data-day="${ymd(d)}"><div class="dh"><b>${d.getDate()}</b><span>${DAYS[i].toLowerCase()}${today ? ' · сегодня' : ''}</span></div>
-      ${ev.map((e) => `<span class="small" style="background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}
-      ${items.map(chip).join('')}
-      ${free.map((s) => `<button type="button" class="pslot" data-fill="${ymd(d)}|${esc(s.time || '')}|${esc(rubricName(st, s.rubric))}|${esc(s.kind || '')}" style="border-color: ${rubricColor(st, s.rubric)}"><span style="display: flex; gap: 5px; align-items: center">${svg(s.kind || 'photo', 12)}${esc(rubricName(st, s.rubric))}</span><span class="muted">${esc(s.time || '')} · пусто</span></button>`).join('')}</div>`;
+    return `<div class="ln-cell${isToday ? ' today' : ''}${out ? ' out' : ''}" data-day="${ymd(d)}" style="${month ? '' : 'min-height: 420px'}"><span class="dn">${d.getDate()}</span>
+      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d).map(chip).join('')}</div>`;
   }).join('');
-  const undated = plan.items.filter((x) => !x.at && !['done', 'published'].includes(x.status)).slice(0, 12);
-  const range = `${days[0].getDate()} ${days[0].toLocaleDateString('ru', {month: 'long'}).replace(/ь$/, 'я')} – ${days[6].getDate()} ${days[6].toLocaleDateString('ru', {month: 'long'})}`;
-  const filled = slots.length - gaps.length;
-  view.innerHTML = `<div class="work"><div class="rmain"><div class="chead" style="padding: 0 28px; min-height: 56px"><b style="font-size: 14px">Календарь</b><span class="row" style="gap: 4px; margin-left: 12px"><a class="btn" href="#/plan/${offset - 1}" aria-label="Прошлая неделя">‹</a><a class="btn" href="#/plan">Сегодня</a><a class="btn" href="#/plan/${offset + 1}" aria-label="Следующая неделя">›</a></span><span class="muted" style="margin-left: 10px">${range}</span><span style="flex: 1"></span>${slots.length ? `<span class="small muted">заполнено ${filled} из ${slots.length} мест</span>` : '<a class="btn" href="#/knowledge/rhythm">Задать ритм недели</a>'}</div>
-      <div style="flex: 1; overflow-y: auto; padding: 22px 28px; display: flex; flex-direction: column; gap: 22px">
-        <div class="pweekwrap"><div class="pweek">${cells}</div></div>
-        <div class="small muted">${(st.rubrics || []).map((x) => `<span style="display: inline-flex; align-items: center; gap: 5px; margin-right: 14px"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${esc(x.color || '#A3A3A3')}"></span>${esc(x.name)}</span>`).join('')} пунктир — пустое место, клик — чем заполнить; перетащи выпуск на нужный день</div>
-        <div class="split" style="gap: 24px">
-          <div class="blk" style="flex: 1"><span class="lbl">Требует внимания · ${gaps.length + undated.length ? gaps.length : 0}</span>${gaps.map(([d, s]) => `<div class="li"><span style="width: 8px; height: 8px; border-radius: 3px; background: ${rubricColor(st, s.rubric)}"></span><span style="flex: 1">Пустое место: ${esc(rubricName(st, s.rubric))}</span><span class="small muted">${DAYS[(d.getDay() + 6) % 7].toLowerCase()} ${esc(s.time || '')}</span></div>`).join('') || '<span class="small muted">Всё на месте.</span>'}</div>
-          <div class="blk pdrop" style="flex: 1" data-day=""><span class="lbl">Без даты · ${undated.length}</span><div style="display: flex; flex-direction: column; gap: 6px">${undated.map(chip).join('') || '<span class="small muted">Пусто.</span>'}</div></div>
-        </div></div></div>
-    <aside class="chatcol" aria-label="Чат плана"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат плана</b></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
-  const box = chatBox('_project', {onDone: () => { sidebar(); vPlan(offset); }});
-  $('#chatHost').append(box);
-  view.querySelectorAll('[data-fill]').forEach((b) => (b.onclick = () => { const [d, t, r, k] = b.dataset.fill.split('|'); box.say(`Чем заполнить пустое место ${d} ${t}: рубрика «${r}»${k ? ', ' + KIND[k] : ''}? Предложи 2–3 варианта из идей и выпусков в работе.`, `Чем заполнить: ${r}, ${d.slice(5)} ${t}`); }));
+  const shown = all.filter((x) => !x.proposed && x.at && x.at.slice(0, 10) >= ymd(days[0]) && x.at.slice(0, 10) <= ymd(days.at(-1)));
+  const undated = all.filter((x) => !x.at && !x.proposed && x.stage !== 'published');
+  const mname = first.toLocaleDateString('ru', {month: 'long'});
+  const gen = (m) => m.replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я');
+  const range = month ? mname : `${days[0].getDate()} ${gen(days[0].toLocaleDateString('ru', {month: 'long'}))} – ${days[6].getDate()} ${gen(days[6].toLocaleDateString('ru', {month: 'long'}))}`;
+  const base = month ? '#/plan/m/' : '#/plan/w/';
+  const rubs = ITEMS.rubrics.map((r) => `<a href="#/rubric/${esc(r.id)}" style="display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-bottom: 1px solid #F0F0F0; text-decoration: none; color: var(--ink)"><span style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600"><span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}<span class="muted" style="margin-left: auto; font-weight: 400; font-size: 12px">${shown.filter((x) => itemRubric(x)?.id === r.id).length}</span></span>${r.about ? `<span class="muted" style="font-size: 12px; padding-left: 16px">${esc(r.about)}</span>` : ''}</a>`).join('');
+  view.innerHTML = `<div style="display: flex; flex-direction: column; height: 100vh; min-width: 0">
+    <div class="ln-top"><b>План</b><span>·</span><span>${range}</span>
+      <span class="ln-seg" style="margin-left: 12px"><a href="#/plan/w" class="${month ? '' : 'on'}">Неделя</a><a href="#/plan" class="${month ? 'on' : ''}">Месяц</a></span>
+      <span style="display: inline-flex; gap: 2px; margin-left: 6px"><a class="ln-btn g s" href="${base}${offset - 1}" aria-label="Назад">‹</a><a class="ln-btn g s" href="${base.slice(0, -1)}">Сейчас</a><a class="ln-btn g s" href="${base}${offset + 1}" aria-label="Вперёд">›</a></span>
+      <span style="display: inline-flex; gap: 12px; margin-left: 8px">${LIFE.slice(0, 4).map(([k]) => `${sdot(k)}<span class="muted">${shown.filter((x) => x.stage === k).length}</span>`).join('')}</span>
+      <span style="flex: 1"></span>${canEdit() ? `<button type="button" class="ln-btn p" id="lay">${svg('idea', 14)}Расписать идеи на 2 недели</button>` : ''}</div>
+    <div style="flex: 1; display: flex; min-height: 0">
+      <div style="flex: 1; display: flex; flex-direction: column; padding: 16px 20px 20px; min-width: 0; overflow-y: auto">
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 12px; color: var(--muted); padding: 0 0 8px">${DAYS.map((d, i) => `<span style="padding-left: 8px">${month ? d.toLowerCase() : d.toLowerCase() + ' ' + days[i].getDate()}</span>`).join('')}</div>
+        <div class="ln-grid">${cells}</div>
+        <p class="small muted" style="margin: 12px 2px 0">Пунктир — пока только идея: дату и рубрику уже видно, снимать ещё нечего. Перетащи выпуск на другой день или в «Без даты».</p>
+      </div>
+      <aside class="ln-aside">
+        <div style="display: flex; align-items: center"><b style="font-weight: 600">Рубрики</b><span class="muted" style="margin-left: auto; font-size: 12px">${month ? 'в этом месяце' : 'на этой неделе'}</span></div>
+        <div>${rubs || '<span class="small muted">Рубрик пока нет.</span>'}</div>
+        ${canEdit() ? '<a href="#/knowledge/rubrics" style="font-size: 13px; color: #2F6FEB; font-weight: 600; text-decoration: none">+ Рубрика</a>' : ''}
+        <div class="ln-drop" data-day="" style="display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 2px"><div style="display: flex; align-items: center; margin-top: 8px"><b style="font-weight: 600">Без даты</b><span class="muted" style="margin-left: auto; font-size: 12px">${undated.length}</span></div>${undated.slice(0, 6).map(chip).join('')}${undated.length > 6 ? `<a class="small muted" href="#/all">ещё ${undated.length - 6} — в Выпусках</a>` : ''}</div>
+        <div class="muted" style="font-size: 13px; line-height: 1.5; margin-top: auto">Площадки и ритм — <a href="#/knowledge">${svg('sliders', 13)} настройки плана</a>.</div>
+      </aside>
+    </div></div>`;
+  const redraw = () => vPlan(offset, month);
+  $('#lay')?.addEventListener('click', () => { sessionStorage.setItem('planLay', '1'); location.hash = '#/plan/draft'; });
+  view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); redraw(); }));
+  view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const x = all.find((y) => y.id === b.dataset.other); sessionStorage.setItem('planAsk', JSON.stringify({text: `Замени идею «${x.title}» на ${(x.at || '').slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric:.`, shown: `Другую вместо «${x.title}»`})); location.hash = '#/plan/draft'; }));
   let drag = null;
-  view.querySelectorAll('.pchip').forEach((c) => { c.ondragstart = () => { drag = c.dataset.key; }; });
-  view.querySelectorAll('.pday, .pdrop').forEach((d) => {
+  view.querySelectorAll('.ln-chip').forEach((c) => { c.ondragstart = () => { drag = c.dataset.id; }; });
+  view.querySelectorAll('.ln-cell, .ln-drop').forEach((d) => {
     d.ondragover = (e) => { e.preventDefault(); d.classList.add('over'); };
     d.ondragleave = () => d.classList.remove('over');
     d.ondrop = async (e) => {
       e.preventDefault(); d.classList.remove('over');
       if (!drag || !canEdit()) return;
-      const it = plan.items.find((x) => x.key === drag);
-      const time = it?.at?.slice(11, 16) || slots.find((s) => s.rubric === it?.rubric)?.time || '19:00';
-      await post('/api/plan/set', {key: drag, at: d.dataset.day ? `${d.dataset.day}T${time}` : ''});
-      vPlan(offset);
+      const it = all.find((x) => x.id === drag);
+      const time = it?.at?.slice(11, 16) || (st.rhythm?.slots || []).find((s) => s.rubric === it?.rubric)?.time || '19:00';
+      await post('/api/items/set', {id: drag, at: d.dataset.day ? `${d.dataset.day}T${time}` : null});
+      redraw();
     };
   });
 }
+
+// Расписать идеи (LeanPlanDraft): Claude's proposals for the next two weeks by rubric, to take or
+// replace one by one; the plan chat on the right.
+async function vPlanDraft() {
+  title('Расписать идеи');
+  await loadItems();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const to = new Date(today); to.setDate(today.getDate() + 13);
+  const list = ITEMS.items.filter((x) => x.proposed && x.at && x.at.slice(0, 10) >= ymd(today) && x.at.slice(0, 10) <= ymd(to)).sort((p, q) => p.at.localeCompare(q.at));
+  const byRub = [...ITEMS.rubrics, {id: '', name: 'Без рубрики', color: '#A3A3A3'}].map((r) => [r, list.filter((x) => (itemRubric(x)?.id || '') === r.id)]).filter(([, l]) => l.length);
+  const row = (x) => `<div class="ln-li"><span class="muted" style="flex: 0 0 64px; font-size: 13px">${new Date(x.at).toLocaleDateString('ru', {weekday: 'short', day: 'numeric'})}</span><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><a href="#/item/${x.id}" style="flex: 0 0 300px; font-weight: 600; color: var(--ink); text-decoration: none">${esc(x.title)}</a><span class="s" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.idea?.hook || x.idea?.about || '')}</span>${canEdit() ? `<button type="button" class="ln-btn s" data-take="${x.id}">Взять</button><button type="button" class="ln-btn s g" data-other="${x.id}">Другую</button>` : ''}</div>`;
+  view.innerHTML = `<div class="work"><div class="rmain">
+    <div class="ln-top"><a href="#/plan" style="color: var(--muted); text-decoration: none">План</a><span>›</span><span>Расписать идеи · ${today.getDate()}–${to.getDate()} ${to.toLocaleDateString('ru', {month: 'long'}).replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я')}</span><span style="flex: 1"></span><a class="ln-btn g" href="#/plan">Готово</a>${list.length && canEdit() ? `<button type="button" class="ln-btn p" id="takeAll">Взять все ${list.length} в план</button>` : ''}</div>
+    <div style="flex: 1; overflow-y: auto; padding: 22px 36px">
+      <div style="display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px"><h1 style="font-size: 24px">${list.length ? `${list.length} ${list.length === 1 ? 'идея' : list.length < 5 ? 'идеи' : 'идей'} на две недели` : 'Идей на две недели пока нет'}</h1><div class="muted" style="font-size: 15px; line-height: 1.5">По рубрикам и ритму плана, без повторов того, что уже вышло. Это только концепции — снимать ничего не надо, пока не возьмёте.</div></div>
+      ${byRub.map(([r, l]) => `<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 16px 0 6px"><span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}</div>${l.map(row).join('')}`).join('') || '<p class="muted" style="margin-top: 16px">Claude сейчас распишет — ответ справа, идеи появятся здесь.</p>'}
+    </div></div>
+    <aside class="chatcol" aria-label="Поправить словами"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Поправить словами</b></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+  const box = chatBox('_project', {onDone: () => { sidebar(); vPlanDraft(); }});
+  $('#chatHost').append(box);
+  view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async () => { b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); vPlanDraft(); }));
+  view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = () => { const x = list.find((y) => y.id === b.dataset.other); box.say(`Замени идею «${x.title}» на ${x.at.slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric:.`, `Другую вместо «${x.title}»`); }));
+  $('#takeAll')?.addEventListener('click', async (e) => { e.target.disabled = true; for (const x of list) await post('/api/items/set', {id: x.id, take: true}); toast(`Взято ${list.length}`); location.hash = '#/plan'; });
+  await box.ready;
+  const ask = sessionStorage.getItem('planAsk');
+  if (ask) { sessionStorage.removeItem('planAsk'); const {text, shown} = JSON.parse(ask); box.say(text, shown); }
+  else if (sessionStorage.getItem('planLay')) { sessionStorage.removeItem('planLay'); box.say(layIdeasText(ymd(today), ymd(to)), 'Расписать идеи на 2 недели'); }
+}
+
 
 // Рубрика (CleanRubric): its issues, from the strategy and plan.json.
 async function vRubric(id) {
@@ -1501,17 +1725,28 @@ async function vRubric(id) {
 }
 
 // Project settings: title + tabs on top, each tab is one of the older pages rendered below.
-async function vSettings(tab = 'ds', sub) {
-  if (tab === 'access') tab = 'team';
-  const tabs = [['voice', 'Голос и стили', vVoice], ['rules', 'Правила', vRules], ['ds', 'Дизайн-система', vDs], ['team', 'Команда', () => vTeam(sub)], ['files', 'Файлы и место', vFiles], ...(isOwner() ? [['tests', 'Тестовые аккаунты', vTests]] : [])];
+// Память (handbook/LEAN.md, кусок 2): what Claude knows and checks in every release.
+// For now its tabs are the old Settings and Strategy ones; facts with dates come in кусок 9.
+const MEMORY_TABS = ['brief', 'voice', 'rules', 'ds', 'files'];
+async function vBrief() {
+  const k = await api('/api/knowledge');
+  view.innerHTML = `<div class="page" style="max-width: 980px; padding: 22px 36px"><div class="md">${md(k.brief) || '<p class="muted">Пусто. Расскажите о проекте в <a href="#/chat/_project">чате проекта</a> — Claude запишет.</p>'}</div></div>`;
+}
+async function vTabs(base, head, tabs, tab) {
   const cur = tabs.find(([k]) => k === tab) || tabs[0];
-  view.innerHTML = `<div style="padding: 28px 36px 0; display: flex; flex-direction: column; gap: 18px"><h1>Настройки проекта</h1>
-    <div class="utabs" role="tablist">${tabs.map(([k, t]) => `<a href="#/settings/${k}" class="${k === cur[0] ? 'on' : ''}">${t}</a>`).join('')}</div></div>
+  view.innerHTML = `<div style="padding: 28px 36px 0; display: flex; flex-direction: column; gap: 18px"><h1>${head}</h1>
+    <div class="utabs" role="tablist">${tabs.map(([k, t]) => `<a href="#/${base}/${k}" class="${k === cur[0] ? 'on' : ''}">${t}</a>`).join('')}</div></div>
     <div id="tabHost" style="flex: 1; display: flex; flex-direction: column; min-height: 0"></div>`;
   const main = view;
   view = $('#tabHost');
   try { await cur[2](); } finally { view = main; }
-  title('Настройки проекта');
+  title(head);
+}
+const vMemory = (tab) => vTabs('memory', 'Память', [['brief', 'О проекте', vBrief], ['voice', 'Голос и стиль', vVoice], ['rules', 'Правила', vRules], ['ds', 'Дизайн', vDs], ['files', 'Файлы', vFiles]], tab);
+async function vSettings(tab = 'team', sub) {
+  if (tab === 'access') tab = 'team';
+  if (MEMORY_TABS.includes(tab)) return location.replace('#/memory/' + tab);
+  return vTabs('settings', 'Настройки', [['team', 'Команда', () => vTeam(sub)], ...(isOwner() ? [['tests', 'Тестовые аккаунты', vTests]] : [])], tab);
 }
 
 async function vDs() {
@@ -1949,16 +2184,19 @@ async function route() {
     else if ((m = /^#\/chat\/(_project)/.exec(h))) await vChat(m[1]);
     else if (h === '#/new') await vNew();
     else if ((m = /^#\/knowledge(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vKnowledge(m[1], m[2]);
-    else if ((m = /^#\/plan(?:\/(-?\d+))?$/.exec(h))) await vPlan(Number(m[1] || 0));
+    else if (h === '#/plan/draft') await vPlanDraft();
+    else if ((m = /^#\/plan(?:\/(m|w))?(?:\/(-?\d+))?$/.exec(h))) await vPlan(Number(m[2] || 0), m[1] !== 'w');
     else if ((m = /^#\/rubric\/([\w-]+)/.exec(h))) await vRubric(m[1]);
     else if ((m = /^#\/settings(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vSettings(m[1], m[2]);
+    else if ((m = /^#\/memory(?:\/(\w+))?/.exec(h))) await vMemory(m[1]);
     else if (h === '#/inbox') await vInbox();
     else if (h === '#/help/telegram-export') vHelpExport();
     else if (h === '#/tasks') await vTasks();
-    else if (h === '#/ds') location.replace('#/settings/ds');
-    else if (h === '#/files') location.replace('#/settings/files');
+    else if (h === '#/ds') location.replace('#/memory/ds');
+    else if (h === '#/files') location.replace('#/memory/files');
     else if (h === '#/access') location.replace('#/settings/access');
-    else if ((m = /^#\/all(?:\/(reels|posts))?$/.exec(h))) await vAll(m[1]);
+    else if ((m = /^#\/all(?:\/(\w+))?$/.exec(h))) await vAll(m[1]);
+    else if ((m = /^#\/item\/([\w-]+)/.exec(h))) await vItem(m[1]);
     else if ((m = /^#\/post\/([\w-]+)(?:\/(\w+))?/.exec(h))) await vPost(m[1], m[2]);
     else await vToday();
   } catch (e) {

@@ -12,6 +12,7 @@ import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
+import {changeItem, createItems, followPlan, needOf, syncItems} from './items.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -255,7 +256,8 @@ function preamble(p, k) {
   ];
   if (k === '_ds') lines.push(`THIS CHAT develops the project's design system for its reels. The result is ONE self-contained HTML page, \`${relative(BOT, studio)}/design-system/index.html\` (inline CSS/JS, Google Fonts allowed, images as relative files next to it): a small landing page with the system's name and idea, color and type tokens, spacing and motion rules, and a library of the components (plates, price receipts, titles, subtitles, phone mockup…) drawn in HTML/CSS as they look in the reels, each with its name, when to use it and its Remotion component name if there is one. Read the brief, PLAYBOOK.md, \`template/src\` and the reels' code to stay true to what is really used. After each change, rewrite the page and tell the owner in one or two lines what changed; the page reloads by itself. Keep \`design-system/tokens.json\` in sync with the tokens on the page.`);
   else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules, settings, strategy and plan. Reels and posts themselves are made in their own chats; if the owner asks to make one here, say that «+ Новый выпуск» starts it in its own chat.',
-    `Strategy and plan follow STRATEGY.md: \`${relative(BOT, studio)}/strategy.json\` (platforms, rubrics, weekly rhythm, events) and \`${relative(BOT, studio)}/plan.json\` (dates and rubrics of reels and posts); the page draws Strategy and the Calendar from them.`);
+    `Strategy and plan follow STRATEGY.md: \`${relative(BOT, studio)}/strategy.json\` (platforms, rubrics, weekly rhythm, events) and \`${relative(BOT, studio)}/plan.json\` (dates and rubrics of reels and posts); the page draws Strategy and the Calendar from them.`,
+    `Units of content live in \`${relative(BOT, studio)}/items.json\` (handbook/LEAN.md): one item per format with stage, rubric, at and idea {about, hook, flow}. When the owner asks about an item by its id, edit only that item's idea, format, rubric or at there. Never add or remove items yourself: new ideas go to ideas.md («My ideas», Format:/Hook:/Plot: plus «Date: YYYY-MM-DDTHH:MM» and «Rubric: <rubric id>»), and the page turns them into proposals.`);
   // A new project (the starter brief, or a test account not set up yet) is a first visit: the
   // whole onboarding, as the bot runs it, not just an answer to the first message.
   if (k === '_project' && onboardingDue(studio)) lines.push(`THIS PROJECT IS NEW: run REELS.md section 0 (Onboarding) from where it stands, whatever the owner's message is about (a greeting too): start with the guiding questions, material and the Telegram archive link come last (step 1). Ask ONE question per turn with \`--keyboard\` buttons and stop until they answer; the next turn goes on with the next question. You are not done until \`brief.md\` is filled, \`strategy.json\` is written and \`settings.json\` has \`mode\`, \`plan\` and \`team\` (step 5), and the summary (step 6) is shown.`);
@@ -721,8 +723,35 @@ createServer(async (req, res) => {
     if (at !== undefined) { if (at) plan.at[key] = String(at).slice(0, 25); else delete plan.at[key]; }
     if (rubric !== undefined) { if (rubric) plan.rubric[key] = String(rubric).slice(0, 60); else delete plan.rubric[key]; }
     writeJson(f, plan);
+    followPlan(studio, key, {at, rubric});
     log(me.name, `поставил ${key} на ${at ?? '—'}`);
     return json(200, {});
+  }
+  // Units of content (web/items.mjs, handbook/LEAN.md): one item per format, by stage.
+  if (req.method === 'GET' && url.pathname === '/api/items') {
+    const {data, src} = syncItems(studio);
+    const thumbs = {};
+    for (const r of reels(p)) thumbs['reel:' + r.id] = r.thumb;
+    for (const x of listPosts(studio, mediaUrl)) thumbs['post:' + x.id] = x.thumb;
+    const items = data.items.map((x) => ({...x, need: needOf(x, src), thumb: x.ref ? thumbs[`${x.ref.kind}:${x.ref.id}`] || null : null}));
+    const rubrics = (readJson(join(studio, 'strategy.json'), {}).rubrics || []).map((r) => ({id: r.id, name: r.name, color: r.color, about: r.about || '', format: r.format || '', day: r.day || ''}));
+    return json(200, {items, rubrics});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/items/set') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const item = changeItem(studio, String(b.id || ''), b, {by: me.name});
+    if (!item) return json(404, {});
+    log(me.name, `выпуск «${item.title}»: ${Object.keys(b).filter((k) => k !== 'id').join(', ')}`);
+    return json(200, {item});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/items/new') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const made = createItems(studio, {formats: b.formats, title: b.title, rubric: b.rubric || null, at: b.at || null, idea: b.idea || null, by: me.name});
+    if (!made.length) return json(400, {});
+    log(me.name, `новые выпуски «${made[0].title}»: ${made.map((x) => x.format).join(', ')}`);
+    return json(200, {items: made});
   }
   if (req.method === 'GET' && url.pathname === '/api/knowledge') {
     const ds = join(studio, 'design-system', 'index.html');
