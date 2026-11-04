@@ -310,7 +310,7 @@
   .pmonth .pchip { padding: 5px 7px; gap: 2px; font-size: 12px; }
   .pmonth .pchip b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; min-width: 0; }
   .pmonth .pchip > span { min-width: 0; }
-  .ln-top { height: 52px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .ln-top { position: sticky; top: 0; z-index: 5; background: #fff; height: 52px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .ln-top b { color: var(--ink); font-weight: 600; font-size: 14px; }
   .ln-seg { display: inline-flex; gap: 2px; background: #F4F4F4; border-radius: 10px; padding: 3px; }
   .ln-seg a, .ln-seg button { padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); text-decoration: none; border: 0; background: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
@@ -346,6 +346,23 @@
   a.lstep:hover { color: var(--ink); }
   .lstep.view { border-bottom-color: var(--ink); }
   .lsub { display: flex; gap: 4px; padding: 8px 28px 0; }
+  /* the canvas-look pages scroll inside the view, the header stays */
+  #view > div[style*="overflow-y: auto"], #tabHost > div[style*="overflow-y: auto"] { min-height: 0; }
+  .rhead { min-height: 52px; flex: none; display: flex; align-items: center; gap: 12px; padding: 6px 20px 6px 24px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .rtitle { font-weight: 600; font-size: 15px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lbar.mini { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; font-size: 12px; }
+  .lbar.mini .lstep .c { width: 14px; height: 14px; font-size: 8px; }
+  .lbar.mini .lstep.on .c::after { width: 4px; height: 4px; }
+  .lbar.mini .lline { width: 12px; }
+  .rchip { height: 30px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 8px; font: inherit; font-size: 12px; color: var(--ink2); width: auto; }
+  .lsub { padding: 8px 24px 0; }
+  .rhead .lstep:not(.on):not(.view) .t { display: none; }
+  .rhead .lstep { gap: 5px; }
+  #peek { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; background: #fff; border-left: 1px solid var(--line); box-shadow: -12px 0 32px rgba(0,0,0,.06); display: flex; flex-direction: column; z-index: 15; animation: peekIn .18s ease; }
+  @keyframes peekIn { from { transform: translateX(24px); opacity: 0; } }
+  body.peeking main { margin-right: 460px; transition: margin .18s ease; }
+  .peeked { outline: 2px solid var(--ink); outline-offset: 1px; }
+  @media (max-width: 900px) { #peek { width: 100%; } body.peeking main { margin-right: 0; } }
   .lline { width: 22px; height: 1.5px; background: #E5E5E5; } .lline.done { background: var(--ink); }
 </style>
 <script src="/preview.js"></script>
@@ -779,14 +796,14 @@ async function vToday() {
   }
   waits.sort((p, q) => p[0] - q[0] || String(p[1].at || '9').localeCompare(String(q[1].at || '9')));
   const pitches = ITEMS.items.filter((x) => x.proposed && x.at && inDays(x) >= 0 && inDays(x) <= 14).length;
-  const wline = ([, x, note, tag]) => `<a class="wl" href="${itemHref(x)}"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="display: inline-flex; gap: 6px; align-items: center">${svg(FMT_ICON[x.format], 14)}${esc(x.title)}</span><span class="small muted">${esc(note)}</span><span class="r"><span class="tag">${tag}</span>${x.at ? '&nbsp;&nbsp;' + dayName(x) : ''}</span></a>`;
+  const wline = ([, x, note, tag]) => `<a class="wl" href="${itemHref(x)}" data-peek="${x.id}"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="display: inline-flex; gap: 6px; align-items: center">${svg(FMT_ICON[x.format], 14)}${esc(x.title)}</span><span class="small muted">${esc(note)}</span><span class="r"><span class="tag">${tag}</span>${x.at ? '&nbsp;&nbsp;' + dayName(x) : ''}</span></a>`;
   const dayCell = (d) => {
     const list = onWeek.filter((x) => dayOf(x) === ymd(d));
     const isToday = ymd(d) === ymd(today);
     const head = `<span class="small" style="color: ${isToday ? 'var(--ink)' : 'var(--muted)'}; font-weight: ${isToday ? 700 : 500}">${DAYS[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()}</span>`;
     if (!list.length) return `<div style="flex: 1; min-width: 0; border: 1px dashed #D4D4D4; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; min-height: 104px; background: #FCFCFC">${head}${d >= today && canEdit() ? `<button type="button" class="small" data-day="${ymd(d)}" style="margin-top: auto; border: 0; background: none; padding: 0; text-align: left; color: var(--blue); font-weight: 600; cursor: pointer">Предложить идею</button>` : ''}</div>`;
     const x = list[0];
-    return `<a href="${itemHref(x)}" style="flex: 1; min-width: 0; border: 1px ${x.stage === 'idea' ? 'dashed #D4D4D4' : 'solid var(--line)'}; ${isToday ? 'border-color: var(--ink);' : ''} border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 5px; min-height: 104px; text-decoration: none; color: var(--ink)">${head}
+    return `<a href="${itemHref(x)}" data-peek="${x.id}" style="flex: 1; min-width: 0; border: 1px ${x.stage === 'idea' ? 'dashed #D4D4D4' : 'solid var(--line)'}; ${isToday ? 'border-color: var(--ink);' : ''} border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 5px; min-height: 104px; text-decoration: none; color: var(--ink)">${head}
       <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; min-width: 0"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span></span>
       <span class="small muted">${FMT_NAME[x.format].toLowerCase()}${list.length > 1 ? ` · ещё ${list.length - 1}` : ''}</span><span style="margin-top: auto">${sdot(x.stage)}</span></a>`;
   };
@@ -830,7 +847,7 @@ function itemCard(x) {
   const need = x.need || [];
   const extra = x.stage === 'material' && need.length ? ` · снято ${need.filter((n) => n.done).length} из ${need.length}` : '';
   const sib = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id).length : 0;
-  return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}">
+  return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}" data-peek="${x.id}">
     <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)}${extra}${sib ? ` · ещё ${sib} из того же материала` : ''}${x.missing ? ' · папка пропала' : ''}</span></a>`;
@@ -903,7 +920,7 @@ function drawIdea(host, kind, id) {
 }
 function lifeBarFor(x, {controls = true, href = null, viewing = null} = {}) {
   const k = LIFE.findIndex(([s]) => s === x.stage);
-  const steps = LIFE.map(([s, t], i) => { const tag = href ? 'a' : 'span'; return `<${tag} class="lstep ${i < k ? 'done' : i === k ? 'on' : ''} ${s === viewing ? 'view' : ''}" ${href ? `href="${href(s)}"` : ''}><span class="c">${i < k ? '✓' : ''}</span>${t}</${tag}>${i < 4 ? `<span class="lline ${i < k ? 'done' : ''}"></span>` : ''}`; }).join('');
+  const steps = LIFE.map(([s, t], i) => { const tag = href ? 'a' : 'span'; return `<${tag} class="lstep ${i < k ? 'done' : i === k ? 'on' : ''} ${s === viewing ? 'view' : ''}" title="${t}" ${href ? `href="${href(s)}"` : ''}><span class="c">${i < k ? '✓' : ''}</span><span class="t">${t}</span></${tag}>${i < 4 ? `<span class="lline ${i < k ? 'done' : ''}"></span>` : ''}`; }).join('');
   const r = itemRubric(x);
   const sibs = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id) : [];
   return `<div class="lbar" data-item="${x.id}">${steps}
@@ -923,6 +940,81 @@ function wireLifeBar(root, onChange) {
     onChange?.();
   }));
 }
+
+// A release's header (LeanRelease): one low row — rubric, title, the five stages as tabs, date and
+// rubric chips, download; a second thin row only when a stage has several screens.
+async function relHead(kind, id, steps, tab, base, title) {
+  await loadItems().catch(() => null);
+  const x = ITEMS?.items.find((y) => y.ref?.kind === kind && y.ref.id === id);
+  if (!x) return '';
+  const viewing = LIFE.map(([s]) => s).find((s) => steps[s].includes(tab) && (s === x.stage || !LIFE.some(([o]) => o === x.stage && steps[o].includes(tab)))) || x.stage;
+  const r = itemRubric(x);
+  const ed = canEdit();
+  const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
+  return `<div class="rhead" data-item="${x.id}">
+    <a href="#/all" class="muted" title="Выпуски" aria-label="Выпуски" style="display: inline-flex">${svg(FMT_ICON[x.format], 16)}</a>
+    <b class="rtitle" title="${esc(title)}">${esc(title)}</b>
+    <span class="lbar mini">${lifeBarFor(x, {controls: false, href: (s) => base + steps[s][0], viewing}).replace(/^<div class="lbar"[^>]*>/, '').replace(/<span style="flex: 1"><\/span>[\s\S]*<\/div>$/, '')}</span>
+    <span style="flex: 1"></span>
+    ${ed ? `<select class="rchip" data-f="rubric" aria-label="Рубрика"><option value="">без рубрики</option>${ITEMS.rubrics.map((y) => `<option value="${esc(y.id)}" ${r?.id === y.id ? 'selected' : ''}>${esc(y.name)}</option>`).join('')}</select>
+      <input class="rchip" data-f="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">`
+    : `${r ? `<span class="small">${esc(r.name)}</span>` : ''}<span class="small muted">${whenText(x.at)}</span>`}
+    <span id="dlTop" class="row" style="gap: 8px"></span></div>${subs}`;
+}
+function wireRelHead(root, redraw) {
+  root.querySelectorAll('.rhead [data-f]').forEach((el) => (el.onchange = async () => {
+    await post('/api/items/set', {id: el.closest('.rhead').dataset.item, [el.dataset.f]: el.value || null});
+    await loadItems(); toast('Сохранено'); redraw?.();
+  }));
+}
+
+// Боковая панель выпуска: from the Plan, Releases, Today or a rubric a release opens on the right,
+// the page beside it narrows; «Открыть полностью» goes to its own page.
+async function peek(id) {
+  if (!ITEMS) await loadItems();
+  const x = ITEMS.items.find((y) => y.id === id);
+  if (!x) return;
+  let el = $('#peek');
+  if (!el) { el = document.createElement('aside'); el.id = 'peek'; el.setAttribute('aria-label', 'Выпуск'); document.body.append(el); }
+  if (!document.body.classList.contains('peeking')) { peek.folded = !document.body.classList.contains('side-mini'); if (peek.folded) foldSide(true); }
+  document.body.classList.add('peeking');
+  view.querySelectorAll('[data-peek]').forEach((a) => a.classList.toggle('peeked', a.dataset.peek === id));
+  const r = itemRubric(x);
+  const reel = x.ref?.kind === 'reel' ? OV?.reels.find((y) => y.id === x.ref.id) : null;
+  const need = x.need || [];
+  const sibs = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id) : [];
+  el.innerHTML = `<div class="ln-top" style="padding: 0 16px 0 20px"><span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</b>
+      <a class="ln-btn s" href="${itemHref(x)}" id="peekFull">${svg('panel', 13)}Открыть полностью</a><button type="button" class="ln-btn g s" id="peekClose" aria-label="Закрыть">✕</button></div>
+    <div style="flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 18px">
+      <div class="lbar mini" style="padding: 0; border: 0; flex-wrap: wrap">${lifeBarFor(x, {controls: false}).replace(/^<div class="lbar"[^>]*>/, '').replace(/<span style="flex: 1"><\/span>[\s\S]*<\/div>$/, '')}</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+        <span class="ln-pill" style="cursor: default">${svg(FMT_ICON[x.format], 13)}${FMT_NAME[x.format]}</span>
+        ${canEdit() ? `<select class="rchip" data-pf="rubric" aria-label="Рубрика"><option value="">без рубрики</option>${ITEMS.rubrics.map((y) => `<option value="${esc(y.id)}" ${r?.id === y.id ? 'selected' : ''}>${esc(y.name)}</option>`).join('')}</select>
+          <input class="rchip" data-pf="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">
+          <select class="rchip" data-pf="stage" aria-label="Этап">${LIFE.map(([s, t]) => `<option value="${s}" ${s === x.stage ? 'selected' : ''}>${t}</option>`).join('')}</select>` : `<span class="small muted">${r ? esc(r.name) + ' · ' : ''}${whenText(x.at)}</span>`}
+        ${x.proposed ? '<span class="small muted">предложение Claude</span>' : ''}
+      </div>
+      ${x.thumb ? `<a href="${itemHref(x)}" style="display: block; width: ${x.format === 'reel' ? 180 : 260}px; aspect-ratio: ${x.format === 'reel' ? '9 / 16' : '4 / 5'}; border-radius: 12px; background: #E5E5E5 center / cover url('${x.thumb}')" aria-label="Открыть"></a>` : ''}
+      ${reel?.version ? `<span class="small muted">${esc(reel.version)} · ${STATUS[reel.status] || ''}</span>` : ''}
+      ${x.idea?.about || x.idea?.hook ? `<div><div class="ln-lh">Идея</div><div style="padding-top: 10px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.55">${x.idea.about ? `<div><span class="muted">О чём:</span> ${esc(x.idea.about)}</div>` : ''}${x.idea.hook ? `<div><span class="muted">Крючок:</span> ${esc(x.idea.hook)}</div>` : ''}${(x.idea.flow || []).length ? `<div><span class="muted">Ход:</span> ${x.idea.flow.map(esc).join(' · ')}</div>` : ''}</div></div>` : ''}
+      ${need.length ? `<div><div class="ln-lh">Что нужно · снято ${need.filter((n) => n.done).length} из ${need.length}</div>${need.map((n) => `<div class="ln-li" style="padding: 9px 2px"><span style="width: 16px; height: 16px; border-radius: 5px; flex: none; ${n.done ? 'background: var(--ink); color: #fff' : 'border: 1.5px solid #D4D4D4'}; display: grid; place-items: center; font-size: 10px">${n.done ? '✓' : ''}</span><span style="flex: 1">${esc(n.text)}</span>${n.have ? `<span class="s">${esc(n.have)}</span>` : ''}</div>`).join('')}</div>` : ''}
+      ${sibs.length ? `<div><div class="ln-lh">Из того же материала</div>${sibs.map((y) => `<a class="ln-li" href="${itemHref(y)}" data-peek="${y.id}">${svg(FMT_ICON[y.format], 15)}<span style="flex: 1">${esc(y.title)}</span>${sdot(y.stage)}</a>`).join('')}</div>` : ''}
+      ${x.proposed && canEdit() ? '<button type="button" class="ln-btn p" id="peekTake" style="align-self: flex-start">Взять в план</button>' : ''}
+    </div>`;
+  const close = () => { el.remove(); document.body.classList.remove('peeking'); view.querySelectorAll('.peeked').forEach((a) => a.classList.remove('peeked')); if (peek.folded) { foldSide(false); peek.folded = false; } };
+  $('#peekClose').onclick = close;
+  el.querySelectorAll('[data-pf]').forEach((f) => (f.onchange = async () => { await post('/api/items/set', {id: x.id, [f.dataset.pf]: f.value || null}); await loadItems(); toast('Сохранено'); peek(x.id); }));
+  $('#peekTake')?.addEventListener('click', async () => { await post('/api/items/set', {id: x.id, take: true}); await loadItems(); toast('Взято в план'); peek(x.id); });
+}
+// A plain click on a release in a list opens the side panel; ⌘-click and the panel's own button open the page.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[data-peek]');
+  if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 || e.target.closest('button')) return;
+  e.preventDefault();
+  peek(a.dataset.peek);
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#peek')) $('#peekClose').click(); });
+window.addEventListener('hashchange', () => { if (!$('#peek')) return; $('#peek').remove(); document.body.classList.remove('peeking'); if (peek.folded) { foldSide(false); peek.folded = false; } });
 
 // Starts work on an idea: a reel opens a new reel chat (its folder links back to the idea by
 // itself), a post, carousel or Telegram text gets its folder now. Returns where to go.
@@ -1014,10 +1106,10 @@ async function vReel(id, tab) {
   const data = isNew ? null : await api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null);
   const r = data?.reel;
   if (r && (!tab || tab === 'files')) tab = tab === 'files' ? 'materials' : stageAt(r);
-  const nav = r ? await lifeNav('reel', id, REEL_STEPS, tab, `#/reel/${id}/`) : '';
+  const nav = r ? await relHead('reel', id, REEL_STEPS, tab, `#/reel/${id}/`, `${r.num} · ${r.title}`) : '';
   title(r ? `${r.num} ${r.title}` : 'Новый выпуск');
-  const head = `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Выпуски</a> › рилс</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
-      ${r && nav ? '' : stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>${nav}`;
+  const head = nav || `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Выпуски</a> › рилс</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
+      ${stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>`;
   const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
   const chatName = {script: 'Чат сценария', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
   // A reel that exists: its stage in the middle, its chat as a column on the right (CleanReel, CleanText…).
@@ -1031,7 +1123,7 @@ async function vReel(id, tab) {
   });
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id, tab); } });
-  wireLifeBar(view);
+  wireRelHead(view, () => vReel(id, tab));
   if (r && tab === 'idea') drawIdea($('#reelHost'), 'reel', id);
   else if (r) drawStage(id, tab, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
@@ -1242,19 +1334,19 @@ async function vPost(id, stage) {
   const at = data.summary?.stage === 'done' ? 'publish' : data.summary?.stage;
   if (stage !== 'idea' && !stages.some(([k]) => k === stage)) stage = stages.some(([k]) => k === at) ? at : stages[0][0];
   const atI = stages.findIndex(([k]) => k === at);
-  const nav = await lifeNav('post', id, POST_STEPS(p.kind), stage, `#/post/${id}/`);
+  const kindSel = canEdit() ? `<select class="rchip" id="kindSel" aria-label="Тип поста">${[['text', 'Текст'], ['photo', 'С фото'], ['carousel', 'Карусель']].map(([k, t]) => `<option value="${k}" ${k === p.kind ? 'selected' : ''}>${t}</option>`).join('')}</select>` : '';
+  const nav = (await relHead('post', id, POST_STEPS(p.kind), stage, `#/post/${id}/`, p.title || 'Пост')).replace('<span id="dlTop"', kindSel + '<span id="dlTop"');
   title(p.title || 'Пост');
   const chatName = {idea: 'Чат поста', text: 'Чат поста', struct: 'Чат карусели', slides: 'Чат карусели', publish: 'Чат выкладки'}[stage];
   view.innerHTML = `<div class="work"><div class="rmain">
-    <div class="chead"><div style="flex: 1; min-width: 220px"><div class="small muted"><a href="#/all">Выпуски</a> › ${esc((KIND[p.kind] || 'пост').toLowerCase())}</div><h1 style="font-size: 20px; display: flex; align-items: center; gap: 10px">${esc(p.title || 'Пост')} ${kindBadge(p.kind)}</h1></div>
+    ${nav || `    <div class="chead"><div style="flex: 1; min-width: 220px"><div class="small muted"><a href="#/all">Выпуски</a> › ${esc((KIND[p.kind] || 'пост').toLowerCase())}</div><h1 style="font-size: 20px; display: flex; align-items: center; gap: 10px">${esc(p.title || 'Пост')} ${kindBadge(p.kind)}</h1></div>
       ${nav ? '' : `<nav class="stg" aria-label="Этапы">${stages.map(([k, t], i) => `<a href="#/post/${esc(id)}/${k}" class="${k === stage ? 'on' : i < atI ? 'done' : ''}">${t}</a>`).join('')}</nav>`}
-      ${canEdit() ? `<select class="f" id="kindSel" aria-label="Тип поста" style="width: auto; min-height: 36px">${[['text', 'Текст'], ['photo', 'С фото'], ['carousel', 'Карусель']].map(([k, t]) => `<option value="${k}" ${k === p.kind ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}</div>
-    ${nav}
+      ${canEdit() ? `<select class="f" id="kindSel" aria-label="Тип поста" style="width: auto; min-height: 36px">${[['text', 'Текст'], ['photo', 'С фото'], ['carousel', 'Карусель']].map(([k, t]) => `<option value="${k}" ${k === p.kind ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}</div>`}
     <div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
     <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
       <div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span><span class="chip">этот пост</span></div>
       <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
-  wireLifeBar(view);
+  wireRelHead(view, () => vPost(id, stage));
   const box = chatBox('post-' + id, {onDone: () => { sidebar(); if (stage !== 'idea') drawPost(id, stage); }});
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат поста заново? Тексты и картинки останутся.')) { await post('/api/chat/reset', {key: 'post-' + id}); vPost(id, stage); } });
@@ -1734,7 +1826,7 @@ async function vPlan(offset = 0, month = true) {
   }
   const all = ITEMS.items;
   const onDay = (d) => all.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
-  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" title="${esc(x.title)}">
+  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
       <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
       <span class="m">${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}</span>
       ${x.proposed && canEdit() ? `<span class="m" style="gap: 8px"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</a>`;
@@ -1845,7 +1937,7 @@ async function vRubric(id) {
         ${card('Ритм', `<select id="rDay" ${ed ? '' : 'disabled'} style="${plain}"><option value="">по поводу</option>${DAYNAMES.map((t, i) => `<option value="${i + 1}" ${String(r.day) === String(i + 1) ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
       </div>
       <div><div class="ln-lh">Идеи и выпуски · ${own.length}${ideas ? `<a href="#/all/proposed">ещё ${ideas} предложений Claude</a>` : ''}</div>
-        ${own.map((x) => `<a class="ln-li" href="${itemHref(x)}"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><span style="flex: 0 0 380px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span><span class="s" style="flex: 1">${whenText(x.at)}</span>${sdot(x.stage)}</a>`).join('') || '<p class="small muted" style="padding: 10px 2px">Пока ни одного выпуска.</p>'}</div>
+        ${own.map((x) => `<a class="ln-li" href="${itemHref(x)}" data-peek="${x.id}"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><span style="flex: 0 0 380px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span><span class="s" style="flex: 1">${whenText(x.at)}</span>${sdot(x.stage)}</a>`).join('') || '<p class="small muted" style="padding: 10px 2px">Пока ни одного выпуска.</p>'}</div>
       <p class="small muted" style="margin: 0">Больше в рубрике ничего нет: ни шаблонов, ни серий, ни каскада правил. Claude держит формулу и прошлые выпуски, чтобы новые были похожи.${r.rules?.length || r.series?.length || r.template ? ` Старые настройки рубрики (правила, серии, шаблон) остаются в <a href="#/knowledge/rubrics/${esc(r.id)}">прежней Стратегии</a>.` : ''}</p>
       ${ed ? '<button type="button" class="ln-btn g" id="rDel" style="align-self: flex-start; color: #B42318">Удалить рубрику</button>' : ''}
     </div></div>`;
