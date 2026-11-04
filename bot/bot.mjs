@@ -8,6 +8,7 @@ import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
 import {DATA, FIRST_PROJECT, PROJECTS, ROOT, env, loadState, saveState, settings, studio, writeSettings} from './config.mjs';
+import * as lean from './lean.mjs';
 import {createProject, dropRequest, ensureProjects, listProjects, projectAt, projectExists, projectName, removeProject, takeRequest, untouched} from './projects.mjs';
 import {APPROVED as CLAIM_APPROVED, REQUEST as CLAIM_REQUEST} from './claim.mjs';
 import {killTree, runAgent} from './agents.mjs';
@@ -1049,6 +1050,8 @@ async function onMessage(msg) {
     await tg.call('sendMessage', {chat_id: state.chatId, text: '👋', reply_markup: HOME_KEYS, disable_notification: true}).catch(() => {});
     return ed.today(state.chatId);
   }
+  // «Основа» (handbook/BOT-LEAN.md): items by stage, only where the project switched it on.
+  if (cmd === 'items' && lean.isLean()) return tg.call('sendMessage', {chat_id: state.chatId, text: lean.itemsText(lean.items(), LANG), parse_mode: 'HTML', disable_notification: true}).catch((e) => console.error('items', e.message));
   if (cmd === 'reels') return reels.list(state.chatId);
   if (cmd === 'inbox') return ed.inbox(state.chatId);
   if (cmd === 'week') return ed.week(state.chatId);
