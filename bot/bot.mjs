@@ -9,6 +9,7 @@ import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, write
 import {dirname, join, relative} from 'node:path';
 import {DATA, FIRST_PROJECT, PROJECTS, ROOT, env, loadState, saveState, settings, studio, writeSettings} from './config.mjs';
 import * as lean from './lean.mjs';
+import {itemsUi} from './itemcard.mjs';
 import {createProject, dropRequest, ensureProjects, listProjects, projectAt, projectExists, projectName, removeProject, takeRequest, untouched} from './projects.mjs';
 import {APPROVED as CLAIM_APPROVED, REQUEST as CLAIM_REQUEST} from './claim.mjs';
 import {killTree, runAgent} from './agents.mjs';
@@ -196,6 +197,9 @@ const state = loadState();
 const panelOrigin = process.env.MINIAPP_URL ? new URL(process.env.MINIAPP_URL).origin : null;
 const reels = reelsUi({tg, studio, project: () => state.project, state, save: saveState, send: (p) => enqueue(p), root: ROOT,
   panel: (folder) => (panelOrigin ? `${panelOrigin}/#/reel/${encodeURIComponent(folder)}` : null)});
+// «Основа» (bot/itemcard.mjs): the same card for an item of any format, when lean is on.
+const items = itemsUi({tg, studio, project: () => state.project, state, save: saveState, send: (p) => enqueue(p), root: ROOT,
+  panel: (item) => (panelOrigin && item.ref?.kind === 'reel' ? `${panelOrigin}/#/reel/${encodeURIComponent(item.ref.id)}` : null)});
 // Team texts: members invited from the web version (bot/members.mjs).
 const TEAM = {
   ru: {
@@ -728,7 +732,10 @@ async function runTurn(prompt, retried = false) {
   const res = await runWithStatus(prompt, T.accepted, {open: true});
   // A reel Claude has just created becomes the focus; the pinned card shows new versions.
   const born = listReels(studio()).find((r) => !reelsBefore.has(r.folder));
-  await (born ? reels.setFocus(state.chatId, born.folder) : reels.refresh()).catch(() => {});
+  if (lean.isLean()) {
+    const bornItem = born && lean.items().find((x) => x.ref?.kind === 'reel' && x.ref.id === born.folder);
+    await (bornItem ? items.setFocus(state.chatId, bornItem.id) : items.refresh()).catch(() => {});
+  } else await (born ? reels.setFocus(state.chatId, born.folder) : reels.refresh()).catch(() => {});
   delete state.pending;
   saveState(state);
   if (res.cancelled && (res.reason === 'stalled' || res.reason === 'overtime')) {
@@ -1051,8 +1058,9 @@ async function onMessage(msg) {
     return ed.today(state.chatId);
   }
   // «Основа» (handbook/BOT-LEAN.md): items by stage, only where the project switched it on.
-  if (cmd === 'items' && lean.isLean()) return tg.call('sendMessage', {chat_id: state.chatId, text: lean.itemsText(lean.items(), LANG), parse_mode: 'HTML', disable_notification: true}).catch((e) => console.error('items', e.message));
-  if (cmd === 'reels') return reels.list(state.chatId);
+  if (cmd === 'items' && lean.isLean()) return items.list(state.chatId);
+  if (cmd === 'stages' && lean.isLean()) return tg.call('sendMessage', {chat_id: state.chatId, text: lean.itemsText(lean.items(), LANG), parse_mode: 'HTML', disable_notification: true}).catch((e) => console.error('items', e.message));
+  if (cmd === 'reels') return lean.isLean() ? items.list(state.chatId) : reels.list(state.chatId);
   if (cmd === 'inbox') return ed.inbox(state.chatId);
   if (cmd === 'week') return ed.week(state.chatId);
   if (cmd === 'people') return ed.people(state.chatId);
@@ -1141,7 +1149,7 @@ async function onMessage(msg) {
     if (result) enqueue(result);
     return;
   }
-  if (prompt) batch(await reels.framePrompt(state.chatId, prompt, msg));
+  if (prompt) batch(await (lean.isLean() ? items : reels).framePrompt(state.chatId, prompt, msg));
 }
 
 // Albums and quick follow-ups arrive as separate messages; wait a moment and hand
@@ -1195,6 +1203,7 @@ async function onButton(q) {
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
   if (/^(rl|rla|rx|rn)$|^r[spvm]:/.test(q.data)) return reels.onButton(q).catch((e) => console.error('reels', e));
+  if (/^it[lx]$|^it[snbwprud]:/.test(q.data)) return items.onButton(q).catch((e) => console.error('items', e));
   if (q.data.startsWith('set:')) return onSettings(q);
   if (q.data.startsWith('tst:')) return who ? null : onTestButton(q);
   if (q.data.startsWith('p:')) return onProjectButton(q);
