@@ -135,9 +135,17 @@ export function syncItems(studio, {dry = false, now = Date.now()} = {}) {
   }
   // Claude's and the owner's pitches in ideas.md: proposals without a date until someone takes them.
   const titles = new Set(src.pitches.map((i) => i.title));
+  // «Расписать идеи»: Claude adds Date: and Rubric: lines to its pitches; they fill a proposal
+  // until someone sets its own date or rubric.
+  const pitchAt = (i) => (/^\d{4}-\d\d-\d\d(T\d\d:\d\d)?$/.test(field(i, 'Date')) ? field(i, 'Date') : null);
   for (const i of src.pitches) {
-    if (byRef('idea', i.title)) continue;
-    add({id: newId(), format: guessFormat(field(i, 'Format')), title: i.title.replace(/^\p{Extended_Pictographic}️?\s*/u, ''), stage: 'idea', rubric: null, at: null,
+    const had = byRef('idea', i.title);
+    if (had) {
+      if (had.proposed && !had.at && pitchAt(i)) { had.at = pitchAt(i); changed = true; }
+      if (had.proposed && !had.rubric && field(i, 'Rubric')) { had.rubric = field(i, 'Rubric'); changed = true; }
+      continue;
+    }
+    add({id: newId(), format: guessFormat(field(i, 'Format')), title: i.title.replace(/^\p{Extended_Pictographic}️?\s*/u, ''), stage: 'idea', rubric: field(i, 'Rubric') || null, at: pitchAt(i),
       ref: {kind: 'idea', id: i.title}, proposed: true, by: i.section === "Owner's ideas" ? 'owner' : 'Claude',
       idea: {about: field(i, 'Plot'), hook: field(i, 'Hook').replace(/^[«"]|[»"]$/g, ''), flow: []}, created: now});
   }
