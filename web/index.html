@@ -444,9 +444,13 @@
   .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #D4E2FB; border-top-color: #2F6FEB; flex: none; display: inline-block; margin-top: 1px; animation: jspin 0.9s linear infinite; }
   @keyframes jspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+  .spin.q { animation: none; border-color: #E5E5E5; border-top-color: #A3A3A3; border-style: dashed; }
+  .jrow.queue .jtx b { color: var(--ink2); } #jobsPop .jrow.interrupted { background: #FFF8EB; border-color: #F3DDB3; }
+  .jrow.interrupted .jtx > span:not(.jbar) { color: #8A5A00; }
   .jic { width: 15px; height: 15px; flex: none; display: grid; place-items: center; margin-top: 1px; } .jic.ok { color: #2E8A4F; } .jic.warn { color: #B7791F; }
   .jic.err { border-radius: 50%; background: #B42318; color: #fff; font-size: 10px; font-weight: 700; }
   .jrow.done.fresh, .jbox:has(.jrow.done) { border-color: #CFE6D7; }
+  .jfold > span { white-space: nowrap; }
   .jfold { width: 100%; border: 1px solid var(--line); background: #fff; font: inherit; cursor: pointer; margin-bottom: 6px; }
   .jfold.wait { background: #FFF8EB; border-color: #F3DDB3; color: var(--ink); }
   .jring { display: none; width: 30px; height: 30px; border-radius: 50%; border: 0; margin: 4px auto 8px; font: inherit; font-size: 11px; font-weight: 700; color: var(--ink); cursor: pointer;
@@ -637,7 +641,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (text) { $('.stext', st).textContent = text; $('.shint', st).textContent = /рендер/i.test(text) ? 'Это нормально: монтаж идёт на сервере. Страницу можно закрыть — версия появится сама.' : ''; }
     el.querySelectorAll('.btns button, .keys button, .go').forEach((b) => (b.disabled = on));
   };
-  $('button', st).onclick = () => post('/api/stop');
+  $('button', st).onclick = () => post('/api/stop', {key});
   const buttons = (list, under) => {
     const box = document.createElement('div'); box.className = 'btns';
     for (const label of list) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = () => say(`(pressed button "${label}" under: "${short(under)}")`, label); box.append(b); }
@@ -705,7 +709,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
     setBusy(true, 'Думаю…');
     try {
       const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown, task})});
-      if (r.status === 429) throw new Error('Claude сейчас занят в другом чате — дождись, пока он закончит');
+      if (r.status === 409) throw new Error('Claude ещё работает над этим выпуском — дождись ответа или останови задачу в «Claude делает» слева');
       if (!r.ok) throw new Error('Ошибка ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '';
@@ -3053,24 +3057,26 @@ document.body.classList.toggle('chat-mini', UI.get('chat') === 'mini');
 let JOBS = {active: [], recent: []}, jobsTimer = null;
 const JOB_SRC = {web: ['web', 'запущено: веб'], bot: ['tg', 'запущено: бот'], phone: ['phone', 'запущено: телефон'], plan: ['cal', 'запущено: План']};
 const jobHref = (t) => t.ref?.kind === 'reel' ? '#/reel/' + t.ref.id : t.ref?.kind === 'post' ? '#/post/' + t.ref.id : t.kind === 'plan' ? '#/plan/draft' : t.key === '_ds' ? '#/memory/ds' : t.key && t.key !== '_project' && !t.key.startsWith('new-') ? '#/reel/' + t.key : '#/chat/_project';
-const jobIcon = (t) => t.state === 'run' ? '<i class="spin"></i>' : t.state === 'ask' ? `<span class="jic warn">${svg('flag', 14)}</span>` : t.state === 'error' ? '<span class="jic err">!</span>' : `<span class="jic ok">${svg('check', 14)}</span>`;
-const jobLine = (t) => t.state === 'run' ? `${esc(t.now)}${t.left && !/осталось/.test(t.now) ? ' · ' + esc(t.left) : ''}` : t.state === 'ask' ? `нужен ответ: ${esc(t.note || '')}` : t.state === 'error' ? `не вышло: ${esc(t.note || 'ошибка')}` : `готово${t.note ? ' — ' + esc(t.note) : ''}`;
+const jobIcon = (t) => t.state === 'run' ? '<i class="spin"></i>' : t.state === 'queue' ? '<i class="spin q"></i>' : t.state === 'ask' || t.state === 'interrupted' ? `<span class="jic warn">${svg('flag', 14)}</span>` : t.state === 'error' ? '<span class="jic err">!</span>' : `<span class="jic ok">${svg('check', 14)}</span>`;
+const jobLine = (t) => t.state === 'run' ? `${esc(t.now)}${t.left && !/осталось/.test(t.now) ? ' · ' + esc(t.left) : ''}` : t.state === 'queue' ? esc(t.now) : t.state === 'interrupted' ? `прервано: ${esc(t.note || '')}` : t.state === 'ask' ? `нужен ответ: ${esc(t.note || '')}` : t.state === 'error' ? `не вышло: ${esc(t.note || 'ошибка')}` : `готово${t.note ? ' — ' + esc(t.note) : ''}`;
 const jobAgo = (ms) => { const m = Math.round((Date.now() - ms) / 60e3); return m < 1 ? 'только что' : m < 60 ? `${m} мин назад` : m < 1440 ? `${Math.round(m / 60)} ч назад` : new Date(ms).toLocaleDateString('ru', {day: 'numeric', month: 'short'}); };
 function jobRow(t, full) {
   const [ic, tip] = JOB_SRC[t.source] || JOB_SRC.web;
   return `<div class="jrow ${t.state}"><a href="${jobHref(t)}" class="jmain">${jobIcon(t)}<span class="jtx"><b>${esc(t.title)}</b><span class="${full ? 'jfull' : ''}">${jobLine(t)}</span>${t.state === 'run' ? `<span class="jbar"><i style="width: ${t.pct || 0}%"></i></span>` : ''}</span><span class="muted jsrc" title="${tip}${t.who ? ' · ' + esc(t.who) : ''}">${svg(ic, 13)}</span></a>
-    ${full && t.state === 'run' ? (t.canStop && canEdit() ? `<button type="button" class="ln-btn s jstop" data-jstop="${esc(t.id)}">Остановить</button>` : t.source === 'bot' ? '<span class="small muted jstop" style="white-space: nowrap">остановить в боте</span>' : '') : ''}</div>`;
+    ${!full || !canEdit() ? '' : t.state === 'run' ? (t.canStop ? `<button type="button" class="ln-btn s jstop" data-jstop="${esc(t.id)}">Остановить</button>` : t.source === 'bot' ? '<span class="small muted jstop" style="white-space: nowrap">остановить в боте</span>' : '')
+      : t.state === 'queue' ? `<button type="button" class="ln-btn s jstop" data-jstop="${esc(t.id)}" data-q="1">Убрать</button>`
+      : t.state === 'interrupted' ? `<span class="jstop" style="display: flex; gap: 4px"><button type="button" class="ln-btn s p" data-jre="${esc(t.id)}">Перезапустить</button><button type="button" class="ln-btn s g" data-jstop="${esc(t.id)}" data-q="1" aria-label="Закрыть">✕</button></span>` : ''}</div>`;
 }
 function drawJobs() {
   const box = $('#jobsBox');
   if (!box) return;
-  const act = JOBS.active, run = act.filter((t) => t.state === 'run'), wait = act.filter((t) => t.state === 'ask').length;
+  const act = JOBS.active, run = act.filter((t) => t.state === 'run'), wait = act.filter((t) => t.state === 'ask' || t.state === 'interrupted').length, queued = act.filter((t) => t.state === 'queue').length;
   if (!act.length) { box.innerHTML = ''; box.dataset.html = ''; return; }
   const pct = run.length ? Math.round(run.reduce((n, t) => n + (t.pct || 0), 0) / run.length) : 100;
   const ring = `<button type="button" class="jring" data-jopen title="Claude делает · ${act.length}" aria-label="Задачи Claude: ${act.length}" style="--p: ${pct}">${act.length}</button>`;
   const html = act.length < 3 && !wait
     ? `<div class="jbox"><button type="button" class="jhead" data-jopen>Claude делает<span class="n">${act.length}</span></button>${act.map((t) => jobRow(t, false)).join('')}</div>${ring}`
-    : `<button type="button" class="nav jfold ${wait ? 'wait' : ''}" data-jopen>${run.length ? '<i class="spin"></i>' : jobIcon(act[0])}<span>Claude делает · ${act.length}</span>${wait ? `<span class="bdg" style="background: #B7791F">${wait} ждёт</span>` : `<span class="n">${pct}%</span>`}</button>${ring}`;
+    : `<button type="button" class="nav jfold ${wait ? 'wait' : ''}" data-jopen>${run.length ? '<i class="spin"></i>' : jobIcon(act[0])}<span>Claude делает · ${act.length}</span>${wait ? `<span class="bdg" style="background: #B7791F">${wait} ждёт</span>` : `<span class="n">${queued ? `${queued} в очереди` : pct + '%'}</span>`}</button>${ring}`;
   // Redrawn every few seconds: only when something changed, and opened on press, so a click
   // that lands during a redraw is not lost.
   if (box.dataset.html !== html) { box.dataset.html = html; box.innerHTML = html; }
@@ -3087,10 +3093,11 @@ function openJobs() {
     el.innerHTML = `<div style="display: flex; align-items: baseline; gap: 8px"><b style="font-size: 15px">Задачи Claude</b><span class="small muted">из веба, бота и телефона</span><button type="button" class="ln-btn s g" id="jClose" style="margin-left: auto" aria-label="Закрыть">✕</button></div>
       ${JOBS.active.map((t) => jobRow(t, true)).join('') || '<p class="small muted" style="margin: 4px 0">Сейчас Claude ничего не делает.</p>'}
       ${JOBS.recent.length ? `<div class="lbl" style="padding-top: 8px">Недавние</div>${JOBS.recent.map((t) => `<a class="jold" href="${jobHref(t)}">${jobIcon(t)}<span class="jtx"><b>${esc(t.title)}</b><span>${t.state === 'error' ? 'не вышло: ' + esc(t.note || 'ошибка') : t.state === 'ask' ? 'спрашивал: ' + esc(t.note || '') : esc(t.note || 'готово')} · ${jobAgo(t.finishedAt)}</span></span></a>`).join('')}` : ''}
-      <span class="small muted">Задача — долгая работа Claude: сборка, рендер, план, разбор материала, память. Короткие ответы видны в самом чате.</span>`;
+      <span class="small muted">Задача — долгая работа Claude: сборка, рендер, план, разбор материала, память. Короткие ответы видны в самом чате.${JOBS.limits ? ` Одновременно до ${JOBS.limits.claude} задач Claude и ${JOBS.limits.render} рендеров, остальные ждут в очереди; над одним выпуском — одна задача.` : ''}</span>`;
     el.querySelector('#jClose').onclick = () => el.remove();
     el.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => el.remove()));
-    el.querySelectorAll('[data-jstop]').forEach((b) => (b.onclick = async () => { if (!confirm('Остановить эту задачу?')) return; b.disabled = true; await post('/api/jobs/stop', {id: b.dataset.jstop}).catch(() => toast('Не получилось остановить')); pollJobs(); }));
+    el.querySelectorAll('[data-jstop]').forEach((b) => (b.onclick = async () => { if (!b.dataset.q && !confirm('Остановить эту задачу?')) return; b.disabled = true; await post('/api/jobs/stop', {id: b.dataset.jstop}).catch(() => toast('Не получилось')); pollJobs(); }));
+    el.querySelectorAll('[data-jre]').forEach((b) => (b.onclick = async () => { b.disabled = true; await post('/api/jobs/restart', {id: b.dataset.jre}).then(() => toast('Перезапущено')).catch((e) => toast(e.status === 409 ? 'Над этим выпуском уже идёт задача' : 'Не получилось перезапустить')); pollJobs(); }));
   };
   el.paint = paint;
   paint();

@@ -16,11 +16,12 @@
 // Background jobs survive the agent's per-command time limits; the bot stops them on
 // «Stop» and on restart (jobs live in data/renders/<job>.json).
 import {spawn} from 'node:child_process';
-import {existsSync, mkdirSync, openSync, readFileSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, openSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync} from 'node:fs';
 import {randomBytes} from 'node:crypto';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {killTree} from '../bot/agents.mjs';
+import {LIMITS} from '../web/limits.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.REELS_DATA || join(ROOT, 'data');
@@ -42,7 +43,7 @@ if (argv[0] === '--wait' || argv[0] === '--stop') {
   }
   if (argv[0] === '--stop') {
     const job = readJob(id);
-    if (job.status === 'running') {
+    if (job.status === 'running' || job.status === 'queued') {
       killTree(job.pid);
       writeJob({...job, status: 'failed', code: 'stopped', tail: 'stopped by the agent'});
     }
@@ -102,6 +103,32 @@ if (background) {
   child.unref();
   console.log(`started render job ${id}; wait with: node scripts/render.mjs --wait ${id}`);
   process.exit(0);
+}
+
+// A render is heavy: at most LIMITS.render run at once for the web and the bot together
+// (web/limits.mjs). Each render holds a file named by its pid in data/render-slots; the oldest
+// LIMITS.render go, the others wait their turn as «ждёт очереди на рендер».
+const SLOTS = join(ROOT, 'data', 'render-slots');
+mkdirSync(SLOTS, {recursive: true});
+const mySlot = join(SLOTS, String(process.pid));
+writeFileSync(mySlot, label);
+process.on('exit', () => { try { unlinkSync(mySlot); } catch {} });
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => process.exit(1));
+const alivePid = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+for (let waiting = false; ;) {
+  const slots = readdirSync(SLOTS).filter((f) => /^\d+$/.test(f)).map((f) => ({pid: Number(f), at: statSync(join(SLOTS, f)).mtimeMs}));
+  for (const x of slots) if (!alivePid(x.pid)) try { unlinkSync(join(SLOTS, String(x.pid))); } catch {}
+  const line = slots.filter((x) => alivePid(x.pid)).sort((a, b) => a.at - b.at || a.pid - b.pid);
+  if (line.findIndex((x) => x.pid === process.pid) < LIMITS.render) {
+    if (waiting && jobArg) writeJob({...readJob(jobArg), status: 'running'});
+    break;
+  }
+  if (!waiting) {
+    waiting = true;
+    writeFileSync(join(DATA, 'status.txt'), `${label} · ждёт очереди на рендер`);
+    if (jobArg) writeJob({...readJob(jobArg), status: 'queued'});
+  }
+  await new Promise((r) => setTimeout(r, 3000));
 }
 
 // Same as `npx remotion render`, without depending on npx or a shell.

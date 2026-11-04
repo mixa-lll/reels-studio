@@ -14,6 +14,7 @@ import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
 import {changeItem, createItems, followPlan, needOf, syncItems} from './items.mjs';
 import {KINDS, makeJobs} from './jobs.mjs';
+import {LIMITS} from './limits.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -31,8 +32,6 @@ try { process.loadEnvFile(join(BOT, '.env')); } catch {}
 const PROJECTS = join(BOT, 'projects');
 const DATA = join(HERE, 'data');
 const CHATS = join(DATA, 'chats');
-const EVENTS = join(DATA, 'events.jsonl');
-const STATUS = join(DATA, 'status.txt');
 const SEND = join(HERE, 'send.mjs');
 const PORT = Number(process.env.PORT || 8080);
 const KEY = process.env.WEB_KEY;
@@ -284,8 +283,40 @@ function preamble(p, k) {
   return lines.join('\n');
 }
 
-let job = null;
+// Задачи параллельно (кусок 16): each turn is its own `claude -p` with its own data folder
+// (status line, events, renders) in web/data/turns/<id>. At most LIMITS.claude turns run at once —
+// the bot's turn counts too — the rest wait «в очереди · N»; one release has one turn at a time.
+const TURNS = new Map();
+const QUEUE = [];
 const jobs = makeJobs({BOT, DATA});
+const turnDir = (id) => join(DATA, 'turns', id);
+const botBusy = () => !!readJson(join(BOT, 'data', 'state.json'), {}).pending;
+const turnOf = (p, k) => [...TURNS.values()].find((j) => j.p === p && j.key === k) || null;
+const busyKey = (p, k) => turnOf(p, k) || QUEUE.find((q) => q.p === p && q.key === k) || null;
+const room = () => TURNS.size + (botBusy() ? 1 : 0) < LIMITS.claude;
+function runTurn(p, k, text, send, meta) {
+  const item = {id: 't' + Date.now().toString(36) + randomBytes(2).toString('hex'), p, key: k, text, send, meta};
+  if (room()) launch(item);
+  else { QUEUE.push(item); jobs.queued(item); send({status: `в очереди · ${QUEUE.length}`}); }
+  return item;
+}
+function launch(item) {
+  const t = startTurn(item.p, item.key, item.text, item.send, item.id);
+  TURNS.set(item.id, t);
+  jobs.begin(t, item);
+}
+function pump() { while (QUEUE.length && room()) launch(QUEUE.shift()); }
+setInterval(() => QUEUE.length && pump(), 5000).unref();
+// Turn folders older than three days, with no render still running in them, go away.
+for (const id of existsSync(join(DATA, 'turns')) ? readdirSync(join(DATA, 'turns')) : []) {
+  try { if (Date.now() - statSync(turnDir(id)).mtimeMs > 3 * 864e5 && !jobs.rendersIn(turnDir(id)).length) rmSync(turnDir(id), {recursive: true, force: true}); } catch {}
+}
+// Stops a turn: its process group and the background renders it started.
+function stopTurn(t) {
+  t.stopped = true;
+  try { process.kill(-t.child.pid, 'SIGTERM'); } catch {}
+  for (const r of jobs.rendersIn(turnDir(t.id))) spawn(process.execPath, [join(BOT, 'scripts', 'render.mjs'), '--stop', r.id], {cwd: BOT, env: {...process.env, REELS_DATA: turnDir(t.id)}, stdio: 'ignore', detached: true}).unref();
+}
 // What kind of task a turn is (кусок 16): the page names plan, material, memory and facts turns;
 // a release's chat is its build; the project chat's short answers are not tasks.
 function taskOf(p, k, task, source) {
@@ -302,7 +333,9 @@ function taskOf(p, k, task, source) {
 }
 const reelTitle = (p) => (id) => { const r = reels(p).find((y) => y.id === id); return r ? `${r.num} ${r.title}` : null; };
 
-function startTurn(p, k, text, send) {
+function startTurn(p, k, text, send, id) {
+  const TD = turnDir(id), STATUS = join(TD, 'status.txt'), EVENTS = join(TD, 'events.jsonl');
+  mkdirSync(TD, {recursive: true});
   const meta = chatMeta(p, k);
   const studio = join(PROJECTS, p);
   const reelsBefore = new Set(existsSync(join(studio, 'reels')) ? readdirSync(join(studio, 'reels')) : []);
@@ -319,7 +352,7 @@ function startTurn(p, k, text, send) {
   let key = k;
   const child = spawn(process.env.AGENT_BIN || 'claude', args, {
     cwd: BOT,
-    env: {...process.env, REELS_BOT: '1', REELS_DATA: DATA, REELS_PROJECTS: PROJECTS, REELS_STUDIO: studio},
+    env: {...process.env, REELS_BOT: '1', REELS_DATA: TD, REELS_PROJECTS: PROJECTS, REELS_STUDIO: studio},
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
@@ -371,24 +404,26 @@ function startTurn(p, k, text, send) {
     if (result?.is_error || (code && !result)) {
       const msg = {from: 'bot', kind: 'error', text: reply || err.trim().split('\n').pop() || `агент завершился с кодом ${code}`};
       record(p, key, msg); send({msg});
-      if (job) jobs.end(job, {ok: false, error: msg.text});
+      jobs.end(self, {ok: false, error: msg.text});
     } else if (reply && reply !== 'NO_REPLY') {
       // «⌨️ A | B | C» on the last line is the keyboard, as in the bot.
       let keys = [];
       reply = reply.replace(/\n?\s*⌨️\s*(.+)\s*$/u, (_, k2) => { keys = k2.split('|').map((x) => x.trim()).filter(Boolean); return ''; }).trim();
       const msg = {from: 'bot', kind: 'text', text: reply.replace(/\s*NO_REPLY\s*$/, ''), keys, buttons: []};
       record(p, key, msg); send({msg});
-      if (job) jobs.end(job, {ok: true, reply: msg.text, keys});
-    } else if (job) jobs.end(job, {ok: true});
+      jobs.end(self, {ok: true, reply: msg.text, keys});
+    } else jobs.end(self, {ok: true});
     setChatMeta(p, key, {status: '', updated: Date.now()});
     if (!key.startsWith('_') && !key.startsWith('new-') && !key.startsWith('post-')) {
       const freed = retain(p, key);
       if (freed) send({freed});
     }
+    TURNS.delete(id);
     send({done: true, ms: result?.duration_ms});
-    job = null;
+    pump();
   });
-  return {child, p, get key() { return key; }};
+  const self = {id, child, p, get key() { return key; }};
+  return self;
 }
 
 // ---------- media ----------
@@ -525,14 +560,13 @@ function loginPage(res, error = '', who = '') {
 const APP_PAGE = join(HERE, 'app.html');
 // The mini app's editor hands its comments to the reel's chat, as «Собрать vN» on the page does.
 const buildFromApp = (p, r, text, shown, who) => {
-  if (job) return false;
+  if (busyKey(p, r)) return false;
   record(p, r, {from: 'me', kind: 'text', text: shown, by: who});
   log(who, `собрал из мини-приложения: ${shown}`);
-  job = startTurn(p, r, `(from ${who}, mini app)\n${text}`, () => {});
-  jobs.begin(job, taskOf(p, r, null, 'phone'));
+  runTurn(p, r, `(from ${who}, mini app)\n${text}`, () => {}, taskOf(p, r, null, 'phone'));
   return true;
 };
-const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, saveAccess, logFile: () => LOG, sandboxPaths: {projects: PROJECTS, access: ACCESS, starter: join(BOT, 'starter'), chats: CHATS, outbox: OUTBOX, log: LOG, botState: join(BOT, 'data', 'state.json')}, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: () => job && {p: job.p, key: job.key}});
+const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, saveAccess, logFile: () => LOG, sandboxPaths: {projects: PROJECTS, access: ACCESS, starter: join(BOT, 'starter'), chats: CHATS, outbox: OUTBOX, log: LOG, botState: join(BOT, 'data', 'state.json')}, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: (p, k) => busyKey(p, k)});
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -733,7 +767,7 @@ createServer(async (req, res) => {
     // «Входящие»: what people sent through the bot or the member page in the last week.
     const sentLines = read(join(studio, 'inbox', 'authors.jsonl')).split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return {}; } });
     const inboxNew = new Set(sentLines.filter((e) => e.who && e.at > Date.now() - 7 * 864e5 && e.status !== 'private').map((e) => e.id)).size;
-    return json(200, {inbox: inboxNew, reels: list, posts, rubrics, ideasCount: ideas.length, chats, busy: job ? {project: job.p, key: job.key} : null,
+    return json(200, {inbox: inboxNew, reels: list, posts, rubrics, ideasCount: ideas.length, chats, busy: (() => { const t = [...TURNS.values()].find((x) => x.p === p); return t ? {project: t.p, key: t.key} : null; })(),
       disk: disk()});
   }
   if (req.method === 'GET' && url.pathname === '/api/ideas') {
@@ -1090,30 +1124,34 @@ createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/chat') {
     const k = url.searchParams.get('key');
     if (!chatKey(k)) return json(400, {});
-    const busy = job && job.p === p && job.key === k;
-    return json(200, {messages: history(p, k), busy: !!busy, status: busy ? chatMeta(p, k).status || '' : '', otherBusy: !!job && !busy});
+    const t = turnOf(p, k), q = !t && busyKey(p, k);
+    return json(200, {messages: history(p, k), busy: !!(t || q), status: t ? chatMeta(p, k).status || '' : q ? `в очереди · ${QUEUE.indexOf(q) + 1}` : '', otherBusy: false});
   }
   if (req.method === 'POST' && url.pathname === '/api/chat') {
     if (!can('editor')) return json(403, {});
     const {key: k, text, shown, task} = await body(req);
     if (!chatKey(k) || !text?.trim()) return json(400, {});
-    if (job) return json(429, {key: job.key});
+    // One release, one turn: a second one waits for the first or stops it from «Claude делает».
+    const same = busyKey(p, k);
+    if (same) return json(409, {id: same.id});
     record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name});
     log(me.name, `написал в чат «${k}»: ${(shown || text).slice(0, 80)}`);
     res.writeHead(200, {'content-type': 'text/event-stream', 'cache-control': 'no-store'});
-    const send = (ev) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(ev)}\n\n`); };
+    const send = (ev) => { if (res.writableEnded) return; res.write(`data: ${JSON.stringify(ev)}\n\n`); if (ev.done) setTimeout(() => res.end(), 50); };
     // The turn goes on if the page is closed; the history keeps what it sent.
-    job = startTurn(p, k, `(from ${me.name})\n${text}`, send);
-    jobs.begin(job, taskOf(p, k, task, 'web'));
-    job.child.on('close', () => setTimeout(() => res.end(), 50));
+    runTurn(p, k, `(from ${me.name})\n${text}`, send, taskOf(p, k, task, 'web'));
     return;
   }
   // Задачи Claude (кусок 16): what runs now for this project, from the web, the bot and the phone.
-  if (req.method === 'GET' && url.pathname === '/api/jobs') return json(200, jobs.list(p, {job, status: job ? read(STATUS).trim() : '', titleOf: reelTitle(p)}));
+  if (req.method === 'GET' && url.pathname === '/api/jobs') return json(200, {...jobs.list(p, {turns: [...TURNS.values()], queue: QUEUE, turnDir, titleOf: reelTitle(p)}), limits: LIMITS});
   if (req.method === 'POST' && url.pathname === '/api/jobs/stop') {
     if (!can('editor')) return json(403, {});
     const {id} = await body(req);
-    if (job?.task && job.task.id === id) { job.stopped = true; try { process.kill(-job.child.pid, 'SIGTERM'); } catch {} log(me.name, `остановил задачу «${job.task.title}»`); return json(200, {}); }
+    const t = TURNS.get(id);
+    if (t?.p === p) { stopTurn(t); log(me.name, `остановил задачу «${t.task?.title || t.key}»`); return json(200, {}); }
+    const qi = QUEUE.findIndex((q) => q.id === id && q.p === p);
+    if (qi >= 0) { const [q] = QUEUE.splice(qi, 1); jobs.dropped(q, 'убрано из очереди'); q.send({done: true}); log(me.name, 'убрал задачу из очереди'); return json(200, {}); }
+    if (jobs.dismiss(id, p)) return json(200, {});
     const rj = String(id || '').startsWith('r-') && jobs.renderJob(String(id).slice(2));
     if (!rj) return json(404, {});
     // scripts/render.mjs --stop kills the render's process tree and marks its job file stopped.
@@ -1121,16 +1159,28 @@ createServer(async (req, res) => {
     log(me.name, `остановил рендер ${rj.id}`);
     return json(200, {});
   }
+  // «Прервано, перезапустить?»: a turn the server's restart cut off runs again with the same request.
+  if (req.method === 'POST' && url.pathname === '/api/jobs/restart') {
+    if (!can('editor')) return json(403, {});
+    const {id} = await body(req);
+    const rec = jobs.revive(id, p);
+    if (!rec) return json(404, {});
+    if (busyKey(p, rec.key)) return json(409, {});
+    runTurn(p, rec.key, rec.text, () => {}, {...rec, id: undefined});
+    log(me.name, `перезапустил задачу «${rec.title}»`);
+    return json(200, {});
+  }
   if (req.method === 'POST' && url.pathname === '/api/stop') {
     if (!can('editor')) return json(403, {});
-    if (job) { job.stopped = true; try { process.kill(-job.child.pid, 'SIGTERM'); } catch {} }
+    const {key: sk} = await body(req);
+    for (const t of [...TURNS.values()].filter((x) => x.p === p && (!sk || x.key === sk))) stopTurn(t);
     log(me.name, 'остановил задачу');
     return json(200, {});
   }
   if (req.method === 'POST' && url.pathname === '/api/chat/reset') {
     if (!can('editor')) return json(403, {});
     const {key: k} = await body(req);
-    if (!chatKey(k) || (job && job.key === k)) return json(400, {});
+    if (!chatKey(k) || busyKey(p, k)) return json(400, {});
     for (const ext of ['jsonl', 'json']) rmSync(chatFile(p, k, ext), {force: true});
     return json(200, {});
   }
@@ -1255,7 +1305,7 @@ createServer(async (req, res) => {
     const {reel} = await body(req);
     const list = reel ? [reel] : reels(p).map((r) => r.id);
     let freed = 0;
-    for (const r of list) if (!(job && job.key === r)) freed += retain(p, r);
+    for (const r of list) if (!busyKey(p, r)) freed += retain(p, r);
     log(me.name, `освободил место${reel ? ` в «${reel}»` : ''}: ${Math.round(freed / 1e6)} МБ`);
     return json(200, {freed});
   }
