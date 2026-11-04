@@ -259,6 +259,7 @@ function preamble(p, k) {
     `Strategy and plan follow STRATEGY.md: \`${relative(BOT, studio)}/strategy.json\` (platforms, rubrics, weekly rhythm, events) and \`${relative(BOT, studio)}/plan.json\` (dates and rubrics of reels and posts); the page draws Strategy and the Calendar from them.`,
     `Units of content live in \`${relative(BOT, studio)}/items.json\` (handbook/LEAN.md): one item per format with stage, rubric, at and idea {about, hook, flow}. When the owner asks about an item by its id, edit only that item's idea, format, rubric or at there. Never add or remove items yourself: new ideas go to ideas.md («My ideas», Format:/Hook:/Plot: plus «Date: YYYY-MM-DDTHH:MM» and «Rubric: <rubric id>»), and the page turns them into proposals.`,
     `Facts and prices live in \`${relative(BOT, studio)}/facts.json\`: {"facts":[{"id":"f-…","text":"what","value":"how much or when","source":"сайт|прайс|сказал <name>|…","kind":"price|date|people|other","at":"YYYY-MM-DD"}]}. When the owner tells you a new price or date, update or add the fact there with today's date and the source; check every caption and slide against these facts and say when one is older than 30 days.`);
+  lines.push(`Memory also has \`${relative(BOT, studio)}/memory.json\`: {"answers":[{"q","question","text"}] — the owner's spoken answers to the guiding questions, "questions":[{"id":"q-<random>","text","source","at":"YYYY-MM-DD"}] — what clients ask (add the ones you find in chats, screenshots and comments; they are material for ideas), "sources":[…]}. brief.md is one page in «## » sections: Кто мы, Для кого, Что продаём, Чем отличаемся, Сезон, Площадки, Что работает, Цели на сезон, Чего не обещаем, Чьи аккаунты нравятся — keep these headings when you write it. A design taken from the site goes to design-system/tokens.json: {"site","colors":[{"name","hex","role","use":true}],"fonts":[{"family","weight","role"}],"radii":[px],"logo","photo"}.`);
   // A new project (the starter brief, or a test account not set up yet) is a first visit: the
   // whole onboarding, as the bot runs it, not just an answer to the first message.
   // The web's first launch (handbook/LEAN.md, кусок 11): an organisation, not a questionnaire.
@@ -790,6 +791,37 @@ createServer(async (req, res) => {
     writeJson(f, d);
     log(me.name, `факт «${x.text}»: ${x.value || ''}`);
     return json(200, {fact: x});
+  }
+  // Память (handbook/LEAN.md, кусок 14): memory.json keeps the owner's spoken answers to the guiding
+  // questions, the clients' questions and where memory came from; /api/memory is the overview.
+  if (req.method === 'GET' && url.pathname === '/api/memory') {
+    const m = readJson(join(studio, 'memory.json'), {});
+    const st = readJson(join(studio, 'strategy.json'), {});
+    const facts = readJson(join(studio, 'facts.json'), {facts: []}).facts || [];
+    const old = facts.filter((x) => !x.at || Date.now() - new Date(x.at) > 30 * 864e5).length;
+    const rules = (read(join(studio, 'PLAYBOOK.md')).match(/^\s*[-*] /gm) || []).length + (st.rubrics || []).reduce((n, r) => n + (r.rules || []).length, 0);
+    return json(200, {answers: m.answers || [], questions: m.questions || [], sources: m.sources || [], brief: read(join(studio, 'brief.md')),
+      facts: {n: facts.length, old, prices: facts.filter((x) => x.kind === 'price').slice(0, 4)}, voice: !!(st.voice?.about || (st.voice?.styles || []).length), rules,
+      tokens: readJson(join(studio, 'design-system', 'tokens.json'), null), ds: existsSync(join(studio, 'design-system', 'index.html')),
+      links: readJson(join(studio, 'settings.json'), {}).links || []});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/memory/set') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const f = join(studio, 'memory.json');
+    const m = readJson(f, {});
+    const at = new Date().toISOString();
+    const clip = (t, n) => String(t || '').trim().slice(0, n);
+    if (b.answer && clip(b.answer.text, 4000)) {
+      m.answers = (m.answers || []).filter((x) => x.q !== b.answer.q);
+      m.answers.push({q: clip(b.answer.q, 40), question: clip(b.answer.question, 200), text: clip(b.answer.text, 4000), at, by: me.name});
+    }
+    if (b.question && clip(b.question.text, 300)) (m.questions ||= []).push({id: 'q-' + randomBytes(4).toString('hex'), text: clip(b.question.text, 300), source: clip(b.question.source, 80) || 'сказал ' + me.name, at: at.slice(0, 10)});
+    if (b.removeQuestion) m.questions = (m.questions || []).filter((x) => x.id !== b.removeQuestion);
+    if (b.source && clip(b.source.name, 200)) (m.sources ||= []).unshift({kind: clip(b.source.kind, 20), name: clip(b.source.name, 200), at});
+    m.sources = (m.sources || []).slice(0, 40);
+    writeJson(f, m);
+    return json(200, m);
   }
   // A rubric's template (TEMPLATES.md): which of template/src/templates its reels are built by.
   if (req.method === 'POST' && url.pathname === '/api/strategy/template') {
