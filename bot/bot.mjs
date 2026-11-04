@@ -222,7 +222,14 @@ const OWNER_WROTE_FILE = join(DATA, 'owner-wrote.txt');
 const queue = [];
 let current = null; // {handle, statusId, startedAt, activity, lastText, sentMark, reason}
 
-if (await applyProfile(tg, env.token, state, LANG).catch((e) => console.error('profile', e.message))) saveState(state);
+// Chats that get the mini app button directly: the owner, team members, partners from .env.
+const teamChats = () => {
+  let people = [];
+  try { people = JSON.parse(readFileSync(memberFile, 'utf8')).people || []; } catch {}
+  const partners = `${process.env.BOT_EDITORS || ''},${process.env.MINIAPP_OWNERS || ''}`.split(',').map((x) => Number(x.trim())).filter(Boolean);
+  return [...new Set([state.chatId, ...people.map((p) => p.telegram?.chatId), ...partners].filter(Boolean))];
+};
+if (await applyProfile(tg, env.token, state, LANG, teamChats()).catch((e) => console.error('profile', e.message))) saveState(state);
 
 // ---------- progress line ----------
 

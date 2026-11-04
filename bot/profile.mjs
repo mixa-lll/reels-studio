@@ -35,7 +35,7 @@ const TEXT = {
 };
 
 /** Sets avatar, descriptions and commands once per PROFILE_VERSION. */
-export async function applyProfile(tg, token, state, lang) {
+export async function applyProfile(tg, token, state, lang, chats = []) {
   const t = TEXT[lang];
   // /app only when the mini app has an HTTPS address (MINIAPP_URL).
   await tg.call('setMyCommands', {
@@ -43,7 +43,11 @@ export async function applyProfile(tg, token, state, lang) {
   });
   // The «Съёмка» button left of the message field opens the mini app.
   if (process.env.MINIAPP_URL) {
-    await tg.call('setChatMenuButton', {menu_button: {type: 'web_app', text: lang === 'ru' ? 'Съёмка' : 'Filming', web_app: {url: process.env.MINIAPP_URL}}}).catch((e) => console.error('menu button', e.message));
+    const menuButton = {type: 'web_app', text: lang === 'ru' ? 'Съёмка' : 'Filming', web_app: {url: process.env.MINIAPP_URL}};
+    await tg.call('setChatMenuButton', {menu_button: menuButton}).catch((e) => console.error('menu button', e.message));
+    // Per chat too: a stale default (an old tunnel address) can outlive a new one, and a
+    // per-chat button wins over it. Owner and team chats the bot knows.
+    for (const chatId of chats) await tg.call('setChatMenuButton', {chat_id: chatId, menu_button: menuButton}).catch(() => {});
   }
   if (state.profileVersion === PROFILE_VERSION && state.profileLang === lang) return false;
 
