@@ -7,6 +7,7 @@ import {existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSy
 import {randomBytes} from 'node:crypto';
 import {join} from 'node:path';
 import {listPosts} from './posts.mjs';
+import {logEvent} from './events.mjs';
 
 export const STAGES = ['idea', 'material', 'build', 'ready', 'published'];
 export const FORMATS = ['reel', 'post', 'carousel', 'telegram', 'story'];
@@ -164,11 +165,16 @@ export function syncItems(studio, {dry = false, now = Date.now()} = {}) {
       const r = item.ref.kind === 'reel' ? src.reels.find((x) => x.id === item.ref.id) : null;
       if (r && r.versions > item.hold.versions) { delete item.hold; changed = true; } else continue;
     }
-    if (rank(d) > rank(item.stage)) { item.stage = d; item.stageAt = now; changed = true; }
+    if (rank(d) > rank(item.stage)) {
+      if (!dry && !first) logEvent(studio, {type: 'stage', item: item.id, from: item.stage, to: d, by: 'files'}, now);
+      item.stage = d; item.stageAt = now; changed = true;
+    }
   }
   if (changed && !dry) {
     if (first && existsSync(join(studio, 'plan.json')) && !existsSync(join(studio, 'plan.json.bak'))) writeFileSync(join(studio, 'plan.json.bak'), read(join(studio, 'plan.json')));
     saveItems(studio, data);
+    // The first run brings the whole history in: that is not news.
+    if (!first) for (const x of added) if (!x.proposed) logEvent(studio, {type: 'new', item: x.id, format: x.format, by: 'files'}, now);
   }
   return {data, changed, added, src};
 }
@@ -201,6 +207,7 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
     if (!data.items.some((x) => x.ref?.kind === 'post' && x.ref.id === b.link.id)) { item.ref = {kind: 'post', id: b.link.id}; delete item.proposed; }
   }
   if (b.stage !== undefined && STAGES.includes(b.stage) && b.stage !== item.stage) {
+    logEvent(studio, {type: 'stage', item: item.id, from: item.stage, to: b.stage, by}, now);
     if (rank(b.stage) < rank(item.stage) && item.ref?.kind === 'reel') {
       const vd = join(studio, 'reels', item.ref.id, 'versions');
       item.hold = {stage: b.stage, versions: existsSync(vd) ? readdirSync(vd).filter((v) => /^v\d+$/.test(v)).length : 0};
@@ -224,6 +231,7 @@ export function createItems(studio, {formats, title, rubric = null, at = null, i
     by, created: now}));
   data.items.push(...made);
   saveItems(studio, data);
+  for (const x of made) logEvent(studio, {type: 'new', item: x.id, format: x.format, by}, now);
   return made;
 }
 
