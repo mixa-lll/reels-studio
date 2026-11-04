@@ -387,6 +387,7 @@ const ICON = {
   tg: '<path d="m22 3-9.5 18-2.5-7.5L3 11z"></path><path d="M10 13.5 22 3"></path>',
   web: '<rect x="2.5" y="4" width="19" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle>',
+  globe: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path>',
   cam: '<path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 11"></path><rect x="2" y="6" width="14" height="12" rx="3"></rect>',
   up: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m17 8-5-5-5 5M12 3v12"></path>',
   folder2: '<path d="M3 7h6l2 2h10v10H3Z"></path>',
@@ -418,10 +419,10 @@ const KIND = {reel: 'рилс', text: 'текст', photo: 'пост', carousel:
 const kindBadge = (k) => `<span class="kind" title="${KIND[k]}">${svg(k, 13)}${KIND[k]}</span>`;
 const svg = (k, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
-let TEAM = 1, ME = null, PROJECTS = [], P = localStorage.getItem('project') || 'main', OV = null, PLAN = null, TEST = false;
+let TEAM = 1, ME = null, PROJECTS = [], P = localStorage.getItem('project') || 'main', OV = null, PLAN = null, TEST = false, MODS = {}, MEMBOT = null;
 // Mode and plan of the open project (bot/plans.mjs): a feature the plan lacks is hidden.
 const feat = (f) => !PLAN || PLAN.features?.[f] !== false;
-async function loadMe() { const d = await (await fetch('/api/me?project=' + encodeURIComponent(P))).json(); ME = d.me; PROJECTS = d.projects; TEAM = d.team || 1; P = d.project || P; PLAN = d.plan || null; TEST = !!d.test; localStorage.setItem('project', P); }
+async function loadMe() { const d = await (await fetch('/api/me?project=' + encodeURIComponent(P))).json(); ME = d.me; PROJECTS = d.projects; TEAM = d.team || 1; P = d.project || P; PLAN = d.plan || null; TEST = !!d.test; MODS = d.modules || {}; MEMBOT = d.bot || null; localStorage.setItem('project', P); }
 const api = async (path, opts) => {
   const r = await fetch(path + (path.includes('?') ? '&' : '?') + 'project=' + encodeURIComponent(P), opts);
   if (!r.ok) throw Object.assign(new Error('Ошибка ' + r.status), {status: r.status});
@@ -453,8 +454,8 @@ async function sidebar() {
     ${item('#/all', 'board', 'Выпуски', `<span class="n">${OV.reels.length + (OV.posts || []).length}</span>`)}
     ${item('#/plan', 'cal', 'План')}
     ${item('#/memory', 'idea', 'Память')}
-    ${TEAM > 1 && feat('inbox') ? item('#/inbox', 'inbox', 'Входящие', OV.inbox ? `<span class="bdg">${OV.inbox}</span>` : '') : ''}
-    ${TEAM > 1 && feat('tasks') ? item('#/tasks', 'people', 'Задания людям') : ''}
+    ${modOn('staff') && feat('inbox') ? item('#/inbox', 'inbox', 'Входящие', OV.inbox ? `<span class="bdg">${OV.inbox}</span>` : '') : ''}
+    ${modOn('staff') && feat('tasks') ? item('#/tasks', 'people', 'Задания людям') : ''}
     <div style="margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 2px">
       ${item('#/settings', 'sliders', 'Настройки')}
       <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${roleName(ME)}</span></div>
@@ -1797,11 +1798,48 @@ async function vTabs(base, head, tabs, tab, note = '') {
   title(head);
 }
 const vMemory = (tab) => vTabs('memory', 'Память', [['facts', 'Факты и цены', vFacts], ['voice', 'Голос и стиль', vVoice], ['rules', 'Правила', vRules], ['ds', 'Дизайн', vDs], ['files', 'Файлы', vFiles], ['brief', 'О проекте', vBrief]], tab, 'всё, что Claude знает о проекте и проверяет в каждом выпуске');
-async function vSettings(tab = 'team', sub) {
+async function vSettings(tab = 'modules', sub) {
   if (tab === 'access') tab = 'team';
   if (MEMORY_TABS.includes(tab)) return location.replace('#/memory/' + tab);
-  return vTabs('settings', 'Настройки', [['team', 'Команда', () => vTeam(sub)], ...(isOwner() ? [['tests', 'Тестовые аккаунты', vTests]] : [])], tab);
+  return vTabs('settings', 'Настройки', [['modules', 'Модули', vModules], ['team', `Люди · ${TEAM}`, () => vTeam(sub)], ['connect', 'Подключения', vConnect], ...(isOwner() ? [['tests', 'Тестовые аккаунты', vTests]] : [])], tab);
 }
+// Настройки › Модули (LeanSettings): the base is always there; the rest is switched on when there is
+// a reason and then adds its items to the sidebar.
+const MODULES = [
+  ['camera', 'cam', 'Люди в кадре', 'Ведущие, которых снимаем: лица, голос, где можно снимать.', 'когда в выпусках появится человек'],
+  ['staff', 'people', 'От сотрудников', 'Сотрудники присылают материал в бота; у вас — «Входящие» и «Задания людям».', 'когда пригласите первого человека'],
+  ['approve', 'eye', 'Согласование', 'Ссылка без аккаунта для директора, напоминания, замещение.', 'когда выпуск надо кому-то показать'],
+  ['branches', 'board', 'Филиалы и проекты', 'Несколько студий с общей памятью сети.', 'когда понадобится вторая студия'],
+];
+const modOn = (k) => MODS[k] ?? (k === 'staff' ? TEAM > 1 : false);
+async function vModules() {
+  const ed = canEdit();
+  view.innerHTML = `<div style="flex: 1; overflow-y: auto"><div style="max-width: 1100px; padding: 22px 40px; display: flex; flex-direction: column; gap: 20px">
+    <div class="muted" style="font-size: 15px; line-height: 1.5">Основа — Сегодня, Выпуски, План, Память — есть всегда. Остальное включается по поводу и тогда добавляет себе пункт в колонку.</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 14px">${MODULES.map(([k, i, t, d, w]) => `<div style="border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 10px">${svg(i, 18)}<b style="font-weight: 600; font-size: 15px">${t}</b>
+        <label class="sw" style="margin-left: auto; position: relative; width: 36px; height: 20px; flex: none"><input type="checkbox" data-mod="${k}" ${modOn(k) ? 'checked' : ''} ${ed ? '' : 'disabled'} style="position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer" aria-label="${t}"><span style="position: absolute; inset: 0; border-radius: 999px; background: ${modOn(k) ? 'var(--ink)' : '#E5E5E5'}; transition: background .15s"></span><span style="position: absolute; top: 2px; left: ${modOn(k) ? '18px' : '2px'}; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: left .15s"></span></label></div>
+      <span style="font-size: 14px; color: var(--ink2); line-height: 1.5">${d}</span>
+      <span class="small muted">${modOn(k) ? 'Включён' : 'Предложу сам — ' + w}</span></div>`).join('')}</div>
+  </div></div>`;
+  view.querySelectorAll('[data-mod]').forEach((el) => (el.onchange = async () => { const r = await post('/api/modules', {key: el.dataset.mod, on: el.checked}); MODS = r.modules; toast(el.checked ? 'Модуль включён' : 'Модуль выключен'); sidebar(); vSettings('modules'); }));
+}
+
+// Настройки › Подключения (LeanConnect): the bot, the channel, Instagram by package, the site.
+async function vConnect() {
+  const plan = await api('/api/plan').catch(() => ({}));
+  const plats = plan.strategy?.platforms || [];
+  const tg = plats.filter((x) => /tg|telegram|телеграм/i.test(x.id + x.name));
+  const ig = plats.filter((x) => /ig|instagram/i.test(x.id + x.name));
+  const row = (i, t, sub, state, ok, btn) => `<div style="border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; align-items: center; gap: 14px">${svg(i, 20)}<span style="flex: 1; display: flex; flex-direction: column; gap: 3px"><b style="font-weight: 600">${t}</b><span class="small muted">${sub}</span></span><span class="small" style="font-weight: 600; color: ${ok ? '#2E8A4F' : 'var(--muted)'}">${state}</span>${btn || ''}</div>`;
+  view.innerHTML = `<div style="flex: 1; overflow-y: auto"><div style="max-width: 1100px; padding: 22px 40px; display: flex; flex-direction: column; gap: 12px">
+    ${row('tg', `Телеграм-бот${MEMBOT ? ' @' + esc(MEMBOT) : ''}`, 'сюда приходят идеи, списки кадров и пакеты на выкладку; сюда же вы кидаете материал', MEMBOT ? 'подключён' : 'не подключён', !!MEMBOT, `<a class="ln-btn" href="#/settings/team">Как подключиться</a>`)}
+    ${tg.map((x) => row('text', `Телеграм-канал ${esc(x.account || x.name)}`, 'бот добавлен администратором — выкладывает сам', 'выкладка ботом', true)).join('') || row('text', 'Телеграм-канал', 'добавьте бота администратором канала — и он будет выкладывать тексты сам', 'не задан', false, '<a class="ln-btn" href="#/plan/setup">Площадки</a>')}
+    ${row('photo', ig.length ? `Instagram ${ig.map((x) => esc(x.account || x.name)).join(', ')}` : 'Instagram', 'без доступа к аккаунту: пакет на телефон, вы нажимаете «поделиться»', 'пакетом', true)}
+    ${row('globe', 'Сайт', 'Claude читает его, когда собирает факты и цены в Памяти', 'по запросу', false, '<a class="ln-btn" href="#/memory/facts">Факты</a>')}
+  </div></div>`;
+}
+
 
 async function vDs() {
   title('Дизайн-система');
