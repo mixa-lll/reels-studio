@@ -554,7 +554,7 @@ const api = async (path, opts) => {
   if (!r.ok) throw Object.assign(new Error('Ошибка ' + r.status), {status: r.status});
   return r.json();
 };
-const post = (path, b) => api(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(b || {})});
+const post = (path, b) => { ITEMS_AT = 0; return api(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(b || {})}); };
 const toast = (t) => { const el = document.createElement('div'); el.className = 'toast'; el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 3500); };
 const isOwner = () => ME?.isOwner === true;
 const canEdit = () => ME?.role === 'editor';
@@ -586,7 +586,7 @@ async function sidebar() {
       ${item('#/settings', 'sliders', 'Настройки')}
       <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${roleName(ME)}</span></div>
     </div>`;
-  $('#projSel').onchange = async (e) => { P = e.target.value; localStorage.setItem('project', P); await loadMe(); location.hash = '#/'; route(); };
+  $('#projSel').onchange = async (e) => { P = e.target.value; localStorage.setItem('project', P); OV = null; ITEMS_AT = 0; await loadMe(); location.hash = '#/'; route(); };
   $('#srchBtn').onclick = search;
 }
 
@@ -940,7 +940,14 @@ const LIFE_COLOR = {idea: '#8B8B8B', material: '#B7791F', build: '#2F6FEB', read
 const FMT_NAME = {reel: 'Рилс', post: 'Пост', carousel: 'Карусель', telegram: 'Телеграм', story: 'История'};
 const FMT_ICON = {reel: 'reel', post: 'photo', carousel: 'carousel', telegram: 'text', story: 'story'};
 let ITEMS = null;
-const loadItems = async () => (ITEMS = await api('/api/items'));
+// Kept for a few seconds so switching tabs does not refetch it; any post() drops it.
+let ITEMS_AT = 0;
+const loadItems = async (fresh) => {
+  if (!fresh && ITEMS && Date.now() - ITEMS_AT < 15000) return ITEMS;
+  ITEMS = await api('/api/items');
+  ITEMS_AT = Date.now();
+  return ITEMS;
+};
 const itemRubric = (x) => (ITEMS?.rubrics || []).find((r) => r.id === x.rubric || r.name === x.rubric);
 const itemHref = (x) => x.ref?.kind === 'reel' ? '#/reel/' + x.ref.id : x.ref?.kind === 'post' ? '#/post/' + x.ref.id : '#/item/' + x.id;
 const sdot = (s) => `<span class="sdot" style="color: ${LIFE_COLOR[s]}"><i style="${s === 'idea' ? 'border: 1.5px dashed ' + LIFE_COLOR[s] : 'background: ' + LIFE_COLOR[s]}"></i>${LIFE.find(([k]) => k === s)?.[1] || ''}</span>`;
@@ -1249,7 +1256,7 @@ function stages(r, tab) {
 
 async function vReel(id, tab) {
   const isNew = id.startsWith('new-');
-  const data = isNew ? null : await api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null);
+  const [data] = await Promise.all([isNew ? null : api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null), loadItems().catch(() => null)]);
   const r = data?.reel;
   if (r && (!tab || tab === 'files')) tab = tab === 'files' ? 'materials' : stageAt(r);
   const nav = r ? await relHead('reel', id, REEL_STEPS, tab, `#/reel/${id}/`, `${r.num} · ${r.title}`) : '';
@@ -1487,7 +1494,7 @@ const postStages = (k) => k === 'carousel' ? [['struct', 'Структура'], 
   : [['text', k === 'photo' ? 'Текст и фото' : 'Текст'], ['publish', 'Выкладка']];
 
 async function vPost(id, stage) {
-  const data = await api('/api/post?post=' + encodeURIComponent(id)).catch(() => null);
+  const [data] = await Promise.all([api('/api/post?post=' + encodeURIComponent(id)).catch(() => null), loadItems().catch(() => null)]);
   if (!data) { view.innerHTML = '<div class="page"><p class="muted">Такого поста нет. <a href="#/all/posts">Все посты</a></p></div>'; return; }
   const p = data.post;
   const stages = postStages(p.kind);
@@ -2880,7 +2887,7 @@ async function vTests() {
       ${x.people.length ? `<div class="small muted">Люди: ${x.people.map((y) => `${esc(y.name)} <a href="#" data-link="${esc(y.id)}" data-slug="${esc(x.slug)}">войти как</a>`).join(' · ')}</div>` : ''}</div>`).join('') : '<p class="muted">Пока нет ни одного.</p>'}
     <p class="small muted">В Телеграме — команда /test в боте: он переключится в тестовый аккаунт и начнёт знакомство.</p></div>`;
   $('#tNew').onclick = async () => { const r = await post('/api/sandbox', {action: 'create'}); toast('Тестовый аккаунт создан — расскажите о проекте в чате'); P = r.slug; await loadMe(); location.hash = '#/'; route(); };
-  body.querySelectorAll('[data-open]').forEach((b) => b.onclick = async () => { P = b.dataset.open; await loadMe(); location.hash = '#/'; route(); });
+  body.querySelectorAll('[data-open]').forEach((b) => b.onclick = async () => { P = b.dataset.open; OV = null; ITEMS_AT = 0; await loadMe(); location.hash = '#/'; route(); });
   body.querySelectorAll('[data-del]').forEach((b) => b.onclick = async () => {
     if (!confirm('Удалить тестовый аккаунт со всем, что в нём есть: выпуски, посты, файлы, задания, чаты, люди?')) return;
     const r = await post('/api/sandbox', {action: 'delete', slug: b.dataset.del});
@@ -3103,8 +3110,9 @@ async function route() {
   document.body.classList.remove('menu');
   const h = location.hash || '#/';
   try {
-    await sidebar();
-    foldSide(document.body.classList.contains('side-mini'));
+    // The side panel refreshes alongside the view; only the first draw waits for it.
+    const side = sidebar().then(() => foldSide(document.body.classList.contains('side-mini')));
+    if (!OV) await side; else side.catch(() => {});
     let m;
     view = $('#view');
     if (isMember()) await vMember(h);
