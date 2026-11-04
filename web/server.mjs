@@ -257,7 +257,8 @@ function preamble(p, k) {
   if (k === '_ds') lines.push(`THIS CHAT develops the project's design system for its reels. The result is ONE self-contained HTML page, \`${relative(BOT, studio)}/design-system/index.html\` (inline CSS/JS, Google Fonts allowed, images as relative files next to it): a small landing page with the system's name and idea, color and type tokens, spacing and motion rules, and a library of the components (plates, price receipts, titles, subtitles, phone mockup…) drawn in HTML/CSS as they look in the reels, each with its name, when to use it and its Remotion component name if there is one. Read the brief, PLAYBOOK.md, \`template/src\` and the reels' code to stay true to what is really used. After each change, rewrite the page and tell the owner in one or two lines what changed; the page reloads by itself. Keep \`design-system/tokens.json\` in sync with the tokens on the page.`);
   else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules, settings, strategy and plan. Reels and posts themselves are made in their own chats; if the owner asks to make one here, say that «+ Новый выпуск» starts it in its own chat.',
     `Strategy and plan follow STRATEGY.md: \`${relative(BOT, studio)}/strategy.json\` (platforms, rubrics, weekly rhythm, events) and \`${relative(BOT, studio)}/plan.json\` (dates and rubrics of reels and posts); the page draws Strategy and the Calendar from them.`,
-    `Units of content live in \`${relative(BOT, studio)}/items.json\` (handbook/LEAN.md): one item per format with stage, rubric, at and idea {about, hook, flow}. When the owner asks about an item by its id, edit only that item's idea, format, rubric or at there. Never add or remove items yourself: new ideas go to ideas.md («My ideas», Format:/Hook:/Plot: plus «Date: YYYY-MM-DDTHH:MM» and «Rubric: <rubric id>»), and the page turns them into proposals.`);
+    `Units of content live in \`${relative(BOT, studio)}/items.json\` (handbook/LEAN.md): one item per format with stage, rubric, at and idea {about, hook, flow}. When the owner asks about an item by its id, edit only that item's idea, format, rubric or at there. Never add or remove items yourself: new ideas go to ideas.md («My ideas», Format:/Hook:/Plot: plus «Date: YYYY-MM-DDTHH:MM» and «Rubric: <rubric id>»), and the page turns them into proposals.`,
+    `Facts and prices live in \`${relative(BOT, studio)}/facts.json\`: {"facts":[{"id":"f-…","text":"what","value":"how much or when","source":"сайт|прайс|сказал <name>|…","kind":"price|date|people|other","at":"YYYY-MM-DD"}]}. When the owner tells you a new price or date, update or add the fact there with today's date and the source; check every caption and slide against these facts and say when one is older than 30 days.`);
   // A new project (the starter brief, or a test account not set up yet) is a first visit: the
   // whole onboarding, as the bot runs it, not just an answer to the first message.
   if (k === '_project' && onboardingDue(studio)) lines.push(`THIS PROJECT IS NEW: run REELS.md section 0 (Onboarding) from where it stands, whatever the owner's message is about (a greeting too): start with the guiding questions, material and the Telegram archive link come last (step 1). Ask ONE question per turn with \`--keyboard\` buttons and stop until they answer; the next turn goes on with the next question. You are not done until \`brief.md\` is filled, \`strategy.json\` is written and \`settings.json\` has \`mode\`, \`plan\` and \`team\` (step 5), and the summary (step 6) is shown.`);
@@ -740,6 +741,25 @@ createServer(async (req, res) => {
       return json(200, {});
     }
     return json(400, {});
+  }
+  // Память › Факты и цены (handbook/LEAN.md, кусок 9): facts.json, each fact with its source and
+  // the date it was last confirmed; Claude checks releases against them.
+  if (req.method === 'GET' && url.pathname === '/api/facts') return json(200, {facts: readJson(join(studio, 'facts.json'), {facts: []}).facts || []});
+  if (req.method === 'POST' && url.pathname === '/api/facts/set') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const f = join(studio, 'facts.json');
+    const d = readJson(f, {facts: []});
+    d.facts ||= [];
+    let x = d.facts.find((y) => y.id === b.id);
+    if (b.remove) { d.facts = d.facts.filter((y) => y !== x); writeJson(f, d); return json(200, {}); }
+    if (!x) { if (!String(b.text || '').trim()) return json(400, {}); x = {id: 'f-' + randomBytes(4).toString('hex')}; d.facts.push(x); }
+    for (const [k, n] of [['text', 160], ['value', 120], ['source', 80]]) if (b[k] !== undefined) x[k] = String(b[k]).trim().slice(0, n);
+    if (['price', 'date', 'people', 'other'].includes(b.kind)) x.kind = b.kind;
+    x.at = new Date().toISOString().slice(0, 10); x.by = me.name;
+    writeJson(f, d);
+    log(me.name, `факт «${x.text}»: ${x.value || ''}`);
+    return json(200, {fact: x});
   }
   // A rubric's template (TEMPLATES.md): which of template/src/templates its reels are built by.
   if (req.method === 'POST' && url.pathname === '/api/strategy/template') {
