@@ -440,7 +440,7 @@ async function sidebar() {
   if (isMember()) return memberSidebar();
   OV = await api('/api/overview');
   const cur = location.hash || '#/';
-  const on = (h) => (h === '#/' ? cur === '#/' : cur.startsWith(h) || (h === '#/all' && /^#\/(reel|post|new)\b/.test(cur)) || (h === '#/plan' && /^#\/(knowledge|rubric)\b/.test(cur))) ? 'on' : '';
+  const on = (h) => (h === '#/' ? cur === '#/' : cur.startsWith(h) || (h === '#/all' && /^#\/(reel|post|new)\b/.test(cur)) || (h === '#/plan' && /^#\/(knowledge|rubric|plan)\b/.test(cur))) ? 'on' : '';
   const item = (h, i, t, n = '') => `<a class="nav ${on(h)}" href="${h}" title="${t}">${svg(i)}<span>${t}</span>${n}</a>`;
   const initials = projName().split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   $('#side').innerHTML = `
@@ -1504,6 +1504,8 @@ async function vNew() {
     location.hash = await startItem(first);
   };
   $('#nAsk').onclick = () => { sessionStorage.setItem('planLay', '1'); location.hash = '#/plan/draft'; };
+  const fromRub = sessionStorage.getItem('newRubric');
+  if (fromRub) { sessionStorage.removeItem('newRubric'); $('#nRub').value = fromRub; }
   draw();
 }
 
@@ -1615,13 +1617,14 @@ async function vPlan(offset = 0, month = true) {
       <aside class="ln-aside">
         <div style="display: flex; align-items: center"><b style="font-weight: 600">Рубрики</b><span class="muted" style="margin-left: auto; font-size: 12px">${month ? 'в этом месяце' : 'на этой неделе'}</span></div>
         <div>${rubs || '<span class="small muted">Рубрик пока нет.</span>'}</div>
-        ${canEdit() ? '<a href="#/knowledge/rubrics" style="font-size: 13px; color: #2F6FEB; font-weight: 600; text-decoration: none">+ Рубрика</a>' : ''}
+        ${canEdit() ? '<button type="button" id="addRub" style="align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; color: #2F6FEB; font-weight: 600; cursor: pointer">+ Рубрика</button>' : ''}
         <div class="ln-drop" data-day="" style="display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 2px"><div style="display: flex; align-items: center; margin-top: 8px"><b style="font-weight: 600">Без даты</b><span class="muted" style="margin-left: auto; font-size: 12px">${undated.length}</span></div>${undated.slice(0, 6).map(chip).join('')}${undated.length > 6 ? `<a class="small muted" href="#/all">ещё ${undated.length - 6} — в Выпусках</a>` : ''}</div>
-        <div class="muted" style="font-size: 13px; line-height: 1.5; margin-top: auto">Площадки и ритм — <a href="#/knowledge">${svg('sliders', 13)} настройки плана</a>.</div>
+        <a href="#/plan/setup" class="muted" style="font-size: 13px; line-height: 1.5; margin-top: auto; display: inline-flex; gap: 6px; align-items: center; text-decoration: none">${svg('sliders', 14)}Площадки и ритм</a>
       </aside>
     </div></div>`;
   const redraw = () => vPlan(offset, month);
   $('#lay')?.addEventListener('click', () => { sessionStorage.setItem('planLay', '1'); location.hash = '#/plan/draft'; });
+  $('#addRub')?.addEventListener('click', async () => { const name = prompt('Название рубрики'); if (!name?.trim()) return; const {rubric} = await post('/api/strategy/edit', {rubric: {name}}); location.hash = '#/rubric/' + rubric.id; });
   view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); redraw(); }));
   view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const x = all.find((y) => y.id === b.dataset.other); sessionStorage.setItem('planAsk', JSON.stringify({text: `Замени идею «${x.title}» на ${(x.at || '').slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric:.`, shown: `Другую вместо «${x.title}»`})); location.hash = '#/plan/draft'; }));
   let drag = null;
@@ -1671,15 +1674,66 @@ async function vPlanDraft() {
 
 
 // Рубрика (CleanRubric): its issues, from the strategy and plan.json.
+// Рубрика (LeanRubric): a simple group — formula, usual format, day, and its ideas and releases.
 async function vRubric(id) {
-  const plan = await api('/api/plan');
-  const st = plan.strategy || {}, r = (st.rubrics || []).find((x) => x.id === id) || {id, name: id};
+  const [plan] = await Promise.all([api('/api/plan'), loadItems()]);
+  const st = plan.strategy || {}, r = (st.rubrics || []).find((x) => x.id === id);
+  if (!r) { view.innerHTML = '<div class="page"><p class="muted">Такой рубрики нет. <a href="#/plan">План</a></p></div>'; return; }
   title(r.name);
-  const own = plan.items.filter((x) => x.rubric === r.id || x.rubric === r.name);
-  view.innerHTML = `<div class="chead" style="padding: 0 28px; min-height: 56px"><span class="small muted"><a href="#/knowledge/rubrics/${esc(r.id)}">Рубрики</a> ›</span><b style="font-size: 14px">${esc(r.name)}</b><span style="flex: 1"></span>${canEdit() ? '<a class="btn primary" href="#/new">+ Новый выпуск</a>' : ''}</div>
-    <div class="page" style="padding: 28px 36px; gap: 18px"><div class="row" style="gap: 12px"><span style="width: 16px; height: 16px; border-radius: 5px; background: ${esc(r.color || '#A3A3A3')}"></span><h1>${esc(r.name)}</h1></div>
-      <div class="muted" style="font-size: 15px">${[r.share ? r.share + ' % плана' : '', r.why].filter(Boolean).map(esc).join(' · ')}</div>
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px">${own.map((x) => `<a href="${x.kind === 'reel' ? '#/reel/' : '#/post/'}${esc(x.id)}" style="text-decoration: none; display: flex; flex-direction: column; gap: 8px"><span style="aspect-ratio: ${x.kind === 'reel' ? '9 / 16' : '4 / 5'}; border-radius: 12px; background: var(--soft) center / cover no-repeat; ${x.thumb ? `background-image: url('${x.thumb}')` : ''}; display: grid; place-items: center; color: var(--muted)">${x.thumb ? '' : svg(x.kind, 22)}</span><span style="display: flex; gap: 6px; align-items: center; font-weight: 500">${svg(x.kind, 13)}${esc(x.title)}</span><span class="small muted">${x.at ? new Date(x.at).toLocaleDateString('ru', {day: 'numeric', month: 'short'}) : 'без даты'}</span></a>`).join('') || '<p class="muted">Выпусков этой рубрики пока нет. Рубрику ставит Claude или ты — перетаскиванием в календаре.</p>'}</div></div>`;
+  const ed = canEdit();
+  const own = ITEMS.items.filter((x) => !x.proposed && itemRubric(x)?.id === r.id).sort((p, q) => String(q.at || '').localeCompare(String(p.at || '')));
+  const ideas = ITEMS.items.filter((x) => x.proposed && itemRubric(x)?.id === r.id).length;
+  const DAYNAMES = ['по понедельникам', 'по вторникам', 'по средам', 'по четвергам', 'по пятницам', 'по субботам', 'по воскресеньям'];
+  const card = (label, inner) => `<div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}</span>${inner}</div>`;
+  const plain = 'border: 0; padding: 0; font: inherit; font-size: 15px; background: none; color: var(--ink); width: 100%';
+  view.innerHTML = `<div class="ln-top"><a href="#/plan" style="color: var(--muted); text-decoration: none">План</a><span>›</span><span>Рубрика</span><span style="flex: 1"></span>
+      ${ed ? `<button type="button" class="ln-btn" id="rAsk">${svg('idea', 14)}Предложить 3 идеи</button><a class="ln-btn p" href="#/new" id="rNew">${svg('plus', 14)}Идея в рубрику</a>` : ''}</div>
+    <div style="flex: 1; overflow-y: auto"><div style="max-width: 1120px; padding: 30px 48px; display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; align-items: center; gap: 12px">${ed ? `<input type="color" id="rColor" value="${esc(r.color || '#737373')}" aria-label="Цвет рубрики" style="width: 22px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer">` : `<span style="width: 16px; height: 16px; border-radius: 5px; background: ${esc(r.color)}"></span>`}<input id="rName" aria-label="Название рубрики" value="${esc(r.name)}" ${ed ? '' : 'readonly'} style="border: 0; padding: 0; font: inherit; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; background: none; color: var(--ink); flex: 1"></div>
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px">
+        ${card('Формула — что объединяет', `<input id="rAbout" value="${esc(r.about || '')}" placeholder="Например: «сколько стоит X в Гудаури — честно, с чеком»" ${ed ? '' : 'readonly'} style="${plain}">`)}
+        ${card('Обычно', `<select id="rFormat" ${ed ? '' : 'disabled'} style="${plain}"><option value="">любой формат</option>${['reel', 'post', 'carousel', 'telegram'].map((k) => `<option value="${k}" ${r.format === k ? 'selected' : ''}>${FMT_NAME[k].toLowerCase()}</option>`).join('')}</select>`)}
+        ${card('Ритм', `<select id="rDay" ${ed ? '' : 'disabled'} style="${plain}"><option value="">по поводу</option>${DAYNAMES.map((t, i) => `<option value="${i + 1}" ${String(r.day) === String(i + 1) ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
+      </div>
+      <div><div class="ln-lh">Идеи и выпуски · ${own.length}${ideas ? `<a href="#/all/proposed">ещё ${ideas} предложений Claude</a>` : ''}</div>
+        ${own.map((x) => `<a class="ln-li" href="${itemHref(x)}"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><span style="flex: 0 0 380px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span><span class="s" style="flex: 1">${whenText(x.at)}</span>${sdot(x.stage)}</a>`).join('') || '<p class="small muted" style="padding: 10px 2px">Пока ни одного выпуска.</p>'}</div>
+      <p class="small muted" style="margin: 0">Больше в рубрике ничего нет: ни шаблонов, ни серий, ни каскада правил. Claude держит формулу и прошлые выпуски, чтобы новые были похожи.${r.rules?.length || r.series?.length || r.template ? ` Старые настройки рубрики (правила, серии, шаблон) остаются в <a href="#/knowledge/rubrics/${esc(r.id)}">прежней Стратегии</a>.` : ''}</p>
+      ${ed ? '<button type="button" class="ln-btn g" id="rDel" style="align-self: flex-start; color: #B42318">Удалить рубрику</button>' : ''}
+    </div></div>`;
+  const save = (patch) => post('/api/strategy/edit', {rubric: {id: r.id, ...patch}}).then(() => toast('Сохранено'));
+  $('#rName')?.addEventListener('change', (e) => save({name: e.target.value}).then(() => sidebar()));
+  $('#rColor')?.addEventListener('change', (e) => save({color: e.target.value}));
+  $('#rAbout')?.addEventListener('change', (e) => save({about: e.target.value}));
+  $('#rFormat')?.addEventListener('change', (e) => save({format: e.target.value}));
+  $('#rDay')?.addEventListener('change', (e) => save({day: e.target.value}));
+  $('#rDel')?.addEventListener('click', async () => { if (!confirm(`Удалить рубрику «${r.name}»? Выпуски останутся, просто без рубрики.`)) return; await post('/api/strategy/edit', {rubric: {id: r.id, remove: true}}); location.hash = '#/plan'; });
+  $('#rAsk')?.addEventListener('click', () => { sessionStorage.setItem('planAsk', JSON.stringify({text: `Предложи 3 идеи в рубрику «${r.name}» (id ${r.id}${r.about ? ', формула: ' + r.about : ''}${r.format ? ', обычно ' + FMT_NAME[r.format].toLowerCase() : ''}) на ближайшие две недели, не повторяя её прошлые выпуски. Каждую добавь в ideas.md в «My ideas» со строками «Date: YYYY-MM-DDTHH:MM» и «Rubric: ${r.id}».`, shown: `3 идеи в «${r.name}»`})); location.hash = '#/plan/draft'; });
+  $('#rNew')?.addEventListener('click', () => sessionStorage.setItem('newRubric', r.id));
+}
+
+// Площадки и ритм (LeanPlanSetup): where we post and how often; Claude counts ideas per week from it.
+async function vPlanSetup() {
+  title('Площадки и ритм');
+  const plan = await api('/api/plan');
+  const st = plan.strategy || {};
+  const plats = st.platforms || [];
+  const per = (p) => p.perWeek ?? (p.formats || []).reduce((n, f) => n + (f.perWeek || 0), 0);
+  const off = new Set((st.rhythm?.daysOff || []).map(Number));
+  const ed = canEdit();
+  const total = plats.reduce((n, p) => n + per(p), 0);
+  view.innerHTML = `<div class="ln-top"><a href="#/plan" style="color: var(--muted); text-decoration: none">План</a><span>›</span><span>Площадки и ритм</span><span style="flex: 1"></span><a class="ln-btn p" href="#/plan">Готово</a></div>
+    <div style="flex: 1; overflow-y: auto"><div style="max-width: 1100px; padding: 30px 48px; display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; flex-direction: column; gap: 6px"><h1 style="font-size: 24px">Где выходим и как часто</h1><div class="muted" style="font-size: 15px">От этого Claude считает, сколько идей ставить на неделю и какого формата.</div></div>
+      <div><div class="ln-lh">Площадки</div>
+        ${plats.map((p) => `<div class="ln-li" style="padding: 13px 4px">${svg(/tg|telegram|телеграм/i.test(p.id + p.name) ? 'text' : 'photo', 16)}<span style="font-weight: 600; flex: 0 0 220px">${esc(p.name)}</span><span class="s" style="flex: 1">${esc((p.formats || []).map((f) => KIND[f.kind] || f.kind).join(', ').toLowerCase() || p.account || '')}</span>
+          <span class="ln-seg">${ed ? `<button type="button" data-pl="${esc(p.id)}" data-d="-1" aria-label="Реже">−</button>` : ''}<span class="on" style="padding: 5px 12px; border-radius: 8px; font-size: 13px">${per(p)} в нед.</span>${ed ? `<button type="button" data-pl="${esc(p.id)}" data-d="1" aria-label="Чаще">+</button>` : ''}</span></div>`).join('') || '<p class="small muted" style="padding: 10px 2px">Площадок пока нет — расскажите о них в чате проекта.</p>'}
+        <a class="ln-li" href="#/chat/_project" style="color: #A3A3A3">${svg('plus', 16)}<span>Площадка: YouTube Shorts, VK, TikTok — добавить через чат</span></a></div>
+      <div><div class="ln-lh">Дни, когда не выходим</div><div style="display: flex; gap: 8px; padding-top: 12px">${DAYS.map((d, i) => `<button type="button" class="ln-pill ${off.has(i + 1) ? 'on' : ''}" data-off="${i + 1}" ${ed ? '' : 'disabled'}>${d.toLowerCase()}</button>`).join('')}</div></div>
+      <div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; gap: 12px; align-items: center; background: #FAFAFA"><span class="muted">${svg('idea', 18)}</span><span style="font-size: 14px">Итого ≈ ${total} ${total === 1 ? 'выпуск' : total > 1 && total < 5 ? 'выпуска' : 'выпусков'} в неделю${off.size ? ` · не выходим: ${[...off].sort().map((d) => DAYS[d - 1].toLowerCase()).join(', ')}` : ''}.</span></div>
+      <p class="small muted" style="margin: 0">Подробности площадок — аудитория, время, форматы — в <a href="#/knowledge/platforms">прежней Стратегии</a>.</p>
+    </div></div>`;
+  view.querySelectorAll('[data-pl]').forEach((b) => (b.onclick = async () => { const p = plats.find((x) => x.id === b.dataset.pl); await post('/api/strategy/edit', {platform: {id: p.id, perWeek: per(p) + Number(b.dataset.d)}}); vPlanSetup(); }));
+  view.querySelectorAll('[data-off]').forEach((b) => (b.onclick = async () => { const d = Number(b.dataset.off); off.has(d) ? off.delete(d) : off.add(d); await post('/api/strategy/edit', {daysOff: [...off]}); vPlanSetup(); }));
 }
 
 // Project settings: title + tabs on top, each tab is one of the older pages rendered below.
@@ -2143,6 +2197,7 @@ async function route() {
     else if (h === '#/new') await vNew();
     else if ((m = /^#\/knowledge(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vKnowledge(m[1], m[2]);
     else if (h === '#/plan/draft') await vPlanDraft();
+    else if (h === '#/plan/setup') await vPlanSetup();
     else if ((m = /^#\/plan(?:\/(m|w))?(?:\/(-?\d+))?$/.exec(h))) await vPlan(Number(m[2] || 0), m[1] !== 'w');
     else if ((m = /^#\/rubric\/([\w-]+)/.exec(h))) await vRubric(m[1]);
     else if ((m = /^#\/settings(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vSettings(m[1], m[2]);
