@@ -465,6 +465,22 @@
   .ttrack { display: flex; gap: 3px; height: 64px; margin: 12px 0 6px; }
   .ttrack span { border-radius: 8px; color: #fff; padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; overflow: hidden; }
   .ttrack b { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ttrack i { font-style: normal; font-size: 11px; opacity: .85; }
+  #fmic { position: fixed; z-index: 70; height: 26px; min-width: 26px; border-radius: 13px; border: 1px solid var(--line); background: #fff; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 6px; cursor: pointer; font: inherit; font-size: 11.5px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  #fmic:hover { color: var(--ink); border-color: #CFCFCF; } #fmic span:empty { display: none; }
+  #fmic.rec { background: #C43F34; border-color: #C43F34; color: #fff; padding: 0 9px; } #fmic.busy { color: var(--ink); padding: 0 9px; }
+  .dictating { box-shadow: 0 0 0 2px rgba(196,63,52,.35) !important; }
+  .fromvoice { background: #FFFBEB !important; border-color: #F3DDB3 !important; }
+  .dtag { color: #B7791F; font-weight: 600; }
+  .dict { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #FAFAFA; }
+  .dbig { height: 46px; border-radius: 12px; border: 0; background: var(--ink); color: #fff; font: inherit; font-size: 15px; font-weight: 600; padding: 0 18px; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+  .kbd { display: inline-block; border: 1px solid #D4D4D4; border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; font-size: 11.5px; color: var(--ink2); background: #fff; }
+  .dict.rec { background: #FFF6F5; border-color: #F2C9C4; }
+  .dstop { width: 46px; height: 46px; border-radius: 50%; border: 0; background: #C43F34; color: #fff; display: grid; place-items: center; cursor: pointer; animation: micPulse 1.2s ease-in-out infinite; }
+  .dtime { font-variant-numeric: tabular-nums; font-size: 15px; }
+  .dlive { flex-basis: 100%; font-size: 15px; line-height: 1.55; color: var(--ink); }
+  .dnote { flex-basis: 100%; color: #8A5A00; } .dnote:empty { display: none; }
+  .dict.done { flex-direction: column; align-items: stretch; gap: 10px; }
+  @media (prefers-reduced-motion: reduce) { .dstop { animation: none; } }
 </style>
 <script src="/preview.js"></script>
 </head>
@@ -1013,13 +1029,193 @@ function drawIdea(host, kind, id) {
   const x = ITEMS?.items.find((y) => y.ref?.kind === kind && y.ref.id === id);
   if (!x) { host.innerHTML = '<p class="muted" style="padding: 28px">Идея не записана.</p>'; return; }
   const ed = canEdit();
-  const area = (f, label, v, rows, ph) => `<label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}</span><textarea class="f" data-i="${f}" rows="${rows}" placeholder="${ph}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.55; resize: vertical">${esc(v || '')}</textarea></label>`;
+  const area = (f, label, v, rows, ph) => `<label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}<span class="dtag" hidden> · из голоса</span></span><textarea class="f" data-i="${f}" rows="${rows}" placeholder="${ph}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.55; resize: vertical">${esc(v || '')}</textarea></label>`;
   host.innerHTML = `<div style="max-width: 760px; padding: 26px 28px; display: flex; flex-direction: column; gap: 16px">
+    ${ed ? '<div id="dict"></div>' : ''}
     ${area('about', 'О чём', x.idea?.about, 3, 'Одна-две фразы: о чём выпуск')}
     ${area('hook', 'Крючок — первые 2 секунды', x.idea?.hook, 2, 'Фраза или кадр, на котором остаются')}
     ${area('flow', 'Ход — по строке на шаг', (x.idea?.flow || []).join('\n'), 4, '1 · …\n2 · …')}
+    <label style="display: flex; flex-direction: column; gap: 6px; max-width: 360px"><span class="lbl">Кто в кадре<span class="dtag" hidden> · из голоса</span></span><input class="f" data-i="who" value="${esc(x.idea?.who || '')}" placeholder="инструктор, гость, никто — только кадры" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 15px"></label>
     <p class="small muted" style="margin: 0">Идея — первый этап. Сценарий и что снять — на этапе «Материал»; правки сохраняются сами.</p></div>`;
-  host.querySelectorAll('[data-i]').forEach((el) => (el.onchange = () => { const v = (k) => host.querySelector(`[data-i="${k}"]`).value; post('/api/items/set', {id: x.id, idea: {about: v('about'), hook: v('hook'), flow: v('flow').split('\n').map((l) => l.trim()).filter(Boolean)}}).then(() => toast('Сохранено')); }));
+  host.querySelectorAll('[data-i]').forEach((el) => (el.onchange = () => { const v = (k) => host.querySelector(`[data-i="${k}"]`).value; post('/api/items/set', {id: x.id, idea: {about: v('about'), hook: v('hook'), flow: v('flow').split('\n').map((l) => l.trim()).filter(Boolean), who: v('who')}}).then(() => toast('Сохранено')); }));
+  if (ed) ideaDictation(host, x, () => loadItems().catch(() => null));
+}
+// ---------- Диктовка (handbook/LEAN.md, кусок 18; холст L15, L15b) ----------
+// The speech goes to the same local Whisper as the bot's voice notes (/api/voice → bot/stt.mjs).
+// Every text field gets a microphone in its corner that fills only that field; on the idea stage
+// «Надиктовать идею» (or holding Space) lets one speak freely and Claude lays it out on the fields.
+const voiceText = (blob) => fetch(`/api/voice?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': blob.type || 'audio/webm'}, body: blob}).then((r) => (r.ok ? r.json() : {})).then((r) => r.text || '').catch(() => '');
+const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+// One recording: the chunks so far (each blob from the start is a whole file), a level for the wave.
+async function startRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('nomic');
+  const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+  const rec = new MediaRecorder(stream), chunks = [];
+  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  rec.start(1000);
+  let ctx = null, an = null;
+  try { ctx = new AudioContext(); an = ctx.createAnalyser(); an.fftSize = 256; ctx.createMediaStreamSource(stream).connect(an); } catch {}
+  const blob = () => new Blob(chunks, {type: rec.mimeType || 'audio/webm'});
+  return {
+    at: Date.now(), blob,
+    level() { if (!an) return 0; const d = new Uint8Array(an.fftSize); an.getByteTimeDomainData(d); let m = 0; for (const v of d) m = Math.max(m, Math.abs(v - 128)); return m / 128; },
+    stop: () => new Promise((ok) => { rec.onstop = () => { stream.getTracks().forEach((t) => t.stop()); ctx?.close().catch(() => {}); ok(blob()); }; rec.state === 'inactive' ? rec.onstop() : rec.stop(); }),
+  };
+}
+const micError = (e) => toast(e?.message === 'nomic' ? 'Этот браузер не умеет записывать звук — откройте студию в Chrome или Safari' : 'Нет доступа к микрофону — разрешите его в настройках браузера для этого сайта');
+
+// The microphone in the corner of a field: shows on hover or focus, records, puts the text in.
+const MIC_FIELDS = 'textarea:not([readonly]):not([disabled]), input:not([type]):not([readonly]):not([disabled]), input[type="text"]:not([readonly]):not([disabled])';
+let micFor = null, micRec = null, micHide = 0;
+function fieldMic() {
+  let b = $('#fmic');
+  if (!b) {
+    b = document.createElement('button');
+    b.type = 'button'; b.id = 'fmic'; b.hidden = true;
+    b.innerHTML = `${svg('mic', 15)}<span></span>`;
+    b.onmousedown = (e) => e.preventDefault();
+    b.onclick = () => (micRec ? micStop() : micStart());
+    document.body.append(b);
+  }
+  return b;
+}
+function micPlace(el) {
+  const b = fieldMic(), r = el.getBoundingClientRect();
+  if (!r.width || r.width < 120) return;
+  const one = el.tagName === 'INPUT' || r.height < 44;
+  b.style.left = `${r.right - 32}px`; b.style.top = `${one ? r.top + r.height / 2 - 13 : r.top + 6}px`;
+  b.hidden = false; micFor = el;
+}
+async function micStart() {
+  const el = micFor;
+  if (!el) return;
+  try { micRec = await startRecording(); } catch (e) { micRec = null; return micError(e); }
+  const b = fieldMic();
+  b.classList.add('rec'); el.classList.add('dictating');
+  const tick = () => { if (!micRec) return; b.querySelector('span').textContent = mmss(Date.now() - micRec.at); requestAnimationFrame(tick); };
+  tick();
+}
+async function micStop() {
+  const el = micFor, b = fieldMic(), rec = micRec;
+  micRec = null;
+  b.classList.remove('rec'); b.classList.add('busy'); b.querySelector('span').textContent = 'распознаю…';
+  const text = (await voiceText(await rec.stop())).trim();
+  b.classList.remove('busy'); b.querySelector('span').textContent = ''; el?.classList.remove('dictating');
+  if (!text) return toast('Не расслышал — скажите ещё раз или напишите');
+  if (!el?.isConnected) return toast('Поле закрылось, текст: ' + text.slice(0, 80));
+  const v = el.value, at = el.selectionEnd ?? v.length, pre = v.slice(0, at), post = v.slice(at);
+  el.value = pre + (pre && !/\s$/.test(pre) ? ' ' : '') + text + (post && !/^\s/.test(post) ? ' ' : '') + post;
+  el.focus();
+  el.dispatchEvent(new Event('input', {bubbles: true}));
+  el.dispatchEvent(new Event('change', {bubbles: true}));
+}
+const micOk = (el) => el?.matches?.(MIC_FIELDS) && canEdit() && !el.closest('#fmic, .nomic');
+document.addEventListener('focusin', (e) => { if (!micRec && micOk(e.target)) { clearTimeout(micHide); micPlace(e.target); } });
+document.addEventListener('mouseover', (e) => { if (!micRec && micOk(e.target)) { clearTimeout(micHide); micPlace(e.target); } });
+document.addEventListener('focusout', () => { if (micRec) return; micHide = setTimeout(() => { if (!micRec && !micOk(document.activeElement)) fieldMic().hidden = true; }, 200); });
+window.addEventListener('scroll', () => { if (micFor && !fieldMic().hidden) micFor.isConnected ? micPlace(micFor) : (fieldMic().hidden = true); }, true);
+window.addEventListener('hashchange', () => { if (micRec) micStop(); fieldMic().hidden = true; });
+
+// «Надиктовать идею» on the idea stage: speak freely; the text shows while one speaks, Claude fills
+// «О чём», «Крючок», «Ход» and «Кто в кадре» (and says if the rubric, format or day change), each
+// marked «из голоса». Nothing is saved until «Оставить, как надиктовал»; «Вернуть, как было» undoes.
+function ideaDictation(host, x, onSaved) {
+  const box = host.querySelector('#dict');
+  const fields = ['about', 'hook', 'flow', 'who'];
+  const val = (k) => host.querySelector(`[data-i="${k}"]`)?.value ?? '';
+  const put = (k, v) => { const el = host.querySelector(`[data-i="${k}"]`); if (!el) return; el.value = v; el.classList.add('fromvoice'); el.closest('label')?.querySelector('.dtag')?.removeAttribute('hidden'); };
+  let rec = null, before = null, said = '', busy = false, parsing = false, wanted = '', extra = {}, note = '', timer = 0, raf = 0;
+  const idle = () => {
+    box.className = 'dict';
+    box.innerHTML = `<button type="button" class="dbig" id="dGo">${svg('mic', 18)}Надиктовать идею</button><span class="small muted" style="line-height: 1.45">Расскажите как есть — Claude сам разложит по полям «О чём», «Крючок», «Ход».<br><span class="kbd">удерживайте пробел</span> — говорите, отпустите — готово</span>`;
+    box.querySelector('#dGo').onclick = () => start(false);
+  };
+  const parse = async (text) => {
+    if (parsing) { wanted = text; return; }
+    parsing = true;
+    const r = await post('/api/dictate/parse', {text, idea: {about: val('about'), hook: val('hook'), flow: val('flow').split('\n').filter(Boolean), who: val('who')}, rubric: x.rubric, format: x.format, at: x.at}).catch(() => null);
+    parsing = false;
+    const f = r?.fields || {};
+    if (f.about) put('about', f.about);
+    if (f.hook) put('hook', f.hook.replace(/^[«"]|[»"]$/g, ''));
+    if (f.flow) put('flow', f.flow.join('\n'));
+    if (f.who) put('who', f.who);
+    for (const k of ['rubric', 'format', 'date']) if (f[k] && f[k] !== (k === 'date' ? (x.at || '').slice(0, 10) : x[k])) {
+      extra[k] = f[k];
+      // A page with the card's own controls (Рубрика, Формат, Дата) shows the change right there.
+      const el = host.querySelector(`[data-i="${k === 'date' ? 'at' : k}"]`);
+      if (el) { el.value = k === 'date' ? `${f.date}T${(x.at || '').slice(11, 16) || '19:00'}` : f[k]; el.classList.add('fromvoice'); }
+    }
+    if (f.note) note = f.note;
+    paintNote();
+    if (wanted && wanted !== text) { const w = wanted; wanted = ''; parse(w); }
+  };
+  const listen = async () => {
+    if (!rec || busy) return;
+    busy = true;
+    const t = await voiceText(rec.blob());
+    busy = false;
+    if (t && t !== said) { said = t; const l = box.querySelector('.dlive'); if (l) l.textContent = t; parse(t); }
+  };
+  const rubricName = (id) => ITEMS.rubrics.find((r) => r.id === id)?.name || id;
+  const extraText = () => [extra.rubric && `рубрика → ${rubricName(extra.rubric)}`, extra.format && `формат → ${FMT_NAME[extra.format]?.toLowerCase() || extra.format}`, extra.date && `дата → ${new Date(extra.date).toLocaleDateString('ru', {weekday: 'short', day: 'numeric', month: 'long'})}`].filter(Boolean).join(' · ');
+  const paintNote = () => { const n = box.querySelector('.dnote'); if (n) n.textContent = [note, extraText()].filter(Boolean).join(' '); };
+  const start = async (hold) => {
+    if (rec) return;
+    before ||= Object.fromEntries(fields.map((k) => [k, val(k)]));
+    try { rec = await startRecording(); } catch (e) { rec = null; return micError(e); }
+    said = ''; extra = {}; note = '';
+    box.className = 'dict rec';
+    box.innerHTML = `<button type="button" class="dstop" id="dStop" aria-label="Готово">${svg('mic', 18)}</button><canvas id="dWave" width="240" height="36" aria-hidden="true"></canvas><b class="dtime" id="dTime">0:00</b><span class="small muted">${hold ? 'отпустите — готово' : 'нажмите — готово'}</span>
+      <div class="dlive" aria-live="polite">Слушаю…</div><div class="dnote small"></div>`;
+    box.querySelector('#dStop').onclick = stop;
+    const cv = box.querySelector('#dWave'), g = cv.getContext('2d'), bars = new Array(40).fill(0.04);
+    const draw = () => {
+      if (!rec) return;
+      bars.push(Math.max(0.04, rec.level())); bars.shift();
+      g.clearRect(0, 0, cv.width, cv.height); g.fillStyle = '#C43F34';
+      bars.forEach((v, i) => { const h = Math.max(3, v * cv.height); g.fillRect(i * 6, (cv.height - h) / 2, 3, h); });
+      box.querySelector('#dTime').textContent = mmss(Date.now() - rec.at);
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    timer = setInterval(listen, 5000);
+  };
+  const stop = async () => {
+    if (!rec) return;
+    clearInterval(timer); cancelAnimationFrame(raf);
+    const r = rec; rec = null;
+    box.className = 'dict done';
+    box.innerHTML = `<div class="dlive">${esc(said || '…')}</div><div class="dnote small">Дослушиваю и раскладываю…</div>`;
+    const blob = await r.stop();
+    while (busy) await new Promise((ok) => setTimeout(ok, 200));
+    const t = (await voiceText(blob)).trim() || said;
+    if (!t) { toast('Не расслышал — попробуйте ещё раз'); return idle(); }
+    said = t;
+    box.querySelector('.dlive').textContent = t;
+    await parse(t);
+    while (parsing) await new Promise((ok) => setTimeout(ok, 200));
+    box.innerHTML = `<div class="dlive">${esc(said)}</div><div class="dnote small"></div>
+      <div class="row" style="gap: 8px"><button type="button" class="btn primary" id="dKeep">Оставить, как надиктовал</button><button type="button" class="btn" id="dBack">Вернуть, как было</button><button type="button" class="btn" id="dMore" style="margin-left: auto">${svg('mic', 14)}Ещё</button></div>`;
+    paintNote();
+    box.querySelector('#dKeep').onclick = keep;
+    box.querySelector('#dBack').onclick = back;
+    box.querySelector('#dMore').onclick = () => start(false);
+  };
+  const clearMarks = () => { host.querySelectorAll('.fromvoice').forEach((e) => e.classList.remove('fromvoice')); host.querySelectorAll('.dtag').forEach((t) => t.setAttribute('hidden', '')); };
+  const keep = async () => {
+    const at = extra.date ? `${extra.date}T${(x.at || '').slice(11, 16) || '19:00'}` : undefined;
+    await post('/api/items/set', {id: x.id, idea: {about: val('about'), hook: val('hook'), flow: val('flow').split('\n').map((l) => l.trim()).filter(Boolean), who: val('who')}, ...(extra.rubric ? {rubric: extra.rubric} : {}), ...(extra.format ? {format: extra.format} : {}), ...(at ? {at} : {})});
+    toast('Идея сохранена'); before = null; clearMarks(); idle(); onSaved?.();
+  };
+  const back = () => { for (const k of fields) { const el = host.querySelector(`[data-i="${k}"]`); if (el) el.value = before[k]; } for (const [k, v] of [['rubric', x.rubric || ''], ['format', x.format], ['at', (x.at || '').slice(0, 16)]]) { const el = host.querySelector(`[data-i="${k}"]`); if (el && extra[k === 'at' ? 'date' : k]) el.value = v; } before = null; extra = {}; clearMarks(); idle(); };
+  idle();
+  // Holding Space anywhere but a text field records; letting go finishes.
+  const down = (e) => { if (!box.isConnected) return cleanup(); if (e.code !== 'Space' || e.repeat || e.target.closest?.('input, textarea, select, button, [contenteditable]') || !canEdit()) return; e.preventDefault(); start(true); };
+  const up = (e) => { if (!box.isConnected) return cleanup(); if (e.code === 'Space' && rec) { e.preventDefault(); stop(); } };
+  const cleanup = () => { document.removeEventListener('keydown', down); document.removeEventListener('keyup', up); };
+  document.addEventListener('keydown', down);
+  document.addEventListener('keyup', up);
 }
 function lifeBarFor(x, {controls = true, href = null, viewing = null} = {}) {
   const k = LIFE.findIndex(([s]) => s === x.stage);
@@ -1190,7 +1386,7 @@ async function vItem(id) {
   title(x.title);
   const ed = canEdit();
   const r = itemRubric(x);
-  const field = (f, label, v, rows, ph) => `<label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}</span><textarea class="f" data-i="${f}" rows="${rows}" placeholder="${ph}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.55; resize: vertical">${esc(v || '')}</textarea></label>`;
+  const field = (f, label, v, rows, ph) => `<label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}<span class="dtag" hidden> · из голоса</span></span><textarea class="f" data-i="${f}" rows="${rows}" placeholder="${ph}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.55; resize: vertical">${esc(v || '')}</textarea></label>`;
   const prop = (k, v) => `<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span class="muted" style="flex: 0 0 72px">${k}</span><span style="flex: 1; display: flex; justify-content: flex-end">${v}</span></div>`;
   const sel = (f, opts, cur) => `<select class="f" data-i="${f}" ${ed ? '' : 'disabled'} style="width: auto; min-height: 30px; font-size: 13px; font-weight: 600; border-color: transparent; text-align: right">${opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
   view.innerHTML = `<div class="work"><div class="rmain">
@@ -1199,10 +1395,12 @@ async function vItem(id) {
     <div style="flex: 1; overflow-y: auto; padding: 28px 40px; display: flex; gap: 32px; min-height: 0">
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px">
         <span class="small muted">${x.by === 'Claude' ? 'Предложил Claude' : x.by === 'owner' ? 'Твоя идея' : x.by ? 'Добавил ' + esc(x.by) : 'Идея'}${x.takenBy ? ' · взял ' + esc(x.takenBy) : ''}</span>
+        ${ed ? '<div id="dict"></div>' : ''}
         <label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Название</span><input class="f" data-i="title" value="${esc(x.title)}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 15px"></label>
         ${field('about', 'О чём', x.idea?.about, 3, 'Одна-две фразы: о чём выпуск')}
         ${field('hook', 'Крючок — первые 2 секунды', x.idea?.hook, 2, 'Фраза или кадр, на котором остаются')}
         ${field('flow', 'Ход — по строке на шаг', (x.idea?.flow || []).join('\n'), 4, '1 · …\n2 · …\n3 · …')}
+        <label style="display: flex; flex-direction: column; gap: 6px; max-width: 360px"><span class="lbl">Кто в кадре<span class="dtag" hidden> · из голоса</span></span><input class="f" data-i="who" value="${esc(x.idea?.who || '')}" placeholder="инструктор, гость, никто — только кадры" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 15px"></label>
         ${ed ? `<div class="row" style="gap: 8px">${['Другой крючок', 'Короче, 15 секунд', 'Распиши ход', 'Сделать каруселью'].map((t) => `<button type="button" class="ln-pill" data-ask="${t}">${t}</button>`).join('')}</div>` : ''}
       </div>
       <div style="flex: 0 0 280px; display: flex; flex-direction: column; gap: 14px">
@@ -1225,8 +1423,9 @@ async function vItem(id) {
     const f = el.dataset.i;
     if (['title', 'format', 'rubric', 'at'].includes(f)) return save({[f]: el.value || null}).then(() => ['rubric', 'at', 'format'].includes(f) && vItem(id));
     const v = (k) => view.querySelector(`[data-i="${k}"]`).value;
-    save({idea: {about: v('about'), hook: v('hook'), flow: v('flow').split('\n').map((l) => l.trim()).filter(Boolean)}});
+    save({idea: {about: v('about'), hook: v('hook'), flow: v('flow').split('\n').map((l) => l.trim()).filter(Boolean), who: v('who')}});
   }));
+  if (ed) ideaDictation(view, x, () => vItem(id));
   // The idea lives in items.json; Claude edits it there, by its id.
   view.querySelectorAll('[data-ask]').forEach((b) => (b.onclick = () => box.say(`Идея «${x.title}» (projects/${P}/items.json, элемент id ${x.id}, поле idea: about, hook, flow). ${b.dataset.ask}${b.dataset.ask === 'Сделать каруселью' ? ': поменяй format на carousel и перепиши ход под 5–7 слайдов' : ''}. Запиши результат в это поле и коротко скажи здесь, что поменял.`, b.dataset.ask)));
   $('#iTake')?.addEventListener('click', async () => { await save({take: true}); toast('Взято в план'); vItem(id); });
