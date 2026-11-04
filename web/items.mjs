@@ -122,6 +122,9 @@ export function syncItems(studio, {dry = false, now = Date.now()} = {}) {
 
   for (const r of src.reels) {
     if (byRef('reel', r.id)) continue;
+    // A reel started from an idea in the last hours becomes that idea's folder.
+    const waiting = data.items.filter((x) => x.starting && now - x.starting < 6 * 3600e3 && x.format === 'reel' && x.ref?.kind !== 'reel').sort((a, b) => b.starting - a.starting)[0];
+    if (waiting) { waiting.ref = {kind: 'reel', id: r.id}; delete waiting.starting; delete waiting.proposed; changed = true; continue; }
     add({id: newId(), format: 'reel', title: r.title, stage: 'idea', rubric: rubric['reel:' + r.id] || null, at: at['reel:' + r.id] || null, ref: {kind: 'reel', id: r.id}, created: now});
   }
   for (const x of src.posts) {
@@ -182,6 +185,13 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
   if (b.idea && typeof b.idea === 'object') item.idea = {about: String(b.idea.about ?? item.idea?.about ?? '').slice(0, 2000), hook: String(b.idea.hook ?? item.idea?.hook ?? '').slice(0, 300), flow: (Array.isArray(b.idea.flow) ? b.idea.flow : item.idea?.flow || []).map((s) => String(s).slice(0, 300)).slice(0, 12)};
   if (Array.isArray(b.need) && item.ref?.kind !== 'reel') item.need = b.need.map((n) => ({text: String(n.text || '').slice(0, 200), have: String(n.have || '').slice(0, 200), done: !!n.done})).slice(0, 30);
   if (b.take) { delete item.proposed; item.takenBy = by; }
+  if (b.starting) item.starting = now;
+  // Links an idea to the post folder made for it (reels link themselves in syncItems).
+  if (b.link?.kind === 'post' && /^[\w-]{1,80}$/.test(b.link.id || '') && existsSync(join(studio, 'posts', b.link.id))) {
+    // A sync may have added the fresh folder on its own a moment ago: that copy goes.
+    data.items = data.items.filter((x) => !(x !== item && x.ref?.kind === 'post' && x.ref.id === b.link.id && now - (x.created || 0) < 5 * 60e3));
+    if (!data.items.some((x) => x.ref?.kind === 'post' && x.ref.id === b.link.id)) { item.ref = {kind: 'post', id: b.link.id}; delete item.proposed; }
+  }
   if (b.stage !== undefined && STAGES.includes(b.stage) && b.stage !== item.stage) {
     if (rank(b.stage) < rank(item.stage) && item.ref?.kind === 'reel') {
       const vd = join(studio, 'reels', item.ref.id, 'versions');
