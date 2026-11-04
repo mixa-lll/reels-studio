@@ -393,6 +393,19 @@
   .nx-phones { display: flex; gap: 28px; flex-wrap: wrap; }
   .nx-ph { border: 0; background: none; padding: 0; display: flex; flex-direction: column; gap: 12px; align-items: center; cursor: pointer; font: inherit; color: var(--muted); }
   .nx-ph:hover .pv-ip { transform: translateY(-2px); } .nx-ph .pv-ip { transition: transform .15s ease; }
+  /* Память (M1–M5) */
+  .mh1 { font-size: 24px; font-weight: 600; letter-spacing: -0.03em; color: var(--ink); }
+  .mcard { border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #fff; text-decoration: none; color: var(--ink); }
+  .mcard:hover { border-color: #D4D4D4; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+  .meter { height: 4px; border-radius: 2px; background: #EFEFEF; overflow: hidden; display: block; } .meter i { display: block; height: 4px; background: var(--ink); border-radius: 2px; }
+  .mdrop { border: 1.5px dashed #CFCFCF; border-radius: 16px; background: #FAFAFA; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 26px 18px; cursor: pointer; }
+  .mdrop.over, .mdrop:hover { border-color: var(--ink); background: #F4F4F4; }
+  .qi { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; font: inherit; font-size: 13.5px; color: var(--ink2); background: none; border: 0; cursor: pointer; width: 100%; }
+  .qi.on { background: #F2F2F2; color: var(--ink); font-weight: 600; }
+  .qi .d { width: 18px; height: 18px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 10px; box-sizing: border-box; }
+  .mic { width: 76px; height: 76px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; border: 0; cursor: pointer; box-shadow: 0 0 0 10px rgba(23,23,23,.06), 0 0 0 22px rgba(23,23,23,.035); }
+  .mic.rec { background: #C43F34; box-shadow: 0 0 0 10px rgba(196,63,52,.12), 0 0 0 22px rgba(196,63,52,.06); animation: micPulse 1.2s ease-in-out infinite; }
+  @keyframes micPulse { 50% { box-shadow: 0 0 0 14px rgba(196,63,52,.16), 0 0 0 28px rgba(196,63,52,.05); } }
   .lline { width: 22px; height: 1.5px; background: #E5E5E5; } .lline.done { background: var(--ink); }
 </style>
 <script src="/preview.js"></script>
@@ -433,6 +446,8 @@ const STATUS = {work: 'В работе', review: 'На ревью', none: 'Бе�
 const ICON = {
   panel: '<rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path>',
   expand: '<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"></path>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path>',
+  flag: '<path d="M5 21V4h11l-2 4 2 4H5"></path>',
   panelR: '<rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M15 4v16"></path>',
   chat2: '<path d="M4 5h16v11H8l-4 4Z"></path>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>',
@@ -2068,10 +2083,191 @@ async function vPlanSetup() {
 // Project settings: title + tabs on top, each tab is one of the older pages rendered below.
 // Память (handbook/LEAN.md, кусок 2): what Claude knows and checks in every release.
 // For now its tabs are the old Settings and Strategy ones; facts with dates come in кусок 9.
-const MEMORY_TABS = ['facts', 'brief', 'voice', 'rules', 'ds', 'files'];
+const MEMORY_TABS = ['overview', 'facts', 'brief', 'questions', 'voice', 'rules', 'ds', 'files', 'ask'];
+// «О проекте» (M5): brief.md by its «## » sections, each a card; the sections Claude expects but
+// does not have are gaps with «Ответить» — a guiding question by voice.
+const BRIEF = [['who', 'Кто мы', /кто мы|о нас|о проекте|^что$/i], ['for', 'Для кого', /для кого|аудитор|клиент/i], ['sell', 'Что продаём', /продаём|продаем|услуг|что делаем/i], ['diff', 'Чем отличаемся', /отлича|почему мы|преимущ/i],
+  ['season', 'Сезон', /сезон|даты/i], ['where', 'Площадки', /площадк|аккаунт|соцсет/i], ['works', 'Что работает', /работает|заходит/i], ['goal', 'Цели на сезон', /цел|делает после/i], ['never', 'Чего не обещаем', /не обещ|нельзя|не дела/i], ['like', 'Чьи аккаунты нравятся', /нрав|пример|референс/i]];
+// Sections are «## » headings; an onboarding brief's «- **Что:** …» lines count as sections too.
+const briefParts = (text) => String(text || '').split(/^## +/m).flatMap((p, i) => {
+  if (!i) return [...p.matchAll(/^\s*[-*] \*\*([^*]+?)\*\*:?\s*(.+)$/gm)].map((m) => ({head: m[1].replace(/:$/, ''), body: m[2]}));
+  const j = p.indexOf('\n');
+  return [{head: (j < 0 ? p : p.slice(0, j)).trim(), body: j < 0 ? '' : p.slice(j + 1).trim()}];
+});
+// tokens.json from the site ({colors, fonts, radii}) or the reels' own ({color, font, radius}) — one shape.
+const normTok = (t) => {
+  if (!t) return null;
+  const hex = (v) => typeof v === 'string' ? v : v?.hex || v?.value || '';
+  const colors = Array.isArray(t.colors) ? t.colors : Object.entries(t.color || {}).filter(([, v]) => /^#/.test(hex(v))).map(([k, v]) => ({name: k, hex: hex(v), role: v?.role || ''}));
+  const fonts = Array.isArray(t.fonts) ? t.fonts : Object.entries(t.font || {}).map(([k, v]) => { const m = /^(.*?)\s+(\d+)/.exec(String(v)); return {family: m ? m[1] : String(v), weight: m ? m[2] : '', role: k}; });
+  const radii = Array.isArray(t.radii) ? t.radii : Object.values(t.radius || {}).filter((x) => Number.isFinite(x));
+  return {...t, colors, fonts, radii, site: t.site || ''};
+};
+const briefGaps = (text) => { const parts = briefParts(text); return BRIEF.filter(([, , re]) => !parts.some((p) => re.test(p.head) && p.body)); };
+const memSay = (text, shown) => { sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown})); location.hash = '#/chat/_project'; };
 async function vBrief() {
-  const k = await api('/api/knowledge');
-  view.innerHTML = `<div class="page" style="max-width: 980px; padding: 22px 36px"><div class="md">${md(k.brief) || '<p class="muted">Пусто. Расскажите о проекте в <a href="#/chat/_project">чате проекта</a> — Claude запишет.</p>'}</div></div>`;
+  const m = await api('/api/memory');
+  const parts = briefParts(m.brief);
+  const gaps = briefGaps(m.brief);
+  const rest = !parts.length && m.brief.trim() ? m.brief : '';
+  const card = (p) => `<div style="padding: 14px 0; border-bottom: 1px solid #F0F0F0; display: flex; flex-direction: column; gap: 6px"><span class="small muted" style="font-weight: 500">${esc(p.head)}</span><div class="md" style="font-size: 14.5px; line-height: 1.55">${md(p.body)}</div></div>`;
+  const hole = ([k, t]) => `<div style="padding: 14px 0; border-bottom: 1px solid #F0F0F0; display: flex; flex-direction: column; gap: 6px"><span class="small muted" style="font-weight: 500">${t}</span><div style="border: 1.5px dashed #E3C98F; background: #FFFBF2; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: #8A5A00"><span style="flex: 1">Claude пока догадывается — ответ займёт минуту</span>${canEdit() ? `<a class="ln-btn s" href="#/memory/ask/${k}">${svg('mic', 13)}Ответить</a>` : ''}</div></div>`;
+  const all = [...parts.map(card), ...gaps.map(hole)];
+  const half = Math.ceil(all.length / 2);
+  view.innerHTML = `<div class="work"><div style="flex: 1; min-width: 0; overflow-y: auto; padding: 22px 40px">
+      <div style="display: flex; align-items: flex-end; gap: 16px; padding-bottom: 6px"><div style="flex: 1"><div class="mh1" role="heading" aria-level="1">О проекте</div><div class="muted" style="font-size: 14px">Одна страница, которую Claude перечитывает перед каждым выпуском.</div></div><span class="small muted">${parts.length} разделов · ${gaps.length} ${gaps.length === 1 ? 'пробел' : gaps.length < 5 && gaps.length ? 'пробела' : 'пробелов'}</span></div>
+      ${rest ? `<div class="md" style="padding-top: 12px">${md(rest)}</div>` : ''}
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); column-gap: 40px"><div>${all.slice(0, half).join('')}</div><div>${all.slice(half).join('')}</div></div>
+      ${!m.brief.trim() ? '<p class="muted">Пусто. Ответьте голосом на вопросы или бросьте ссылку на сайт в Обзоре — Claude запишет.</p>' : ''}</div>
+    <aside class="ln-aside" style="flex-basis: 300px"><div class="lbl">Откуда Claude это знает</div>
+      ${m.sources.slice(0, 8).map((x) => `<div class="ln-li" style="padding: 9px 2px; font-size: 13px">${svg(x.kind === 'link' ? 'globe' : x.kind === 'voice' ? 'mic' : 'clip', 14)}<span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.name)}</span><span class="r">${new Date(x.at).toLocaleDateString('ru', {day: 'numeric', month: 'short'})}</span></div>`).join('') || '<span class="small muted">Источники появятся, когда вы что-то загрузите или ответите голосом.</span>'}
+      ${canEdit() && m.links[0] ? `<button type="button" class="ln-btn" id="bReread" style="align-self: flex-start">${svg('globe', 14)}Перечитать сайт</button>` : ''}
+      <span class="small muted" style="margin-top: auto; line-height: 1.5">Правится словами в <a href="#/chat/_project">чате проекта</a>: «мы ещё делаем фотосессии на склоне» — Claude допишет нужный раздел.</span></aside></div>`;
+  $('#bReread')?.addEventListener('click', () => memSay(`Перечитай сайт ${m.links[0]} и обнови brief.md по разделам (## Кто мы, Для кого, Что продаём, …) и facts.json. Скажи коротко, что поменялось.`, 'Перечитать сайт'));
+}
+
+// Память › Обзор (M1): what Claude knows, the gaps, and one place to drop anything in.
+async function vMemHub() {
+  const m = await api('/api/memory');
+  const gaps = briefGaps(m.brief);
+  const ed = canEdit();
+  const card = (icon, t, meta, frac, text, gap, href, act) => `<a class="mcard" href="${href}"><span style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px">${svg(icon, 16)}${t}<span class="small muted" style="margin-left: auto; font-weight: 400">${meta}</span></span>
+    <span class="meter"><i style="width: ${Math.round(Math.max(0.04, frac) * 100)}%"></i></span><span style="font-size: 13.5px; line-height: 1.5; color: var(--ink2)">${text}</span>
+    ${gap ? `<span style="font-size: 13px; color: #8A5A00; line-height: 1.4">⚠ ${gap}</span>` : ''}${act ? `<span style="font-size: 13px; margin-top: auto">${act} →</span>` : ''}</a>`;
+  const tok = normTok(m.tokens);
+  const cards = [
+    card('idea', 'О проекте', `${BRIEF.length - gaps.length} из ${BRIEF.length}`, (BRIEF.length - gaps.length) / BRIEF.length, 'Кто мы, для кого, что продаём, сезон, площадки', gaps.length ? 'Нет: ' + gaps.slice(0, 2).map(([, t]) => t.toLowerCase()).join(', ') : '', '#/memory/brief', gaps.length && ed ? 'Ответить голосом' : ''),
+    card('clip', 'Факты и цены', String(m.facts.n), m.facts.n ? 1 - m.facts.old / m.facts.n : 0, 'Цены, даты, расписание — у каждого источник и дата', m.facts.old ? `${m.facts.old} без проверки больше 30 дней` : m.facts.n ? '' : 'Пусто — бросьте прайс или ссылку', '#/memory/facts', m.facts.old ? 'Проверить' : ''),
+    card('chat2', 'Вопросы клиентов', String(m.questions.length), Math.min(1, m.questions.length / 10), 'Что спрашивают в переписках и звонках — из них идеи выпусков', m.questions.length ? '' : 'Бросьте скриншот переписки', '#/memory/questions', ''),
+    card('text', 'Голос и стиль', m.voice ? 'заполнен' : 'пусто', m.voice ? 1 : 0, 'Как мы говорим и как никогда', m.voice ? '' : 'Не описан — ответьте на вопрос о голосе', '#/memory/voice', ''),
+    card('flag', 'Правила', String(m.rules), Math.min(1, m.rules / 8), 'Что нельзя говорить и показывать', '', '#/memory/rules', ''),
+    card('eye', 'Дизайн', tok?.site ? 'с сайта' : tok || m.ds ? 'есть' : 'пусто', tok || m.ds ? 1 : 0, tok ? `${(tok.colors || []).length} цветов, ${(tok.fonts || [])[0]?.family || 'шрифт'}` : 'Цвета, шрифт, скругления для плашек', tok || m.ds ? '' : 'Возьмите с сайта одной кнопкой', '#/memory/ds', tok?.site ? '' : 'Взять с сайта'),
+  ];
+  const holes = gaps.length + (m.voice ? 0 : 1);
+  view.innerHTML = `<div class="work"><div style="flex: 1; min-width: 0; overflow-y: auto; padding: 22px 32px 24px 40px; display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; align-items: flex-end; gap: 16px"><div style="flex: 1"><div class="mh1" role="heading" aria-level="1">Что Claude знает о ${esc(projName())}</div><div class="muted" style="font-size: 14px">Это Claude читает перед каждым выпуском. Пробелы — то, о чём он будет гадать.</div></div></div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px">${cards.join('')}</div>
+      ${ed && holes ? `<a href="#/memory/ask" style="display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 14px; background: var(--ink); color: #fff; text-decoration: none"><span style="width: 40px; height: 40px; border-radius: 50%; background: #fff; color: var(--ink); display: grid; place-items: center; flex: none">${svg('mic', 18)}</span><span style="flex: 1; line-height: 1.45"><b style="font-weight: 600">${holes} ${holes === 1 ? 'пробел' : holes < 5 ? 'пробела' : 'пробелов'} — несколько минут голосом</b><br><span style="opacity: .7; font-size: 13px">Claude спросит по одному, вы отвечаете как в голосовом, он раскладывает ответы по разделам</span></span><span class="ln-btn" style="background: #fff; border-color: #fff">Начать</span></a>` : ''}
+    </div>
+    <aside class="ln-aside" style="flex-basis: 340px">
+      ${ed ? `<label class="mdrop" id="mDrop">${svg('clip', 24)}<b style="font-size: 15px">Бросьте сюда что угодно</b><span class="small muted" style="line-height: 1.5">прайс, логотип, брендбук, фото, голосовое, скриншот переписки — Claude прочитает и покажет, что взял</span><input type="file" multiple id="mFiles" style="display: none"></label>
+      <form id="mLink" class="row" style="gap: 6px; flex-wrap: nowrap"><input class="f" id="mLinkIn" placeholder="Ссылка: сайт, Instagram, Телеграм" style="min-height: 36px; font-size: 13px"><button class="ln-btn">Прочитать</button></form>` : ''}
+      <div class="lbl" style="margin-top: 4px">Недавно</div>
+      ${m.sources.slice(0, 6).map((x) => `<div class="ln-li" style="padding: 9px 2px; font-size: 13px">${svg(x.kind === 'link' ? 'globe' : x.kind === 'voice' ? 'mic' : 'clip', 14)}<span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.name)}</span><span class="r">${new Date(x.at).toLocaleDateString('ru', {day: 'numeric', month: 'short'})}</span></div>`).join('') || '<span class="small muted">Пока ничего.</span>'}
+    </aside></div>`;
+  const sort = 'Разложи по памяти: цифры и даты — в facts.json (с источником и сегодняшней датой), вопросы клиентов — в memory.json → questions, как мы пишем — в голос (strategy.json → voice), цвета, шрифты и логотип — в design-system/tokens.json, кто мы и для кого — в brief.md по разделам. Сначала коротко покажи, что взял из каждого и куда положишь; то, что меняет уже записанное, — спроси.';
+  const send = async (files) => {
+    const got = [];
+    for (const f of files) { const r = await fetch(`/api/upload?project=${encodeURIComponent(P)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f}).then((x) => x.json()).catch(() => null); if (r?.path) { got.push(r.path); await post('/api/memory/set', {source: {kind: 'file', name: f.name}}); } }
+    if (got.length) memSay(`Я загрузил в память: ${got.join(', ')}.\n${sort}`, `Загрузил: ${files.map((f) => f.name).join(', ')}`);
+  };
+  const drop = $('#mDrop');
+  if (drop) {
+    $('#mFiles').onchange = (e) => send([...e.target.files]);
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); send([...e.dataTransfer.files]); };
+    $('#mLink').onsubmit = async (e) => { e.preventDefault(); const u = $('#mLinkIn').value.trim(); if (!u) return; await post('/api/memory/set', {source: {kind: 'link', name: u}}); memSay(`Прочитай ${u}.\n${sort}`, `Прочитать ${u}`); };
+  }
+}
+
+// Память › Вопросы клиентов: what clients ask, from chats and calls — material for ideas.
+async function vQuestions() {
+  const m = await api('/api/memory');
+  const ed = canEdit();
+  view.innerHTML = `<div style="flex: 1; overflow-y: auto"><div style="max-width: 1100px; padding: 22px 40px; display: flex; flex-direction: column; gap: 16px">
+    <div class="muted" style="font-size: 14.5px; line-height: 1.5">Что спрашивают клиенты в переписках, звонках и комментариях. Из этих вопросов Claude предлагает выпуски — ответ на частый вопрос почти всегда хороший рилс.</div>
+    <div>${m.questions.map((x) => `<div class="ln-li"><span style="color: var(--muted); display: inline-flex">${svg('chat2', 15)}</span><span style="flex: 1">${esc(x.text)}</span><span class="r">${esc(x.source || '')} · ${esc(x.at || '')}${ed ? `<button type="button" class="ln-act" data-rm="${x.id}" style="color: var(--muted)">убрать</button>` : ''}</span></div>`).join('') || '<p class="muted">Пока пусто. Бросьте скриншот переписки в Обзоре или впишите вопрос ниже.</p>'}</div>
+    ${ed ? `<form class="row" id="qAdd" style="gap: 8px; flex-wrap: nowrap"><input class="f" id="qIn" placeholder="«А если не будет снега?»"><button class="ln-btn">Добавить</button></form>
+      ${m.questions.length ? '<button type="button" class="ln-btn p" id="qIdeas" style="align-self: flex-start">Сделать идеи из вопросов</button>' : ''}` : ''}
+  </div></div>`;
+  view.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = async () => { await post('/api/memory/set', {removeQuestion: b.dataset.rm}); vMemory('questions'); }));
+  $('#qAdd')?.addEventListener('submit', async (e) => { e.preventDefault(); const t = $('#qIn').value.trim(); if (!t) return; await post('/api/memory/set', {question: {text: t}}); vMemory('questions'); });
+  $('#qIdeas')?.addEventListener('click', () => memSay('Посмотри вопросы клиентов в memory.json → questions и предложи 4–6 выпусков, которые на них отвечают: в ideas.md «My ideas» с Format:/Hook:/Plot:, Date: и Rubric:.', 'Идеи из вопросов клиентов'));
+}
+
+// Ответить голосом (M4): guiding questions one by one; the answer is dictated (the browser's own
+// speech recognition) or typed, saved in memory.json, and at the end Claude sorts them into memory.
+const ASK = [['who', 'Кто вы — одной фразой', 'Как бы вы объяснили соседу в самолёте, чем занимаетесь.'], ['for', 'Для кого: кто ваши клиенты', 'Возраст, откуда приезжают, с детьми или без, новички или опытные.'],
+  ['sell', 'Что продаёте и что самое ходовое', 'Что покупают чаще всего и на чём вы зарабатываете больше.'], ['diff', 'Чем вы отличаетесь от других? Почему выбирают вас', 'Цена, скорость ответа, язык, гарантии, что всё в одном месте. Скажите как другу.'],
+  ['price', 'Что входит в цену, а что нет', 'Чтобы Claude не обещал лишнего: трансфер до склона, снаряжение, страховка.'], ['season', 'Важные даты сезона', 'Открытие, праздники, акции, когда больше всего гостей.'],
+  ['asks', 'Что чаще всего спрашивают клиенты', 'Три-пять вопросов, которые вы слышите каждую неделю.'], ['fear', 'Чего клиенты боятся', 'Что их останавливает перед покупкой.'],
+  ['voice', 'Как вы говорите — и как никогда', 'На «вы» или на «ты», шутите или нет, какие слова вас бесят.'], ['never', 'Что нельзя показывать и обещать', 'Погода, цены без «от», чьи-то лица, конкуренты.'],
+  ['people', 'Кто может быть в кадре', 'Кто из команды готов сниматься, кого снимать нельзя.'], ['goal', 'Цель на сезон: что считать успехом', 'Заявки, подписчики, узнаваемость — и сколько примерно.'],
+  ['like', 'Чьи аккаунты нравятся и почему', 'Пара аккаунтов и что именно в них нравится.']];
+async function vAsk(start) {
+  const m = await api('/api/memory');
+  const done = new Map(m.answers.map((x) => [x.q, x]));
+  let at = Math.max(0, ASK.findIndex(([k]) => k === start));
+  if (!start) { const i = ASK.findIndex(([k]) => !done.has(k)); at = i < 0 ? 0 : i; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, said = '';
+  const draw = () => {
+    const [k, q, hint] = ASK[at];
+    said = done.get(k)?.text || '';
+    view.innerHTML = `<div class="work">
+      <aside style="flex: 0 0 310px; border-right: 1px solid var(--line); padding: 18px 12px; display: flex; flex-direction: column; gap: 2px; background: #FCFCFC; overflow-y: auto">
+        <div style="display: flex; padding: 0 10px 10px"><b>${ASK.length} вопросов · ~8 минут</b><span class="small muted" style="margin-left: auto">${done.size} готово</span></div>
+        ${ASK.map(([k2, q2], i) => `<button type="button" class="qi ${i === at ? 'on' : ''}" data-at="${i}"><span class="d" style="${done.has(k2) ? 'background: var(--ink); color: #fff' : i === at ? 'border: 2px solid var(--ink)' : 'border: 1.5px solid #D4D4D4'}">${done.has(k2) ? '✓' : ''}</span><span style="flex: 1; text-align: left">${q2}</span></button>`).join('')}</aside>
+      <div style="flex: 1; min-width: 0; overflow-y: auto; padding: 36px 48px; display: flex; flex-direction: column; gap: 20px; align-items: center; text-align: center">
+        <span class="small muted">Вопрос ${at + 1} из ${ASK.length}</span>
+        <div class="mh1" role="heading" aria-level="1" style="font-size: 30px; max-width: 640px; line-height: 1.2">${q}</div>
+        <div class="muted" style="font-size: 14.5px; max-width: 560px; line-height: 1.5">${hint} Можно долго — Claude сам выберет главное.</div>
+        ${SR ? `<button type="button" class="mic" id="aMic" aria-label="Говорить">${svg('mic', 26)}</button><span class="small muted" id="aState">Нажмите и говорите</span>` : '<span class="small muted">Диктовка в этом браузере недоступна — напишите или нажмите микрофон на клавиатуре телефона.</span>'}
+        <textarea class="f" id="aText" rows="5" placeholder="Ответ — голосом или текстом" style="max-width: 640px; width: 100%; font-size: 15px; line-height: 1.55; text-align: left">${esc(said)}</textarea>
+        <div class="row" style="gap: 10px"><button type="button" class="ln-btn g" id="aSkip">Пропустить</button><button type="button" class="ln-btn p" id="aNext">${at < ASK.length - 1 ? 'Дальше →' : 'Готово'}</button></div>
+      </div>
+      <aside class="ln-aside" style="flex-basis: 300px; background: #fff"><div class="lbl">Ваши ответы</div>
+        ${m.answers.length ? m.answers.map((x) => `<div style="border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px"><span class="small muted">${esc(x.question || x.q)}</span><span style="font-size: 13.5px; line-height: 1.45">${esc(x.text.length > 180 ? x.text.slice(0, 180) + '…' : x.text)}</span></div>`).join('') : '<span class="small muted">Появятся здесь, как только ответите.</span>'}
+        ${m.answers.length ? `<button type="button" class="ln-btn p" id="aSort" style="margin-top: auto; justify-content: center">Разложить по памяти · ${m.answers.length}</button><span class="small muted" style="line-height: 1.5">Claude запишет ответы в «О проекте», голос, правила и факты и покажет, что поменял.</span>` : ''}</aside></div>`;
+    view.querySelectorAll('[data-at]').forEach((b) => (b.onclick = () => { stop(); at = Number(b.dataset.at); draw(); }));
+    $('#aMic')?.addEventListener('click', () => (rec ? stop() : listen()));
+    $('#aSkip').onclick = () => { stop(); at = (at + 1) % ASK.length; draw(); };
+    $('#aNext').onclick = async () => {
+      stop();
+      const text = $('#aText').value.trim();
+      if (text) { const r = await post('/api/memory/set', {answer: {q: k, question: q, text}}); m.answers = r.answers; done.set(k, {text}); if (!m.sources.some((x) => x.kind === 'voice' && Date.now() - new Date(x.at) < 36e5)) await post('/api/memory/set', {source: {kind: 'voice', name: 'Ответы голосом'}}); }
+      const next = ASK.findIndex(([k2], i) => i > at && !done.has(k2));
+      if (next < 0 && text) { toast('Ответы сохранены'); }
+      at = next < 0 ? Math.min(at + 1, ASK.length - 1) : next;
+      draw();
+    };
+    $('#aSort')?.addEventListener('click', () => memSay(`Вот мои ответы на вопросы о проекте:\n${m.answers.map((x) => `— ${x.question || x.q}: ${x.text}`).join('\n')}\nРазложи их по памяти: brief.md по разделам (## Кто мы, Для кого, Что продаём, Чем отличаемся, Сезон, Площадки, Что работает, Цели на сезон, Чего не обещаем, Чьи аккаунты нравятся), голос и правила — в strategy.json → voice и PLAYBOOK.md, цифры и даты — в facts.json, вопросы клиентов — в memory.json → questions. Покажи коротко, что куда записал.`, 'Разложить ответы по памяти'));
+  };
+  function listen() {
+    rec = new SR(); rec.lang = 'ru-RU'; rec.continuous = true; rec.interimResults = true;
+    const base = $('#aText').value.trim();
+    rec.onresult = (e) => { let t = ''; for (const r of e.results) t += r[0].transcript; $('#aText').value = (base ? base + ' ' : '') + t.trim(); };
+    rec.onend = () => { rec = null; $('#aMic')?.classList.remove('rec'); if ($('#aState')) $('#aState').textContent = 'Нажмите и говорите'; };
+    rec.onerror = () => stop();
+    rec.start();
+    $('#aMic').classList.add('rec'); $('#aState').textContent = 'Слушаю… нажмите, чтобы остановить';
+  }
+  function stop() { try { rec?.stop(); } catch {} rec = null; }
+  draw();
+}
+
+// Дизайн с сайта (M3): Claude reads the site's CSS into design-system/tokens.json; here the colours,
+// fonts and radii, which colours go into the releases, and how a plate looks in them.
+function dsFromSite(k, m) {
+  const tok = normTok(m.tokens);
+  const site = tok?.site || m.links[0] || '';
+  const prices = m.facts.prices.slice(0, 3);
+  const C = (role, d) => (tok?.colors || []).find((c) => c.use !== false && new RegExp(role, 'i').test(c.role + ' ' + c.name))?.hex || d;
+  const ink = C('текст|text|ink', '#151612'), bg = C('фон|background|bg|surface|paper', '#F6F6F3'), acc = C('акцент|accent|primary|signal|brand', '#C43F34');
+  const font = (tok?.fonts || [])[0]?.family || 'inherit';
+  return `<div style="display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--line); border-radius: 14px; padding: 18px">
+    <div class="row" style="gap: 10px; flex-wrap: nowrap"><input class="f" id="dsSite" value="${esc(site)}" placeholder="Сайт: mygudauri.org" style="min-height: 40px"><button type="button" class="ln-btn p" id="dsTake" style="height: 40px">${tok?.site ? 'Обновить с сайта' : 'Взять дизайн с сайта'}</button></div>
+    ${tok ? `<div style="display: flex; gap: 14px; flex-wrap: wrap">${(tok.colors || []).map((c) => `<span style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; opacity: ${c.use === false ? .45 : 1}"><span style="width: 64px; height: 50px; border-radius: 10px; background: ${esc(c.hex)}; border: 1px solid rgba(0,0,0,.08)"></span>${esc(c.name || c.role || '')}<span class="muted" style="font-size: 11px">${esc(c.hex)}${c.role ? ' · ' + esc(c.role) : ''}</span></span>`).join('')}</div>
+      <div style="display: flex; gap: 28px; flex-wrap: wrap; align-items: center">
+        ${(tok.fonts || []).slice(0, 2).map((f) => `<span style="display: flex; gap: 10px; align-items: center"><span style="font-family: '${esc(f.family)}', inherit; font-size: 40px; font-weight: ${Number(f.weight) || 600}; letter-spacing: -0.03em">Аа</span><span class="small">${esc(f.family)}<br><span class="muted">${esc(f.weight || '')} · ${esc(f.role || '')}</span></span></span>`).join('')}
+        ${(tok.radii || []).length ? `<span style="display: flex; gap: 8px; align-items: flex-end">${tok.radii.slice(0, 5).map((r) => `<span class="muted" style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px"><span style="width: 34px; height: 34px; border: 2px solid ${esc(ink)}; border-radius: ${Number(r) || 0}px"></span>${esc(r)}</span>`).join('')}</span>` : ''}</div>
+      <div><div class="lbl" style="margin-bottom: 8px">Так это ляжет в выпуски</div><div style="display: flex; gap: 10px; flex-wrap: wrap">
+        <div style="width: 120px; height: 213px; border-radius: 12px; background: linear-gradient(180deg,#9DB4C8,#5F7A92); position: relative; overflow: hidden"><span style="position: absolute; left: 9px; right: 9px; top: 18px; color: #fff; font-family: '${esc(font)}', inherit; font-weight: 600; letter-spacing: -0.04em; font-size: 16px; line-height: 1.05">${esc(projName())}</span><span style="position: absolute; left: 9px; bottom: 12px; background: ${esc(acc)}; color: #fff; border-radius: 999px; padding: 3px 9px; font-size: 10px; font-weight: 600">сейчас</span></div>
+        <div style="width: 170px; height: 213px; border-radius: 12px; background: ${esc(bg)}; border: 1px solid rgba(0,0,0,.08); padding: 12px; display: flex; flex-direction: column; justify-content: space-between; color: ${esc(ink)}"><span style="font-size: 10px; opacity: .6">1 / 6</span><b style="font-family: '${esc(font)}', inherit; font-weight: 600; letter-spacing: -0.04em; font-size: 18px; line-height: 1.05">Обложка карусели</b><span style="color: ${esc(acc)}; font-weight: 700">${esc(prices[0]?.value || 'от … ₾')}</span></div>
+        <div style="width: 170px; height: 213px; border-radius: 12px; background: ${esc(ink)}; padding: 12px; display: flex; flex-direction: column; gap: 6px; color: #fff; font-size: 11.5px"><span style="opacity: .6; font-size: 10px">прайс</span>${(prices.length ? prices : [{text: 'Цена из Фактов', value: '…'}]).map((x) => `<span style="display: flex; gap: 6px; border-bottom: 1px dashed rgba(255,255,255,.2); padding-bottom: 4px"><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.text)}</span><b>${esc(x.value)}</b></span>`).join('')}</div>
+      </div></div>` : '<span class="small muted">Claude откроет сайт, вытащит из CSS цвета, шрифты, скругления, кнопки и логотип и покажет здесь, как это ляжет в плашки рилсов. Цвета, которые не нужны в выпусках, можно выключить словами.</span>'}
+  </div>`;
 }
 async function vTabs(base, head, tabs, tab, note = '') {
   const cur = tabs.find(([k]) => k === tab) || tabs[0];
@@ -2083,7 +2279,11 @@ async function vTabs(base, head, tabs, tab, note = '') {
   try { await cur[2](); } finally { view = main; }
   title(head);
 }
-const vMemory = (tab) => vTabs('memory', 'Память', [['facts', 'Факты и цены', vFacts], ['voice', 'Голос и стиль', vVoice], ['rules', 'Правила', vRules], ['ds', 'Дизайн', vDs], ['files', 'Файлы', vFiles], ['brief', 'О проекте', vBrief]], tab, 'всё, что Claude знает о проекте и проверяет в каждом выпуске');
+async function vMemory(tab, sub) {
+  if (tab === 'ask') return vTabs('memory', 'Память', [['ask', 'Ответить голосом', () => vAsk(sub)]], 'ask', 'вопросы о проекте');
+  await vTabs('memory', 'Память', [['overview', 'Обзор', vMemHub], ['brief', 'О проекте', vBrief], ['facts', 'Факты и цены', vFacts], ['questions', 'Вопросы клиентов', vQuestions], ['voice', 'Голос и стиль', vVoice], ['rules', 'Правила', vRules], ['ds', 'Дизайн', vDs], ['files', 'Файлы', vFiles]], tab, 'всё, что Claude знает о проекте и проверяет в каждом выпуске');
+  if (canEdit()) view.querySelector('.ln-top')?.insertAdjacentHTML('beforeend', `<span style="flex: 1"></span><a class="ln-btn" href="#/memory/overview">${svg('clip', 14)}Загрузить</a><a class="ln-btn p" href="#/memory/ask">${svg('mic', 14)}Ответить голосом</a>`);
+}
 async function vSettings(tab = 'modules', sub) {
   if (tab === 'access') tab = 'team';
   if (MEMORY_TABS.includes(tab)) return location.replace('#/memory/' + tab);
@@ -2129,8 +2329,9 @@ async function vConnect() {
 
 async function vDs() {
   title('Дизайн-система');
-  const k = await api('/api/knowledge');
-  view.innerHTML = `<div class="work"><div style="flex: 999 1 560px; min-width: 0; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px">
+  const [k, mem] = await Promise.all([api('/api/knowledge'), api('/api/memory')]);
+  view.innerHTML = `<div class="work"><div style="flex: 999 1 560px; min-width: 0; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto">
+      ${dsFromSite(k, mem)}
       <div class="row" style="justify-content: space-between"><div><div class="small muted">Проект</div><h1 style="font-size: 22px">Дизайн-система рилсов</h1></div>
         ${k.ds ? `<a class="btn" href="${k.ds.url}" target="_blank" rel="noopener">Открыть отдельно</a>` : ''}</div>
       ${k.ds ? `<iframe class="dsf" src="${k.ds.url}" sandbox="allow-scripts" title="Дизайн-система"></iframe><span class="small muted">Обновлена ${ago(k.ds.updated)}</span>`
@@ -2140,6 +2341,12 @@ async function vDs() {
     <aside class="vers" style="width: 400px; padding: 0" aria-label="Чат дизайн-системы"><div class="chead"><h2 style="flex: 1">Чат дизайн-системы</h2></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   const box = chatBox('_ds', {onDone: () => vDsRefresh()});
   $('#chatHost').append(box);
+  $('#dsTake')?.addEventListener('click', async () => {
+    const u = $('#dsSite').value.trim();
+    if (!u) return $('#dsSite').focus();
+    await post('/api/memory/set', {source: {kind: 'link', name: u + ' — дизайн'}});
+    box.say(`Возьми дизайн с сайта ${u}: открой главную и 3–5 страниц, вытащи из CSS цвета (с ролью: текст, фон, акцент, знак…), шрифты (семейство, начертание, где), скругления, вид кнопок и меток, логотип и стиль фото. Запиши design-system/tokens.json: {"site","colors":[{"name","hex","role","use":true}],"fonts":[{"family","weight","role"}],"radii":[px],"logo","photo"} — цвет только для логотипа пометь use:false. Потом обнови страницу дизайн-системы и плашки шаблона под эти токены и коротко скажи, что взял.`, `Взять дизайн с сайта ${u}`);
+  });
   $('#dsStart')?.addEventListener('click', () => box.say('Собери дизайн-систему рилсов из того, что уже есть: бриф, PLAYBOOK, template/src и код последних рилсов. Сделай страницу design-system/index.html.', 'Собрать дизайн-систему из рилсов'));
   async function vDsRefresh() { const k2 = await api('/api/knowledge'); if (k2.ds && !$('iframe.dsf')) return route(); if (k2.ds) $('iframe.dsf').src = k2.ds.url; }
 }
@@ -2621,7 +2828,7 @@ async function route() {
     else if ((m = /^#\/plan(?:\/(m|w))?(?:\/(-?\d+))?$/.exec(h))) await vPlan(Number(m[2] || 0), m[1] !== 'w');
     else if ((m = /^#\/rubric\/([\w-]+)/.exec(h))) await vRubric(m[1]);
     else if ((m = /^#\/settings(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vSettings(m[1], m[2]);
-    else if ((m = /^#\/memory(?:\/(\w+))?/.exec(h))) await vMemory(m[1]);
+    else if ((m = /^#\/memory(?:\/(\w+))?(?:\/(\w+))?/.exec(h))) await vMemory(m[1], m[2]);
     else if (h === '#/inbox') await vInbox();
     else if (h === '#/help/telegram-export') vHelpExport();
     else if (h === '#/tasks') await vTasks();
