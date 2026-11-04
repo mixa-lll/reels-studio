@@ -918,7 +918,7 @@ createServer(async (req, res) => {
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
-      scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
+      ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10)});
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
@@ -934,6 +934,16 @@ createServer(async (req, res) => {
     if (label) writeJson(f, {label, by: me.name, at: Date.now()}); else rmSync(f, {force: true});
     log(me.name, label ? `назвал ${b.v} ролика ${b.reel} вариантом «${label}»` : `снял метку варианта с ${b.v} ролика ${b.reel}`);
     return json(200, {ok: true});
+  }
+  // Which version goes to «Готово» (кусок 17): one is marked, the newest by default.
+  if (req.method === 'POST' && url.pathname === '/api/reel/ready') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir || !/^v\d+$/.test(b.v || '') || !existsSync(join(dir, 'versions', b.v))) return json(404, {});
+    writeJson(join(dir, 'ready.json'), {v: b.v, by: me.name, at: Date.now()});
+    log(me.name, `${b.v} ролика ${b.reel} идёт в «Готово»`);
+    return json(200, {ready: b.v});
   }
   if (req.method === 'POST' && url.pathname === '/api/reel/edits') {
     if (!can('editor')) return json(403, {});

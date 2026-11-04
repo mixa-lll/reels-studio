@@ -3,7 +3,8 @@
 //   {id, stage: 'script'|'scenes'|'video', t: seconds, text, voice, by, at, state: 'open'|'sent'|'done'|'note',
 //    quote?: words picked in the script, scene?: index in scenes.json, hint?: 'blur'|'replace'|'trim'|'remove',
 //    shape?: {kind: 'rect', x, y, w, h} | {kind: 'brush', pts: [[x, y], …]} | {kind: 'point', x, y} | {kind: 'frame'}
-//            (fractions of the frame, 0–1), point?: {x, y} (% of the frame, the web's older form), forV?, result?}
+//            (fractions of the frame, 0–1), point?: {x, y} (% of the frame, the web's older form), forV?, result?,
+//    lang?: 'ru'|'en' — only that language's track (none: both), accepted?: the owner checked a done one}
 // «note» is Claude's own pre-build check (faces, subtitles, consents), shown with the comments.
 import {randomBytes} from 'node:crypto';
 import {readFileSync, renameSync, writeFileSync} from 'node:fs';
@@ -11,6 +12,7 @@ import {join} from 'node:path';
 
 const STAGES = ['script', 'scenes', 'video'];
 const HINTS = ['blur', 'replace', 'trim', 'remove'];
+const LANGS = ['ru', 'en'];
 const f01 = (n) => Math.min(1, Math.max(0, Math.round(Number(n) * 1000) / 1000));
 const ok = (n) => Number.isFinite(Number(n));
 
@@ -41,8 +43,21 @@ export function changeEdits(dir, b, by) {
       text: String(b.text).trim().slice(0, 600), point, ...(shape ? {shape} : {}), ...(HINTS.includes(b.hint) ? {hint: b.hint} : {}),
       ...(typeof b.quote === 'string' && b.quote.trim() ? {quote: b.quote.trim().slice(0, 200)} : {}),
       ...(Number.isInteger(b.scene) && b.scene >= 0 ? {scene: b.scene} : {}),
-      voice: !!b.voice, state: 'open', by, at: Date.now()});
+      ...(LANGS.includes(b.lang) ? {lang: b.lang} : {}), voice: !!b.voice, state: 'open', by, at: Date.now()});
   } else if (b.action === 'remove') list = list.filter((x) => x.id !== b.id || x.state !== 'open');
+  // Before the build an open note can be reworded or narrowed to one language (Сборка, кусок 17).
+  else if (b.action === 'update') {
+    const x = list.find((y) => y.id === b.id && y.state === 'open');
+    if (!x) return null;
+    if (typeof b.text === 'string' && b.text.trim()) x.text = b.text.trim().slice(0, 600);
+    if (b.lang !== undefined) { if (LANGS.includes(b.lang)) x.lang = b.lang; else delete x.lang; }
+  }
+  // «✓ принято»: the owner checked what Claude did for this note in the new version.
+  else if (b.action === 'accept') {
+    const x = list.find((y) => y.id === b.id && y.state === 'done');
+    if (!x) return null;
+    if (b.accepted) x.accepted = true; else delete x.accepted;
+  }
   else if (b.action === 'send') list = list.map((x) => (x.state === 'open' ? {...x, state: 'sent', forV: String(b.forV || '').slice(0, 10)} : x));
   else return null;
   writeFileSync(join(dir, 'edits.json.tmp'), JSON.stringify(list, null, 2));
@@ -67,7 +82,7 @@ function where(x, scenes) {
 
 /** The comments as one message for the reel chat: what to change in the next version. */
 export function buildRequest(items, scenes, nextV) {
-  return `Комментарии к ${nextV}:\n${items.map((x, i) => `${i + 1}. [${where(x, scenes || [])}]${x.hint ? ` (${HINT_RU[x.hint]})` : ''} ${x.text} — ${x.by || ''}`).join('\n')}\n` +
+  return `Комментарии к ${nextV}:\n${items.map((x, i) => `${i + 1}. [${where(x, scenes || [])}]${x.hint ? ` (${HINT_RU[x.hint]})` : ''}${x.lang ? ` (только ${x.lang.toUpperCase()})` : ''} ${x.text} — ${x.by || ''}`).join('\n')}\n` +
     `Перед сборкой проверь лица (ничего на лице), субтитры и согласия людей в кадре; если что-то не так, допиши в edits.json пункт {"state":"note","by":"Claude","stage":"video","t":секунда,"text":"что не так"}. ` +
     `Собери ${nextV} черновиком и отметь в edits.json, что сделано.`;
 }
