@@ -224,6 +224,44 @@
   .tms { width: 120px; background: var(--side); border-right: 1px solid var(--line); padding: 8px 6px; display: flex; flex-direction: column; gap: 2px; }
   .tms span { padding: 4px 6px; border-radius: 5px; color: var(--ink2); } .tms span.on { background: var(--sel); color: var(--ink); font-weight: 600; } .tms span.off { color: #C4C4C4; text-decoration: line-through; }
   .seg button:disabled { opacity: .5; }
+  .ds-wrap { flex: 1; display: flex; min-height: 0; } .ds-wrap [hidden] { display: none !important; }
+  .ds-nav { flex: none; position: sticky; top: 0; align-self: flex-start; width: 200px; padding: 28px 12px 28px 40px; display: flex; flex-direction: column; gap: 2px; }
+  .ds-nav a { padding: 7px 10px; border-radius: 8px; font-size: 14px; color: var(--muted); text-decoration: none; }
+  .ds-nav a:hover { background: var(--soft); color: var(--ink); } .ds-nav a.on { background: var(--soft); color: var(--ink); font-weight: 500; }
+  .ds-main { flex: 1; min-width: 0; overflow-y: auto; scroll-behavior: smooth; }
+  .ds-inner { max-width: 1040px; padding: 28px 48px 80px; display: flex; flex-direction: column; }
+  .ds-head { display: flex; gap: 24px; align-items: flex-end; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+  .ds-h1 { font-size: 32px; font-weight: 600; letter-spacing: -0.03em; margin: 0 0 8px; }
+  .ds-head p { margin: 0; color: var(--ink2); font-size: 15px; line-height: 1.5; } .ds-head a, .ds-sh a { color: inherit; }
+  .ds-site { display: flex; gap: 8px; padding: 16px 0 0; } .ds-site .f { min-height: 40px; max-width: 420px; }
+  .ds-sec { padding: 40px 0 8px; scroll-margin-top: 8px; }
+  .ds-sh { margin-bottom: 20px; } .ds-sh h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0; } .ds-sh p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+  .ds-sub { font-size: 13px; color: var(--muted); margin: 24px 0 10px; }
+  .ds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 16px; } .ds-grid-s { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .ds-sw { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .ds-chip { height: 104px; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); display: flex; align-items: flex-end; padding: 10px 12px; margin-bottom: 6px; transition: transform .12s; }
+  .ds-chip span { font: 500 12px/1 'Geist Mono', ui-monospace, monospace; opacity: 0; transition: opacity .12s; }
+  .ds-sw:hover .ds-chip { transform: translateY(-2px); } .ds-sw:hover .ds-chip span, .ds-sw:focus-visible .ds-chip span { opacity: .85; }
+  .ds-hex { font: 12px/1.3 'Geist Mono', ui-monospace, monospace; color: var(--ink2); }
+  .ds-sw b, .ds-tile b { font-weight: 600; font-size: 14px; }
+  .ds-role { font-size: 12.5px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ds-tile { border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .ds-rad { width: 56px; height: 56px; border: 2px solid var(--ink); border-right-color: transparent; border-bottom-color: transparent; margin-bottom: 10px; }
+  .ds-rows { border-top: 1px solid var(--line); } .ds-row { display: flex; gap: 32px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--line); }
+  .ds-meta { flex: none; width: 240px; display: flex; flex-direction: column; gap: 4px; } .ds-meta b { font-weight: 600; font-size: 14px; } .ds-meta span { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .ds-spec { flex: 1; min-width: 0; color: var(--ink); } .ds-desc { flex: 1; font-size: 14px; color: var(--ink2); line-height: 1.5; }
+  .ds-stage { flex: 1; display: flex; align-items: center; padding: 18px 20px; border-radius: 12px; background: var(--soft); } .ds-btn { display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 22px; font-size: 15px; }
+  .ds-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .ds-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
+  .ds-card p { grid-column: 1 / -1; margin: 6px 4px 4px; font-size: 13.5px; color: var(--ink2); line-height: 1.55; }
+  .ds-logo { height: 120px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; letter-spacing: -0.03em; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); } .ds-logo b { font-weight: 700; }
+  .ds-photo { grid-column: 1 / -1; height: 120px; border-radius: 10px; background: linear-gradient(180deg,#4A86C8 0%,#9CC3E6 55%,#F4F6F8 56%,#E4E9EE 100%); }
+  .ds-outs { display: flex; gap: 20px; flex-wrap: wrap; } .ds-outs figure { margin: 0; display: flex; flex-direction: column; gap: 8px; width: 200px; } .ds-outs figcaption { font-size: 13px; color: var(--muted); }
+  .ds-out { position: relative; overflow: hidden; border-radius: 14px; aspect-ratio: 9/16; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); } .ds-outs figure:first-child { width: 160px; }
+  iframe.ds-lib { height: 80vh; }
+  .ds-empty { margin: 32px 0; padding: 32px; border: 1px dashed var(--line); border-radius: 14px; } .ds-empty h2 { margin: 0 0 8px; font-size: 20px; } .ds-empty p { margin: 0; color: var(--ink2); line-height: 1.5; max-width: 560px; }
+  .ds-chat { flex: none; width: 400px; border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: #fff; }
+  @media (max-width: 900px) { .ds-nav { display: none; } .ds-inner { padding: 20px 16px 60px; } .ds-head { flex-direction: column; align-items: stretch; } .ds-row { flex-direction: column; align-items: stretch; gap: 12px; } .ds-meta { width: auto; } .ds-chat { position: fixed; inset: 0; width: auto; z-index: 50; } .ds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .ds-chip { height: 72px; } }
   .utabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
   .utabs a { padding: 0 0 10px; color: var(--muted); text-decoration: none; }
   .utabs a.on { color: var(--ink); border-bottom: 2px solid var(--ink); font-weight: 500; }
@@ -2450,27 +2488,60 @@ async function vAsk(start) {
   draw();
 }
 
-// Дизайн с сайта (M3): Claude reads the site's CSS into design-system/tokens.json; here the colours,
-// fonts and radii, which colours go into the releases, and how a plate looks in them.
-function dsFromSite(k, m) {
+// Память › Дизайн: the project's design system as a reference page, the way design systems show
+// themselves (Vercel Geist, Atlassian, Material): sections on the left, an even grid of colour
+// tokens, a type specimen, shape, buttons and labels, logo and photo, how it looks in the releases,
+// then the reels component library (design-system/index.html). Values come from
+// design-system/tokens.json, which Claude writes from the site; the chat opens on demand.
+const DS_NAV = [['ds-colors', 'Цвета'], ['ds-type', 'Шрифты'], ['ds-shape', 'Форма'], ['ds-ui', 'Кнопки и метки'], ['ds-brand', 'Логотип и фото'], ['ds-out', 'В выпусках'], ['ds-lib', 'Компоненты рилсов']];
+const dsInk = (hex) => { const n = parseInt(String(hex).replace('#', '').padEnd(6, '0').slice(0, 6), 16); const l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; return l > 0.6 ? '#171717' : '#fff'; };
+const dsDate = (d) => (d ? new Date(d).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}) : '');
+function dsSection(id, h, lead, body) {
+  return `<section class="ds-sec" id="${id}"><div class="ds-sh"><h2>${h}</h2>${lead ? `<p>${lead}</p>` : ''}</div>${body}</section>`;
+}
+function dsBody(k, m) {
   const tok = normTok(m.tokens);
-  const site = tok?.site || m.links[0] || '';
+  if (!tok) return `<div class="ds-empty"><h2>Дизайн-системы ещё нет</h2><p>Claude откроет сайт, снимет цвета, шрифты, скругления, кнопки, метки, логотип и стиль фото и разложит здесь по разделам — так же, как устроены страницы дизайн-систем.</p></div>`;
+  const C = (role, d) => tok.colors.find((c) => c.use !== false && new RegExp(role, 'i').test(c.role + ' ' + c.name))?.hex || d;
+  const ink = C('текст|text|ink', '#151612'), bg = C('фон стр|background|bg|surface|paper', '#F6F6F3'), acc = C('акцент|accent|primary|signal|brand', '#C43F34');
+  const font = tok.fonts[0]?.family || 'inherit';
+  const ff = (f) => `'${esc(f)}', inherit`;
+  const swatch = (c) => `<button type="button" class="ds-sw" data-copy="${esc(c.hex)}" title="Скопировать ${esc(c.hex)}"><span class="ds-chip" style="background: ${esc(c.hex)}"><span style="color: ${dsInk(c.hex)}">Скопировать</span></span><b>${esc(c.name || '')}</b><span class="ds-hex">${esc(c.hex.toUpperCase())}</span><span class="ds-role">${esc(c.role || '')}</span></button>`;
+  const used = tok.colors.filter((c) => c.use !== false), off = tok.colors.filter((c) => c.use === false);
+  const colors = `<div class="ds-grid">${used.map(swatch).join('')}</div>${off.length ? `<div class="ds-sub">Не идут в выпуски</div><div class="ds-grid">${off.map(swatch).join('')}</div>` : ''}`;
+  const SPEC = [['Заголовок', 40, 'Снег до самого вечера'], ['Подзаголовок', 24, 'Трансфер из Тбилиси за 2,5 часа'], ['Текст', 16, 'Встретим в аэропорту, поможем с багажом и довезём до отеля.'], ['Подпись', 13, '42.4780° N 44.4762° E · за машину']];
+  const type = `<div class="ds-rows">${tok.fonts.map((f, i) => {
+    const [lbl, size, text] = SPEC[Math.min(i, SPEC.length - 1)] || SPEC[2];
+    const head = Number(f.weight) >= 600;
+    return `<div class="ds-row"><div class="ds-meta"><b>${esc(f.family)} ${esc(f.weight || '')}</b><span>${esc(f.role || lbl)}</span></div><div class="ds-spec" style="font-family: ${ff(f.family)}; font-weight: ${Number(f.weight) || 400}; font-size: ${head ? 40 : /mono/i.test(f.family) ? 14 : 18}px; letter-spacing: ${head ? '-0.03em' : '0'}; line-height: ${head ? 1.05 : 1.5}">${esc(head ? SPEC[0][2] : /mono/i.test(f.family) ? SPEC[3][2] : SPEC[2][2])}</div></div>`;
+  }).join('')}</div>`;
+  const ru = tok.radiiUse || {};
+  const shape = `<div class="ds-grid ds-grid-s">${tok.radii.map((r) => `<div class="ds-tile"><span class="ds-rad" style="border-radius: ${Math.min(Number(r) || 0, 60)}px"></span><b>${Number(r) >= 999 ? 'Пилюля' : esc(r) + ' px'}</b><span class="ds-role">${esc(ru[r] || '')}</span></div>`).join('')}</div>`;
+  const btns = tok.buttons || [], labels = tok.labels || [];
+  const ui = `${btns.length ? `<div class="ds-sub">Кнопки</div><div class="ds-rows">${btns.map((b) => {
+      const round = /кругл/i.test(b.name);
+      const dark = /тёмн|темн/i.test(b.name);
+      const label = round ? '↗' : /заявк/i.test(b.name) ? 'Отправить заявку' : /тёмн|темн/i.test(b.name) ? 'Все машины ↗' : 'Начать поездку ↗';
+      return `<div class="ds-row"><div class="ds-meta"><b>${esc(b.name)}</b><span>${esc([b.bg, b.extra].filter(Boolean).join(' · '))}</span></div><div class="ds-stage${dark ? ' dark' : ''}" style="${dark ? `background: ${esc(ink)}` : ''}"><span class="ds-btn" style="background: ${esc(b.bg)}; color: ${esc(b.ink)}; border-radius: ${Number(b.radius) || 0}px; font-family: ${ff(font)}; font-weight: ${Number(b.weight) || 500}; ${round ? 'width: 40px; height: 40px; padding: 0; justify-content: center' : ''}">${label}</span></div></div>`;
+    }).join('')}</div>` : ''}
+    ${labels.length ? `<div class="ds-sub">Метки</div><div class="ds-rows">${labels.map((l) => `<div class="ds-row"><div class="ds-meta"><b>${esc(l.name)}</b></div><div class="ds-desc">${esc(l.look)}</div></div>`).join('')}</div>` : ''}`;
+  const brand = `<div class="ds-two">${tok.logo ? `<div class="ds-card"><div class="ds-logo" style="background: ${esc(bg)}; color: ${esc(ink)}; font-family: ${ff(font)}"><span>My <b>Gudauri</b></span></div><div class="ds-logo" style="background: linear-gradient(180deg,#8FB0CC,#4F6E8C); color: #fff; font-family: ${ff(font)}"><span>My <b>Gudauri</b></span></div><p>${esc(tok.logo)}</p></div>` : ''}
+    ${tok.photo ? `<div class="ds-card"><div class="ds-photo"></div><p>${esc(tok.photo)}</p></div>` : ''}</div>`;
   const prices = m.facts.prices.slice(0, 3);
-  const C = (role, d) => (tok?.colors || []).find((c) => c.use !== false && new RegExp(role, 'i').test(c.role + ' ' + c.name))?.hex || d;
-  const ink = C('текст|text|ink', '#151612'), bg = C('фон|background|bg|surface|paper', '#F6F6F3'), acc = C('акцент|accent|primary|signal|brand', '#C43F34');
-  const font = (tok?.fonts || [])[0]?.family || 'inherit';
-  return `<div style="display: flex; flex-direction: column; gap: 16px; border: 1px solid var(--line); border-radius: 14px; padding: 18px">
-    <div class="row" style="gap: 10px; flex-wrap: nowrap"><input class="f" id="dsSite" value="${esc(site)}" placeholder="Сайт: mygudauri.org" style="min-height: 40px"><button type="button" class="ln-btn p" id="dsTake" style="height: 40px">${tok?.site ? 'Обновить с сайта' : 'Взять дизайн с сайта'}</button></div>
-    ${tok ? `<div style="display: flex; gap: 14px; flex-wrap: wrap">${(tok.colors || []).map((c) => `<span style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; opacity: ${c.use === false ? .45 : 1}"><span style="width: 64px; height: 50px; border-radius: 10px; background: ${esc(c.hex)}; border: 1px solid rgba(0,0,0,.08)"></span>${esc(c.name || c.role || '')}<span class="muted" style="font-size: 11px">${esc(c.hex)}${c.role ? ' · ' + esc(c.role) : ''}</span></span>`).join('')}</div>
-      <div style="display: flex; gap: 28px; flex-wrap: wrap; align-items: center">
-        ${(tok.fonts || []).slice(0, 2).map((f) => `<span style="display: flex; gap: 10px; align-items: center"><span style="font-family: '${esc(f.family)}', inherit; font-size: 40px; font-weight: ${Number(f.weight) || 600}; letter-spacing: -0.03em">Аа</span><span class="small">${esc(f.family)}<br><span class="muted">${esc(f.weight || '')} · ${esc(f.role || '')}</span></span></span>`).join('')}
-        ${(tok.radii || []).length ? `<span style="display: flex; gap: 8px; align-items: flex-end">${tok.radii.slice(0, 5).map((r) => `<span class="muted" style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px"><span style="width: 34px; height: 34px; border: 2px solid ${esc(ink)}; border-radius: ${Number(r) || 0}px"></span>${esc(r)}</span>`).join('')}</span>` : ''}</div>
-      <div><div class="lbl" style="margin-bottom: 8px">Так это ляжет в выпуски</div><div style="display: flex; gap: 10px; flex-wrap: wrap">
-        <div style="width: 120px; height: 213px; border-radius: 12px; background: linear-gradient(180deg,#9DB4C8,#5F7A92); position: relative; overflow: hidden"><span style="position: absolute; left: 9px; right: 9px; top: 18px; color: #fff; font-family: '${esc(font)}', inherit; font-weight: 600; letter-spacing: -0.04em; font-size: 16px; line-height: 1.05">${esc(projName())}</span><span style="position: absolute; left: 9px; bottom: 12px; background: ${esc(acc)}; color: #fff; border-radius: 999px; padding: 3px 9px; font-size: 10px; font-weight: 600">сейчас</span></div>
-        <div style="width: 170px; height: 213px; border-radius: 12px; background: ${esc(bg)}; border: 1px solid rgba(0,0,0,.08); padding: 12px; display: flex; flex-direction: column; justify-content: space-between; color: ${esc(ink)}"><span style="font-size: 10px; opacity: .6">1 / 6</span><b style="font-family: '${esc(font)}', inherit; font-weight: 600; letter-spacing: -0.04em; font-size: 18px; line-height: 1.05">Обложка карусели</b><span style="color: ${esc(acc)}; font-weight: 700">${esc(prices[0]?.value || 'от … ₾')}</span></div>
-        <div style="width: 170px; height: 213px; border-radius: 12px; background: ${esc(ink)}; padding: 12px; display: flex; flex-direction: column; gap: 6px; color: #fff; font-size: 11.5px"><span style="opacity: .6; font-size: 10px">прайс</span>${(prices.length ? prices : [{text: 'Цена из Фактов', value: '…'}]).map((x) => `<span style="display: flex; gap: 6px; border-bottom: 1px dashed rgba(255,255,255,.2); padding-bottom: 4px"><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.text)}</span><b>${esc(x.value)}</b></span>`).join('')}</div>
-      </div></div>` : '<span class="small muted">Claude откроет сайт, вытащит из CSS цвета, шрифты, скругления, кнопки и логотип и покажет здесь, как это ляжет в плашки рилсов. Цвета, которые не нужны в выпусках, можно выключить словами.</span>'}
-  </div>`;
+  const out = `<div class="ds-outs">
+    <figure><div class="ds-out" style="background: linear-gradient(180deg,#9DB4C8,#5F7A92)"><span style="position: absolute; left: 12px; right: 12px; top: 20px; color: #fff; font-family: ${ff(font)}; font-weight: 600; letter-spacing: -0.04em; font-size: 20px; line-height: 1.05">${esc(projName())}</span><span style="position: absolute; left: 12px; bottom: 14px; background: ${esc(acc)}; color: #fff; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600">сейчас</span></div><figcaption>Обложка рилса</figcaption></figure>
+    <figure><div class="ds-out" style="background: ${esc(bg)}; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; color: ${esc(ink)}; aspect-ratio: 4/5"><span style="font-size: 11px; opacity: .6">1 / 6</span><b style="font-family: ${ff(font)}; font-weight: 600; letter-spacing: -0.04em; font-size: 22px; line-height: 1.05">Обложка карусели</b><span style="color: ${esc(acc)}; font-weight: 700">${esc(prices[0]?.value || 'от … ₾')}</span></div><figcaption>Карусель</figcaption></figure>
+    <figure><div class="ds-out" style="background: ${esc(ink)}; padding: 14px; display: flex; flex-direction: column; gap: 8px; color: #fff; font-size: 12.5px; aspect-ratio: 4/5"><span style="opacity: .6; font-size: 11px">прайс</span>${(prices.length ? prices : [{text: 'Цена из Фактов', value: '…'}]).map((x) => `<span style="display: flex; gap: 8px; border-bottom: 1px dashed rgba(255,255,255,.2); padding-bottom: 6px"><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.text)}</span><b>${esc(x.value)}</b></span>`).join('')}</div><figcaption>Прайс</figcaption></figure></div>`;
+  const lib = k.ds ? `<iframe class="dsf ds-lib" src="${k.ds.url}" sandbox="allow-scripts" title="Компоненты рилсов"></iframe>` : `<div class="ds-empty" style="margin: 0"><p>Библиотеки компонентов ещё нет. Попросите Claude собрать её из рилсов — кнопка «Изменить словами».</p></div>`;
+  return [
+    dsSection('ds-colors', 'Цвета', 'Нажмите на цвет, чтобы скопировать код.', colors),
+    dsSection('ds-type', 'Шрифты', '', type),
+    dsSection('ds-shape', 'Форма', 'Скругления, от мелких меток до пилюль.', shape),
+    btns.length || labels.length ? dsSection('ds-ui', 'Кнопки и метки', '', ui) : '',
+    tok.logo || tok.photo ? dsSection('ds-brand', 'Логотип и фото', '', brand) : '',
+    dsSection('ds-out', 'В выпусках', 'Так эти токены ложатся в плашки рилсов и каруселей.', out),
+    dsSection('ds-lib', 'Компоненты рилсов', k.ds ? `Библиотека шаблона, обновлена ${ago(k.ds.updated)}. <a href="${k.ds.url}" target="_blank" rel="noopener">Открыть отдельно ↗</a>` : '', lib),
+  ].join('');
 }
 async function vTabs(base, head, tabs, tab, note = '') {
   const cur = tabs.find(([k]) => k === tab) || tabs[0];
@@ -2533,24 +2604,41 @@ async function vConnect() {
 async function vDs() {
   title('Дизайн-система');
   const [k, mem] = await Promise.all([api('/api/knowledge'), api('/api/memory')]);
-  view.innerHTML = `<div class="work"><div style="flex: 999 1 560px; min-width: 0; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto">
-      ${dsFromSite(k, mem)}
-      <div class="row" style="justify-content: space-between"><div><div class="small muted">Проект</div><h1 style="font-size: 22px">Дизайн-система рилсов</h1></div>
-        ${k.ds ? `<a class="btn" href="${k.ds.url}" target="_blank" rel="noopener">Открыть отдельно</a>` : ''}</div>
-      ${k.ds ? `<iframe class="dsf" src="${k.ds.url}" sandbox="allow-scripts" title="Дизайн-система"></iframe><span class="small muted">Обновлена ${ago(k.ds.updated)}</span>`
-        : `<div class="card" style="padding: 32px"><h2>Страницы дизайн-системы ещё нет</h2><p class="muted">Попроси в чате справа — например, «собери дизайн-систему из того, что уже есть в рилсах». Claude соберёт одну HTML-страницу: идея, цвета, шрифты, движение и библиотека компонентов с примерами.</p>
-          ${canEdit() ? '<button type="button" class="btn primary" id="dsStart">Собрать из рилсов</button>' : ''}</div>`}
-    </div>
-    <aside class="vers" style="width: 400px; padding: 0" aria-label="Чат дизайн-системы"><div class="chead"><h2 style="flex: 1">Чат дизайн-системы</h2></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
-  const box = chatBox('_ds', {onDone: () => vDsRefresh()});
-  $('#chatHost').append(box);
-  $('#dsTake')?.addEventListener('click', async () => {
+  const tok = normTok(mem.tokens);
+  const site = tok?.site || mem.links[0] || '';
+  const ed = canEdit();
+  view.innerHTML = `<div class="ds-wrap">
+    <nav class="ds-nav" aria-label="Разделы дизайн-системы">${DS_NAV.map(([id, t]) => `<a href="#${id}" data-ds="${id}">${t}</a>`).join('')}</nav>
+    <div class="ds-main" id="dsMain"><div class="ds-inner">
+      <header class="ds-head"><div style="flex: 1; min-width: 0"><div class="ds-h1" role="heading" aria-level="1">Дизайн-система</div>
+        <p>${tok?.site ? `Снято с <a href="${esc(tok.site)}" target="_blank" rel="noopener">${esc(tok.site.replace(/^https?:\/\//, ''))}</a>${tok.takenAt ? ' · ' + dsDate(tok.takenAt) : ''}. Claude берёт эти цвета и шрифты для каждого выпуска.` : 'Цвета, шрифты и формы, по которым Claude собирает выпуски.'}</p></div>
+        ${ed ? `<div class="row" style="gap: 8px; flex: none"><button type="button" class="ln-btn" id="dsTake">${tok?.site ? 'Обновить с сайта' : 'Взять с сайта'}</button><button type="button" class="ln-btn p" id="dsChat">Изменить словами</button></div>` : ''}</header>
+      ${ed ? `<div class="ds-site" id="dsSiteRow" hidden><input class="f" id="dsSite" value="${esc(site)}" placeholder="Сайт: mygudauri.org"><button type="button" class="ln-btn p" id="dsGo">Снять дизайн</button></div>` : ''}
+      ${dsBody(k, mem)}
+    </div></div>
+    <aside class="ds-chat" id="dsChatPane" hidden aria-label="Чат дизайн-системы"><div class="chead"><h2 style="flex: 1">Изменить словами</h2><button type="button" class="ln-btn g" id="dsClose" aria-label="Закрыть">✕</button></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+  wireCopy(view);
+  const wrap = view.querySelector('.ds-wrap');
+  const fit = () => { if (!wrap.isConnected) return removeEventListener('resize', fit); wrap.style.flex = 'none'; wrap.style.height = Math.max(400, innerHeight - wrap.getBoundingClientRect().top) + 'px'; };
+  fit(); addEventListener('resize', fit);
+  const links = [...view.querySelectorAll('[data-ds]')];
+  let main = $('#dsMain'); while (main && main !== document.body && !(/(auto|scroll)/.test(getComputedStyle(main).overflowY) && main.scrollHeight > main.clientHeight + 1)) main = main.parentElement;
+  if (main === document.body || !main) main = document.scrollingElement;
+  links.forEach((a) => { const sec = $('#' + a.dataset.ds); if (!sec) a.remove(); a.onclick = (e) => { e.preventDefault(); sec?.scrollIntoView({behavior: 'smooth', block: 'start'}); }; });
+  const spy = () => { let cur = links[0]; for (const a of links) { const s = $('#' + a.dataset.ds); if (s && s.getBoundingClientRect().top - (main.getBoundingClientRect?.().top || 0) < 120) cur = a; } links.forEach((a) => a.classList.toggle('on', a === cur)); };
+  (main === document.scrollingElement ? window : main).addEventListener('scroll', spy, {passive: true}); spy();
+  if (!ed) return;
+  let box = null;
+  const chat = () => { const p = $('#dsChatPane'); p.hidden = false; if (!box) { box = chatBox('_ds', {onDone: () => vDsRefresh()}); $('#chatHost').append(box); } return box; };
+  $('#dsChat').onclick = () => { const p = $('#dsChatPane'); if (!p.hidden) return (p.hidden = true); chat(); };
+  $('#dsClose').onclick = () => ($('#dsChatPane').hidden = true);
+  $('#dsTake').onclick = () => { const r = $('#dsSiteRow'); r.hidden = !r.hidden; if (!r.hidden) $('#dsSite').focus(); };
+  $('#dsGo').onclick = async () => {
     const u = $('#dsSite').value.trim();
     if (!u) return $('#dsSite').focus();
     await post('/api/memory/set', {source: {kind: 'link', name: u + ' — дизайн'}});
-    box.say(`Возьми дизайн с сайта ${u}: открой главную и 3–5 страниц, вытащи из CSS цвета (с ролью: текст, фон, акцент, знак…), шрифты (семейство, начертание, где), скругления, вид кнопок и меток, логотип и стиль фото. Запиши design-system/tokens.json: {"site","colors":[{"name","hex","role","use":true}],"fonts":[{"family","weight","role"}],"radii":[px],"logo","photo"} — цвет только для логотипа пометь use:false. Потом обнови страницу дизайн-системы и плашки шаблона под эти токены и коротко скажи, что взял.`, `Взять дизайн с сайта ${u}`);
-  });
-  $('#dsStart')?.addEventListener('click', () => box.say('Собери дизайн-систему рилсов из того, что уже есть: бриф, PLAYBOOK, template/src и код последних рилсов. Сделай страницу design-system/index.html.', 'Собрать дизайн-систему из рилсов'));
+    chat().say(`Возьми дизайн с сайта ${u}: открой главную и 3–5 страниц, вытащи из CSS цвета (с ролью: текст, фон, акцент, знак…), шрифты (семейство, начертание, где), скругления, вид кнопок и меток, логотип и стиль фото. Запиши design-system/tokens.json: {"site","takenAt","colors":[{"name","hex","role","use":true}],"fonts":[{"family","weight","role"}],"radii":[px],"radiiUse":{px: "где"},"buttons":[{"name","bg","ink","radius","weight","extra"}],"labels":[{"name","look"}],"logo","photo"} — цвет только для логотипа пометь use:false, роль пиши коротко, в 3–6 слов. Потом обнови страницу дизайн-системы и плашки шаблона под эти токены и коротко скажи, что взял.`, `Взять дизайн с сайта ${u}`);
+  };
   async function vDsRefresh() { const k2 = await api('/api/knowledge'); if (k2.ds && !$('iframe.dsf')) return route(); if (k2.ds) $('iframe.dsf').src = k2.ds.url; }
 }
 
