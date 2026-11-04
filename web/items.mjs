@@ -144,11 +144,12 @@ export function syncItems(studio, {dry = false, now = Date.now()} = {}) {
     if (had) {
       if (had.proposed && !had.at && pitchAt(i)) { had.at = pitchAt(i); changed = true; }
       if (had.proposed && !had.rubric && field(i, 'Rubric')) { had.rubric = field(i, 'Rubric'); changed = true; }
+      if (had.proposed && had.idea && !had.idea.why && field(i, 'Why')) { had.idea.why = field(i, 'Why'); changed = true; }
       continue;
     }
     add({id: newId(), format: guessFormat(field(i, 'Format')), title: i.title.replace(/^\p{Extended_Pictographic}️?\s*/u, ''), stage: 'idea', rubric: field(i, 'Rubric') || null, at: pitchAt(i),
       ref: {kind: 'idea', id: i.title}, proposed: true, by: i.section === "Owner's ideas" ? 'owner' : 'Claude',
-      idea: {about: field(i, 'Plot'), hook: field(i, 'Hook').replace(/^[«"]|[»"]$/g, ''), flow: []}, created: now});
+      idea: {about: field(i, 'Plot'), hook: field(i, 'Hook').replace(/^[«"]|[»"]$/g, ''), flow: [], ...(field(i, 'Why') ? {why: field(i, 'Why')} : {})}, created: now});
   }
   // A pitch that left ideas.md before anyone took it (made into a reel, cancelled) goes away.
   const before = data.items.length;

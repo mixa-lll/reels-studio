@@ -407,6 +407,26 @@
   .mic.rec { background: #C43F34; box-shadow: 0 0 0 10px rgba(196,63,52,.12), 0 0 0 22px rgba(196,63,52,.06); animation: micPulse 1.2s ease-in-out infinite; }
   @keyframes micPulse { 50% { box-shadow: 0 0 0 14px rgba(196,63,52,.16), 0 0 0 28px rgba(196,63,52,.05); } }
   .lline { width: 22px; height: 1.5px; background: #E5E5E5; } .lline.done { background: var(--ink); }
+  .bset { flex: 0 0 300px; border-right: 1px solid var(--line); padding: 18px 18px 24px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; background: #FCFCFC; }
+  .blk2 { display: flex; flex-direction: column; gap: 8px; }
+  .brow { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .bchk { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; cursor: pointer; } .bchk > span { display: flex; flex-direction: column; gap: 1px; } .bchk b { font-weight: 600; } .bchk input { margin-top: 3px; accent-color: var(--ink); }
+  .bwhy { font-size: 11px; line-height: 1.35; color: var(--ink2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .bev { font-size: 11px; background: #FFF4E0; color: #8A5A00; border-radius: 6px; padding: 3px 6px; font-weight: 600; }
+  .ln-cell.ev { background: #FFFCF5; }
+  .bgrid .ln-chip .t { align-items: flex-start; } .bgrid .ln-chip .t .rsq { margin-top: 4px; } .bgrid .ln-chip .t span:last-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; line-height: 1.3; }
+  .rtabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); font-size: 14px; margin-top: -6px; }
+  .rtabs a { padding: 10px 0; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+  .rtabs a.on { color: var(--ink); font-weight: 600; border-color: var(--ink); }
+  .rtk { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; color: var(--ink2); background: #F2F2F2; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+  .rkeep { display: flex; flex-direction: column; gap: 5px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: #fff; text-decoration: none; color: var(--ink); font-size: 13px; line-height: 1.4; }
+  .rkeep:hover { border-color: #D4D4D4; }
+  .rref { display: flex; flex-direction: column; gap: 8px; text-align: left; border: 1px solid var(--line); border-radius: 14px; padding: 8px 8px 10px; background: #fff; font: inherit; font-size: 13px; color: var(--ink); cursor: pointer; min-width: 0; }
+  .rref b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rref.on { border: 2px solid var(--ink); padding: 7px 7px 9px; }
+  .ttrack { display: flex; gap: 3px; height: 64px; margin: 12px 0 6px; }
+  .ttrack span { border-radius: 8px; color: #fff; padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; overflow: hidden; }
+  .ttrack b { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ttrack i { font-style: normal; font-size: 11px; opacity: .85; }
 </style>
 <script src="/preview.js"></script>
 </head>
@@ -861,7 +881,7 @@ async function vToday() {
       ${canEdit() ? `<form class="box" id="todayForm" style="padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px">
         <textarea id="todayIn" rows="2" placeholder="Скажи идею, попроси предложить — или скинь фото и видео" style="border: 0; resize: none; font-size: 15px; outline: none; padding: 0"></textarea>
         <div class="row" style="color: var(--muted); gap: 8px"><a href="#/new" class="icon" style="width: 30px; height: 30px; border: 0" title="Новый выпуск" aria-label="Новый выпуск">${svg('plus')}</a><span class="small">Ответ — в чате проекта</span><button type="submit" class="icon go" style="margin-left: auto; width: 32px; height: 32px" aria-label="Отправить">↑</button></div></form>
-      <div class="row" style="gap: 8px; margin-top: -14px"><button type="button" class="chip" id="layWeek">Расписать идеи на 2 недели</button>${['Что снять на этой неделе', 'Предложи 3 идеи в пустые дни'].map((t) => `<button type="button" class="chip" data-say="${esc(t)}">${t}</button>`).join('')}</div>` : ''}
+      <div class="row" style="gap: 8px; margin-top: -14px"><button type="button" class="chip" id="layWeek">Собрать контент-план</button>${['Что снять на этой неделе', 'Предложи 3 идеи в пустые дни'].map((t) => `<button type="button" class="chip" data-say="${esc(t)}">${t}</button>`).join('')}</div>` : ''}
       <div><div class="lh">Эта неделя<a href="#/plan">открыть План</a></div><div style="display: flex; gap: 8px; padding-top: 12px">${week.map(dayCell).join('')}</div></div>
       <div><div class="lh">Ждёт тебя<a href="#/all">все выпуски</a></div>${waits.slice(0, 8).map(wline).join('') || '<p class="small muted">Пусто — можно начинать новое.</p>'}
         ${pitches ? `<a class="wl" href="#/plan/draft"><span class="muted">◌</span><span>${pitches} ${pitches === 1 ? 'предложение' : pitches < 5 ? 'предложения' : 'предложений'} Claude на ближайшие две недели</span><span class="small muted">взять или заменить</span><span class="r"><span class="tag">план</span></span></a>` : ''}</div>
@@ -874,7 +894,6 @@ async function vToday() {
   view.querySelectorAll('[data-day]').forEach((b) => (b.onclick = () => go(`Предложи идею на ${b.dataset.day} по рубрикам и ритму из strategy.json. Добавь её в ideas.md в «My ideas» со строками «Date: ${b.dataset.day}T19:00» и «Rubric: <id рубрики>».`, `Идея на ${b.dataset.day.slice(5)}`)));
   $('#layWeek')?.addEventListener('click', () => { sessionStorage.setItem('planLay', '1'); location.hash = '#/plan/draft'; });
 }
-const layIdeasText = (from, to) => `Распиши идеи на две недели, с ${from} по ${to}: по площадкам, рубрикам и ритму из strategy.json, не повторяя то, что уже вышло или стоит в плане. Это только концепции — снимать пока ничего не надо. Каждую идею добавь в ideas.md в раздел «My ideas», как обычно (Format:, Hook:, Plot:), и ещё две строки: «Date: YYYY-MM-DDTHH:MM» и «Rubric: <id рубрики из strategy.json>». Потом коротко перечисли их здесь.`;
 
 // «Все выпуски» with the format switch inside (решение 2026-10-28): Все · Рилсы · Посты.
 // Единицы контента (web/items.mjs): one item per format, idea → material → build → ready → published.
@@ -1951,7 +1970,7 @@ async function vPlan(offset = 0, month = true) {
       <span class="ln-seg" style="margin-left: 12px"><a href="#/plan/w" class="${month ? '' : 'on'}">Неделя</a><a href="#/plan" class="${month ? 'on' : ''}">Месяц</a></span>
       <span style="display: inline-flex; gap: 2px; margin-left: 6px"><a class="ln-btn g s" href="${base}${offset - 1}" aria-label="Назад">‹</a><a class="ln-btn g s" href="${base.slice(0, -1)}">Сейчас</a><a class="ln-btn g s" href="${base}${offset + 1}" aria-label="Вперёд">›</a></span>
       <span style="display: inline-flex; gap: 12px; margin-left: 8px">${LIFE.slice(0, 4).map(([k]) => `${sdot(k)}<span class="muted">${shown.filter((x) => x.stage === k).length}</span>`).join('')}</span>
-      <span style="flex: 1"></span>${canEdit() ? `<button type="button" class="ln-btn p" id="lay">${svg('idea', 14)}Расписать идеи на 2 недели</button>` : ''}</div>
+      <span style="flex: 1"></span>${canEdit() ? `<button type="button" class="ln-btn p" id="lay">${svg('idea', 14)}Собрать контент-план</button>` : ''}</div>
     <div style="flex: 1; display: flex; min-height: 0">
       <div style="flex: 1; display: flex; flex-direction: column; padding: 16px 20px 20px; min-width: 0; overflow-y: auto">
         <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 12px; color: var(--muted); padding: 0 0 8px">${DAYS.map((d, i) => `<span style="padding-left: 8px">${month ? d.toLowerCase() : d.toLowerCase() + ' ' + days[i].getDate()}</span>`).join('')}</div>
@@ -1987,72 +2006,256 @@ async function vPlan(offset = 0, month = true) {
   });
 }
 
-// Расписать идеи (LeanPlanDraft): Claude's proposals for the next two weeks by rubric, to take or
-// replace one by one; the plan chat on the right.
+// Собрать контент-план (handbook/LEAN.md, кусок 15): what the plan is built from on the left — period,
+// releases a week per platform, rubric shares, what to keep in mind; Claude's proposals on a day grid,
+// each with why it is on that day; «Почему так» and edits in words on the right.
 async function vPlanDraft() {
-  title('Расписать идеи');
-  await loadItems();
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  title('Собрать контент-план');
+  const [plan, mem] = await Promise.all([api('/api/plan'), api('/api/memory').catch(() => ({})), loadItems()]);
+  const st = plan.strategy || {}, plats = st.platforms || [], ed = canEdit();
+  const KEY = 'build:' + P;
+  let opt = {days: 14, events: true, questions: true, fresh: true, facts: true, wish: ''};
+  try { opt = {...opt, ...JSON.parse(localStorage.getItem(KEY) || '{}')}; } catch {}
+  const keep = () => { try { localStorage.setItem(KEY, JSON.stringify(opt)); } catch {} };
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const to = new Date(today); to.setDate(today.getDate() + 13);
-  const list = ITEMS.items.filter((x) => x.proposed && x.at && x.at.slice(0, 10) >= ymd(today) && x.at.slice(0, 10) <= ymd(to)).sort((p, q) => p.at.localeCompare(q.at));
-  const byRub = [...ITEMS.rubrics, {id: '', name: 'Без рубрики', color: '#A3A3A3'}].map((r) => [r, list.filter((x) => (itemRubric(x)?.id || '') === r.id)]).filter(([, l]) => l.length);
-  const row = (x) => `<div class="ln-li"><span class="muted" style="flex: 0 0 64px; font-size: 13px">${new Date(x.at).toLocaleDateString('ru', {weekday: 'short', day: 'numeric'})}</span><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><a href="#/item/${x.id}" style="flex: 0 0 300px; font-weight: 600; color: var(--ink); text-decoration: none">${esc(x.title)}</a><span class="s" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.idea?.hook || x.idea?.about || '')}</span>${canEdit() ? `<button type="button" class="ln-btn s" data-take="${x.id}">Взять</button><button type="button" class="ln-btn s g" data-other="${x.id}">Другую</button>` : ''}</div>`;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const to = new Date(today); to.setDate(today.getDate() + opt.days - 1);
+  const mon = new Date(today); mon.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const days = Array.from({length: Math.ceil((opt.days + (today.getDay() + 6) % 7) / 7) * 7}, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
+  const inRange = (x) => x.at && x.at.slice(0, 10) >= ymd(today) && x.at.slice(0, 10) <= ymd(to);
+  const list = ITEMS.items.filter((x) => x.proposed && inRange(x)).sort((p, q) => p.at.localeCompare(q.at));
+  const taken = ITEMS.items.filter((x) => !x.proposed && inRange(x));
+  const events = (plan.events || []).concat(st.events || []);
+  const per = (p) => p.perWeek ?? (p.formats || []).reduce((n, f) => n + (f.perWeek || 0), 0);
+  const weekly = plats.reduce((n, p) => n + per(p), 0);
+  const want = Math.round(weekly * opt.days / 7);
+  const rubs = ITEMS.rubrics;
+  const shareSum = rubs.reduce((n, r) => n + (r.share || 0), 0);
+  const qn = (mem.questions || []).length;
+  const gen = (m) => m.replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я');
+  const range = `${today.getDate()} ${gen(today.toLocaleDateString('ru', {month: 'long'}))} – ${to.getDate()} ${gen(to.toLocaleDateString('ru', {month: 'long'}))}`;
+  const chip = (x) => `<div class="ln-chip ${x.proposed ? 'idea' : ''}" data-peek="${x.id}" title="${esc(x.title)}" style="cursor: default">
+      <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
+      <span class="m">${svg(FMT_ICON[x.format], 11)}${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? '' : ' · в плане'}</span>
+      ${x.proposed && x.idea?.why ? `<span class="bwhy">${esc(x.idea.why)}</span>` : ''}
+      ${x.proposed && ed ? `<span class="m" style="gap: 10px"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</div>`;
+  const cells = days.map((d) => {
+    const out = ymd(d) < ymd(today) || ymd(d) > ymd(to), ev = events.filter((e) => e.date === ymd(d));
+    const here = [...taken, ...list].filter((x) => x.at.slice(0, 10) === ymd(d));
+    return `<div class="ln-cell${ymd(d) === ymd(today) ? ' today' : ''}${out ? ' out' : ''}${ev.length ? ' ev' : ''}" style="min-height: 150px"><span class="dn">${d.getDate()}</span>
+      ${ev.map((e) => `<span class="bev">${esc(e.title)}</span>`).join('')}${out ? '' : here.map(chip).join('')}</div>`;
+  }).join('');
+  const check = (k, label, note) => `<label class="bchk"><input type="checkbox" data-opt="${k}" ${opt[k] ? 'checked' : ''} ${ed ? '' : 'disabled'}><span><b>${label}</b><span class="small muted">${note}</span></span></label>`;
   view.innerHTML = `<div class="work"><div class="rmain">
-    <div class="ln-top"><a href="#/plan" style="color: var(--muted); text-decoration: none">План</a><span>›</span><span>Расписать идеи · ${today.getDate()}–${to.getDate()} ${to.toLocaleDateString('ru', {month: 'long'}).replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я')}</span><span style="flex: 1"></span><a class="ln-btn g" href="#/plan">Готово</a>${list.length && canEdit() ? `<button type="button" class="ln-btn p" id="takeAll">Взять все ${list.length} в план</button>` : ''}</div>
-    <div style="flex: 1; overflow-y: auto; padding: 22px 36px">
-      <div style="display: flex; flex-direction: column; gap: 6px; padding-bottom: 6px"><h1 style="font-size: 24px">${list.length ? `${list.length} ${list.length === 1 ? 'идея' : list.length < 5 ? 'идеи' : 'идей'} на две недели` : 'Идей на две недели пока нет'}</h1><div class="muted" style="font-size: 15px; line-height: 1.5">По рубрикам и ритму плана, без повторов того, что уже вышло. Это только концепции — снимать ничего не надо, пока не возьмёте.</div></div>
-      ${byRub.map(([r, l]) => `<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding: 16px 0 6px"><span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}</div>${l.map(row).join('')}`).join('') || '<p class="muted" style="margin-top: 16px">Claude сейчас распишет — ответ справа, идеи появятся здесь.</p>'}
-    </div></div>
-    <aside class="chatcol" aria-label="Поправить словами"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Поправить словами</b></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+    <div class="ln-top"><a href="#/plan" style="color: var(--muted); text-decoration: none">План</a><span>›</span><b>Собрать контент-план</b><span>·</span><span>${range}</span><span style="flex: 1"></span><a class="ln-btn g" href="#/plan">Готово</a>${list.length && ed ? `<button type="button" class="ln-btn p" id="takeAll">Взять все ${list.length} в план</button>` : ''}</div>
+    <div style="flex: 1; display: flex; min-height: 0">
+      <aside class="bset" aria-label="Из чего собираем">
+        <b style="font-size: 15px">Из чего собираем</b>
+        <div class="blk2"><span class="lbl">Период</span><span class="ln-seg">${[[7, 'Неделя'], [14, '2 недели'], [28, 'Месяц']].map(([n, t]) => `<button type="button" data-days="${n}" class="${opt.days === n ? 'on' : ''}">${t}</button>`).join('')}</span></div>
+        <div class="blk2"><span class="lbl">Выпусков в неделю · всего ${weekly}</span>${plats.map((p) => `<div class="brow"><span style="flex: 1; min-width: 0"><b style="font-weight: 600">${esc(p.name)}</b>${p.account ? ` <span class="small muted">${esc(p.account)}</span>` : ''}</span>${ed ? `<button type="button" class="ln-btn s" data-pl="${esc(p.id)}" data-d="-1" aria-label="Меньше">−</button>` : ''}<b style="width: 22px; text-align: center">${per(p)}</b>${ed ? `<button type="button" class="ln-btn s" data-pl="${esc(p.id)}" data-d="1" aria-label="Больше">+</button>` : ''}</div>`).join('') || '<span class="small muted">Площадок нет — <a href="#/plan/setup">добавить</a>.</span>'}</div>
+        <div class="blk2"><span class="lbl">Доли рубрик${shareSum && shareSum !== 100 ? ` · сумма ${shareSum} %` : ''}</span>${rubs.map((r) => `<div class="brow"><span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span><span style="flex: 0 0 92px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(r.name)}</span><input type="range" min="0" max="100" step="5" value="${r.share || 0}" data-share="${esc(r.id)}" ${ed ? '' : 'disabled'} aria-label="Доля рубрики ${esc(r.name)}" style="flex: 1; min-width: 0; accent-color: ${esc(r.color || '#171717')}"><b class="bpct" style="width: 40px; text-align: right">${r.share || 0} %</b></div>`).join('') || '<span class="small muted">Рубрик пока нет.</span>'}</div>
+        <div class="blk2"><span class="lbl">Учесть</span>
+          ${check('events', 'Даты сезона и события', events.length ? events.slice(0, 3).map((e) => esc(e.title)).join(', ') : 'в плане событий нет')}
+          ${check('questions', 'Вопросы клиентов', qn ? `${qn} в памяти` : 'в памяти пока нет')}
+          ${check('facts', 'Факты и цены', 'сверять цифры с памятью')}
+          ${check('fresh', 'Не повторять вышедшее', 'темы и крючки прошлых выпусков')}
+          <textarea class="f" id="bWish" rows="3" placeholder="Своё пожелание: «больше про детей», «в пятницу без цен»…" ${ed ? '' : 'readonly'} style="font-size: 13px; resize: vertical">${esc(opt.wish || '')}</textarea></div>
+        ${ed ? `<button type="button" class="ln-btn p" id="bGo" style="justify-content: center; height: 40px">${svg('idea', 14)}${list.length ? 'Пересобрать' : 'Собрать'} · ~${want} ${want === 1 ? 'выпуск' : want > 1 && want < 5 ? 'выпуска' : 'выпусков'}</button>` : ''}
+      </aside>
+      <div style="flex: 1; overflow-y: auto; padding: 18px 22px; min-width: 0">
+        <div style="display: flex; align-items: baseline; gap: 12px; padding-bottom: 12px"><div class="mh1" role="heading" aria-level="1">${list.length ? `${list.length} ${list.length === 1 ? 'идея' : list.length < 5 ? 'идеи' : 'идей'} на ${opt.days === 7 ? 'неделю' : opt.days === 14 ? 'две недели' : 'месяц'}` : 'Предложений на этот период пока нет'}</div><span class="muted" style="font-size: 13px">${taken.length ? `и ${taken.length} уже в плане` : ''}</span></div>
+        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 12px; color: var(--muted); padding: 0 0 8px">${DAYS.map((d) => `<span style="padding-left: 8px">${d.toLowerCase()}</span>`).join('')}</div>
+        <div class="ln-grid bgrid">${cells}</div>
+        <p class="small muted" style="margin: 12px 2px 0">Пунктир — предложение Claude, под ним почему оно в этот день. Сплошные уже в плане. Взятое переходит в План и остаётся идеей, пока не начнёте снимать.</p>
+      </div></div></div>
+    <aside class="chatcol" aria-label="Почему так"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Почему так</b><span class="small muted">поправить словами</span></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   const box = chatBox('_project', {onDone: () => { sidebar(); vPlanDraft(); }});
   $('#chatHost').append(box);
-  view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async () => { b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); vPlanDraft(); }));
-  view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = () => { const x = list.find((y) => y.id === b.dataset.other); box.say(`Замени идею «${x.title}» на ${x.at.slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric:.`, `Другую вместо «${x.title}»`); }));
+  const buildText = () => {
+    const shares = rubs.filter((r) => r.share).map((r) => `${r.name} (id ${r.id}) — ${r.share} %`).join(', ');
+    const counts = plats.map((p) => `${p.name} — ${per(p)} в неделю`).join(', ');
+    const mind = [opt.events && 'даты сезона и события из plan.json и strategy.json', opt.questions && 'вопросы клиентов из memory.json → questions', opt.facts && 'цифры и цены только из facts.json', opt.fresh && 'не повторять темы и крючки уже вышедших и стоящих в плане выпусков'].filter(Boolean);
+    return `Собери контент-план с ${ymd(today)} по ${ymd(to)}. Площадки и сколько выпусков в неделю: ${counts || 'по strategy.json'}. Доли рубрик: ${shares || 'по strategy.json'}.${mind.length ? ' Учти: ' + mind.join('; ') + '.' : ''}${opt.wish ? ` Пожелание: ${opt.wish}.` : ''} Это только концепции — снимать пока ничего не надо. Твои ещё не взятые предложения на этот период убери из ideas.md и сложи заново. Каждую идею добавь в ideas.md в «My ideas» (Format:, Hook:, Plot:) и ещё три строки: «Date: YYYY-MM-DDTHH:MM», «Rubric: <id рубрики>» и «Why: <одна фраза — почему она в этот день>». Потом здесь коротко: как разложил по дням и почему так.`;
+  };
+  view.querySelectorAll('[data-days]').forEach((b) => (b.onclick = () => { opt.days = Number(b.dataset.days); keep(); vPlanDraft(); }));
+  view.querySelectorAll('[data-opt]').forEach((b) => (b.onchange = () => { opt[b.dataset.opt] = b.checked; keep(); }));
+  $('#bWish')?.addEventListener('change', (e) => { opt.wish = e.target.value.trim(); keep(); });
+  view.querySelectorAll('[data-pl]').forEach((b) => (b.onclick = async () => { const p = plats.find((x) => x.id === b.dataset.pl); await post('/api/strategy/edit', {platform: {id: p.id, perWeek: Math.max(0, per(p) + Number(b.dataset.d))}}); vPlanDraft(); }));
+  view.querySelectorAll('[data-share]').forEach((b) => {
+    b.oninput = () => { b.parentElement.querySelector('.bpct').textContent = b.value + ' %'; };
+    b.onchange = () => post('/api/strategy/edit', {rubric: {id: b.dataset.share, share: Number(b.value)}}).then(() => vPlanDraft());
+  });
+  $('#bGo')?.addEventListener('click', () => { opt.wish = $('#bWish').value.trim(); keep(); box.say(buildText(), `${list.length ? 'Пересобрать' : 'Собрать'} контент-план · ${range}`); });
+  view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.stopPropagation(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); vPlanDraft(); }));
+  view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); const x = list.find((y) => y.id === b.dataset.other); box.say(`Замени идею «${x.title}» на ${x.at.slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric: и новой строкой Why:.`, `Другую вместо «${x.title}»`); }));
   $('#takeAll')?.addEventListener('click', async (e) => { e.target.disabled = true; for (const x of list) await post('/api/items/set', {id: x.id, take: true}); toast(`Взято ${list.length}`); location.hash = '#/plan'; });
   await box.ready;
   const ask = sessionStorage.getItem('planAsk');
   if (ask) { sessionStorage.removeItem('planAsk'); const {text, shown} = JSON.parse(ask); box.say(text, shown); }
-  else if (sessionStorage.getItem('planLay')) { sessionStorage.removeItem('planLay'); box.say(layIdeasText(ymd(today), ymd(to)), 'Расписать идеи на 2 недели'); }
+  else if (sessionStorage.getItem('planLay')) { sessionStorage.removeItem('planLay'); if (ed) $('#bGo')?.focus(); }
 }
 
-
-// Рубрика (CleanRubric): its issues, from the strategy and plan.json.
-// Рубрика (LeanRubric): a simple group — formula, usual format, day, and its ideas and releases.
-async function vRubric(id) {
+// Рубрика (handbook/LEAN.md, кусок 15): one page with tabs — Обзор (formula, how it looks, what is
+// next, what Claude keeps), Шаблоны (the studio's templates by seconds), Референсы (what we take from
+// whom), Выпуски and Правила. Everything lives on the rubric in strategy.json.
+const REF_TAKES = [['hook', 'крючок'], ['edit', 'монтаж'], ['plates', 'плашки'], ['delivery', 'подача'], ['sound', 'звук'], ['cover', 'обложка']];
+const KIND_COLOR = {hook: '#C43F34', photo: '#46708A', clip: '#46708A', base: '#E5A33C', item: '#E5A33C', total: '#151612', tip: '#E5A33C', compare: '#E5A33C', question: '#C43F34', answer: '#46708A', fact: '#E5A33C', cta: '#2E8A4F'};
+async function vRubric(id, tab = 'overview', sub) {
   const [plan] = await Promise.all([api('/api/plan'), loadItems()]);
   const st = plan.strategy || {}, r = (st.rubrics || []).find((x) => x.id === id);
   if (!r) { view.innerHTML = '<div class="page"><p class="muted">Такой рубрики нет. <a href="#/plan">План</a></p></div>'; return; }
   title(r.name);
-  const ed = canEdit();
-  const own = ITEMS.items.filter((x) => !x.proposed && itemRubric(x)?.id === r.id).sort((p, q) => String(q.at || '').localeCompare(String(p.at || '')));
-  const ideas = ITEMS.items.filter((x) => x.proposed && itemRubric(x)?.id === r.id).length;
+  const ed = canEdit(), base = '#/rubric/' + r.id;
+  const tpls = plan.templates || [], kinds = plan.kinds || {}, tpl = tpls.find((x) => x.id === r.template);
+  const refs = r.refs || [], rules = r.rules || [];
+  const mine = ITEMS.items.filter((x) => itemRubric(x)?.id === r.id);
+  const own = mine.filter((x) => !x.proposed).sort((p, q) => String(q.at || '').localeCompare(String(p.at || '')));
+  const ideas = mine.filter((x) => x.proposed).length;
+  const now = new Date().toISOString().slice(0, 16);
+  const next = mine.filter((x) => x.stage !== 'published' && (!x.at || x.at >= now)).sort((p, q) => String(p.at || '9').localeCompare(String(q.at || '9')));
+  const looks = own.filter((x) => x.thumb).slice(0, 6);
   const DAYNAMES = ['по понедельникам', 'по вторникам', 'по средам', 'по четвергам', 'по пятницам', 'по субботам', 'по воскресеньям'];
-  const card = (label, inner) => `<div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}</span>${inner}</div>`;
   const plain = 'border: 0; padding: 0; font: inherit; font-size: 15px; background: none; color: var(--ink); width: 100%';
-  view.innerHTML = `<div class="ln-top"><a href="#/plan" style="color: var(--muted); text-decoration: none">План</a><span>›</span><span>Рубрика</span><span style="flex: 1"></span>
-      ${ed ? `<button type="button" class="ln-btn" id="rAsk">${svg('idea', 14)}Предложить 3 идеи</button><a class="ln-btn p" href="#/new" id="rNew">${svg('plus', 14)}Идея в рубрику</a>` : ''}</div>
-    <div style="flex: 1; overflow-y: auto"><div style="max-width: 1120px; padding: 30px 48px; display: flex; flex-direction: column; gap: 22px">
-      <div style="display: flex; align-items: center; gap: 12px">${ed ? `<input type="color" id="rColor" value="${esc(r.color || '#737373')}" aria-label="Цвет рубрики" style="width: 22px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer">` : `<span style="width: 16px; height: 16px; border-radius: 5px; background: ${esc(r.color)}"></span>`}<input id="rName" aria-label="Название рубрики" value="${esc(r.name)}" ${ed ? '' : 'readonly'} style="border: 0; padding: 0; font: inherit; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; background: none; color: var(--ink); flex: 1"></div>
-      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px">
+  const card = (label, inner) => `<div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0"><span class="lbl">${label}</span>${inner}</div>`;
+  const tabs = [['overview', 'Обзор'], ['templates', 'Шаблоны' + (tpl ? ' · 1' : '')], ['refs', 'Референсы · ' + refs.length], ['issues', 'Выпуски · ' + own.length], ['rules', 'Правила · ' + rules.length]];
+  const sec = (k) => Math.round((kinds[k.kind]?.dur || 3) * (k.repeat ? (k.repeat[0] + k.repeat[1]) / 2 : 1));
+  const tplLen = (t) => t.scenes.reduce((n, k) => n + sec(k), 0);
+  const issueRow = (x) => `<a class="ln-li" href="${itemHref(x)}" data-peek="${x.id}"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><span style="flex: 0 0 380px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span><span class="s" style="flex: 1">${whenText(x.at)}</span>${x.proposed ? '<span class="small muted">предложение</span>' : sdot(x.stage)}</a>`;
+  const refMedia = (x, h) => {
+    const isVid = /\.(mp4|mov|webm|m4v)(&|$)/i.test(x.url) || /\.(mp4|mov|webm|m4v)$/i.test(x.name || '');
+    const isImg = /\.(jpe?g|png|webp|gif|heic)(&|$)/i.test(x.url) || /\.(jpe?g|png|webp|gif)$/i.test(x.name || '');
+    if (x.file && isVid) return `<video src="${esc(x.url)}" muted playsinline preload="metadata" style="width: 100%; height: ${h}px; object-fit: cover; border-radius: 10px; background: #111; display: block"></video>`;
+    if (x.file && isImg) return `<span style="display: block; height: ${h}px; border-radius: 10px; background: #EEE center / cover url('${esc(x.url)}')"></span>`;
+    let host = ''; try { host = new URL(x.url, location.href).hostname.replace(/^www\./, ''); } catch {}
+    return `<span style="display: grid; place-items: center; height: ${h}px; border-radius: 10px; background: #151612; color: #fff; font-size: 13px; text-align: center; padding: 10px">${svg(/instagram|tiktok|youtu/.test(host) ? 'reel' : 'link', 22)}<span style="opacity: .8">${esc(host || 'ссылка')}</span></span>`;
+  };
+  const takeChips = (x) => (x.takes || []).map((t) => `<span class="rtk">${REF_TAKES.find(([k]) => k === t)?.[1] || t}</span>`).join('');
+  const phone = (inner) => window.Preview ? Preview.phone(inner, {w: 220}) : '';
+  const tplPhone = (t) => {
+    const bg = 'background: linear-gradient(165deg, #46708A 0%, #2B4556 45%, #151612 100%)';
+    const first = kinds[t.scenes[0]?.kind]?.label || 'Хук';
+    return phone(`<div style="position: absolute; inset: 0; ${bg}; display: flex; flex-direction: column; justify-content: flex-end; padding: 18% 9%; gap: 8px; font-family: Geist, system-ui, sans-serif">
+      <span style="align-self: flex-start; background: #C43F34; color: #fff; font-weight: 600; font-size: 11px; border-radius: 999px; padding: 4px 10px">${esc(r.name)}</span>
+      <span style="background: #fff; color: #151612; font-weight: 600; letter-spacing: -0.04em; font-size: 20px; line-height: 1.1; border-radius: 14px; padding: 10px 12px">${esc(next[0]?.idea?.hook || next[0]?.title || first)}</span>
+      <span style="color: #fff; font-size: 11px; opacity: .85">${esc(t.name)} · ${tplLen(t)} с</span></div>`);
+  };
+  let body = '', aside = '';
+  if (tab === 'overview') {
+    body = `<div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 12px">
         ${card('Формула — что объединяет', `<input id="rAbout" value="${esc(r.about || '')}" placeholder="Например: «сколько стоит X в Гудаури — честно, с чеком»" ${ed ? '' : 'readonly'} style="${plain}">`)}
         ${card('Обычно', `<select id="rFormat" ${ed ? '' : 'disabled'} style="${plain}"><option value="">любой формат</option>${['reel', 'post', 'carousel', 'telegram'].map((k) => `<option value="${k}" ${r.format === k ? 'selected' : ''}>${FMT_NAME[k].toLowerCase()}</option>`).join('')}</select>`)}
         ${card('Ритм', `<select id="rDay" ${ed ? '' : 'disabled'} style="${plain}"><option value="">по поводу</option>${DAYNAMES.map((t, i) => `<option value="${i + 1}" ${String(r.day) === String(i + 1) ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
+        ${card('Доля плана', `<span style="display: flex; align-items: center; gap: 8px"><input type="number" id="rShare" min="0" max="100" step="5" value="${r.share || 0}" ${ed ? '' : 'readonly'} style="${plain}; width: 56px"><span class="muted">%</span></span>`)}
       </div>
-      <div><div class="ln-lh">Идеи и выпуски · ${own.length}${ideas ? `<a href="#/all/proposed">ещё ${ideas} предложений Claude</a>` : ''}</div>
-        ${own.map((x) => `<a class="ln-li" href="${itemHref(x)}" data-peek="${x.id}"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><span style="flex: 0 0 380px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span><span class="s" style="flex: 1">${whenText(x.at)}</span>${sdot(x.stage)}</a>`).join('') || '<p class="small muted" style="padding: 10px 2px">Пока ни одного выпуска.</p>'}</div>
-      <p class="small muted" style="margin: 0">Больше в рубрике ничего нет: ни шаблонов, ни серий, ни каскада правил. Claude держит формулу и прошлые выпуски, чтобы новые были похожи.${r.rules?.length || r.series?.length || r.template ? ` Старые настройки рубрики (правила, серии, шаблон) остаются в <a href="#/knowledge/rubrics/${esc(r.id)}">прежней Стратегии</a>.` : ''}</p>
-      ${ed ? '<button type="button" class="ln-btn g" id="rDel" style="align-self: flex-start; color: #B42318">Удалить рубрику</button>' : ''}
-    </div></div>`;
-  const save = (patch) => post('/api/strategy/edit', {rubric: {id: r.id, ...patch}}).then(() => toast('Сохранено'));
+      <div><div class="ln-lh">Как выглядит${looks.length ? ` · ${looks.length} последних` : ''}</div>
+        ${looks.length ? `<div style="display: flex; gap: 10px; padding: 12px 0; overflow-x: auto">${looks.map((x) => `<a href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}" style="flex: none; width: 110px; aspect-ratio: ${x.format === 'reel' ? '9 / 16' : '4 / 5'}; border-radius: 10px; background: #E5E5E5 center / cover url('${x.thumb}')"></a>`).join('')}</div>` : '<p class="small muted" style="padding: 10px 2px 0">Обложки появятся, когда у рубрики будут собранные выпуски.</p>'}
+        <label class="blk2" style="padding-top: 6px"><span class="lbl">Что у них общего</span><input class="f" id="rLook" value="${esc(r.look || '')}" placeholder="Например: «чек цен крупно на снегу, сумма в ₾ и $»" ${ed ? '' : 'readonly'}></label></div>
+      <div><div class="ln-lh">Дальше в рубрике · ${next.length}${ideas ? `<a href="#/plan/draft">${ideas} предложений Claude</a>` : ''}</div>
+        ${next.slice(0, 8).map((x) => `<a class="ln-li" href="${itemHref(x)}" data-peek="${x.id}"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><span style="flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span>${tpl && x.format === 'reel' ? `<span class="rtk">${esc(tpl.name)}</span>` : ''}<span class="s" style="flex: 0 0 120px; text-align: right">${whenText(x.at)}</span>${x.proposed ? '<span class="small muted" style="flex: 0 0 90px">предложение</span>' : `<span style="flex: 0 0 90px">${sdot(x.stage)}</span>`}</a>`).join('') || '<p class="small muted" style="padding: 10px 2px">Впереди ничего нет — «Предложить 3 идеи» сверху.</p>'}</div>`;
+    aside = `<b style="font-weight: 600">Что Claude держит в рубрике</b>
+      <a class="rkeep" href="${base}/templates"><span class="lbl">Шаблон</span><span>${tpl ? `${esc(tpl.name)} · ${tplLen(tpl)} с` : 'не выбран — Claude пишет ролик целиком'}</span></a>
+      <a class="rkeep" href="${base}/rules"><span class="lbl">Правила · ${rules.length}</span>${rules.slice(0, 3).map((x) => `<span>${x.lock ? '🔒 ' : ''}${esc(x.text)}</span>`).join('') || '<span class="muted">пока нет</span>'}</a>
+      <a class="rkeep" href="${base}/refs"><span class="lbl">Референсы · ${refs.length}</span>${refs.length ? `<span style="display: flex; gap: 4px; flex-wrap: wrap">${[...new Set(refs.flatMap((x) => x.takes || []))].map((t) => `<span class="rtk">${REF_TAKES.find(([k]) => k === t)?.[1] || t}</span>`).join('') || '<span class="muted">ещё не разобраны</span>'}</span>` : '<span class="muted">пока нет</span>'}${r.refsSummary ? `<span class="small muted" style="line-height: 1.45">${esc(r.refsSummary)}</span>` : ''}</a>
+      <span class="small muted" style="line-height: 1.5">Новые выпуски рубрики Claude делает по шаблону, правилам и тому, что взяли из референсов.</span>`;
+  } else if (tab === 'templates') {
+    const cur = tpls.find((x) => x.id === sub) || tpl || tpls[0];
+    const total = cur ? tplLen(cur) : 0;
+    body = !cur ? '<p class="muted">Шаблонов в студии пока нет.</p>' : `<div style="display: flex; gap: 22px; min-width: 0">
+      <div style="flex: 0 0 230px; display: flex; flex-direction: column; gap: 4px">${tpls.map((x) => `<a class="qi ${x === cur ? 'on' : ''}" href="${base}/templates/${esc(x.id)}" style="text-decoration: none; flex-direction: column; align-items: flex-start; gap: 2px"><span style="display: flex; gap: 6px; align-items: center; width: 100%">${esc(x.name)}${x.id === r.template ? '<span class="rtk" style="margin-left: auto">в рубрике</span>' : ''}</span><span class="small muted" style="font-weight: 400">${esc(x.fits)}</span></a>`).join('')}</div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 18px">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"><div class="mh1" role="heading" aria-level="2" style="font-size: 20px">${esc(cur.name)}</div><span class="muted">${esc(cur.about)} · около ${total} с</span>
+          ${ed ? (cur.id === r.template ? '<button type="button" class="ln-btn" id="tUse" data-t="" style="margin-left: auto">Убрать из рубрики</button>' : `<button type="button" class="ln-btn p" id="tUse" data-t="${esc(cur.id)}" style="margin-left: auto">Сделать шаблоном рубрики</button>`) : ''}</div>
+        <div><div class="ln-lh">Ход ролика по секундам</div>
+          <div class="ttrack">${cur.scenes.map((k) => `<span style="flex: ${sec(k)}; background: ${KIND_COLOR[k.kind] || '#8B8B8B'}; color: ${KIND_COLOR[k.kind] === '#E5A33C' ? '#151612' : '#fff'}" title="${esc(kinds[k.kind]?.label || k.kind)}"><b>${esc(kinds[k.kind]?.label || k.kind)}${k.repeat ? ` ×${k.repeat[0]}–${k.repeat[1]}` : ''}</b><i>${sec(k)} с</i></span>`).join('')}</div>
+          <div style="display: flex; justify-content: space-between" class="small muted"><span>0 с</span><span>${total} с</span></div></div>
+        <div><div class="ln-lh">Что подставляется и откуда</div>
+          ${cur.scenes.map((k) => `<div class="ln-li"><span class="rsq" style="background: ${KIND_COLOR[k.kind] || '#8B8B8B'}"></span><b style="flex: 0 0 130px; font-weight: 600">${esc(kinds[k.kind]?.label || k.kind)}${k.repeat ? ` ×${k.repeat[0]}–${k.repeat[1]}` : ''}</b><span class="s" style="flex: 1">${esc(kinds[k.kind]?.need || '')}</span><span class="small muted" style="flex: 0 0 120px; text-align: right">${k.lock ? '🔒 из рубрики' : kinds[k.kind]?.media === 'video' ? 'видео' : kinds[k.kind]?.media === 'none' ? 'считается сам' : 'из материала'}</span></div>`).join('')}</div>
+        <p class="small muted" style="margin: 0">Шаблоны — готовые форматы студии, одинаковые во всех проектах. Цвета и шрифт плашек берутся из дизайна проекта (Память › Дизайн).</p>
+      </div></div>`;
+    aside = cur ? `<b style="font-weight: 600">Как будет выглядеть</b><div style="display: flex; justify-content: center">${tplPhone(cur)}</div>
+      ${ed ? `<a class="ln-btn p" href="#/new" id="tNew" style="justify-content: center">${svg('plus', 14)}Новый выпуск по шаблону</a>` : ''}
+      ${ed && refs.length ? '<button type="button" class="ln-btn" id="tByRefs" style="justify-content: center">Подогнать под референсы</button>' : ''}` : '';
+  } else if (tab === 'refs') {
+    const f = sub || '';
+    const shown = refs.filter((x) => !f || (x.takes || []).includes(f));
+    const sel = refs.find((x) => x.id === sessionStorage.getItem('refSel:' + r.id)) || shown[0];
+    body = `${ed ? `<div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap">
+        <label class="mdrop" id="refDrop" style="flex: 1 1 260px; padding: 16px; flex-direction: row; gap: 10px">${svg('clip', 18)}<span style="text-align: left"><b>Бросьте ролик, скриншот или фото</b><br><span class="small muted">чужой рилс, который нравится, обложка, плашка</span></span><input type="file" multiple id="refFiles" accept="image/*,video/*" style="display: none"></label>
+        <form id="refLink" style="flex: 1 1 260px; display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px"><input class="f" id="refUrl" placeholder="Ссылка на рилс, тикток или пост" style="flex: 1; border: 0"><button class="ln-btn" type="submit">Добавить</button></form></div>` : ''}
+      <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center"><span class="small muted" style="margin-right: 4px">Приём:</span><a class="ln-pill ${f ? '' : 'on'}" href="${base}/refs">все · ${refs.length}</a>${REF_TAKES.map(([k, t]) => { const n = refs.filter((x) => (x.takes || []).includes(k)).length; return n ? `<a class="ln-pill ${f === k ? 'on' : ''}" href="${base}/refs/${k}">${t} · ${n}</a>` : ''; }).join('')}</div>
+      ${shown.length ? `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px">${shown.map((x) => `<button type="button" class="rref ${x === sel ? 'on' : ''}" data-ref="${x.id}">${refMedia(x, 210)}<b>${esc(x.name || x.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40))}</b><span style="display: flex; gap: 4px; flex-wrap: wrap">${takeChips(x) || '<span class="small muted">ещё не разобран</span>'}</span></button>`).join('')}</div>` : `<p class="muted" style="margin: 0">${refs.length ? 'С этим приёмом референсов нет.' : 'Референсов пока нет. Добавьте чужие ролики, которые нравятся, — Claude разберёт, что у них взять: крючок, монтаж, плашки, подачу.'}</p>`}
+      <div class="mcard" style="cursor: default"><span style="display: flex; align-items: center; gap: 8px"><b>Вывод Claude по всем референсам</b>${ed && refs.length ? '<button type="button" class="ln-btn s" id="refStudy" style="margin-left: auto">Разобрать референсы</button>' : ''}</span>
+        <span class="small" style="line-height: 1.55; color: var(--ink2)">${esc(r.refsSummary || (refs.length ? 'Ещё не разобраны: нажмите «Разобрать референсы» — Claude откроет каждый и запишет, что берём.' : '—'))}</span>
+        ${ed && refs.length ? `<button type="button" class="ln-btn" id="refTpl" style="align-self: flex-start">Обновить шаблон по референсам</button>` : ''}</div>`;
+    aside = sel ? `<b style="font-weight: 600">${esc(sel.name || 'Референс')}</b>${refMedia(sel, 240)}
+      <a class="small" href="${esc(sel.url)}" target="_blank" rel="noopener" style="color: #2F6FEB; word-break: break-all">${sel.file ? 'Открыть файл' : esc(sel.url)}</a>
+      <div class="blk2"><span class="lbl">Что берём</span><span style="display: flex; gap: 6px; flex-wrap: wrap">${REF_TAKES.map(([k, t]) => `<button type="button" class="ln-pill ${(sel.takes || []).includes(k) ? 'on' : ''}" data-take="${k}" ${ed ? '' : 'disabled'}>${t}</button>`).join('')}</span></div>
+      <label class="blk2"><span class="lbl">Как это будет у нас</span><textarea class="f" id="refNote" rows="4" ${ed ? '' : 'readonly'} placeholder="Например: «цена всплывает на 1-й секунде, как у них, но плашкой в наших цветах»" style="font-size: 13px">${esc(sel.note || '')}</textarea></label>
+      <label class="blk2"><span class="lbl">Чего не копируем</span><textarea class="f" id="refSkip" rows="2" ${ed ? '' : 'readonly'} style="font-size: 13px">${esc(sel.skip ?? 'музыку, лица, чужой текст и логотип')}</textarea></label>
+      ${ed ? '<button type="button" class="ln-btn g" id="refDel" style="align-self: flex-start; color: #B42318">Убрать референс</button>' : ''}` : '<span class="small muted">Выберите референс, чтобы отметить, что из него берём.</span>';
+  } else if (tab === 'issues') {
+    body = `<div><div class="ln-lh">Идеи и выпуски · ${own.length}${ideas ? `<a href="#/plan/draft">ещё ${ideas} предложений Claude</a>` : ''}</div>${own.map(issueRow).join('') || '<p class="small muted" style="padding: 10px 2px">Пока ни одного выпуска.</p>'}</div>`;
+  } else {
+    body = `<div><div class="ln-lh">Правила рубрики · ${rules.length}</div>
+      ${rules.map((x, i) => `<div class="ln-li"><button type="button" class="ln-btn s ${x.lock ? '' : 'g'}" data-lock="${i}" ${ed ? '' : 'disabled'} title="${x.lock ? 'Жёсткое: Claude не нарушает никогда' : 'Мягкое: можно отступить, если просят'}">${x.lock ? '🔒 жёсткое' : 'мягкое'}</button><span style="flex: 1">${esc(x.text)}</span>${ed ? `<button type="button" class="ln-btn s g" data-rmrule="${i}" aria-label="Убрать правило">✕</button>` : ''}</div>`).join('') || '<p class="small muted" style="padding: 10px 2px">Правил пока нет. Например: «курс НБГ на дату выкладки», «цена в первом кадре».</p>'}
+      ${ed ? '<form id="ruleAdd" style="display: flex; gap: 8px; padding-top: 12px"><input class="f" id="ruleIn" placeholder="Новое правило рубрики" style="flex: 1"><label class="small" style="display: inline-flex; gap: 6px; align-items: center"><input type="checkbox" id="ruleLock">жёсткое</label><button class="ln-btn" type="submit">Добавить</button></form>' : ''}</div>
+      ${ed ? '<button type="button" class="ln-btn g" id="rDel" style="align-self: flex-start; color: #B42318">Удалить рубрику</button>' : ''}`;
+  }
+  view.innerHTML = `<div class="ln-top"><a href="#/plan" style="color: var(--muted); text-decoration: none">План</a><span>›</span><span>Рубрика</span><span style="flex: 1"></span>
+      ${ed ? `<button type="button" class="ln-btn" id="rAsk">${svg('idea', 14)}Предложить 3 идеи</button><a class="ln-btn p" href="#/new" id="rNew">${svg('plus', 14)}Идея в рубрику</a>` : ''}</div>
+    <div style="flex: 1; display: flex; min-height: 0">
+      <div style="flex: 1; overflow-y: auto; min-width: 0"><div style="max-width: 1120px; padding: 24px 40px 40px; display: flex; flex-direction: column; gap: 22px">
+        <div style="display: flex; align-items: center; gap: 12px">${ed ? `<input type="color" id="rColor" value="${esc(r.color || '#737373')}" aria-label="Цвет рубрики" style="width: 22px; height: 22px; border: 0; padding: 0; background: none; cursor: pointer">` : `<span style="width: 16px; height: 16px; border-radius: 5px; background: ${esc(r.color)}"></span>`}<input id="rName" aria-label="Название рубрики" value="${esc(r.name)}" ${ed ? '' : 'readonly'} style="border: 0; padding: 0; font: inherit; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; background: none; color: var(--ink); flex: 1; min-width: 0"></div>
+        <nav class="rtabs" aria-label="Разделы рубрики">${tabs.map(([k, t]) => `<a href="${base}/${k}" class="${k === tab ? 'on' : ''}">${t}</a>`).join('')}</nav>
+        ${body}
+      </div></div>
+      ${aside ? `<aside class="ln-aside" style="flex-basis: 320px">${aside}</aside>` : ''}
+    </div>`;
+  const redraw = () => vRubric(id, tab, sub);
+  const save = (patch, again) => post('/api/strategy/edit', {rubric: {id: r.id, ...patch}}).then(() => { toast('Сохранено'); if (again) redraw(); });
   $('#rName')?.addEventListener('change', (e) => save({name: e.target.value}).then(() => sidebar()));
   $('#rColor')?.addEventListener('change', (e) => save({color: e.target.value}));
   $('#rAbout')?.addEventListener('change', (e) => save({about: e.target.value}));
   $('#rFormat')?.addEventListener('change', (e) => save({format: e.target.value}));
   $('#rDay')?.addEventListener('change', (e) => save({day: e.target.value}));
+  $('#rShare')?.addEventListener('change', (e) => save({share: Number(e.target.value)}));
+  $('#rLook')?.addEventListener('change', (e) => save({look: e.target.value}));
   $('#rDel')?.addEventListener('click', async () => { if (!confirm(`Удалить рубрику «${r.name}»? Выпуски останутся, просто без рубрики.`)) return; await post('/api/strategy/edit', {rubric: {id: r.id, remove: true}}); location.hash = '#/plan'; });
-  $('#rAsk')?.addEventListener('click', () => { sessionStorage.setItem('planAsk', JSON.stringify({text: `Предложи 3 идеи в рубрику «${r.name}» (id ${r.id}${r.about ? ', формула: ' + r.about : ''}${r.format ? ', обычно ' + FMT_NAME[r.format].toLowerCase() : ''}) на ближайшие две недели, не повторяя её прошлые выпуски. Каждую добавь в ideas.md в «My ideas» со строками «Date: YYYY-MM-DDTHH:MM» и «Rubric: ${r.id}».`, shown: `3 идеи в «${r.name}»`})); location.hash = '#/plan/draft'; });
-  $('#rNew')?.addEventListener('click', () => sessionStorage.setItem('newRubric', r.id));
+  $('#rAsk')?.addEventListener('click', () => { sessionStorage.setItem('planAsk', JSON.stringify({text: `Предложи 3 идеи в рубрику «${r.name}» (id ${r.id}${r.about ? ', формула: ' + r.about : ''}${r.format ? ', обычно ' + FMT_NAME[r.format].toLowerCase() : ''}) на ближайшие две недели, по её шаблону, правилам и референсам из strategy.json, не повторяя её прошлые выпуски. Каждую добавь в ideas.md в «My ideas» со строками «Date: YYYY-MM-DDTHH:MM», «Rubric: ${r.id}» и «Why: <почему в этот день>».`, shown: `3 идеи в «${r.name}»`})); location.hash = '#/plan/draft'; });
+  view.querySelectorAll('#rNew, #tNew').forEach((b) => b.addEventListener('click', () => sessionStorage.setItem('newRubric', r.id)));
+  // Шаблоны
+  $('#tUse')?.addEventListener('click', async (e) => { await post('/api/strategy/template', {rubric: r.id, template: e.target.dataset.t || null}); toast(e.target.dataset.t ? 'Шаблон в рубрике' : 'Шаблон убран'); redraw(); });
+  $('#tByRefs')?.addEventListener('click', () => memSay(`Посмотри референсы рубрики «${r.name}» (strategy.json → rubrics → ${r.id} → refs) и шаблон ${tpl ? `«${tpl.name}» (${tpl.id})` : 'из каталога, который ей подходит'}. Предложи, как подогнать ролики рубрики под то, что мы берём из референсов: длина сцен, первая секунда, плашки. Если нужен другой шаблон из template/src/templates/catalog.json — скажи какой и почему. Каталог шаблонов не меняй.`, `Подогнать «${r.name}» под референсы`));
+  // Референсы
+  const ref = (patch) => post('/api/strategy/edit', {rubric: {id: r.id, ref: patch}});
+  const sel = refs.find((x) => x.id === sessionStorage.getItem('refSel:' + r.id)) || refs.filter((x) => !sub || (x.takes || []).includes(sub))[0];
+  view.querySelectorAll('[data-ref]').forEach((b) => (b.onclick = () => { sessionStorage.setItem('refSel:' + r.id, b.dataset.ref); redraw(); }));
+  view.querySelectorAll('aside [data-take]').forEach((b) => (b.onclick = async () => { const t = new Set(sel.takes || []); t.has(b.dataset.take) ? t.delete(b.dataset.take) : t.add(b.dataset.take); await ref({id: sel.id, takes: [...t]}); redraw(); }));
+  $('#refNote')?.addEventListener('change', (e) => ref({id: sel.id, note: e.target.value}).then(() => toast('Сохранено')));
+  $('#refSkip')?.addEventListener('change', (e) => ref({id: sel.id, skip: e.target.value}).then(() => toast('Сохранено')));
+  $('#refDel')?.addEventListener('click', async () => { await ref({id: sel.id, remove: true}); sessionStorage.removeItem('refSel:' + r.id); redraw(); });
+  const addFiles = async (files) => {
+    for (const f of files) {
+      const u = await fetch(`/api/upload?project=${encodeURIComponent(P)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f}).then((x) => x.json()).catch(() => null);
+      if (u?.url) await ref({add: {url: u.url, name: f.name, file: true}});
+    }
+    toast(files.length > 1 ? `Добавлено ${files.length}` : 'Референс добавлен'); sessionStorage.removeItem('refSel:' + r.id); redraw();
+  };
+  const drop = $('#refDrop');
+  if (drop) {
+    $('#refFiles').onchange = (e) => addFiles([...e.target.files]);
+    drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); addFiles([...e.dataTransfer.files]); };
+    $('#refLink').onsubmit = async (e) => { e.preventDefault(); const u = $('#refUrl').value.trim(); if (!/^https?:\/\//.test(u)) return toast('Нужна ссылка с https://'); await ref({add: {url: u, name: ''}}); sessionStorage.removeItem('refSel:' + r.id); redraw(); };
+  }
+  $('#refStudy')?.addEventListener('click', () => memSay(`Разбери референсы рубрики «${r.name}» (strategy.json → rubrics → ${r.id} → refs): открой каждую ссылку или файл и заполни у каждого takes (hook, edit, plates, delivery, sound, cover), note — как это будет у нас, skip — чего не копируем. Отмеченное мной не снимай. Потом напиши refsSummary рубрики в 2–4 строки и коротко повтори здесь.`, `Разобрать референсы «${r.name}»`));
+  $('#refTpl')?.addEventListener('click', () => $('#tByRefs') ? $('#tByRefs').click() : memSay(`По референсам рубрики «${r.name}» (strategy.json → rubrics → ${r.id} → refs) предложи, как обновить её шаблон ролика ${tpl ? `«${tpl.name}»` : '(выбери подходящий из template/src/templates/catalog.json)'}: длина сцен, первая секунда, плашки. Каталог шаблонов не меняй; если нужен другой шаблон — скажи какой.`, `Шаблон «${r.name}» по референсам`));
+  // Правила
+  const setRules = (list) => save({rules: list}, true);
+  view.querySelectorAll('[data-lock]').forEach((b) => (b.onclick = () => setRules(rules.map((x, i) => (i === Number(b.dataset.lock) ? {...x, lock: !x.lock} : x)))));
+  view.querySelectorAll('[data-rmrule]').forEach((b) => (b.onclick = () => setRules(rules.filter((_, i) => i !== Number(b.dataset.rmrule)))));
+  $('#ruleAdd')?.addEventListener('submit', (e) => { e.preventDefault(); const t = $('#ruleIn').value.trim(); if (t) setRules([...rules, {text: t, lock: $('#ruleLock').checked}]); });
 }
 
 // Площадки и ритм (LeanPlanSetup): where we post and how often; Claude counts ideas per week from it.
@@ -2826,7 +3029,7 @@ async function route() {
     else if (h === '#/plan/draft') await vPlanDraft();
     else if (h === '#/plan/setup') await vPlanSetup();
     else if ((m = /^#\/plan(?:\/(m|w))?(?:\/(-?\d+))?$/.exec(h))) await vPlan(Number(m[2] || 0), m[1] !== 'w');
-    else if ((m = /^#\/rubric\/([\w-]+)/.exec(h))) await vRubric(m[1]);
+    else if ((m = /^#\/rubric\/([\w-]+)(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vRubric(m[1], m[2] || 'overview', m[3]);
     else if ((m = /^#\/settings(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vSettings(m[1], m[2]);
     else if ((m = /^#\/memory(?:\/(\w+))?(?:\/(\w+))?/.exec(h))) await vMemory(m[1], m[2]);
     else if (h === '#/inbox') await vInbox();

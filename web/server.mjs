@@ -110,6 +110,8 @@ const versionDirs = (reelDir) => {
   return existsSync(d) ? readdirSync(d).filter((v) => /^v\d+$/.test(v)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : [];
 };
 // The rubric templates' catalog: scene kinds and the templates built from them.
+// What a reference can lend a rubric (кусок 15).
+const REF_TAKES = ['hook', 'edit', 'plates', 'delivery', 'sound', 'cover'];
 const templates = () => readJson(join(BOT, 'template', 'src', 'templates', 'catalog.json'), {kinds: {}, templates: []});
 
 function reels(p) {
@@ -257,7 +259,8 @@ function preamble(p, k) {
   if (k === '_ds') lines.push(`THIS CHAT develops the project's design system for its reels. The result is ONE self-contained HTML page, \`${relative(BOT, studio)}/design-system/index.html\` (inline CSS/JS, Google Fonts allowed, images as relative files next to it): a small landing page with the system's name and idea, color and type tokens, spacing and motion rules, and a library of the components (plates, price receipts, titles, subtitles, phone mockup…) drawn in HTML/CSS as they look in the reels, each with its name, when to use it and its Remotion component name if there is one. Read the brief, PLAYBOOK.md, \`template/src\` and the reels' code to stay true to what is really used. After each change, rewrite the page and tell the owner in one or two lines what changed; the page reloads by itself. Keep \`design-system/tokens.json\` in sync with the tokens on the page.`);
   else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules, settings, strategy and plan. Reels and posts themselves are made in their own chats; if the owner asks to make one here, say that «+ Новый выпуск» starts it in its own chat.',
     `Strategy and plan follow STRATEGY.md: \`${relative(BOT, studio)}/strategy.json\` (platforms, rubrics, weekly rhythm, events) and \`${relative(BOT, studio)}/plan.json\` (dates and rubrics of reels and posts); the page draws Strategy and the Calendar from them.`,
-    `Units of content live in \`${relative(BOT, studio)}/items.json\` (handbook/LEAN.md): one item per format with stage, rubric, at and idea {about, hook, flow}. When the owner asks about an item by its id, edit only that item's idea, format, rubric or at there. Never add or remove items yourself: new ideas go to ideas.md («My ideas», Format:/Hook:/Plot: plus «Date: YYYY-MM-DDTHH:MM» and «Rubric: <rubric id>»), and the page turns them into proposals.`,
+    `Units of content live in \`${relative(BOT, studio)}/items.json\` (handbook/LEAN.md): one item per format with stage, rubric, at and idea {about, hook, flow}. When the owner asks about an item by its id, edit only that item's idea, format, rubric or at there. Never add or remove items yourself: new ideas go to ideas.md («My ideas», Format:/Hook:/Plot: plus «Date: YYYY-MM-DDTHH:MM», «Rubric: <rubric id>» and «Why: <one phrase: why this idea on this day>»), and the page turns them into proposals.`,
+    `A rubric in strategy.json may carry template (an id from template/src/templates/catalog.json), look (what its releases share visually), rules [{text, lock}] (lock = never break) and refs [{id, url, name, file, takes: hook|edit|plates|delivery|sound|cover, note — how it will look in our releases, skip — what we do not copy}] plus refsSummary (your short summary over all refs). When you make or pitch a release of a rubric, follow its template, rules and the refs' takes and notes; never copy music, faces, someone else's text or logo from a ref. When asked to study the refs, open each url or file, fill takes, note and skip, and write refsSummary in 2–4 lines.`,
     `Facts and prices live in \`${relative(BOT, studio)}/facts.json\`: {"facts":[{"id":"f-…","text":"what","value":"how much or when","source":"сайт|прайс|сказал <name>|…","kind":"price|date|people|other","at":"YYYY-MM-DD"}]}. When the owner tells you a new price or date, update or add the fact there with today's date and the source; check every caption and slide against these facts and say when one is older than 30 days.`);
   lines.push(`Memory also has \`${relative(BOT, studio)}/memory.json\`: {"answers":[{"q","question","text"}] — the owner's spoken answers to the guiding questions, "questions":[{"id":"q-<random>","text","source","at":"YYYY-MM-DD"}] — what clients ask (add the ones you find in chats, screenshots and comments; they are material for ideas), "sources":[…]}. brief.md is one page in «## » sections: Кто мы, Для кого, Что продаём, Чем отличаемся, Сезон, Площадки, Что работает, Цели на сезон, Чего не обещаем, Чьи аккаунты нравятся — keep these headings when you write it. A design taken from the site goes to design-system/tokens.json: {"site","colors":[{"name","hex","role","use":true}],"fonts":[{"family","weight","role"}],"radii":[px],"logo","photo"}.`);
   // A new project (the starter brief, or a test account not set up yet) is a first visit: the
@@ -730,7 +733,7 @@ createServer(async (req, res) => {
       ...reels(p).map((r) => ({key: 'reel:' + r.id, kind: 'reel', id: r.id, title: `${r.num} ${r.title}`, status: r.status, thumb: r.thumb})),
       ...posts.map((x) => ({key: 'post:' + x.id, kind: x.kind, id: x.id, title: x.title, status: x.stage, thumb: x.thumb, at: x.at ? new Date(x.at).toISOString() : null, rubric: x.rubric})),
     ].map((x) => ({...x, at: at[x.key] || x.at || null, rubric: rubric[x.key] || x.rubric || null}));
-    return json(200, {strategy: readJson(join(studio, 'strategy.json'), {}), items, events: plan.events || [], templates: templates().templates});
+    return json(200, {strategy: readJson(join(studio, 'strategy.json'), {}), items, events: plan.events || [], templates: templates().templates, kinds: templates().kinds});
   }
   // Рубрика и ритм (handbook/LEAN.md, кусок 8): a rubric is a simple group — name, color,
   // formula (about), usual format and day; platforms carry a weekly count; days off. Fields the
@@ -752,7 +755,27 @@ createServer(async (req, res) => {
         st.rubrics.push(r);
       }
       if (b.rubric.remove) st.rubrics = st.rubrics.filter((x) => x !== r);
-      for (const [k, n] of [['name', 60], ['about', 200], ['format', 20], ['day', 20]]) if (b.rubric[k] !== undefined) r[k] = str(b.rubric[k], n);
+      for (const [k, n] of [['name', 60], ['about', 200], ['format', 20], ['day', 20], ['look', 300]]) if (b.rubric[k] !== undefined) r[k] = str(b.rubric[k], n);
+      if (Number.isFinite(b.rubric.share)) r.share = Math.max(0, Math.min(100, Math.round(b.rubric.share)));
+      // Правила рубрики (кусок 15): the whole list at once, each {text, lock}.
+      if (Array.isArray(b.rubric.rules)) r.rules = b.rubric.rules.map((x) => ({text: str(x?.text, 240), ...(x?.lock ? {lock: true} : {})})).filter((x) => x.text).slice(0, 30);
+      // Референсы рубрики: a link or an uploaded file, what we take from it, how it will be ours.
+      const ref = b.rubric.ref;
+      if (ref) {
+        r.refs ||= [];
+        if (ref.add) {
+          const url = str(ref.add.url, 500);
+          if (!/^(https?:\/\/|\/media\?)/.test(url)) return json(400, {});
+          r.refs.unshift({id: 'ref-' + Date.now().toString(36), url, name: str(ref.add.name, 120), file: !!ref.add.file, takes: [], at: new Date().toISOString().slice(0, 10)});
+        } else {
+          const x = r.refs.find((y) => y.id === ref.id);
+          if (!x) return json(404, {});
+          if (ref.remove) r.refs = r.refs.filter((y) => y !== x);
+          if (Array.isArray(ref.takes)) x.takes = ref.takes.filter((t) => REF_TAKES.includes(t));
+          for (const [k, n] of [['name', 120], ['note', 400], ['skip', 300]]) if (ref[k] !== undefined) x[k] = str(ref[k], n);
+        }
+        r.refs = r.refs.slice(0, 40);
+      }
       if (/^#[0-9a-f]{6}$/i.test(b.rubric.color || '')) r.color = b.rubric.color;
       writeJson(f, st);
       log(me.name, `рубрика «${r.name}»${b.rubric.remove ? ' удалена' : ''}`);
@@ -857,7 +880,7 @@ createServer(async (req, res) => {
     for (const r of reels(p)) thumbs['reel:' + r.id] = r.thumb;
     for (const x of listPosts(studio, mediaUrl)) thumbs['post:' + x.id] = x.thumb;
     const items = data.items.map((x) => ({...x, need: needOf(x, src), thumb: x.ref ? thumbs[`${x.ref.kind}:${x.ref.id}`] || null : null}));
-    const rubrics = (readJson(join(studio, 'strategy.json'), {}).rubrics || []).map((r) => ({id: r.id, name: r.name, color: r.color, about: r.about || '', format: r.format || '', day: r.day || ''}));
+    const rubrics = (readJson(join(studio, 'strategy.json'), {}).rubrics || []).map((r) => ({id: r.id, name: r.name, color: r.color, about: r.about || '', format: r.format || '', day: r.day || '', share: r.share || 0, template: r.template || null}));
     return json(200, {items, rubrics});
   }
   if (req.method === 'POST' && url.pathname === '/api/items/set') {
