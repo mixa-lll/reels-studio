@@ -261,7 +261,9 @@ function preamble(p, k) {
     `Facts and prices live in \`${relative(BOT, studio)}/facts.json\`: {"facts":[{"id":"f-…","text":"what","value":"how much or when","source":"сайт|прайс|сказал <name>|…","kind":"price|date|people|other","at":"YYYY-MM-DD"}]}. When the owner tells you a new price or date, update or add the fact there with today's date and the source; check every caption and slide against these facts and say when one is older than 30 days.`);
   // A new project (the starter brief, or a test account not set up yet) is a first visit: the
   // whole onboarding, as the bot runs it, not just an answer to the first message.
-  if (k === '_project' && onboardingDue(studio)) lines.push(`THIS PROJECT IS NEW: run REELS.md section 0 (Onboarding) from where it stands, whatever the owner's message is about (a greeting too): start with the guiding questions, material and the Telegram archive link come last (step 1). Ask ONE question per turn with \`--keyboard\` buttons and stop until they answer; the next turn goes on with the next question. You are not done until \`brief.md\` is filled, \`strategy.json\` is written and \`settings.json\` has \`mode\`, \`plan\` and \`team\` (step 5), and the summary (step 6) is shown.`);
+  // The web's first launch (handbook/LEAN.md, кусок 11): an organisation, not a questionnaire.
+  if (k === '_project' && onboardingDue(studio) && readJson(join(studio, 'settings.json'), {}).started) lines.push(`THIS PROJECT IS NEW and the owner started it from the web's first launch: the organisation's name and links are in settings.json (name, links). Do NOT ask REELS.md section 0's guiding questions. Read the links (WebFetch) and any files in the project, then write in one go: brief.md (what they do, for whom, how they speak); facts.json — prices, dates, places, people, each {"id":"f-<random>","text","value","source","kind":"price|date|people|other","at":"<today>"}; strategy.json by STRATEGY.md — platforms from the links with formats and perWeek, 3–5 rubrics each with name, a stable color, about (one-line formula), format (reel|post|carousel|telegram) and day (1–7), a weekly rhythm, and the voice {about, never, styles}; settings.json mode "solo", plan "video", team null — the owner turns modules on later; and 6–10 ideas for the next two weeks in ideas.md «My ideas» with Format:/Hook:/Plot: plus «Date: YYYY-MM-DDTHH:MM» and «Rubric: <id>». Then reply in 4–6 short lines: what you understood, what you could not find (mark it [нужно уточнить]). Mark a fact you are not sure of with source «проверьте».`);
+  else if (k === '_project' && onboardingDue(studio)) lines.push(`THIS PROJECT IS NEW: run REELS.md section 0 (Onboarding) from where it stands, whatever the owner's message is about (a greeting too): start with the guiding questions, material and the Telegram archive link come last (step 1). Ask ONE question per turn with \`--keyboard\` buttons and stop until they answer; the next turn goes on with the next question. You are not done until \`brief.md\` is filled, \`strategy.json\` is written and \`settings.json\` has \`mode\`, \`plan\` and \`team\` (step 5), and the summary (step 6) is shown.`);
   else if (k.startsWith('new-')) lines.push('THIS CHAT starts a NEW reel. Create its folder with `node scripts/new-reel.mjs <latin-slug>` as soon as the idea is clear, before anything else; the page then moves this chat to that reel. One reel per chat.');
   else if (k.startsWith('post-')) {
     const dir = join(studio, 'posts', k.slice(5));
@@ -598,6 +600,20 @@ createServer(async (req, res) => {
     return json(200, {me: {name: me.name, role: isEditor(me) ? 'editor' : 'member', isOwner: !!me.isOwner, deputyUntil: me.deputyUntil || null, onCamera: !!me.onCamera, test: !!me.test},
       team: peopleOf(a, pp).length, projects: mine, project: pp, plan: planAccess(projectSettings(pp)), test: isTestProject(pp),
       modules: projectSettings(pp).modules || {}, bot: botUsername()});
+  }
+  // Первый запуск (handbook/LEAN.md, кусок 11): the organisation's name and links; Claude then reads
+  // them in the project chat and writes the first memory and a draft plan.
+  if (req.method === 'POST' && url.pathname === '/api/start') {
+    if (!can('editor') || !projectDir(p)) return json(400, {});
+    const b = await body(req);
+    const f = join(PROJECTS, p, 'settings.json');
+    const st = readJson(f, {});
+    if (String(b.name || '').trim()) st.name = String(b.name).trim().slice(0, 80);
+    st.links = (Array.isArray(b.links) ? b.links : []).map((x) => String(x).trim().slice(0, 300)).filter(Boolean).slice(0, 8);
+    st.started = new Date().toISOString();
+    writeJson(f, st);
+    log(me.name, `первый запуск: ${st.name || p}`);
+    return json(200, {settings: st});
   }
   // Модули (handbook/LEAN.md, кусок 12): the base is always on; people, staff, approval and branches
   // are switched on when there is a reason, and only then add their items to the sidebar.
