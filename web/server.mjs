@@ -13,6 +13,7 @@ import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
 import {changeItem, createItems, followPlan, needOf, syncItems} from './items.mjs';
+import {KINDS, makeJobs} from './jobs.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -284,6 +285,22 @@ function preamble(p, k) {
 }
 
 let job = null;
+const jobs = makeJobs({BOT, DATA});
+// What kind of task a turn is (кусок 16): the page names plan, material, memory and facts turns;
+// a release's chat is its build; the project chat's short answers are not tasks.
+function taskOf(p, k, task, source) {
+  if (task && KINDS[task.kind]) return {p, key: k, kind: task.kind, title: task.title, source: task.source === 'plan' ? 'plan' : source};
+  if (k === '_ds') return {p, key: k, kind: 'design', title: 'Дизайн-система', source};
+  if (k === '_project') return {p, key: k, kind: null};
+  if (k.startsWith('new-')) return {p, key: k, kind: 'build', title: 'Новый выпуск', source};
+  if (k.startsWith('post-')) {
+    const x = listPosts(join(PROJECTS, p), mediaUrl).find((y) => y.id === k.slice(5));
+    return {p, key: k, kind: 'build', title: x?.title || 'Пост', source, ref: {kind: 'post', id: k.slice(5)}};
+  }
+  const r = reels(p).find((y) => y.id === k);
+  return {p, key: k, kind: 'build', title: r ? `${r.num} ${r.title}` : k, source, ref: {kind: 'reel', id: k}};
+}
+const reelTitle = (p) => (id) => { const r = reels(p).find((y) => y.id === id); return r ? `${r.num} ${r.title}` : null; };
 
 function startTurn(p, k, text, send) {
   const meta = chatMeta(p, k);
@@ -354,13 +371,15 @@ function startTurn(p, k, text, send) {
     if (result?.is_error || (code && !result)) {
       const msg = {from: 'bot', kind: 'error', text: reply || err.trim().split('\n').pop() || `агент завершился с кодом ${code}`};
       record(p, key, msg); send({msg});
+      if (job) jobs.end(job, {ok: false, error: msg.text});
     } else if (reply && reply !== 'NO_REPLY') {
       // «⌨️ A | B | C» on the last line is the keyboard, as in the bot.
       let keys = [];
       reply = reply.replace(/\n?\s*⌨️\s*(.+)\s*$/u, (_, k2) => { keys = k2.split('|').map((x) => x.trim()).filter(Boolean); return ''; }).trim();
       const msg = {from: 'bot', kind: 'text', text: reply.replace(/\s*NO_REPLY\s*$/, ''), keys, buttons: []};
       record(p, key, msg); send({msg});
-    }
+      if (job) jobs.end(job, {ok: true, reply: msg.text, keys});
+    } else if (job) jobs.end(job, {ok: true});
     setChatMeta(p, key, {status: '', updated: Date.now()});
     if (!key.startsWith('_') && !key.startsWith('new-') && !key.startsWith('post-')) {
       const freed = retain(p, key);
@@ -510,6 +529,7 @@ const buildFromApp = (p, r, text, shown, who) => {
   record(p, r, {from: 'me', kind: 'text', text: shown, by: who});
   log(who, `собрал из мини-приложения: ${shown}`);
   job = startTurn(p, r, `(from ${who}, mini app)\n${text}`, () => {});
+  jobs.begin(job, taskOf(p, r, null, 'phone'));
   return true;
 };
 const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, saveAccess, logFile: () => LOG, sandboxPaths: {projects: PROJECTS, access: ACCESS, starter: join(BOT, 'starter'), chats: CHATS, outbox: OUTBOX, log: LOG, botState: join(BOT, 'data', 'state.json')}, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: () => job && {p: job.p, key: job.key}});
@@ -1075,7 +1095,7 @@ createServer(async (req, res) => {
   }
   if (req.method === 'POST' && url.pathname === '/api/chat') {
     if (!can('editor')) return json(403, {});
-    const {key: k, text, shown} = await body(req);
+    const {key: k, text, shown, task} = await body(req);
     if (!chatKey(k) || !text?.trim()) return json(400, {});
     if (job) return json(429, {key: job.key});
     record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name});
@@ -1084,12 +1104,26 @@ createServer(async (req, res) => {
     const send = (ev) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(ev)}\n\n`); };
     // The turn goes on if the page is closed; the history keeps what it sent.
     job = startTurn(p, k, `(from ${me.name})\n${text}`, send);
+    jobs.begin(job, taskOf(p, k, task, 'web'));
     job.child.on('close', () => setTimeout(() => res.end(), 50));
     return;
   }
+  // Задачи Claude (кусок 16): what runs now for this project, from the web, the bot and the phone.
+  if (req.method === 'GET' && url.pathname === '/api/jobs') return json(200, jobs.list(p, {job, status: job ? read(STATUS).trim() : '', titleOf: reelTitle(p)}));
+  if (req.method === 'POST' && url.pathname === '/api/jobs/stop') {
+    if (!can('editor')) return json(403, {});
+    const {id} = await body(req);
+    if (job?.task && job.task.id === id) { job.stopped = true; try { process.kill(-job.child.pid, 'SIGTERM'); } catch {} log(me.name, `остановил задачу «${job.task.title}»`); return json(200, {}); }
+    const rj = String(id || '').startsWith('r-') && jobs.renderJob(String(id).slice(2));
+    if (!rj) return json(404, {});
+    // scripts/render.mjs --stop kills the render's process tree and marks its job file stopped.
+    spawn(process.execPath, [join(BOT, 'scripts', 'render.mjs'), '--stop', rj.id], {cwd: BOT, env: {...process.env, REELS_DATA: rj.dir}, stdio: 'ignore', detached: true}).unref();
+    log(me.name, `остановил рендер ${rj.id}`);
+    return json(200, {});
+  }
   if (req.method === 'POST' && url.pathname === '/api/stop') {
     if (!can('editor')) return json(403, {});
-    if (job) try { process.kill(-job.child.pid, 'SIGTERM'); } catch {}
+    if (job) { job.stopped = true; try { process.kill(-job.child.pid, 'SIGTERM'); } catch {} }
     log(me.name, 'остановил задачу');
     return json(200, {});
   }
