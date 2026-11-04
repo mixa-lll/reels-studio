@@ -197,7 +197,11 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
   if (b.at !== undefined) item.at = b.at ? String(b.at).slice(0, 25) : null;
   if (b.group !== undefined) item.group = b.group ? String(b.group).slice(0, 40) : undefined;
   if (Array.isArray(b.platforms)) item.platforms = b.platforms.map(String).slice(0, 10);
-  if (b.idea && typeof b.idea === 'object') item.idea = {about: String(b.idea.about ?? item.idea?.about ?? '').slice(0, 2000), hook: String(b.idea.hook ?? item.idea?.hook ?? '').slice(0, 300), flow: (Array.isArray(b.idea.flow) ? b.idea.flow : item.idea?.flow || []).map((s) => String(s).slice(0, 300)).slice(0, 12)};
+  if (b.idea && typeof b.idea === 'object') {
+    const who = String(b.idea.who ?? item.idea?.who ?? '').slice(0, 120);
+    item.idea = {about: String(b.idea.about ?? item.idea?.about ?? '').slice(0, 2000), hook: String(b.idea.hook ?? item.idea?.hook ?? '').slice(0, 300), flow: (Array.isArray(b.idea.flow) ? b.idea.flow : item.idea?.flow || []).map((s) => String(s).slice(0, 300)).slice(0, 12),
+      ...(who ? {who} : {}), ...(item.idea?.why ? {why: item.idea.why} : {})};
+  }
   if (Array.isArray(b.need) && item.ref?.kind !== 'reel') item.need = b.need.map((n) => ({text: String(n.text || '').slice(0, 200), have: String(n.have || '').slice(0, 200), done: !!n.done})).slice(0, 30);
   if (b.take) { delete item.proposed; item.takenBy = by; }
   if (b.starting) item.starting = now;

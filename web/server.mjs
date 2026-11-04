@@ -11,10 +11,11 @@ import {spawn} from 'node:child_process';
 import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
+import {tmpdir} from 'node:os';
 import {changeEdits, readEdits} from './edits.mjs';
 import {changeItem, createItems, followPlan, needOf, syncItems} from './items.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
-import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
+import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
@@ -969,6 +970,65 @@ createServer(async (req, res) => {
     writeFileSync(f, Buffer.concat(chunks));
     const text = await transcribe(f, 'ru').catch(() => null);
     return json(200, {text: text || '', file: basename(f)});
+  }
+  // Диктовка (кусок 18): any field's microphone and «Надиктовать идею» send their recording here and
+  // get the text from the same local Whisper as the bot's voice notes (bot/stt.mjs). The idea
+  // dictation sends what it has so far every few seconds, so the text shows up while one speaks.
+  // The audio is not kept.
+  if (req.method === 'POST' && url.pathname === '/api/voice') {
+    if (!can('editor')) return json(403, {});
+    const chunks = [];
+    let size = 0;
+    for await (const c of req) { size += c.length; if (size > 25 * 1024 * 1024) return json(413, {}); chunks.push(c); }
+    const d = mkdtempSync(join(tmpdir(), 'reels-voice-'));
+    const f = join(d, `voice.${/mp4|aac/.test(req.headers['content-type'] || '') ? 'm4a' : 'webm'}`);
+    try {
+      writeFileSync(f, Buffer.concat(chunks));
+      const text = await transcribe(f, url.searchParams.get('lang') === 'en' ? 'en' : 'ru').catch(() => null);
+      return json(200, {text: text || ''});
+    } finally { rmSync(d, {recursive: true, force: true}); }
+  }
+  // «Надиктовать идею»: what was said goes to a short Claude call without tools, which lays it out on
+  // the idea's fields and says what else in the card the speech changes (who is on camera, rubric,
+  // format, day). Nothing is saved here — the page shows it and saves on «Оставить, как надиктовал».
+  if (req.method === 'POST' && url.pathname === '/api/dictate/parse') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const said = String(b.text || '').trim().slice(0, 8000);
+    if (!said) return json(400, {});
+    const cur = b.idea && typeof b.idea === 'object' ? b.idea : {};
+    const rubrics = (readJson(join(studio, 'strategy.json'), {}).rubrics || []).map((r) => `${r.id} — ${r.name}`).join('; ');
+    const prompt = [
+      'Ты раскладываешь надиктованную идею выпуска (рилс, пост, карусель или пост в Телеграм) по полям карточки. Отвечай ТОЛЬКО одним JSON-объектом, без пояснений и без markdown.',
+      'Поля: "about" — о чём выпуск, 1–2 фразы; "hook" — крючок на первые 2 секунды, одна фраза; "flow" — ход, массив коротких строк вида "1 · …"; "who" — кто в кадре, 1–3 слова; "rubric" — id рубрики из списка; "format" — reel|post|carousel|telegram; "date" — YYYY-MM-DD; "note" — одна короткая фраза: что ты понял и что поменял.',
+      'Включай поле, только если оно следует из сказанного. Пиши своими словами, коротко, по-русски, без лишнего; цифры и имена — как сказано. Если речь оборвана, разложи то, что уже есть.',
+      `Сейчас в карточке: ${JSON.stringify({about: cur.about || '', hook: cur.hook || '', flow: cur.flow || [], who: cur.who || '', rubric: b.rubric || '', format: b.format || '', date: (b.at || '').slice(0, 10)})}.`,
+      rubrics ? `Рубрики: ${rubrics}.` : '', `Сегодня ${new Date().toISOString().slice(0, 10)}.`,
+      `Надиктовано: «${said}»`,
+    ].filter(Boolean).join('\n');
+    const d = mkdtempSync(join(tmpdir(), 'reels-dictate-'));
+    try {
+      const out = await new Promise((ok, no) => {
+        const child = spawn(process.env.DICTATE_BIN || process.env.AGENT_BIN || 'claude', ['-p', prompt, '--output-format', 'json', '--model', process.env.DICTATE_MODEL || 'haiku', '--max-turns', '1',
+          '--strict-mcp-config', '--mcp-config', emptyMcp, '--disallowedTools', 'Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Task,NotebookEdit'], {cwd: d, stdio: ['ignore', 'pipe', 'pipe']});
+        let o = '';
+        const t = setTimeout(() => child.kill('SIGTERM'), 90_000);
+        child.stdout.on('data', (x) => (o += x));
+        child.on('close', () => { clearTimeout(t); ok(o); });
+        child.on('error', no);
+      });
+      let reply = '';
+      try { reply = JSON.parse(out).result || ''; } catch { reply = out; }
+      const m = /\{[\s\S]*\}/.exec(reply);
+      let r = {};
+      try { r = m ? JSON.parse(m[0]) : {}; } catch {}
+      const str = (v, n) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : undefined);
+      const fields = {about: str(r.about, 2000), hook: str(r.hook, 300), flow: Array.isArray(r.flow) ? r.flow.map((x) => String(x).slice(0, 300)).filter(Boolean).slice(0, 12) : undefined,
+        who: str(r.who, 120), rubric: str(r.rubric, 60), format: ['reel', 'post', 'carousel', 'telegram'].includes(r.format) ? r.format : undefined,
+        date: /^\d{4}-\d\d-\d\d$/.test(r.date || '') ? r.date : undefined, note: str(r.note, 300)};
+      return json(200, {fields: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined && !(Array.isArray(v) && !v.length)))});
+    } catch { return json(500, {}); }
+    finally { rmSync(d, {recursive: true, force: true}); }
   }
   // ---------- posts (web/posts.mjs) ----------
   if (req.method === 'GET' && url.pathname === '/api/post') {
