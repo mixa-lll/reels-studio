@@ -1,11 +1,22 @@
 {
-  // Relay between reels.mygudauri.org and the web studio on Misha's Mac (see worker.js).
+  // Relay between the studios on people's own computers and the outside: web hosts and one
+  // Telegram bot for everyone (see worker.js).
   "name": "reels-relay",
   "main": "worker.js",
   "compatibility_date": "2026-07-01",
   "workers_dev": false,
-  "routes": [{"pattern": "reels.mygudauri.org/*", "zone_name": "mygudauri.org"}],
-  "durable_objects": {"bindings": [{"name": "RELAY", "class_name": "Relay"}]},
-  "migrations": [{"tag": "v1", "new_sqlite_classes": ["Relay"]}],
+  "routes": [
+    {"pattern": "reels.mygudauri.org/*", "zone_name": "mygudauri.org"},
+    {"pattern": "seva.reels.mygudauri.org/*", "zone_name": "mygudauri.org"}
+  ],
+  "durable_objects": {"bindings": [
+    {"name": "RELAY", "class_name": "Relay"},
+    {"name": "TGQUEUE", "class_name": "TgQueue"},
+    {"name": "ROUTER", "class_name": "Router"}
+  ]},
+  "migrations": [
+    {"tag": "v1", "new_sqlite_classes": ["Relay"]},
+    {"tag": "v2", "new_sqlite_classes": ["TgQueue", "Router"]}
+  ],
   "observability": {"enabled": true}
 }

@@ -4,10 +4,13 @@
 import {createSandbox, isTest, listSandboxes, removeSandbox, sandboxName} from './sandbox.mjs';
 import {editor as makeEditor, KEYS as EDITOR_KEYS, LABELS as EDITOR_LABELS} from './editor.mjs';
 import {listReels, reelsUi} from './reels.mjs';
+import {relayUpdates} from './tgrelay.mjs';
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';
 import {DATA, FIRST_PROJECT, PROJECTS, ROOT, env, loadState, saveState, settings, studio, writeSettings} from './config.mjs';
+import * as lean from './lean.mjs';
+import {itemsUi} from './itemcard.mjs';
 import {createProject, dropRequest, ensureProjects, listProjects, projectAt, projectExists, projectName, removeProject, takeRequest, untouched} from './projects.mjs';
 import {APPROVED as CLAIM_APPROVED, REQUEST as CLAIM_REQUEST} from './claim.mjs';
 import {killTree, runAgent} from './agents.mjs';
@@ -195,6 +198,9 @@ const state = loadState();
 const panelOrigin = process.env.MINIAPP_URL ? new URL(process.env.MINIAPP_URL).origin : null;
 const reels = reelsUi({tg, studio, project: () => state.project, state, save: saveState, send: (p) => enqueue(p), root: ROOT,
   panel: (folder) => (panelOrigin ? `${panelOrigin}/#/reel/${encodeURIComponent(folder)}` : null)});
+// «Основа» (bot/itemcard.mjs): the same card for an item of any format, when lean is on.
+const items = itemsUi({tg, studio, project: () => state.project, state, save: saveState, send: (p) => enqueue(p), root: ROOT,
+  panel: (item) => (panelOrigin && item.ref?.kind === 'reel' ? `${panelOrigin}/#/reel/${encodeURIComponent(item.ref.id)}` : null)});
 // Team texts: members invited from the web version (bot/members.mjs).
 const TEAM = {
   ru: {
@@ -222,7 +228,14 @@ const OWNER_WROTE_FILE = join(DATA, 'owner-wrote.txt');
 const queue = [];
 let current = null; // {handle, statusId, startedAt, activity, lastText, sentMark, reason}
 
-if (await applyProfile(tg, env.token, state, LANG).catch((e) => console.error('profile', e.message))) saveState(state);
+// Chats that get the mini app button directly: the owner, team members, partners from .env.
+const teamChats = () => {
+  let people = [];
+  try { people = JSON.parse(readFileSync(memberFile, 'utf8')).people || []; } catch {}
+  const partners = `${process.env.BOT_EDITORS || ''},${process.env.MINIAPP_OWNERS || ''}`.split(',').map((x) => Number(x.trim())).filter(Boolean);
+  return [...new Set([state.chatId, ...people.map((p) => p.telegram?.chatId), ...partners].filter(Boolean))];
+};
+if (await applyProfile(tg, env.token, state, LANG, teamChats()).catch((e) => console.error('profile', e.message))) saveState(state);
 
 // ---------- progress line ----------
 
@@ -727,7 +740,10 @@ async function runTurn(prompt, retried = false) {
   const res = await runWithStatus(prompt, T.accepted, {open: true});
   // A reel Claude has just created becomes the focus; the pinned card shows new versions.
   const born = listReels(studio()).find((r) => !reelsBefore.has(r.folder));
-  await (born ? reels.setFocus(state.chatId, born.folder) : reels.refresh()).catch(() => {});
+  if (lean.isLean()) {
+    const bornItem = born && lean.items().find((x) => x.ref?.kind === 'reel' && x.ref.id === born.folder);
+    await (bornItem ? items.setFocus(state.chatId, bornItem.id) : items.refresh()).catch(() => {});
+  } else await (born ? reels.setFocus(state.chatId, born.folder) : reels.refresh()).catch(() => {});
   delete state.pending;
   saveState(state);
   if (res.cancelled && (res.reason === 'stalled' || res.reason === 'overtime')) {
@@ -1049,7 +1065,10 @@ async function onMessage(msg) {
     await tg.call('sendMessage', {chat_id: state.chatId, text: '👋', reply_markup: HOME_KEYS, disable_notification: true}).catch(() => {});
     return ed.today(state.chatId);
   }
-  if (cmd === 'reels') return reels.list(state.chatId);
+  // «Основа» (handbook/BOT-LEAN.md): items by stage, only where the project switched it on.
+  if (cmd === 'items' && lean.isLean()) return items.list(state.chatId);
+  if (cmd === 'stages' && lean.isLean()) return tg.call('sendMessage', {chat_id: state.chatId, text: lean.itemsText(lean.items(), LANG), parse_mode: 'HTML', disable_notification: true}).catch((e) => console.error('items', e.message));
+  if (cmd === 'reels') return lean.isLean() ? items.list(state.chatId) : reels.list(state.chatId);
   if (cmd === 'inbox') return ed.inbox(state.chatId);
   if (cmd === 'week') return ed.week(state.chatId);
   if (cmd === 'people') return ed.people(state.chatId);
@@ -1138,7 +1157,7 @@ async function onMessage(msg) {
     if (result) enqueue(result);
     return;
   }
-  if (prompt) batch(await reels.framePrompt(state.chatId, prompt, msg));
+  if (prompt) batch(await (lean.isLean() ? items : reels).framePrompt(state.chatId, prompt, msg));
 }
 
 // Albums and quick follow-ups arrive as separate messages; wait a moment and hand
@@ -1192,6 +1211,7 @@ async function onButton(q) {
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
   if (/^(rl|rla|rx|rn)$|^r[spvm]:/.test(q.data)) return reels.onButton(q).catch((e) => console.error('reels', e));
+  if (/^it[lx]$|^it[snbwprud]:/.test(q.data)) return items.onButton(q).catch((e) => console.error('items', e));
   if (q.data.startsWith('set:')) return onSettings(q);
   if (q.data.startsWith('tst:')) return who ? null : onTestButton(q);
   if (q.data.startsWith('p:')) return onProjectButton(q);
@@ -1420,6 +1440,20 @@ for (const prompt of unbatched) batch(prompt);
 let offset = state.offset ?? 0;
 let handling = Promise.resolve();
 let conflicts = 0;
+// One update, handled in order but off the receiving loop.
+function takeUpdate(u) {
+  offset = u.update_id + 1;
+  state.offset = offset;
+  saveState(state);
+  const m = u.message ?? u.edited_message;
+  if (m) handling = handling.then(() => onMessage(m)).catch((e) => console.error('message', e));
+  if (u.callback_query) handling = handling.then(() => onButton(u.callback_query)).catch((e) => console.error('button', e));
+}
+// One bot for several studios (bot/tgrelay.mjs): updates come from the relay, never from getUpdates.
+if (process.env.TG_RELAY) {
+  await relayUpdates({url: process.env.TG_RELAY, node: process.env.RELAY_NODE, secret: process.env.RELAY_SECRET,
+    onUpdate: takeUpdate, alive: () => { lastPoll = Date.now(); }, seen: (id) => id < offset});
+}
 for (;;) {
   try {
     const updates = await tg.call('getUpdates', {offset, timeout: 50, allowed_updates: ['message', 'edited_message', 'callback_query']});

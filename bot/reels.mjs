@@ -38,7 +38,9 @@ export function listReels(studioDir) {
       const master = videos.filter((f) => /1440p|1080p|master/i.test(f)).sort((a, b) => statSync(join(vdir, v, b)).size - statSync(join(vdir, v, a)).size)[0];
       const copy = videos.filter((f) => f !== master && !/1440p|1080p|master/i.test(f))[0];
       const note = readme.match(new RegExp(`^-\\s*${v}\\b[^:\\n]*:\\s*(.+)$`, 'm'))?.[1]?.trim();
-      return {v, master: master && join(vdir, v, master), copy: copy && join(vdir, v, copy), note};
+      let variant = null;
+      try { variant = JSON.parse(readFileSync(join(vdir, v, 'variant.json'), 'utf8')).label || null; } catch {}
+      return {v, master: master && join(vdir, v, master), copy: copy && join(vdir, v, copy), note, variant};
     });
     return {folder, num, title, status: statusOf(status), done: /^(done|published|cancelled|готово|опубликовано|отмена)/i.test(status), versions, at: statSync(rdir).mtimeMs};
   }).sort((a, b) => b.at - a.at);
@@ -58,7 +60,7 @@ export function reelsUi({tg, studio, project, state, save, send, panel, root}) {
     const cur = r.versions[0];
     const lines = [`🎬 <b>Сейчас в работе: ${esc(label(r))}</b>`, `${r.status} · ${r.versions.length ? `версий: ${r.versions.length}` : 'версий пока нет'}`];
     for (const v of r.versions.slice(0, 4)) {
-      lines.push(`${v === cur ? '▸' : '·'} <b>${v.v}</b>${v === cur ? ' (текущая)' : ''}${v.note ? ` — ${esc(v.note.slice(0, 90))}` : ''} · мастер ${v.master ? '✓' : '—'}`);
+      lines.push(`${v === cur ? '▸' : '·'} <b>${v.v}${v.variant ? ` · ${esc(v.variant)}` : ''}</b>${v === cur ? ' (текущая)' : ''}${v.note ? ` — ${esc(v.note.slice(0, 90))}` : ''} · мастер ${v.master ? '✓' : '—'}`);
     }
     if (r.versions.length > 4) lines.push(`… и ещё ${r.versions.length - 4}`);
     lines.push('', '<i>Всё, что пишешь, относится к этому ролику. Другой — кнопка «🎬 Ролики» или «вернёмся к ролику 12».</i>');
@@ -159,7 +161,7 @@ export function reelsUi({tg, studio, project, state, save, send, panel, root}) {
     if (kind === 'rs') return setFocus(chat, folder);
     if (kind === 'rv') {
       const rows = r.versions.map((x) => [
-        {text: `▶️ ${x.v}${x.note ? ` · ${x.note}` : ''}`.slice(0, 48), callback_data: `rp:${folder}:${x.v}`.slice(0, 64)},
+        {text: `▶️ ${x.v}${x.variant ? ` · ${x.variant}` : x.note ? ` · ${x.note}` : ''}`.slice(0, 48), callback_data: `rp:${folder}:${x.v}`.slice(0, 64)},
         x.master ? {text: '📦 мастер', callback_data: `rp:${folder}:${x.v}:m`.slice(0, 64)} : {text: '🎞 в мастер', callback_data: `rm:${folder}:${x.v}`.slice(0, 64)},
       ]);
       return html(chat, `🗂 <b>${esc(label(r))}</b> — все версии`, {inline_keyboard: rows});
