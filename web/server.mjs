@@ -12,6 +12,7 @@ import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
+import {changeItem, createItems, followPlan, needOf, syncItems} from './items.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -705,8 +706,35 @@ createServer(async (req, res) => {
     if (at !== undefined) { if (at) plan.at[key] = String(at).slice(0, 25); else delete plan.at[key]; }
     if (rubric !== undefined) { if (rubric) plan.rubric[key] = String(rubric).slice(0, 60); else delete plan.rubric[key]; }
     writeJson(f, plan);
+    followPlan(studio, key, {at, rubric});
     log(me.name, `поставил ${key} на ${at ?? '—'}`);
     return json(200, {});
+  }
+  // Units of content (web/items.mjs, handbook/LEAN.md): one item per format, by stage.
+  if (req.method === 'GET' && url.pathname === '/api/items') {
+    const {data, src} = syncItems(studio);
+    const thumbs = {};
+    for (const r of reels(p)) thumbs['reel:' + r.id] = r.thumb;
+    for (const x of listPosts(studio, mediaUrl)) thumbs['post:' + x.id] = x.thumb;
+    const items = data.items.map((x) => ({...x, need: needOf(x, src), thumb: x.ref ? thumbs[`${x.ref.kind}:${x.ref.id}`] || null : null}));
+    const rubrics = (readJson(join(studio, 'strategy.json'), {}).rubrics || []).map((r) => ({id: r.id, name: r.name, color: r.color, about: r.about || '', format: r.format || '', day: r.day || ''}));
+    return json(200, {items, rubrics});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/items/set') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const item = changeItem(studio, String(b.id || ''), b, {by: me.name});
+    if (!item) return json(404, {});
+    log(me.name, `выпуск «${item.title}»: ${Object.keys(b).filter((k) => k !== 'id').join(', ')}`);
+    return json(200, {item});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/items/new') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const made = createItems(studio, {formats: b.formats, title: b.title, rubric: b.rubric || null, at: b.at || null, idea: b.idea || null, by: me.name});
+    if (!made.length) return json(400, {});
+    log(me.name, `новые выпуски «${made[0].title}»: ${made.map((x) => x.format).join(', ')}`);
+    return json(200, {items: made});
   }
   if (req.method === 'GET' && url.pathname === '/api/knowledge') {
     const ds = join(studio, 'design-system', 'index.html');
