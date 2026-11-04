@@ -1739,14 +1739,14 @@ async function vPlanSetup() {
 // Project settings: title + tabs on top, each tab is one of the older pages rendered below.
 // Память (handbook/LEAN.md, кусок 2): what Claude knows and checks in every release.
 // For now its tabs are the old Settings and Strategy ones; facts with dates come in кусок 9.
-const MEMORY_TABS = ['brief', 'voice', 'rules', 'ds', 'files'];
+const MEMORY_TABS = ['facts', 'brief', 'voice', 'rules', 'ds', 'files'];
 async function vBrief() {
   const k = await api('/api/knowledge');
   view.innerHTML = `<div class="page" style="max-width: 980px; padding: 22px 36px"><div class="md">${md(k.brief) || '<p class="muted">Пусто. Расскажите о проекте в <a href="#/chat/_project">чате проекта</a> — Claude запишет.</p>'}</div></div>`;
 }
-async function vTabs(base, head, tabs, tab) {
+async function vTabs(base, head, tabs, tab, note = '') {
   const cur = tabs.find(([k]) => k === tab) || tabs[0];
-  view.innerHTML = `<div style="padding: 28px 36px 0; display: flex; flex-direction: column; gap: 18px"><h1>${head}</h1>
+  view.innerHTML = `<div class="ln-top"><b>${head}</b>${note ? `<span>·</span><span>${note}</span>` : ''}</div><div style="padding: 20px 40px 0">
     <div class="utabs" role="tablist">${tabs.map(([k, t]) => `<a href="#/${base}/${k}" class="${k === cur[0] ? 'on' : ''}">${t}</a>`).join('')}</div></div>
     <div id="tabHost" style="flex: 1; display: flex; flex-direction: column; min-height: 0"></div>`;
   const main = view;
@@ -1754,7 +1754,7 @@ async function vTabs(base, head, tabs, tab) {
   try { await cur[2](); } finally { view = main; }
   title(head);
 }
-const vMemory = (tab) => vTabs('memory', 'Память', [['brief', 'О проекте', vBrief], ['voice', 'Голос и стиль', vVoice], ['rules', 'Правила', vRules], ['ds', 'Дизайн', vDs], ['files', 'Файлы', vFiles]], tab);
+const vMemory = (tab) => vTabs('memory', 'Память', [['facts', 'Факты и цены', vFacts], ['voice', 'Голос и стиль', vVoice], ['rules', 'Правила', vRules], ['ds', 'Дизайн', vDs], ['files', 'Файлы', vFiles], ['brief', 'О проекте', vBrief]], tab, 'всё, что Claude знает о проекте и проверяет в каждом выпуске');
 async function vSettings(tab = 'team', sub) {
   if (tab === 'access') tab = 'team';
   if (MEMORY_TABS.includes(tab)) return location.replace('#/memory/' + tab);
@@ -2062,16 +2062,68 @@ async function vTasks() {
 }
 
 // Настройки › Голос и стили, Правила (Д2): from strategy.json «voice» and PLAYBOOK.md; edits go through the project chat.
+// Память › Факты и цены (LeanMemory): every fact with its source and the date it was confirmed;
+// older than 30 days — «устарело?». A new price said in words goes to Claude, who updates facts.json.
+async function vFacts() {
+  const {facts} = await api('/api/facts');
+  const ed = canEdit();
+  const old = (x) => !x.at || Date.now() - new Date(x.at) > 30 * 864e5;
+  const KINDF = {price: 'Цены', date: 'Даты', people: 'Люди', other: 'Другое'};
+  let kind = sessionStorage.getItem('factKind') || '';
+  const draw = () => {
+    const list = facts.filter((x) => !kind || (kind === 'old' ? old(x) : x.kind === kind));
+    const ago = (x) => { if (!x.at) return 'без даты'; const n = Math.round((Date.now() - new Date(x.at)) / 864e5); return n <= 0 ? 'сегодня' : n === 1 ? 'вчера' : n < 5 ? `${n} дня назад` : `${n} дней назад`; };
+    $('#factBody').innerHTML = `
+      <div class="row" style="gap: 8px; flex-wrap: wrap">${[['', 'Все'], ...Object.entries(KINDF).slice(0, 3), ['old', `Устарели · ${facts.filter(old).length}`]].map(([k, t]) => `<button type="button" class="ln-pill ${k === kind ? 'on' : ''}" data-k="${k}" style="${k === 'old' && facts.some(old) ? 'color: var(--amber)' : ''}">${t}</button>`).join('')}
+        ${ed ? `<button type="button" class="ln-btn" id="fAdd" style="margin-left: auto">${svg('plus', 14)}Добавить</button>` : ''}</div>
+      <div id="fNew"></div>
+      <div>${list.map((x) => `<div class="ln-li" data-id="${x.id}" style="padding: 12px 4px"><span style="flex: 0 0 320px; min-width: 0">${esc(x.text)}</span><b style="font-weight: 600; flex: 0 0 170px">${esc(x.value || '—')}</b>${x.source ? `<span class="tag" style="font-size: 11px; color: var(--ink2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px">${esc(x.source)}</span>` : ''}<span class="r" style="${old(x) ? 'color: var(--amber)' : ''}">${old(x) ? 'устарело? · ' : ''}${ago(x)}${ed ? `<button type="button" class="ln-act" data-edit="${x.id}">править</button><button type="button" class="ln-act" data-ok="${x.id}" style="color: var(--muted)" title="Проверено — поставить сегодняшнюю дату">✓ верно</button>` : ''}</span></div>`).join('') || `<p class="muted" style="padding: 14px 2px">${facts.length ? 'В этом фильтре пусто.' : 'Фактов пока нет. Claude соберёт их с сайта и из брифа: цены, даты, кто есть кто.'}</p>`}</div>`;
+    $('#factBody').querySelectorAll('[data-k]').forEach((b) => (b.onclick = () => { kind = b.dataset.k; sessionStorage.setItem('factKind', kind); draw(); }));
+    $('#factBody').querySelectorAll('[data-ok]').forEach((b) => (b.onclick = async () => { const x = facts.find((y) => y.id === b.dataset.ok); const {fact} = await post('/api/facts/set', {id: x.id}); Object.assign(x, fact); toast('Отмечено: верно на сегодня'); draw(); }));
+    const form = (x = {}) => `<form class="ln-li" id="fForm" style="gap: 8px; padding: 10px 4px"><input class="f" name="text" placeholder="Что: «Урок с инструктором, 2 ч»" value="${esc(x.text || '')}" style="flex: 0 0 300px" required><input class="f" name="value" placeholder="Сколько или когда" value="${esc(x.value || '')}" style="flex: 0 0 160px"><input class="f" name="source" placeholder="Откуда: сайт, прайс…" value="${esc(x.source || '')}" style="flex: 1"><select class="f" name="kind" style="width: auto">${Object.entries(KINDF).map(([k, t]) => `<option value="${k}" ${x.kind === k ? 'selected' : ''}>${t.toLowerCase()}</option>`).join('')}</select><button class="ln-btn p">Сохранить</button>${x.id ? '<button type="button" class="ln-btn g" id="fDel">Удалить</button>' : ''}</form>`;
+    const open = (x) => {
+      $('#fNew').innerHTML = form(x);
+      $('#fForm').onsubmit = async (e) => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.target)); await post('/api/facts/set', {id: x?.id, ...v}); vMemory('facts'); };
+      $('#fDel')?.addEventListener('click', async () => { await post('/api/facts/set', {id: x.id, remove: true}); vMemory('facts'); });
+      $('#fForm').text.focus();
+    };
+    $('#fAdd')?.addEventListener('click', () => open());
+    $('#factBody').querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => open(facts.find((y) => y.id === b.dataset.edit))));
+  };
+  view.innerHTML = `<div style="flex: 1; overflow-y: auto"><div style="max-width: 1100px; padding: 22px 40px; display: flex; flex-direction: column; gap: 18px">
+    <div id="factBody" style="display: flex; flex-direction: column; gap: 16px"></div>
+    ${ed ? `<form class="box" id="fSay" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 8px 24px rgba(0,0,0,.04)"><input id="fSayIn" placeholder="«ски-пасс теперь 70 лари» — запомню с сегодняшней датой" style="flex: 1; border: 0; font: inherit; font-size: 15px; outline: none"><button class="icon go" style="width: 30px; height: 30px" aria-label="Отправить">↑</button></form>
+      ${facts.length ? '' : '<button type="button" class="ln-btn" id="fCollect" style="align-self: flex-start">Собрать факты с сайта и из брифа</button>'}` : ''}
+  </div></div>`;
+  const say = (text, shown) => { sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown})); location.hash = '#/chat/_project'; };
+  $('#fSay')?.addEventListener('submit', (e) => { e.preventDefault(); const t = $('#fSayIn').value.trim(); if (t) say(`${t}\nЗапомни это в facts.json с сегодняшней датой и источником «сказал ${ME.name}».`, t); });
+  $('#fCollect')?.addEventListener('click', () => say('Собери факты проекта в facts.json: цены, даты, кто есть кто — с сайта, из брифа и вышедших выпусков. У каждого источник и дата проверки. Коротко перечисли, что записал.', 'Собрать факты'));
+  draw();
+}
+
+// Память › Голос и стиль (LeanVoice): how we speak, as it should and should not sound.
 async function vVoice() {
-  const [plan] = await Promise.all([api('/api/plan')]);
+  const plan = await api('/api/plan');
   const v = plan.strategy?.voice || {};
-  view.innerHTML = `<div class="page" style="max-width: 980px; padding: 22px 36px">${v.about || (v.styles || []).length ? `
-    ${v.about ? `<div class="blk"><span class="lbl">Голос проекта</span><div style="font-size: 15px; line-height: 1.6">${esc(v.about)}</div></div>` : ''}
-    ${(v.never || []).length ? `<div class="blk"><span class="lbl">Не говорим</span>${v.never.map((x) => `<div class="li">🔒 ${esc(x)}</div>`).join('')}</div>` : ''}
-    <div class="blk"><span class="lbl">Стили текста · ${(v.styles || []).length}</span><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px">${(v.styles || []).map((x) => `<div class="card" style="display: flex; flex-direction: column; gap: 6px"><b>${esc(x.name)}</b>${x.when ? `<span class="small muted">${esc(x.when)}</span>` : ''}${x.sample ? `<span style="line-height: 1.55">«${esc(x.sample)}»</span>` : ''}</div>`).join('')}</div></div>`
-    : `<div class="card" style="display: flex; flex-direction: column; gap: 10px; max-width: 640px"><b>Голос и стили ещё не описаны</b><span class="muted">Claude соберёт их из брифа и вышедших текстов: как мы говорим, чего не говорим и 3–4 стиля (тёплый, новость, коротко…). Варианты постов пишутся в этих стилях.</span></div>`}
-    ${canEdit() ? '<div><button type="button" class="btn" id="vAsk">Попросить Claude собрать или поправить</button></div>' : ''}</div>`;
-  $('#vAsk')?.addEventListener('click', () => { sessionStorage.setItem('firstMsg:_project', JSON.stringify({text: 'Опиши голос проекта и 3–4 стиля текста в strategy.json, поле voice: {about, never: [...], styles: [{name, when, sample}]} (STRATEGY.md).', shown: 'Собрать голос и стили'})); location.hash = '#/chat/_project'; });
+  const styles = v.styles || [];
+  const ed = canEdit();
+  const say = (text, shown) => { sessionStorage.setItem('firstMsg:_project', JSON.stringify({text, shown})); location.hash = '#/chat/_project'; };
+  view.innerHTML = `<div style="flex: 1; overflow-y: auto"><div style="max-width: 1100px; padding: 22px 40px; display: flex; flex-direction: column; gap: 20px">
+    ${v.about || styles.length ? `<div style="display: flex; gap: 24px; flex-wrap: wrap">
+      <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column"><div class="ln-lh">Как мы говорим</div>
+        ${v.about ? `<div class="ln-li" style="align-items: flex-start"><span class="muted" style="flex: 0 0 110px">Голос</span><span style="line-height: 1.5">${esc(v.about)}</span></div>` : ''}
+        ${styles.map((x) => `<div class="ln-li" style="align-items: flex-start"><span class="muted" style="flex: 0 0 110px">${esc(x.name)}</span><span style="line-height: 1.5">${esc(x.when || '')}</span></div>`).join('')}</div>
+      <div style="flex: 1; min-width: 320px; display: flex; flex-direction: column; gap: 12px"><div class="ln-lh">Как надо · как не надо</div>
+        ${styles.find((x) => x.sample) ? `<div style="border: 1px solid #CFE6D7; border-radius: 12px; padding: 14px; font-size: 14px; line-height: 1.5"><span style="color: #2E8A4F; font-weight: 600">Так</span><br>${esc(styles.find((x) => x.sample).sample)}</div>` : ''}
+        ${(v.never || []).length ? `<div style="border: 1px solid #F3D9C7; border-radius: 12px; padding: 14px; font-size: 14px; line-height: 1.6"><span style="color: #C2410C; font-weight: 600">Не так</span><br>${v.never.map(esc).join('<br>')}</div>` : ''}
+      </div></div>`
+    : '<div style="border: 1px solid var(--line); border-radius: 12px; padding: 18px; max-width: 640px; display: flex; flex-direction: column; gap: 8px"><b>Голос ещё не описан</b><span class="muted" style="line-height: 1.5">Claude соберёт его из брифа и вышедших текстов: как мы говорим, чего не говорим и 3–4 стиля. Тексты пишутся в этих стилях.</span></div>'}
+    <p class="small muted" style="margin: 0">Claude дополняет голос сам: когда вы правите текст словами («без эмодзи»), он спрашивает — запомнить это навсегда?</p>
+    ${ed ? `<form class="box" id="vSay" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 8px 24px rgba(0,0,0,.04)"><input id="vSayIn" placeholder="«никогда не пиши капсом» — запомню в голос" style="flex: 1; border: 0; font: inherit; font-size: 15px; outline: none"><button class="icon go" style="width: 30px; height: 30px" aria-label="Отправить">↑</button></form>
+      <button type="button" class="ln-btn" id="vAsk" style="align-self: flex-start">${v.about ? 'Попросить Claude поправить голос' : 'Собрать голос из брифа и текстов'}</button>` : ''}
+  </div></div>`;
+  $('#vSay')?.addEventListener('submit', (e) => { e.preventDefault(); const t = $('#vSayIn').value.trim(); if (t) say(`${t}\nЗапомни это в голосе проекта: strategy.json, поле voice (about, never, styles) — STRATEGY.md.`, t); });
+  $('#vAsk')?.addEventListener('click', () => say('Опиши голос проекта и 3–4 стиля текста в strategy.json, поле voice: {about, never: [...], styles: [{name, when, sample}]} (STRATEGY.md).', 'Собрать голос и стили'));
 }
 async function vRules() {
   const [k, plan] = await Promise.all([api('/api/knowledge'), api('/api/plan')]);
