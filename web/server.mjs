@@ -13,6 +13,7 @@ import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
 import {changeItem, createItems, followPlan, needOf, syncItems} from './items.mjs';
+import {igDir, listAccounts, typical} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -699,6 +700,14 @@ createServer(async (req, res) => {
 
   if (!projectDir(p)) return json(404, {});
   const studio = join(PROJECTS, p);
+
+  // Instagram accounts of the project (web/instagram.mjs) with the saved pictures as media links.
+  if (req.method === 'GET' && url.pathname === '/api/instagram') {
+    const pic = (a, f) => (f ? mediaUrl(join(igDir(studio, a), f)) : null);
+    return json(200, {accounts: listAccounts(studio).map((x) => ({...x, avatar: pic(x.account, x.avatar), typical: typical(x),
+      highlights: (x.highlights || []).map((h) => ({title: h.title, url: pic(x.account, h.image)})),
+      media: x.media.map((m) => ({...m, thumb: pic(x.account, m.thumb)}))}))});
+  }
 
   if (req.method === 'GET' && url.pathname === '/api/overview') {
     const list = reels(p);

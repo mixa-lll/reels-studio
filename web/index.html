@@ -594,11 +594,21 @@ const canEdit = () => ME?.role === 'editor';
 const isMember = () => ME?.role === 'member';
 
 const projName = () => (PROJECTS.find((x) => x.slug === P) || {}).name || P;
+// Instagram accounts as the studio last saw them (web/instagram.mjs): the mockups draw the real
+// avatar, name and numbers. A caption row's account, else its language, picks the profile.
+let IG = null;
+const loadIg = () => api('/api/instagram').then((d) => (IG = d.accounts || [])).catch(() => (IG = []));
+const igFor = (c = {}) => {
+  const acc = String(c.account || '').replace(/^@/, '').toLowerCase();
+  const en = /\b(en|eng|english)\b|англ/i.test(`${c.platform || ''} ${c.lang || ''}`);
+  return (IG || []).find((x) => acc && x.account === acc) || (IG || []).find((x) => x.lang === (en ? 'en' : 'ru')) || null;
+};
+const igWhen = (p) => p ? `${p.source === 'api' ? 'обновлено' : 'снимок от'} ${new Date(p.fetchedAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}` : '';
 const roleName = (m) => m.role === 'editor' ? (m.isOwner ? 'редактор · владелец' : m.deputyUntil ? 'замещает' : 'редактор') : 'участник';
 
 async function sidebar() {
   if (isMember()) return memberSidebar();
-  OV = await api('/api/overview');
+  [OV] = await Promise.all([api('/api/overview'), loadIg()]);
   const cur = location.hash || '#/';
   const on = (h) => (h === '#/' ? cur === '#/' : cur.startsWith(h) || (h === '#/all' && /^#\/(reel|post|new)\b/.test(cur)) || (h === '#/plan' && /^#\/(knowledge|rubric|plan)\b/.test(cur))) ? 'on' : '';
   const item = (h, i, t, n = '') => `<a class="nav ${on(h)}" href="${h}" title="${t}">${svg(i)}<span>${t}</span>${n}</a>`;
@@ -1162,7 +1172,7 @@ async function peek(id) {
   const need = x.need || [];
   const sibs = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id) : [];
   const phone = x.thumb && window.Preview && ['build', 'ready', 'published'].includes(x.stage);
-  const look = phone ? Preview.phone(Preview.frame(x.format === 'reel' ? 'reels' : 'feed', {media: {type: 'image', url: x.thumb}, caption: x.idea?.about || x.title, name: projName()}), {light: x.format !== 'reel'}) : '';
+  const look = phone ? Preview.phone(Preview.frame(x.format === 'reel' ? 'reels' : 'feed', {media: {type: 'image', url: x.thumb}, caption: x.idea?.about || x.title, name: projName(), profile: igFor()}), {light: x.format !== 'reel'}) : '';
   const full = stageHref(x);
   el.innerHTML = `<div class="pk-h"><span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; margin-left: 4px">${esc(x.title)}</b>
       <a class="ln-btn g s" href="${itemHref(x)}" id="peekFull" title="На весь экран" aria-label="На весь экран">${svg('expand', 16)}</a><button type="button" class="ln-btn g s" id="peekClose" title="Закрыть · Esc" aria-label="Закрыть">✕</button></div>
@@ -1515,8 +1525,8 @@ function nxBlock(host, {caps, kind, base, seen, onSeen, ask}) {
   const draw = () => {
     const row = rows[pick];
     live.innerHTML = `<div class="row" style="gap: 12px; flex-wrap: wrap">${rows.length > 1 ? `<span class="ln-seg">${rows.map((r, i) => `<button type="button" class="${i === pick ? 'on' : ''}" data-pick="${i}">${esc(r.c.platform || 'Площадка')}</button>`).join('')}</span>` : `<b>${esc(row.c.platform || 'Как увидят')}</b>`}
-      <span class="small muted">Так увидят подписчики${row.c.account ? ' ' + esc(row.c.account) : ''}. Нажмите на телефон — зоны и проверка.</span></div>
-      <div class="nx-phones">${row.views.slice(0, 2).map(([v, label, o], j) => { const opts = {...base, ...o, caption: row.c.text, platform: row.c.platform, account: row.c.account || base.account}; return `<button type="button" class="nx-ph" data-vi="${j}" aria-label="${esc(label)}">${`<span class="nx-fit" style="width: ${w}px; height: ${Math.round(w * 2.17)}px"><span style="transform: scale(${w / 330})">${Preview.phone(Preview.frame(v, opts), {light: Preview.light(v, o)})}</span></span>`}<span class="small">${esc(label)}</span></button>`; }).join('')}</div>`;
+      <span class="small muted">Так увидят подписчики${row.c.account ? ' ' + esc(row.c.account) : igFor(row.c) ? ' @' + esc(igFor(row.c).account) : ''}${igFor(row.c) ? ` · профиль: ${igWhen(igFor(row.c))}` : ''}. Нажмите на телефон — зоны и проверка.</span></div>
+      <div class="nx-phones">${row.views.slice(0, 2).map(([v, label, o], j) => { const opts = {...base, ...o, caption: row.c.text, platform: row.c.platform, account: row.c.account || base.account, profile: igFor(row.c)}; return `<button type="button" class="nx-ph" data-vi="${j}" aria-label="${esc(label)}">${`<span class="nx-fit" style="width: ${w}px; height: ${Math.round(w * 2.17)}px"><span style="transform: scale(${w / 330})">${Preview.phone(Preview.frame(v, opts), {light: Preview.light(v, o)})}</span></span>`}<span class="small">${esc(label)}</span></button>`; }).join('')}</div>`;
     live.querySelectorAll('[data-pick]').forEach((b) => (b.onclick = () => { pick = Number(b.dataset.pick); draw(); }));
     live.querySelectorAll('[data-vi]').forEach((b) => (b.onclick = () => nxOpen(rows[pick], base, onSeen, ask, Number(b.dataset.vi))));
   };
@@ -1534,7 +1544,7 @@ function nxOpen(row, base, onSeen, ask, start = 0) {
   ov.className = 'nx-ov';
   const draw = () => {
     const [v, label, o] = row.views[at];
-    const opts = {...base, ...o, caption: row.c.text, platform: row.c.platform, account: row.c.account || base.account, zones, slide};
+    const opts = {...base, ...o, caption: row.c.text, platform: row.c.platform, account: row.c.account || base.account, profile: igFor(row.c), zones, slide};
     const warns = Preview.checks(v, opts);
     ov.innerHTML = `<div class="nx-box" role="dialog" aria-label="Как увидят: ${esc(row.c.platform || '')}"><div>${Preview.frame(v, opts)}</div>
       <div style="display: flex; flex-direction: column; gap: 14px; min-width: 0"><div class="row"><b style="font-size: 18px; flex: 1">${esc(row.c.platform || 'Площадка')}</b><button type="button" class="btn" id="nxX" aria-label="Закрыть">✕</button></div>
@@ -1543,7 +1553,7 @@ function nxOpen(row, base, onSeen, ask, start = 0) {
         ${v === 'carousel' && (base.slides || []).length > 1 ? `<div class="row" style="gap: 6px"><button type="button" class="btn" id="nxPrev">‹</button><span class="small muted">слайд ${slide + 1} из ${base.slides.length}</span><button type="button" class="btn" id="nxNext">›</button></div>` : ''}
         ${['reels', 'story', 'grid'].includes(v) && base.kind === 'reel' && !base.reel?.template && ask ? `<div class="small muted" style="display: flex; flex-direction: column; gap: 6px">Ролик собран без шаблона — где стоят плашки, по геометрии не узнать.<button type="button" class="btn" id="nxAsk" style="align-self: flex-start">Попросить Claude проверить зоны</button></div>` : ''}
         ${warns.map((w, i) => `<div class="nx-warn"><span>⚠ ${esc(w.text)}</span>${ask ? `<div class="row" style="gap: 8px"><button type="button" class="btn" data-fix="${i}">Исправить</button><span class="small">или выложить так</span></div>` : ''}</div>`).join('') || '<div class="small" style="color: var(--green)">✓ По геометрии всё на месте: текст вне интерфейса площадки, подпись читается.</div>'}
-        <span class="small muted">Интерфейс нарисован студией для предпросмотра; цифры лайков и просмотров — для примера.</span>
+        <span class="small muted">${opts.profile ? `Аватар, имя и подписчики — с @${esc(opts.profile.account)} (${igWhen(opts.profile)}); лайки — обычные для последних публикаций, в сетке ваши настоящие посты.` : 'Интерфейс нарисован студией для предпросмотра; цифры лайков и просмотров — для примера.'}</span>
         <div class="row" style="margin-top: auto; gap: 8px"><button type="button" class="btn primary" id="nxOk">✓ Видел</button>${at < row.views.length - 1 ? '<button type="button" class="btn" id="nxNx">Дальше: ' + esc(row.views[at + 1][1]) + '</button>' : ''}</div></div></div>`;
     ov.querySelector('#nxX').onclick = () => ov.remove();
     ov.querySelectorAll('[data-v]').forEach((b) => (b.onclick = () => { at = Number(b.dataset.v); slide = 0; draw(); }));
