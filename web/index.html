@@ -677,7 +677,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (text) { $('.stext', st).textContent = text; $('.shint', st).textContent = /рендер/i.test(text) ? 'Это нормально: монтаж идёт на сервере. Страницу можно закрыть — версия появится сама.' : ''; }
     el.querySelectorAll('.btns button, .keys button, .go').forEach((b) => (b.disabled = on));
   };
-  $('button', st).onclick = () => post('/api/stop');
+  $('button', st).onclick = () => post('/api/stop', {key});
   const buttons = (list, under) => {
     const box = document.createElement('div'); box.className = 'btns';
     for (const label of list) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = () => say(`(pressed button "${label}" under: "${short(under)}")`, label); box.append(b); }
@@ -745,7 +745,8 @@ function chatBox(key, {onDone, onRebind} = {}) {
     setBusy(true, 'Думаю…');
     try {
       const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown})});
-      if (r.status === 429) throw new Error('Claude сейчас занят в другом чате — дождись, пока он закончит');
+      if (r.status === 409) throw new Error('Claude ещё отвечает в этом чате — дождись ответа');
+      if (r.status === 429) throw new Error('Claude уже ведёт несколько задач в других чатах — попробуй через пару минут');
       if (!r.ok) throw new Error('Ошибка ' + r.status);
       const reader = r.body.getReader(), dec = new TextDecoder();
       let buf = '';
