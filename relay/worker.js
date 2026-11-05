@@ -31,6 +31,11 @@ function nodesOf(env) {
   return nodes || {misha: {secret: env.RELAY_SECRET, host: 'reels.mygudauri.org', name: 'Миши', default: true, users: []}};
 }
 const defaultNode = (nodes) => Object.keys(nodes).find((n) => nodes[n].default) || Object.keys(nodes)[0];
+// One relay object per studio node, placed in Western Europe next to the studio server (Amsterdam):
+// each browser request goes Worker → this object → the server's WebSocket and back, so a far
+// object adds its distance twice to every request. A new name (v6) because placement is fixed
+// when an object is first created.
+const relayOf = (env, node) => env.RELAY.get(env.RELAY.idFromName(`web:${node}:v6`), {locationHint: 'weur'});
 const authorized = (req, node) => node?.secret && req.headers.get('authorization') === `Bearer ${node.secret}`;
 
 // Who sent an update: messages, edits, buttons.
@@ -74,14 +79,14 @@ export default {
     // A node's studio connects for web requests.
     if (url.pathname === '/__relay') {
       if (!authorized(req, nodes[nodeParam])) return new Response('forbidden', {status: 403});
-      return env.RELAY.get(env.RELAY.idFromName(`web:${nodeParam}:v5`)).fetch(req);
+      return relayOf(env, nodeParam).fetch(req);
     }
 
     // A browser: the node whose host this is.
     const node = Object.keys(nodes).find((n) => nodes[n].host === url.host) || defaultNode(nodes);
     const r = new Request(req);
     r.headers.set('x-relay-node-name', encodeURIComponent(nodes[node]?.name || node));
-    return env.RELAY.get(env.RELAY.idFromName(`web:${node}:v5`)).fetch(r);
+    return relayOf(env, node).fetch(r);
   },
 };
 
