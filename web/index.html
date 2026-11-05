@@ -578,6 +578,9 @@ const KIND = {reel: 'рилс', text: 'текст', photo: 'пост', carousel:
 const kindBadge = (k) => `<span class="kind" title="${KIND[k]}">${svg(k, 13)}${KIND[k]}</span>`;
 const svg = (k, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 
+// Release data and chat kept between tab switches (vReel).
+const REEL_CACHE = new Map();
+let REEL_CHAT = null;
 let TEAM = 1, ME = null, PROJECTS = [], P = localStorage.getItem('project') || 'main', OV = null, PLAN = null, TEST = false, MODS = {}, MEMBOT = null;
 // Mode and plan of the open project (bot/plans.mjs): a feature the plan lacks is hidden.
 const feat = (f) => !PLAN || PLAN.features?.[f] !== false;
@@ -587,7 +590,7 @@ const api = async (path, opts) => {
   if (!r.ok) throw Object.assign(new Error('Ошибка ' + r.status), {status: r.status});
   return r.json();
 };
-const post = (path, b) => { ITEMS_AT = 0; return api(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(b || {})}); };
+const post = (path, b) => { ITEMS_AT = 0; REEL_CACHE.clear(); return api(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(b || {})}); };
 const toast = (t) => { const el = document.createElement('div'); el.className = 'toast'; el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 3500); };
 const isOwner = () => ME?.isOwner === true;
 const canEdit = () => ME?.role === 'editor';
@@ -986,7 +989,7 @@ let ITEMS = null;
 // Kept for a few seconds so switching tabs does not refetch it; any post() drops it.
 let ITEMS_AT = 0;
 const loadItems = async (fresh) => {
-  if (!fresh && ITEMS && Date.now() - ITEMS_AT < 15000) return ITEMS;
+  if (!fresh && ITEMS && Date.now() - ITEMS_AT < 60000) return ITEMS;
   ITEMS = await api('/api/items');
   ITEMS_AT = Date.now();
   return ITEMS;
@@ -1297,9 +1300,17 @@ function stages(r, tab) {
   return `<nav class="stg" aria-label="Этапы">${STAGES.map(([k, t], i) => `<a href="#/reel/${esc(r.id)}/${k}" class="${k === tab ? 'on' : i < at ? 'done' : ''}" ${k === tab ? 'aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
 }
 
+// Switching tabs inside one release reuses its data and its chat column: the tab draws at once
+// from memory and the data refreshes behind it. post() and a finished chat turn drop the copy.
+const getReel = (id) => api('/api/reel?reel=' + encodeURIComponent(id)).then((d) => { REEL_CACHE.set(id, {data: d, at: Date.now()}); return d; });
+const reelTab = () => /^#\/reel\/[\w-]+\/(\w+)/.exec(location.hash)?.[1];
 async function vReel(id, tab) {
   const isNew = id.startsWith('new-');
-  const [data] = await Promise.all([isNew ? null : api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null), loadItems().catch(() => null)]);
+  const cached = !isNew && REEL_CACHE.get(id);
+  const warm = cached && Date.now() - cached.at < 120000;
+  const req = isNew ? null : getReel(id).catch(() => null);
+  const [data] = warm ? [cached.data] : await Promise.all([req, loadItems().catch(() => null)]);
+  if (warm) req.then((d) => { if (d && JSON.stringify(d) !== JSON.stringify(cached.data) && location.hash.startsWith('#/reel/' + id) && $('#reelHost')) drawStage(id, reelTab() || tab, d); });
   const r = data?.reel;
   if (r && (!tab || tab === 'files')) tab = tab === 'files' ? 'materials' : stageAt(r);
   const nav = r ? await relHead('reel', id, REEL_STEPS, tab, `#/reel/${id}/`, `${r.num} · ${r.title}`) : '';
@@ -1309,14 +1320,21 @@ async function vReel(id, tab) {
   const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
   const chatName = {script: 'Чат сценария', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
   // A reel that exists: its stage in the middle, its chat as a column on the right (CleanReel, CleanText…).
+  const keep = !isNew && REEL_CHAT?.id === id && view.contains(REEL_CHAT.box) ? REEL_CHAT.box : null;
   view.innerHTML = isNew || !r
     ? `<div class="work"><div class="chat">${head}${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`
     : `<div class="work"><div class="rmain">${head}<div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
       <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
-  const box = chatBox(id, {
+  const box = keep || chatBox(id, {
     onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
-    onDone: (k) => { sidebar(); if (!k.startsWith('new-')) { if (isNew) vReel(k); else if (['edit', 'script', 'publish'].includes(tab)) drawStage(k, tab); } },
+    onDone: (k) => {
+      REEL_CACHE.delete(k); sidebar();
+      if (k.startsWith('new-')) return;
+      const t = reelTab() || tab;
+      if (isNew) vReel(k); else if (['edit', 'script', 'publish'].includes(t) && location.hash.startsWith('#/reel/' + k)) drawStage(k, t);
+    },
   });
+  REEL_CHAT = isNew ? null : {id, box};
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id, tab); } });
   wireRelHead(view, () => vReel(id, tab));
@@ -1339,7 +1357,7 @@ function draft(text) {
 const tc = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 async function drawStage(id, tab, data) {
-  data ||= await api('/api/reel?reel=' + encodeURIComponent(id));
+  data ||= await getReel(id);
   if (tab === 'script') return stageScript(id, data);
   if (tab === 'materials') return reelFiles(id, data);
   if (tab === 'compare') return stageCompare(id, data);
