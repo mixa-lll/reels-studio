@@ -200,6 +200,13 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
   if (b.idea && typeof b.idea === 'object') item.idea = {about: String(b.idea.about ?? item.idea?.about ?? '').slice(0, 2000), hook: String(b.idea.hook ?? item.idea?.hook ?? '').slice(0, 300), flow: (Array.isArray(b.idea.flow) ? b.idea.flow : item.idea?.flow || []).map((s) => String(s).slice(0, 300)).slice(0, 12)};
   if (Array.isArray(b.need) && item.ref?.kind !== 'reel') item.need = b.need.map((n) => ({text: String(n.text || '').slice(0, 200), have: String(n.have || '').slice(0, 200), done: !!n.done})).slice(0, 30);
   if (b.take) { delete item.proposed; item.takenBy = by; }
+  // Where it came out (web/instagram.mjs links a post to its item): [{account, url, at}], one per link.
+  if (b.publish?.url && /^https:\/\/(www\.)?instagram\.com\//.test(b.publish.url)) {
+    const pub = {account: String(b.publish.account || '').replace(/^@/, '').slice(0, 40), url: String(b.publish.url).slice(0, 200), at: b.publish.at ? String(b.publish.at).slice(0, 30) : null};
+    item.published = [...(item.published || []).filter((x) => x.url !== pub.url), pub];
+    if (b.stage === undefined) b = {...b, stage: 'published'};
+  }
+  if (typeof b.unpublish === 'string') item.published = (item.published || []).filter((x) => x.url !== b.unpublish);
   if (b.starting) item.starting = now;
   // Links an idea to the post folder made for it (reels link themselves in syncItems).
   if (b.link?.kind === 'post' && /^[\w-]{1,80}$/.test(b.link.id || '') && existsSync(join(studio, 'posts', b.link.id))) {

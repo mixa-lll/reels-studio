@@ -19,6 +19,7 @@
 | Работающий бот и студия | сервер, https://reels.mygudauri.org; выкладка через ветку `prod` | партнёры |
 | Общий стенд (свежий `main`, демо-данные) | https://stage-reels.mygudauri.org, ключ от владельца | соавторы |
 | Сайт установки | `docs/` → https://mixa-lll.github.io/reels-studio/ | все |
+| Связь с Instagram (подключение, ключи, синхронизация) | [INSTAGRAM.md](INSTAGRAM.md) | владелец аккаунтов |
 
 ## Главное правило
 

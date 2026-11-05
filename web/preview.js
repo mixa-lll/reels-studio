@@ -26,12 +26,18 @@
   };
   const ic = (n, s = 24) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
   const initials = (o) => esc((o.name || o.account || '··').replace(/^@/, '').split(/[\s._]+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase());
-  const handle = (o) => esc((o.account || o.name || 'account').replace(/^@/, ''));
+  // o.profile: the account as the studio last saw it (web/instagram.mjs) — real avatar, handle,
+  // name and numbers; without it the frame falls back to initials and round sample numbers.
+  const handle = (o) => esc((o.profile?.account || o.account || o.name || 'account').replace(/^@/, ''));
+  const av = (o, cls = '', style = '') => o.profile?.avatar ? `<img class="pv-av ${cls}" src="${esc(o.profile.avatar)}" alt="" style="object-fit:cover;${style}">` : `<span class="pv-av ${cls}" style="${style}">${initials(o)}</span>`;
+  const num = (n) => Number(n).toLocaleString('ru-RU');
+  // A new post shows what the account's latest posts usually get (medians); no profile — samples.
+  const typ = (o, k, fallback) => (o.profile ? o.profile.typical?.[k] ?? null : fallback);
   const media = (m, fit = 'cover') => !m ? '<div class="pv-ph"></div>' : m.type === 'video'
     ? `<video src="${esc(m.url)}" playsinline muted loop autoplay preload="metadata" style="object-fit:${fit}"></video>` : `<img src="${esc(m.url)}" alt="" style="object-fit:${fit}">`;
   const cut = (t, n) => { const s = String(t || '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${esc(s.slice(0, n).replace(/\s\S*$/, ''))}… <span class="pv-m">ещё</span>` : esc(s); };
   const zones = (kind, on) => !on ? '' : (ZONES[kind] || []).map((z) => `<div class="pv-safe" style="left:${z.x0 * 100}%;top:${z.y0 * 100}%;width:${(z.x1 - z.x0) * 100}%;height:${(z.y1 - z.y0) * 100}%"><span>${z.label}</span></div>`).join('');
-  const nav = (dark) => `<div class="pv-nav ${dark ? 'dk' : ''}">${ic('home')}${ic('search')}${ic('plus')}${ic('reel')}<span class="pv-av pv-s">··</span></div>`;
+  const nav = (dark, o = {}) => `<div class="pv-nav ${dark ? 'dk' : ''}">${ic('home')}${ic('search')}${ic('plus')}${ic('reel')}${o.profile?.avatar ? av(o, 'pv-s') : '<span class="pv-av pv-s">··</span>'}</div>`;
 
   const CSS = `
   .pv{width:100%;max-width:380px;aspect-ratio:390/844;position:relative;overflow:hidden;border-radius:28px;background:#000;color:#fff;font:14px/1.4 -apple-system,"SF Pro Text",system-ui,Roboto,sans-serif;letter-spacing:-.01em;container-type:inline-size;box-shadow:0 0 0 8px #171717,0 18px 50px rgba(0,0,0,.25);margin:8px auto}
@@ -48,6 +54,7 @@
   .pv-m{opacity:.6}
   .pv-av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#22A55B,#0E7490);flex:none;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700}
   .pv-av.pv-s{width:24px;height:24px;font-size:9px}
+  .pv img.pv-av{width:30px;height:30px}.pv img.pv-av.pv-s{width:24px;height:24px}
   .pv-nav{position:absolute;left:0;right:0;bottom:0;height:7%;display:flex;justify-content:space-around;align-items:center;background:#fff;color:#0F0F0F;border-top:.5px solid rgba(0,0,0,.12);z-index:4}
   .pv-nav.dk{background:#000;color:#fff;border-color:rgba(255,255,255,.15)}
   .pv.feed{background:#fff;color:#0F0F0F;overflow-y:auto}
@@ -60,7 +67,7 @@
   .pv-cp{padding:3px 12px;font-size:14px}.pv-cp .pv-m{color:#737373;opacity:1}
   .pv-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
   .pv-grid span{aspect-ratio:3/4;position:relative;overflow:hidden;background:#E5E5E5}
-  .pv-grid span.me{outline:3px solid #FACC15;outline-offset:-3px}
+  .pv-grid span.me{outline:3px solid #171717;outline-offset:-3px}
   .pv-grid span i{position:absolute;right:5px;top:5px;color:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
   .pv-stat{display:flex;justify-content:space-around;text-align:center;font-size:12px;padding:6px 0}.pv-stat b{display:block;font-size:16px}
   .pv.tg{background:#9BB8A2;color:#000}.pv.tg.dk{background:#0E1621;color:#fff}
@@ -88,23 +95,27 @@
   // o: {media: {type, url}, slides: [url], cover: url, caption, account, name, grid: [{url, kind}], zones, theme: 'dark'|'light', slide}
   function frame(kind, o = {}) {
     if (kind === 'reels') return `<div class="pv"><div class="pv-full">${media(o.media)}</div>${zones('reels', o.zones)}
-      <div class="pv-rr"><div>${ic('heart', 26)}<span>1 284</span></div><div>${ic('chat', 26)}<span>46</span></div><div>${ic('send', 26)}<span>212</span></div><div>${ic('save', 26)}</div><div>${ic('dots', 22)}</div></div>
-      <div class="pv-capt"><div class="pv-u"><span class="pv-av">${initials(o)}</span>${handle(o)}<span class="pv-fb">Подписаться</span></div>${cut(o.caption, MORE.reels)}<div style="margin-top:6px;font-size:12px;opacity:.9">♫ ${esc(o.name || handle(o))} · оригинальный звук</div></div>${nav(true)}</div>`;
+      <div class="pv-rr">${[['heart', 26, typ(o, 'likes', 1284)], ['chat', 26, typ(o, 'comments', 46)], ['send', 26, o.profile ? null : 212]].map(([n, s, c]) => `<div>${ic(n, s)}${c ? `<span>${num(c)}</span>` : ''}</div>`).join('')}<div>${ic('save', 26)}</div><div>${ic('dots', 22)}</div></div>
+      <div class="pv-capt"><div class="pv-u">${av(o)}${handle(o)}<span class="pv-fb">Подписаться</span></div>${cut(o.caption, MORE.reels)}<div style="margin-top:6px;font-size:12px;opacity:.9">♫ ${handle(o)} · оригинальный звук</div></div>${nav(true, o)}</div>`;
     if (kind === 'feed' || kind === 'carousel') {
       const n = o.slides?.length || 1, at = Math.min(o.slide || 0, n - 1);
       const m = o.slides?.length ? {type: 'image', url: o.slides[at]} : o.media;
       return `<div class="pv feed"><div class="pv-top">Лента<span style="flex:1"></span>${ic('heart', 24)}</div>
-        <div class="pv-h"><span class="pv-av">${initials(o)}</span><b style="flex:1">${handle(o)}</b>${ic('dots', 20)}</div>
+        <div class="pv-h">${av(o)}<b style="flex:1">${handle(o)}</b>${ic('dots', 20)}</div>
         <div class="pv-45" data-pv-slide>${media(m)}${n > 1 ? `<span class="pv-n">${at + 1}/${n}</span>` : ''}</div>
         <div class="pv-act">${ic('heart', 24)}${ic('chat', 24)}${ic('send', 24)}${n > 1 ? `<span class="pv-dots">${Array.from({length: Math.min(n, 10)}, (_, i) => `<i class="${i === at ? 'on' : ''}"></i>`).join('')}</span>` : '<span style="flex:1"></span>'}${ic('save', 24)}</div>
-        <div class="pv-cp"><b>Нравится: 312</b></div><div class="pv-cp"><b>${handle(o)}</b> ${cut(o.caption, MORE.feed)}</div><div class="pv-cp pv-m">Смотреть все комментарии (18)</div><div style="height:60px"></div>${nav(false)}</div>`;
+        ${typ(o, 'likes', 312) ? `<div class="pv-cp"><b>Нравится: ${num(typ(o, 'likes', 312))}</b></div>` : ''}<div class="pv-cp"><b>${handle(o)}</b> ${cut(o.caption, MORE.feed)}</div>${typ(o, 'comments', 18) ? `<div class="pv-cp pv-m">Смотреть все комментарии (${num(typ(o, 'comments', 18))})</div>` : ''}<div style="height:60px"></div>${nav(false, o)}</div>`;
     }
     if (kind === 'grid') {
-      const cells = [{url: o.cover || o.media?.url, kind: o.media?.type === 'video' ? 'reel' : o.slides?.length > 1 ? 'carousel' : 'post', me: true}, ...(o.grid || [])].slice(0, 12);
+      // The new release first, then the account's real latest posts (newest first).
+      const p = o.profile, own = (p?.media || []).filter((m) => m.thumb).map((m) => ({url: m.thumb, kind: m.type}));
+      const cells = [{url: o.cover || o.media?.url, kind: o.media?.type === 'video' ? 'reel' : o.slides?.length > 1 ? 'carousel' : 'post', me: true}, ...(own.length ? own : o.grid || [])].slice(0, 12);
+      const hl = (p?.highlights || []).filter((h) => h.url).slice(0, 5);
       return `<div class="pv feed"><div class="pv-top" style="font:700 18px system-ui">${handle(o)}</div>
-        <div style="display:flex;align-items:center;gap:14px;padding:6px 14px"><span class="pv-av" style="width:64px;height:64px;font-size:20px">${initials(o)}</span><div class="pv-stat" style="flex:1"><div><b>${cells.length + 200}</b>публикаций</div><div><b>3 812</b>подписчиков</div><div><b>96</b>подписок</div></div></div>
-        <div style="padding:0 14px 10px;font-size:13px"><b>${esc(o.name || handle(o))}</b></div>
-        <div class="pv-grid">${cells.map((c) => `<span class="${c.me ? 'me' : ''}">${c.url ? (/\.(mp4|mov|webm)(\?|&|$)/i.test(c.url) ? `<video src="${esc(c.url)}" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>` : `<img src="${esc(c.url)}" alt="" style="width:100%;height:100%;object-fit:cover">`) : ''}${c.kind === 'reel' ? `<i>${ic('play', 16)}</i>` : c.kind === 'carousel' ? `<i>${ic('stack', 16)}</i>` : ''}</span>`).join('')}</div><div style="height:60px"></div>${nav(false)}</div>`;
+        <div style="display:flex;align-items:center;gap:14px;padding:6px 14px">${av(o, '', 'width:64px;height:64px;font-size:20px')}<div class="pv-stat" style="flex:1"><div><b>${p ? num((p.posts || 0) + 1) : cells.length + 200}</b>публикаций</div><div><b>${p ? num(p.followers || 0) : '3 812'}</b>подписчиков</div><div><b>${p ? num(p.following || 0) : 96}</b>подписок</div></div></div>
+        <div style="padding:0 14px 10px;font-size:13px;line-height:1.4"><b>${esc(p?.name || o.name || handle(o))}</b>${p?.bio ? `<div style="white-space:pre-line">${esc(p.bio)}</div>` : ''}${p?.link ? `<div style="color:#00376B">${esc(p.link)}</div>` : ''}</div>
+        ${hl.length ? `<div style="display:flex;gap:12px;padding:0 12px 12px">${hl.map((h) => `<span style="width:52px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;text-align:center;overflow:hidden"><img src="${esc(h.url)}" alt="" style="width:50px;height:50px;border-radius:50%;border:1px solid #DBDBDB;padding:2px;box-sizing:border-box;object-fit:cover;background:#fff">${esc(h.title)}</span>`).join('')}</div>` : ''}
+        <div class="pv-grid">${cells.map((c) => `<span class="${c.me ? 'me' : ''}">${c.url ? (/\.(mp4|mov|webm)(\?|&|$)/i.test(c.url) ? `<video src="${esc(c.url)}" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>` : `<img src="${esc(c.url)}" alt="" style="width:100%;height:100%;object-fit:cover">`) : ''}${c.kind === 'reel' ? `<i>${ic('play', 16)}</i>` : c.kind === 'carousel' ? `<i>${ic('stack', 16)}</i>` : ''}</span>`).join('')}</div><div style="height:60px"></div>${nav(false, o)}</div>`;
     }
     if (kind === 'telegram') {
       const dk = o.theme === 'dark', text = String(o.caption || ''), long = text.length > TG_FULL;
@@ -114,7 +125,7 @@
         <div style="display:flex;gap:6px;padding:4px 10px 0"><span class="pv-rx">👍 48</span><span class="pv-rx">❤️ 21</span><span class="pv-rx">🔥 9</span></div><div class="ft">👁 1,2K · 10:30</div></div></div>`;
     }
     if (kind === 'story') return `<div class="pv"><div class="pv-full">${media(o.media)}</div>${zones('story', o.zones)}<div class="pv-bars"><i class="on"></i><i></i><i></i></div>
-      <div class="pv-sh"><span class="pv-av pv-s">${initials(o)}</span>${handle(o)}<span style="opacity:.7;font-weight:400">2 ч</span><span style="flex:1"></span>✕</div>
+      <div class="pv-sh">${av(o, 'pv-s')}${handle(o)}<span style="opacity:.7;font-weight:400">2 ч</span><span style="flex:1"></span>✕</div>
       <div class="pv-reply"><span>Отправить сообщение</span>${ic('heart', 24)}${ic('send', 24)}</div></div>`;
     return '';
   }
