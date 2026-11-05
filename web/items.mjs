@@ -3,7 +3,7 @@
 // in projects/<p>/items.json and points at the reel and post folders, which stay as they are:
 // the bot and the agent keep using them, ideas.md and plan.json. syncItems() reads those
 // sources, adds what is new and moves each item's stage forward when the files say so.
-import {existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {randomBytes} from 'node:crypto';
 import {join} from 'node:path';
 import {listPosts} from './posts.mjs';
@@ -157,6 +157,7 @@ export function syncItems(studio, {dry = false, now = Date.now()} = {}) {
   if (data.items.length !== before) changed = true;
 
   for (const item of data.items) {
+    if (item.deletedAt) continue;
     const d = derivedStage(item, src);
     const gone = (item.ref?.kind === 'reel' || item.ref?.kind === 'post') && d === null;
     if (!!item.missing !== gone) { if (gone) item.missing = true; else delete item.missing; changed = true; }
@@ -257,4 +258,57 @@ export function followPlan(studio, key, {at, rubric}) {
   if (at !== undefined) item.at = at || null;
   if (rubric !== undefined) item.rubric = rubric || null;
   saveItems(studio, data);
+}
+
+// ---------- Корзина (handbook/LEAN.md, кусок 19) ----------
+// Deleting is soft: the item keeps its record with deletedAt, its folder (reels/<id> or posts/<id>)
+// moves to <project>/.trash/<when>-<id>/, so it leaves the lists, the Plan, Today and the counts.
+// «Вернуть» moves the folder back and clears the mark — stage, date and rubric stay as they were;
+// «Удалить навсегда» removes the folder and the record. Nothing is cleaned up by itself.
+const folderOf = (studio, item) => (item.ref?.kind === 'reel' ? join(studio, 'reels', item.ref.id) : item.ref?.kind === 'post' ? join(studio, 'posts', item.ref.id) : null);
+/** Moves the items to the bin; returns the ones moved. */
+export function trashItems(studio, ids, by, now = Date.now()) {
+  const data = loadItems(studio);
+  const moved = [];
+  for (const item of data.items.filter((x) => ids.includes(x.id) && !x.deletedAt)) {
+    const from = folderOf(studio, item);
+    if (from && existsSync(from)) {
+      const to = join(studio, '.trash', `${new Date(now).toISOString().slice(0, 10)}-${item.ref.kind}-${item.ref.id}`);
+      if (existsSync(to)) continue;
+      mkdirSync(join(studio, '.trash'), {recursive: true});
+      renameSync(from, to);
+      item.trash = {dir: to.slice(studio.length + 1), from: from.slice(studio.length + 1)};
+    }
+    item.deletedAt = now; item.deletedBy = by || null;
+    moved.push(item);
+    logEvent(studio, {type: 'deleted', item: item.id, by: by || null}, now);
+  }
+  if (moved.length) saveItems(studio, data);
+  return moved;
+}
+/** Back from the bin: the folder returns to its place unless that place is taken. */
+export function restoreItems(studio, ids, by, now = Date.now()) {
+  const data = loadItems(studio);
+  const back = [], blocked = [];
+  for (const item of data.items.filter((x) => ids.includes(x.id) && x.deletedAt)) {
+    if (item.trash) {
+      const from = join(studio, item.trash.dir), to = join(studio, item.trash.from);
+      if (existsSync(to) || !existsSync(from)) { blocked.push(item); continue; }
+      mkdirSync(join(to, '..'), {recursive: true});
+      renameSync(from, to);
+    }
+    delete item.deletedAt; delete item.deletedBy; delete item.trash;
+    back.push(item);
+    logEvent(studio, {type: 'restored', item: item.id, by: by || null}, now);
+  }
+  if (back.length) saveItems(studio, data);
+  return {back, blocked};
+}
+/** «Удалить навсегда»: only from the bin. */
+export function purgeItems(studio, ids) {
+  const data = loadItems(studio);
+  const gone = data.items.filter((x) => ids.includes(x.id) && x.deletedAt);
+  for (const item of gone) if (item.trash?.dir && /^\.trash\/[^/]+$/.test(item.trash.dir)) rmSync(join(studio, item.trash.dir), {recursive: true, force: true});
+  if (gone.length) { data.items = data.items.filter((x) => !gone.includes(x)); saveItems(studio, data); }
+  return gone;
 }

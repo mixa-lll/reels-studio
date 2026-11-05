@@ -465,6 +465,22 @@
   .ttrack { display: flex; gap: 3px; height: 64px; margin: 12px 0 6px; }
   .ttrack span { border-radius: 8px; color: #fff; padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; overflow: hidden; }
   .ttrack b { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ttrack i { font-style: normal; font-size: 11px; opacity: .85; }
+  .imore { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 6px; border: 0; background: rgba(255,255,255,.92); color: var(--muted); display: grid; place-items: center; padding: 0; cursor: pointer; opacity: 0; transition: opacity .12s; }
+  .icard, .ln-chip { position: relative; } .icard:hover .imore, .ln-chip:hover .imore, .imore:focus-visible { opacity: 1; } .imore:hover { color: var(--ink); background: #F2F2F2; }
+  .ln-chip .imore { top: 2px; right: 2px; width: 20px; height: 20px; }
+  @media (hover: none) { .imore { opacity: 1; } }
+  #imenu { position: fixed; z-index: 80; min-width: 190px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14); padding: 5px; display: flex; flex-direction: column; }
+  #imenu button { display: flex; align-items: center; gap: 9px; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--ink); padding: 8px 10px; border-radius: 8px; cursor: pointer; text-align: left; }
+  #imenu button:hover, #imenu button:focus-visible { background: #F4F4F4; outline: none; } #imenu .danger { color: #B42318; }
+  .toast.tact { display: flex; align-items: center; gap: 14px; } .toast.tact button { border: 0; background: none; color: #8AB4FF; font: inherit; font-weight: 600; cursor: pointer; padding: 0; }
+  .picking [data-card] { cursor: pointer; } .picking [data-card] .imore { display: none; }
+  .picking [data-card]::after { content: ''; position: absolute; top: 8px; right: 8px; width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid #C4C4C4; background: #fff; }
+  .picking [data-card].sel { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); } .picking [data-card].sel::after { background: var(--ink) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E") center / 14px no-repeat; border-color: var(--ink); }
+  #pickBtn.on { border-color: var(--ink); font-weight: 600; }
+  .pickbar[hidden] { display: none; }
+  .pickbar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 28px; border-top: 1px solid var(--line); background: #fff; }
+  details.trash { border-top: 1px solid var(--line); padding-top: 14px; } details.trash summary { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--ink2); list-style: none; } details.trash summary::-webkit-details-marker { display: none; }
+  details.trash[open] summary { margin-bottom: 6px; }
 </style>
 <script src="/preview.js"></script>
 </head>
@@ -510,6 +526,8 @@ const ICON = {
   chat2: '<path d="M4 5h16v11H8l-4 4Z"></path>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>',
   tg: '<path d="m22 3-9.5 18-2.5-7.5L3 11z"></path><path d="M10 13.5 22 3"></path>',
+  more: '<circle cx="5" cy="12" r="1.4"></circle><circle cx="12" cy="12" r="1.4"></circle><circle cx="19" cy="12" r="1.4"></circle>',
+  trash: '<path d="M4 7h16"></path><path d="M9 7V4.5h6V7"></path><path d="M6 7l1 13h10l1-13"></path><path d="M10 11v6M14 11v6"></path>',
   web: '<rect x="2.5" y="4" width="19" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle>',
   check: '<path d="M20 6 9 17l-5-5"></path>',
@@ -957,10 +975,91 @@ function itemCard(x) {
   const need = x.need || [];
   const extra = x.stage === 'material' && need.length ? ` · снято ${need.filter((n) => n.done).length} из ${need.length}` : '';
   const sib = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id).length : 0;
-  return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}" data-peek="${x.id}">
+  return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}" data-peek="${x.id}" data-card="${x.id}">${moreBtn(x)}
     <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)}${extra}${sib ? ` · ещё ${sib} из того же материала` : ''}${x.missing ? ' · папка пропала' : ''}</span></a>`;
+}
+// ---------- Удалить выпуск и Корзина (handbook/LEAN.md, кусок 19) ----------
+// Soft delete: the release goes to «Корзина» at the end of «Выпуски» and leaves the Plan, Today and
+// the counts; for ten seconds the toast offers «Вернуть». A ready or published one asks first.
+function toastAct(text, label, fn, ms = 10000) {
+  const el = document.createElement('div');
+  el.className = 'toast tact';
+  el.innerHTML = `<span>${esc(text)}</span><button type="button">${esc(label)}</button>`;
+  el.querySelector('button').onclick = () => { el.remove(); fn(); };
+  document.body.append(el);
+  setTimeout(() => el.remove(), ms);
+}
+async function deleteItems(ids, after) {
+  const list = ids.map((id) => ITEMS.items.find((x) => x.id === id)).filter(Boolean);
+  if (!list.length) return;
+  const late = list.filter((x) => x.stage === 'ready' || x.stage === 'published');
+  if (late.length === 1 && list.length === 1 && !confirm(`«${late[0].title}» уже ${late[0].stage === 'published' ? 'вышел' : 'готов'} — удалить из студии? На площадках он останется.`)) return;
+  if (list.length > 1 && !confirm(`Удалить ${list.length} ${list.length < 5 ? 'выпуска' : 'выпусков'} в корзину?${late.length ? ` ${late.length} из них уже готовы или вышли — на площадках они останутся.` : ''} Вернуть можно из корзины в конце «Выпусков».`)) return;
+  const r = await fetch(`/api/items/delete?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({ids: list.map((x) => x.id)})});
+  if (r.status === 409) { const b = await r.json().catch(() => ({})); return toast(`Claude сейчас работает над «${(b.busy || [])[0] || 'выпуском'}» — дождитесь или остановите`); }
+  if (!r.ok) return toast('Не получилось удалить');
+  const {ids: done = [], cancelled = 0} = await r.json();
+  await loadItems().catch(() => null);
+  sidebar();
+  toastAct(`${done.length === 1 ? 'Выпуск удалён' : `Удалено ${done.length}`}${cancelled ? ' · отправка в Телеграм отменена' : ''}`, 'Вернуть', async () => { await restoreItems(done); after?.(); });
+  after?.();
+}
+async function restoreItems(ids) {
+  const r = await post('/api/items/restore', {ids}).catch(() => null);
+  if (r?.blocked?.length) toast(`Не вернул «${r.blocked[0]}»: на его месте уже другая папка`);
+  else if (r) toast(r.ids.length === 1 ? 'Выпуск вернулся' : `Вернулось ${r.ids.length}`);
+  await loadItems().catch(() => null);
+  sidebar();
+}
+// «…» on a card, a Plan chip or a release header: a small menu.
+function moreMenu(btn, x, {onDeleted, side = true} = {}) {
+  $('#imenu')?.remove();
+  const m = document.createElement('div');
+  m.id = 'imenu'; m.setAttribute('role', 'menu');
+  m.innerHTML = `${side ? `<button type="button" role="menuitem" data-m="side">${svg('panelR', 15)}Открыть сбоку</button>` : ''}<button type="button" role="menuitem" data-m="del" class="danger">${svg('trash', 15)}Удалить выпуск</button>`;
+  document.body.append(m);
+  const r = btn.getBoundingClientRect();
+  m.style.top = `${Math.min(innerHeight - m.offsetHeight - 8, r.bottom + 4)}px`;
+  m.style.left = `${Math.max(8, Math.min(innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth))}px`;
+  m.querySelector('[data-m="side"]')?.addEventListener('click', () => { m.remove(); peek(x.id); });
+  m.querySelector('[data-m="del"]').onclick = () => { m.remove(); deleteItems([x.id], onDeleted); };
+  m.querySelector('button').focus();
+}
+document.addEventListener('click', (e) => { if (!e.target.closest?.('#imenu, [data-imore], .rhead [data-more]')) $('#imenu')?.remove(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#imenu')?.remove(); });
+// Cards and chips carry a «…» button inside their link: it opens the menu instead of the release.
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-imore]');
+  if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const x = ITEMS?.items.find((y) => y.id === b.dataset.imore);
+  if (x) moreMenu(b, x, {onDeleted: () => route()});
+}, true);
+const moreBtn = (x) => (canEdit() ? `<button type="button" class="imore" data-imore="${x.id}" aria-label="Ещё: ${esc(x.title)}" title="Ещё">${svg('more', 15)}</button>` : '');
+
+// «Корзина» at the end of «Выпуски»: when, who, how much; back to its place or gone for good.
+function trashBlock(after) {
+  const t = ITEMS.trash || [];
+  if (!t.length) return '';
+  const day = (ms) => new Date(ms).toLocaleDateString('ru', {day: 'numeric', month: 'short'});
+  return `<details class="trash" ${sessionStorage.getItem('trashOpen') ? 'open' : ''}><summary>${svg('trash', 14)}Корзина · ${t.length}<span class="small muted" style="font-weight: 400">удалённые выпуски, их папки целы — можно вернуть</span></summary>
+    ${t.map((x) => `<div class="ln-li"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><span style="flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</span>${sdot(x.stage)}
+      <span class="s" style="flex: 0 0 auto">удалён ${day(x.deletedAt)}${x.deletedBy ? ' · ' + esc(x.deletedBy) : ''}${x.size ? ' · ' + mb(x.size) : ''}</span>
+      ${canEdit() ? `<button type="button" class="ln-btn s" data-tback="${x.id}">Вернуть</button><button type="button" class="ln-btn s g" data-tpurge="${x.id}" style="color: #B42318">Удалить навсегда</button>` : ''}</div>`).join('')}</details>`;
+}
+function wireTrash(root, after) {
+  root.querySelector('details.trash')?.addEventListener('toggle', (e) => { try { e.target.open ? sessionStorage.setItem('trashOpen', '1') : sessionStorage.removeItem('trashOpen'); } catch {} });
+  root.querySelectorAll('[data-tback]').forEach((b) => (b.onclick = async () => { b.disabled = true; await restoreItems([b.dataset.tback]); after(); }));
+  root.querySelectorAll('[data-tpurge]').forEach((b) => (b.onclick = async () => {
+    const x = (ITEMS.trash || []).find((y) => y.id === b.dataset.tpurge);
+    if (!x || !confirm(`Удалить навсегда «${x.title}»?${x.size ? ` Вместе с файлами — ${mb(x.size)}${x.trash?.from ? ` (${x.trash.from})` : ''}.` : ''} Вернуть будет нельзя.`)) return;
+    b.disabled = true;
+    await post('/api/items/purge', {ids: [x.id]}).then(() => toast('Удалено навсегда')).catch(() => toast('Не получилось'));
+    await loadItems().catch(() => null);
+    after();
+  }));
 }
 // Выпуски (LeanAll): five columns by stage; format and rubric are filters, Claude's pitches a separate list.
 async function vAll(fmt = 'all') {
@@ -972,13 +1071,29 @@ async function vAll(fmt = 'all') {
   let rub = sessionStorage.getItem('allRubric') || '';
   const fmts = [['all', 'Все форматы'], ...['reel', 'post', 'carousel', 'telegram'].map((k) => [k, FMT_NAME[k]])];
   const n = (k) => mine.filter((x) => k === 'all' || x.format === k).length;
-  view.innerHTML = `<div class="ln-top"><b>Выпуски</b><span style="flex: 1"></span>${canEdit() ? `<a class="ln-btn p" href="#/new">${svg('plus', 14)}Новый выпуск</a>` : ''}</div>
+  view.innerHTML = `<div class="ln-top"><b>Выпуски</b><span style="flex: 1"></span>${canEdit() ? `<button type="button" class="ln-btn" id="pickBtn">Выбрать</button><a class="ln-btn p" href="#/new">${svg('plus', 14)}Новый выпуск</a>` : ''}</div>
   <div style="flex: 1; overflow-y: auto; padding: 22px 28px; display: flex; flex-direction: column; gap: 16px">
     <div class="row" style="gap: 8px; flex-wrap: wrap">${fmts.map(([k, t]) => `<a class="ln-pill ${k === fmt ? 'on' : ''}" href="#/all${k === 'all' ? '' : '/' + k}">${k === 'all' ? '' : svg(FMT_ICON[k], 14)}${t} · ${n(k)}</a>`).join('')}
       <span style="width: 1px; height: 22px; background: var(--line); margin: 0 6px"></span>
       <select class="ln-pill" id="rubSel" aria-label="Рубрика"><option value="">Рубрика: все</option>${ITEMS.rubrics.map((r) => `<option value="${esc(r.id)}" ${r.id === rub ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
       <a class="ln-pill ${fmt === 'proposed' ? 'on' : ''}" href="#/all/proposed" style="margin-left: auto">${svg('idea', 14)}Предложения Claude · ${pitches.length}</a></div>
-    <div id="allBody"></div></div>`;
+    <div id="allBody"></div><div id="allTrash"></div></div>
+  <div class="pickbar" id="pickBar" hidden><b id="pickN">Выбрано 0</b><span class="small muted">нажимайте на карточки</span><span style="flex: 1"></span><button type="button" class="ln-btn" id="pickNo">Отмена</button><button type="button" class="ln-btn p" id="pickDel" disabled style="background: #B42318; border-color: #B42318">Удалить</button></div>`;
+  // Выбрать несколько → «Удалить N» (кусок 19): in this mode a click marks the card instead of opening it.
+  const picked = new Set();
+  const pickPaint = () => { const n = picked.size; $('#pickN').textContent = `Выбрано ${n}`; $('#pickDel').disabled = !n; $('#pickDel').textContent = n ? `Удалить ${n}` : 'Удалить'; view.querySelectorAll('[data-card]').forEach((c) => c.classList.toggle('sel', picked.has(c.dataset.card))); };
+  const pickMode = (on) => { $('#allBody').classList.toggle('picking', on); $('#pickBar').hidden = !on; $('#pickBtn').classList.toggle('on', on); if (!on) picked.clear(); pickPaint(); };
+  $('#pickBtn')?.addEventListener('click', () => pickMode(!$('#allBody').classList.contains('picking')));
+  $('#pickNo')?.addEventListener('click', () => pickMode(false));
+  $('#pickDel')?.addEventListener('click', () => deleteItems([...picked], () => vAll(fmt)));
+  $('#allBody').addEventListener('click', (e) => {
+    if (!$('#allBody').classList.contains('picking')) return;
+    const c = e.target.closest('[data-card]');
+    if (!c) return;
+    e.preventDefault(); e.stopPropagation();
+    picked.has(c.dataset.card) ? picked.delete(c.dataset.card) : picked.add(c.dataset.card);
+    pickPaint();
+  }, true);
   const draw = () => {
     const pass = (x) => (!rub || x.rubric === rub || itemRubric(x)?.id === rub);
     if (fmt === 'proposed') {
@@ -993,6 +1108,8 @@ async function vAll(fmt = 'all') {
   };
   $('#rubSel').onchange = (e) => { rub = e.target.value; sessionStorage.setItem('allRubric', rub); draw(); };
   draw();
+  $('#allTrash').innerHTML = trashBlock();
+  wireTrash($('#allTrash'), () => vAll(fmt));
 }
 
 // The life of one item above its editor: five stages, rubric, date; stage and date change by hand.
@@ -1098,10 +1215,11 @@ async function relHead(kind, id, steps, tab, base, title) {
       <input class="rchip" data-f="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">`
     : `${r ? `<span class="small">${esc(r.name)}</span>` : ''}<span class="small muted">${whenText(x.at)}</span>`}
     <span id="dlTop" class="row" style="gap: 8px"></span>
-    <button type="button" class="ln-btn g s" data-side="${x.id}" title="Открыть сбоку" aria-label="Открыть сбоку">${svg('panelR', 16)}</button></div>
+    <button type="button" class="ln-btn g s" data-side="${x.id}" title="Открыть сбоку" aria-label="Открыть сбоку">${svg('panelR', 16)}</button>${ed ? `<button type="button" class="ln-btn g s" data-more="${x.id}" title="Ещё" aria-label="Ещё">${svg('more', 16)}</button>` : ''}</div>
     ${stageTrack(x, {viewing, href: (s) => base + steps[s][0]})}${back}${subs}`;
 }
 function wireRelHead(root, redraw) {
+  root.querySelector('.rhead [data-more]')?.addEventListener('click', (e) => { const x = ITEMS.items.find((y) => y.id === e.currentTarget.dataset.more); if (x) moreMenu(e.currentTarget, x, {side: false, onDeleted: () => { location.hash = '#/all'; }}); });
   root.querySelectorAll('.rhead [data-f]').forEach((el) => (el.onchange = async () => {
     await post('/api/items/set', {id: el.closest('.rhead').dataset.item, [el.dataset.f]: el.value || null});
     await loadItems(); toast('Сохранено'); redraw?.();
@@ -1201,7 +1319,7 @@ async function vItem(id) {
   const prop = (k, v) => `<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span class="muted" style="flex: 0 0 72px">${k}</span><span style="flex: 1; display: flex; justify-content: flex-end">${v}</span></div>`;
   const sel = (f, opts, cur) => `<select class="f" data-i="${f}" ${ed ? '' : 'disabled'} style="width: auto; min-height: 30px; font-size: 13px; font-weight: 600; border-color: transparent; text-align: right">${opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
   view.innerHTML = `<div class="work"><div class="rmain">
-    <div class="ln-top"><span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b>${esc(x.title)}</b><span>· ${r ? esc(r.name) + ' · ' : ''}${FMT_NAME[x.format].toLowerCase()} · ${whenText(x.at)}</span><span style="flex: 1"></span>${x.proposed ? '<span class="small muted">предложение</span>' : ''}</div>
+    <div class="ln-top"><span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b>${esc(x.title)}</b><span>· ${r ? esc(r.name) + ' · ' : ''}${FMT_NAME[x.format].toLowerCase()} · ${whenText(x.at)}</span><span style="flex: 1"></span>${x.proposed ? '<span class="small muted">предложение</span>' : ''}${ed ? `<button type="button" class="ln-btn g s" id="iMore" title="Ещё" aria-label="Ещё">${svg('more', 16)}</button>` : ''}</div>
     ${x.proposed ? '' : lifeBarFor(x, {controls: false}).replace('class="lbar"', 'class="lbar" style="padding: 10px 24px"')}
     <div style="flex: 1; overflow-y: auto; padding: 28px 40px; display: flex; gap: 32px; min-height: 0">
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px">
@@ -1225,6 +1343,7 @@ async function vItem(id) {
     </div></div>
     <aside class="chatcol" aria-label="Обсудить идею"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Обсудить идею</b></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   wireLifeBar(view, () => vItem(id));
+  $('#iMore')?.addEventListener('click', (e) => moreMenu(e.currentTarget, x, {side: false, onDeleted: () => { location.hash = '#/all'; }}));
   const box = chatBox('_project', {onDone: () => { sidebar(); vItem(id); }});
   $('#chatHost').append(box);
   const save = async (patch) => { await post('/api/items/set', {id, ...patch}); };
@@ -1993,7 +2112,7 @@ async function vPlan(offset = 0, month = true) {
   }
   const all = ITEMS.items;
   const onDay = (d) => all.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
-  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
+  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">${moreBtn(x)}
       <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
       <span class="m">${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}</span>
       ${x.proposed && canEdit() ? `<span class="m" style="gap: 8px"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</a>`;
