@@ -566,6 +566,8 @@ const ICON = {
   ds: '<circle cx="8" cy="8" r="4"></circle><rect x="13" y="13" width="8" height="8" rx="1"></rect><path d="M4 20l4-6 4 6Z"></path>',
   files: '<path d="M3 7h6l2 2h10v10H3Z"></path>',
   reel: '<rect x="6" y="2.5" width="12" height="19" rx="3"></rect><path d="M10.5 9.3v5.4l4.2-2.7z" fill="currentColor" stroke="none"></path>',
+  ig: '<rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.4" cy="6.6" r=".9" fill="currentColor" stroke="none"></circle>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"></path><path d="M20 4v7h-7"></path>',
   photo: '<rect x="3" y="3" width="18" height="18" rx="3.5"></rect><circle cx="8.6" cy="8.6" r="1.6"></circle><path d="m21 15.5-5-5L5 21"></path>',
   carousel: '<rect x="8" y="4" width="13" height="16" rx="2.5"></rect><path d="M4.5 6.5v11M1.5 9v6"></path>',
   text: '<path d="M4 6h16M4 11h16M4 16h10"></path>',
@@ -607,6 +609,40 @@ const igFor = (c = {}) => {
   return (IG || []).find((x) => acc && x.account === acc) || (IG || []).find((x) => x.lang === (en ? 'en' : 'ru')) || null;
 };
 const igWhen = (p) => p ? `${p.source === 'api' ? 'обновлено' : 'снимок от'} ${new Date(p.fetchedAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}` : '';
+const igAgo = (t) => { const m = Math.round((Date.now() - Date.parse(t)) / 6e4); return m < 1 ? 'только что' : m < 60 ? `${m} мин назад` : m < 1440 ? `${Math.round(m / 60)} ч назад` : new Date(t).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}); };
+const igDate = (t) => new Date(t).toLocaleString('ru-RU', {weekday: 'short', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'});
+const IG_HOWTO = 'https://github.com/mixa-lll/reels-studio/blob/main/handbook/INSTAGRAM.md';
+// Every Instagram post the studio tied to an item (by its link) and the posts it thinks are that item.
+const igOf = (item) => {
+  const out = {linked: [], offers: []};
+  if (!item) return out;
+  for (const a of IG || []) {
+    for (const l of a.linked || []) if (l.item === item.id) out.linked.push({acct: a, m: a.media.find((m) => m.code === l.code)});
+    for (const o of a.offers || []) if (o.item === item.id) out.offers.push({acct: a, m: a.media.find((m) => m.code === o.code)});
+  }
+  return out;
+};
+// «Вышел в Instagram» (IG3) on the publish tab: the post, its time, link and numbers; or «похоже, это он».
+function igPublished(item, redraw) {
+  const {linked, offers} = igOf(item);
+  if (!linked.length && !offers.length) return null;
+  const box = document.createElement('div');
+  box.className = 'blk';
+  const n = (v, l) => `<span style="display: flex; flex-direction: column; gap: 4px"><b style="font-size: 24px; font-weight: 600; letter-spacing: -0.02em; ${v == null ? 'color: #A3A3A3' : ''}">${v == null ? '—' : Number(v).toLocaleString('ru-RU')}</b><span class="small muted">${l}</span></span>`;
+  box.innerHTML = `<span class="lbl">Вышел в Instagram</span>${linked.filter((x) => x.m).map(({acct, m}) => `<div style="display: flex; gap: 22px; align-items: flex-start">
+      <a href="${esc(m.permalink)}" target="_blank" rel="noopener" style="flex: none"><img src="${esc(m.thumb || '')}" alt="" style="width: 120px; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 12px; display: block; background: var(--soft)"></a>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        <div class="row" style="gap: 10px">${acct.avatar ? `<img src="${esc(acct.avatar)}" alt="" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover">` : ''}<span><b>@${esc(acct.account)}</b><div class="small muted">${igDate(m.timestamp)}</div></span></div>
+        <a href="${esc(m.permalink)}" target="_blank" rel="noopener" style="color: #2F6FEB; text-decoration: none; font-size: 14px; overflow-wrap: anywhere">${esc(m.permalink.replace(/^https:\/\/www\./, ''))}</a>
+        <div class="row" style="gap: 36px">${n(m.likes, 'лайков')}${n(m.comments, 'комментариев')}${n(m.views, 'просмотров')}${n(m.saved, 'сохранений')}</div>
+        <span class="small muted">Цифры на ${new Date(acct.fetchedAt).toLocaleString('ru-RU', {day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'})}${acct.connected ? '' : '. Просмотры и сохранения появятся, когда Instagram подключён в Настройках'}.</span>
+      </div></div>`).join('')}
+    ${offers.filter((x) => x.m).map(({acct, m}) => `<div style="display: flex; gap: 16px; align-items: center"><img src="${esc(m.thumb || '')}" alt="" style="width: 54px; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; flex: none">
+      <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px"><span>Похоже, вышел в @${esc(acct.account)} ${igDate(m.timestamp)}</span><span class="small muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${esc((m.caption || 'без подписи').split('\n')[0])}</span></span>
+      ${canEdit() ? `<button type="button" class="btn primary" data-iglink="${esc(acct.account)}|${esc(m.code)}">Да, это он</button>` : ''}</div>`).join('')}`;
+  box.querySelectorAll('[data-iglink]').forEach((b) => (b.onclick = async () => { const [account, code] = b.dataset.iglink.split('|'); b.disabled = true; await post('/api/instagram/link', {account, code, item: item.id}); await loadIg(); toast('Отмечено: вышло в Instagram'); redraw(); }));
+  return box;
+}
 const roleName = (m) => m.role === 'editor' ? (m.isOwner ? 'редактор · владелец' : m.deputyUntil ? 'замещает' : 'редактор') : 'участник';
 
 async function sidebar() {
@@ -1485,6 +1521,12 @@ function stagePublish(id, data) {
       base: {kind: 'reel', media: vid ? {type: 'video', url: vid.url} : null, cover: cover?.url, name: projName(), reel: data.template, grid: (OV?.reels || []).filter((r) => r.id !== id && r.thumb).slice(0, 8).map((r) => ({url: r.thumb, kind: 'reel'}))},
       onSeen: async (key) => { await post('/api/reel/seen', {reel: id, key}); drawStage(id, 'publish'); }});
   }
+  {
+    if (!ITEMS) loadItems().then(() => ITEMS && location.hash.startsWith('#/reel/' + id) && drawStage(id, 'publish')).catch(() => {});
+    const it = ITEMS?.items.find((x) => x.ref?.kind === 'reel' && x.ref.id === id);
+    const ig = igPublished(it, () => drawStage(id, 'publish'));
+    if (ig) host.querySelector('.page').prepend(ig);
+  }
   // A master button per version that has one (RU v1, EN v2…), then the current copy and cover.
   const masterOf = (v) => v.files.filter((f) => f.kind === 'master').sort((a, b) => b.size - a.size)[0];
   const masters = data.versions.filter(isMaster);
@@ -1741,6 +1783,8 @@ function postPublish(id, data, host, save) {
   nxBlock(host.querySelector('.page'), {caps, kind: p.kind === 'carousel' ? 'carousel' : 'post', seen: p.seen, ask: canEdit() ? (t) => chatOf().say(t, 'Исправить: ' + t.slice(0, 60)) : null,
     base: {media: pics[0] ? {type: 'image', url: pics[0].url} : null, slides: pics.map((f) => f.url), cover: pics[0]?.url, name: projName(), grid: (OV?.reels || []).filter((r) => r.thumb).slice(0, 8).map((r) => ({url: r.thumb, kind: 'reel'}))},
     onSeen: async (key) => { await save({seen: {...p.seen, [key]: {by: ME?.name, at: Date.now()}}}); drawPost(id, 'publish'); }});
+  const ig = igPublished(ITEMS?.items.find((x) => x.ref?.kind === 'post' && x.ref.id === id), () => drawPost(id, 'publish'));
+  if (ig) host.querySelector('.page').prepend(ig);
   host.querySelectorAll('[data-cap]').forEach((t) => (t.oninput = () => { host.querySelector(`[data-len="${t.dataset.cap}"]`).textContent = t.value.length; }));
   $('#mkCaps')?.addEventListener('click', () => chatOf().say('Напиши подписи для Instagram RU, Instagram EN (своя версия, не перевод) и Телеграм-канала (длиннее, без хэштегов), проверку перед выкладкой и «что после» в post.json.', 'Написать подписи'));
   $('#capSave')?.addEventListener('click', async () => { await save({captions: current()}); toast('Сохранено'); });
@@ -2106,7 +2150,7 @@ async function vKnowledge(tab = 'overview', sel) {
 // format and stage; ideas dashed, Claude's proposals marked. Rubrics on the right.
 async function vPlan(offset = 0, month = true) {
   title('План');
-  const [plan] = await Promise.all([api('/api/plan'), loadItems()]);
+  const [plan] = await Promise.all([api('/api/plan'), loadItems(), loadIg()]);
   const st = plan.strategy || {};
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -2121,16 +2165,19 @@ async function vPlan(offset = 0, month = true) {
     days = Array.from({length: 7}, (_, i) => { const d = new Date(mon); d.setDate(mon.getDate() + i); return d; });
   }
   const all = ITEMS.items;
+  // Posts found in Instagram without an item (offers first): a muted line in their day and a list aside.
+  const found = (IG || []).flatMap((a) => [...(a.offers || []).map((o) => ({a, m: a.media.find((m) => m.code === o.code), offer: o})), ...(a.loose || []).map((c) => ({a, m: a.media.find((m) => m.code === c)}))]).filter((x) => x.m);
+  const igLoose = (day) => found.filter((x) => ymd(new Date(x.m.timestamp)) === day);
   const onDay = (d) => all.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
   const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
       <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
-      <span class="m">${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}</span>
+      <span class="m">${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex">${svg('ig', 12)}</span>` : ''}${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}</span>
       ${x.proposed && canEdit() ? `<span class="m" style="gap: 8px"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</a>`;
   const cells = days.map((d) => {
     const isToday = ymd(d) === ymd(today), out = month && d.getMonth() !== first.getMonth();
     const ev = (plan.events || []).concat(st.events || []).filter((e) => e.date === ymd(d));
     return `<div class="ln-cell${isToday ? ' today' : ''}${out ? ' out' : ''}" data-day="${ymd(d)}" style="${month ? '' : 'min-height: 420px'}"><span class="dn">${d.getDate()}</span>
-      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d).map(chip).join('')}</div>`;
+      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d).map(chip).join('')}${igLoose(ymd(d)).length ? `<span class="muted" style="margin-top: auto; font-size: 11.5px; display: inline-flex; gap: 5px; align-items: center" title="Вышло в Instagram, в студии такого выпуска нет">${svg('ig', 12)}+${igLoose(ymd(d)).length} без выпуска</span>` : ''}</div>`;
   }).join('');
   const shown = all.filter((x) => !x.proposed && x.at && x.at.slice(0, 10) >= ymd(days[0]) && x.at.slice(0, 10) <= ymd(days.at(-1)));
   const undated = all.filter((x) => !x.at && !x.proposed && x.stage !== 'published');
@@ -2156,10 +2203,20 @@ async function vPlan(offset = 0, month = true) {
         <div>${rubs || '<span class="small muted">Рубрик пока нет.</span>'}</div>
         ${canEdit() ? '<button type="button" id="addRub" style="align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; color: #2F6FEB; font-weight: 600; cursor: pointer">+ Рубрика</button>' : ''}
         <div class="ln-drop" data-day="" style="display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 2px"><div style="display: flex; align-items: center; margin-top: 8px"><b style="font-weight: 600">Без даты</b><span class="muted" style="margin-left: auto; font-size: 12px">${undated.length}</span></div>${undated.slice(0, 6).map(chip).join('')}${undated.length > 6 ? `<a class="small muted" href="#/all">ещё ${undated.length - 6} — в Выпусках</a>` : ''}</div>
+        ${found.length ? `<div style="display: flex; flex-direction: column; gap: 2px; margin-top: 8px"><b style="font-weight: 600">Найдено в Instagram</b><span class="small muted" style="line-height: 1.5; padding-bottom: 4px">${found.length} без выпуска в студии. Привяжите свои — остальные можно убрать.</span>
+          ${found.slice(0, 5).map(({a, m, offer}) => `<div style="display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F0F0F0"><a href="${esc(m.permalink)}" target="_blank" rel="noopener" style="flex: none"><img src="${esc(m.thumb || '')}" alt="" style="width: 40px; height: 54px; object-fit: cover; border-radius: 6px; display: block"></a>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 13px"><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${esc((m.caption || 'без подписи').split('\n')[0])}</span><span class="muted" style="font-size: 12px">@${esc(a.account)} · ${new Date(m.timestamp).toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'})}</span>
+            ${!canEdit() ? '' : offer ? `<span style="font-size: 12.5px; color: var(--ink2)">похоже на «${esc(offer.title)}»</span><span class="row" style="gap: 10px"><button type="button" class="ln-act" data-igl="${esc(a.account)}|${esc(m.code)}|${esc(offer.item)}">привязать</button><button type="button" class="ln-act" data-igh="${esc(a.account)}|${esc(m.code)}" style="color: var(--muted)">не из студии</button></span>`
+              : `<span class="row" style="gap: 10px"><select class="ln-act" data-igs="${esc(a.account)}|${esc(m.code)}" aria-label="Привязать к выпуску" style="max-width: 150px"><option value="">привязать к…</option>${all.filter((x) => !x.proposed && x.stage !== 'idea' && !(x.published || []).some((p) => String(p.account || '').replace(/^@/, '').toLowerCase() === a.account)).slice(-30).reverse().map((x) => `<option value="${esc(x.id)}">${esc(x.title)}</option>`).join('')}</select><button type="button" class="ln-act" data-igh="${esc(a.account)}|${esc(m.code)}" style="color: var(--muted)">не из студии</button></span>`}</span></div>`).join('')}
+          ${found.length > 5 ? `<span class="small muted" style="padding-top: 6px">и ещё ${found.length - 5}</span>` : ''}</div>` : ''}
         <a href="#/plan/setup" class="muted" style="font-size: 13px; line-height: 1.5; margin-top: auto; display: inline-flex; gap: 6px; align-items: center; text-decoration: none">${svg('sliders', 14)}Площадки и ритм</a>
       </aside>
     </div></div>`;
   const redraw = () => vPlan(offset, month);
+  const igPost = async (b, msg) => { await post('/api/instagram/link', b); await Promise.all([loadIg(), loadItems(true)]); toast(msg); redraw(); };
+  view.querySelectorAll('[data-igl]').forEach((b) => (b.onclick = () => { const [account, code, item] = b.dataset.igl.split('|'); igPost({account, code, item}, 'Привязано: вышло в Instagram'); }));
+  view.querySelectorAll('[data-igs]').forEach((b) => (b.onchange = () => { const [account, code] = b.dataset.igs.split('|'); if (b.value) igPost({account, code, item: b.value}, 'Привязано: вышло в Instagram'); }));
+  view.querySelectorAll('[data-igh]').forEach((b) => (b.onclick = () => { const [account, code] = b.dataset.igh.split('|'); igPost({account, code, hide: true}, 'Убрано из найденного'); }));
   $('#lay')?.addEventListener('click', () => { sessionStorage.setItem('planLay', '1'); location.hash = '#/plan/draft'; });
   $('#addRub')?.addEventListener('click', async () => { const name = prompt('Название рубрики'); if (!name?.trim()) return; const {rubric} = await post('/api/strategy/edit', {rubric: {name}}); location.hash = '#/rubric/' + rubric.id; });
   view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); redraw(); }));
@@ -2723,17 +2780,65 @@ async function vModules() {
 
 // Настройки › Подключения (LeanConnect): the bot, the channel, Instagram by package, the site.
 async function vConnect() {
-  const plan = await api('/api/plan').catch(() => ({}));
+  const [plan] = await Promise.all([api('/api/plan').catch(() => ({})), loadIg(), loadItems().catch(() => null)]);
   const plats = plan.strategy?.platforms || [];
   const tg = plats.filter((x) => /tg|telegram|телеграм/i.test(x.id + x.name));
   const ig = plats.filter((x) => /ig|instagram/i.test(x.id + x.name));
   const row = (i, t, sub, state, ok, btn) => `<div style="border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; align-items: center; gap: 14px">${svg(i, 20)}<span style="flex: 1; display: flex; flex-direction: column; gap: 3px"><b style="font-weight: 600">${t}</b><span class="small muted">${sub}</span></span><span class="small" style="font-weight: 600; color: ${ok ? '#2E8A4F' : 'var(--muted)'}">${state}</span>${btn || ''}</div>`;
   view.innerHTML = `<div style="flex: 1; overflow-y: auto"><div style="max-width: 1100px; padding: 22px 40px; display: flex; flex-direction: column; gap: 12px">
+    ${igCards()}
     ${row('tg', `Телеграм-бот${MEMBOT ? ' @' + esc(MEMBOT) : ''}`, 'сюда приходят идеи, списки кадров и пакеты на выкладку; сюда же вы кидаете материал', MEMBOT ? 'подключён' : 'не подключён', !!MEMBOT, `<a class="ln-btn" href="#/settings/team">Как подключиться</a>`)}
     ${tg.map((x) => row('text', `Телеграм-канал ${esc(x.account || x.name)}`, 'бот добавлен администратором — выкладывает сам', 'выкладка ботом', true)).join('') || row('text', 'Телеграм-канал', 'добавьте бота администратором канала — и он будет выкладывать тексты сам', 'не задан', false, '<a class="ln-btn" href="#/plan/setup">Площадки</a>')}
-    ${row('photo', ig.length ? `Instagram ${ig.map((x) => esc(x.account || x.name)).join(', ')}` : 'Instagram', 'без доступа к аккаунту: пакет на телефон, вы нажимаете «поделиться»', 'пакетом', true)}
     ${row('globe', 'Сайт', 'Claude читает его, когда собирает факты и цены в Памяти', 'по запросу', false, '<a class="ln-btn" href="#/memory/facts">Факты</a>')}
   </div></div>`;
+  igBind(vConnect);
+}
+
+// Instagram in Подключения (IG1/IG2): one card per account — not connected, a snapshot, refreshing,
+// refreshed or an error, in words; «Обновить сейчас» asks the server and watches until it is done.
+function igCards() {
+  const accs = IG || [];
+  if (!accs.length) return `<div style="border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; display: flex; align-items: center; gap: 16px">${svg('ig', 22)}<span style="flex: 1; display: flex; flex-direction: column; gap: 4px"><b style="font-weight: 600">Instagram не подключён</b><span class="small muted">Студия не знает, что вышло: «Вышло» ставите вручную, ссылку вставляете сами.</span></span><a class="ln-btn p" href="${IG_HOWTO}" target="_blank" rel="noopener">Как подключить</a></div>`;
+  const card = (a) => {
+    const state = a.refreshing ? `<span style="font-weight: 600">обновляем…</span>`
+      : a.error ? `<span style="color: #B42318; font-weight: 600">не обновилось — ${esc(a.error.replace(/^Instagram: /, ''))}</span><span class="small muted">данные от ${igAgo(a.fetchedAt)}</span>`
+      : a.connected ? `<span style="color: #2E8A4F; font-weight: 600">${svg('check', 13)} подключён</span><span class="small muted" style="white-space: nowrap">обновлено ${igAgo(a.fetchedAt)}</span>`
+      : `<span style="font-weight: 600">снимок от ${new Date(a.fetchedAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}</span><span class="small muted">сам не обновляется</span>`;
+    const btn = !canEdit() ? '' : a.connected ? `<button type="button" class="ln-btn" data-igref="${esc(a.account)}" ${a.refreshing ? 'disabled' : ''}>${svg('refresh', 14)}${a.refreshing ? 'Обновляется…' : a.error ? 'Попробовать ещё' : 'Обновить сейчас'}</button>`
+      : `<a class="ln-btn" href="${IG_HOWTO}" target="_blank" rel="noopener">Подключить</a>`;
+    const own = (a.linked || []).length, loose = (a.loose || []).length, offers = (a.offers || []).length;
+    return `<div style="border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 18px; min-width: 0">
+      <div class="row" style="gap: 14px">${a.avatar ? `<img src="${esc(a.avatar)}" alt="" style="width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line)">` : ''}<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px"><b style="font-size: 16px; font-weight: 600">@${esc(a.account)}</b><span class="small muted">${esc(a.name || '')}</span></span><a class="ln-btn g s" href="https://www.instagram.com/${esc(a.account)}/" target="_blank" rel="noopener" title="Открыть в Instagram" aria-label="Открыть в Instagram">${svg('link', 15)}</a></div>
+      <div class="row" style="gap: 22px; flex-wrap: wrap; font-size: 14px"><span><b>${Number(a.followers || 0).toLocaleString('ru-RU')}</b> <span class="muted">подписчиков</span></span><span><b>${Number(a.posts || 0).toLocaleString('ru-RU')}</b> <span class="muted">публикаций</span></span><span class="muted">${a.lang === 'en' ? 'английский' : 'русский'}</span></div>
+      <div style="display: flex; gap: 8px; overflow: hidden; flex-wrap: nowrap">${a.media.slice(0, 7).map((m) => `<a href="${esc(m.permalink)}" target="_blank" rel="noopener"><img src="${esc(m.thumb || '')}" alt="" style="width: 50px; height: 68px; object-fit: cover; border-radius: 6px; display: block; background: var(--soft); flex: none"></a>`).join('')}</div>
+      <span class="small muted" style="line-height: 1.5">Из ${a.media.length} последних ${own} связаны с выпусками${offers ? `, ${offers} похожи на выпуски` : ''}${loose ? `, <a href="#/plan" style="color: var(--ink)">${loose} без выпуска</a>` : ''}.</span>
+      <div class="row" style="gap: 12px; border-top: 1px solid var(--line); padding-top: 16px; flex-wrap: wrap"><span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px">${state}</span>${btn}</div>
+    </div>`;
+  };
+  return `<div style="display: flex; flex-direction: column; gap: 6px; padding: 4px 0 10px"><b style="font-size: 18px; font-weight: 600">Instagram</b><span class="muted" style="font-size: 14px">Студия видит, что вышло, и подтягивает лайки и просмотры. Выкладываете по-прежнему вы — пакетом из бота.</span></div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px">${accs.map(card).join('')}</div>
+    <span class="small muted" style="padding: 2px 0 14px">${accs.some((a) => a.connected) ? 'Обновляется само каждые 3 часа. ' : ''}Доступ даёт официальный Instagram API; ключ хранится на сервере и нигде не показывается. <a href="${IG_HOWTO}" target="_blank" rel="noopener" style="color: var(--ink)">Как подключить</a></span>
+    ${isOwner() ? `<form id="igTok" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 0 0 16px"><label class="small muted" for="igTokIn">Ключ доступа из Meta — для каждого аккаунта свой:</label><input class="f" id="igTokIn" type="password" autocomplete="off" placeholder="IGAA…" style="flex: 1; min-width: 220px; max-width: 420px"><button type="submit" class="ln-btn">Подключить</button></form>` : ''}
+    <span class="lbl" style="padding-top: 6px">Остальные подключения</span>`;
+}
+function igBind(redraw) {
+  const f = $('#igTok');
+  if (f) f.onsubmit = async (e) => {
+    e.preventDefault();
+    const inp = $('#igTokIn'), token = inp.value.trim();
+    inp.value = '';
+    if (!token) return;
+    const r = await fetch('/api/instagram/token?project=' + encodeURIComponent(P), {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({token})}).then((x) => x.json()).catch(() => ({error: 'нет связи'}));
+    toast(r.account ? `@${r.account} подключён — забираем публикации` : `Не подключилось: ${r.error || 'ошибка'}`);
+    await loadIg(); redraw();
+  };
+  view.querySelectorAll('[data-igref]').forEach((b) => (b.onclick = async () => {
+    b.disabled = true;
+    try { await post('/api/instagram/refresh', {account: b.dataset.igref}); } catch (e) { toast(e.status === 429 ? 'Обновляли меньше 5 минут назад' : 'Не получилось обновить'); }
+    const until = Date.now() + 120e3;
+    const tick = async () => { await loadIg(); if (!location.hash.startsWith('#/settings')) return; if ((IG || []).some((a) => a.refreshing) && Date.now() < until) { redraw(); setTimeout(tick, 3000); } else redraw(); };
+    tick();
+  }));
 }
 
 

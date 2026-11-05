@@ -12,8 +12,8 @@ import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
-import {changeItem, createItems, followPlan, needOf, syncItems} from './items.mjs';
-import {igDir, listAccounts, typical} from './instagram.mjs';
+import {changeItem, createItems, loadItems, followPlan, needOf, syncItems} from './items.mjs';
+import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -406,6 +406,24 @@ const saveAccess = (a) => writeJson(ACCESS, a);
 const LOG = join(SHARED, 'log.jsonl');
 const botUsername = () => readJson(join(SHARED, 'bot.json'), {}).username || null;
 const log = (who, what) => appendFileSync(LOG, JSON.stringify({at: Date.now(), who, what}) + '\n');
+
+// Instagram (web/instagram.mjs): every 3 hours each connected account of each project is read
+// from the official API; «Обновить сейчас» runs the same for one account. Errors stay on the card.
+const IG_BUSY = new Set(), IG_LAST = new Map();
+setTokenFile(join(DATA, 'instagram-tokens.json'));
+function igRefresh(p, a) {
+  const key = `${p}/${a}`;
+  if (IG_BUSY.has(key)) return;
+  IG_BUSY.add(key); IG_LAST.set(key, Date.now());
+  refreshSafe(join(PROJECTS, p), a).then(() => log('Claude', `Instagram @${a} обновлён`), (e) => log('Claude', `Instagram @${a} не обновился: ${String(e.message || e).slice(0, 120)}`)).finally(() => IG_BUSY.delete(key));
+}
+async function igTick() {
+  await refreshTokens().catch(() => {});
+  const accs = tokenAccounts();
+  for (const p of projects().map((x) => x.slug || x)) for (const a of listAccounts(join(PROJECTS, p)).map((x) => x.account)) if (accs.includes(a)) igRefresh(p, a);
+}
+setInterval(igTick, 3 * 3600e3).unref();
+setTimeout(igTick, 60e3).unref();
 const telegramOwner = () => readJson(join(BOT, 'data', 'state.json'), {}).ownerName || null;
 function device(ua = '') {
   const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Устройство';
@@ -701,12 +719,60 @@ createServer(async (req, res) => {
   if (!projectDir(p)) return json(404, {});
   const studio = join(PROJECTS, p);
 
-  // Instagram accounts of the project (web/instagram.mjs) with the saved pictures as media links.
+  // Instagram accounts of the project (web/instagram.mjs) with the saved pictures as media links,
+  // how each post matches the items (by link, else an offer by date and caption) and the sync state.
   if (req.method === 'GET' && url.pathname === '/api/instagram') {
+    const items = loadItems(studio).items;
     const pic = (a, f) => (f ? mediaUrl(join(igDir(studio, a), f)) : null);
-    return json(200, {accounts: listAccounts(studio).map((x) => ({...x, avatar: pic(x.account, x.avatar), typical: typical(x),
-      highlights: (x.highlights || []).map((h) => ({title: h.title, url: pic(x.account, h.image)})),
-      media: x.media.map((m) => ({...m, thumb: pic(x.account, m.thumb)}))}))});
+    return json(200, {accounts: listAccounts(studio).map((x) => {
+      const m = match(x, items);
+      return {...x, avatar: pic(x.account, x.avatar), typical: typical(x), connected: !!tokenFor(x.account), refreshing: IG_BUSY.has(`${p}/${x.account}`),
+        highlights: (x.highlights || []).map((h) => ({title: h.title, url: pic(x.account, h.image)})),
+        media: x.media.map((y) => ({...y, thumb: pic(x.account, y.thumb)})),
+        linked: m.linked.map((y) => ({code: y.media.code, item: y.item.id})), offers: m.offers.map((y) => ({code: y.media.code, item: y.item.id, title: y.item.title, score: y.score})), loose: m.loose.map((y) => y.code)};
+    })});
+  }
+  // «Обновить сейчас»: one account from the API, at most once in 5 minutes; the page polls /api/instagram.
+  if (req.method === 'POST' && url.pathname === '/api/instagram/refresh') {
+    if (!can('editor')) return json(403, {});
+    const a = accountOf((await body(req)).account);
+    if (!readProfile(studio, a) && !tokenFor(a)) return json(404, {});
+    if (!tokenFor(a)) return json(400, {error: 'Instagram не подключён'});
+    const key = `${p}/${a}`, last = IG_LAST.get(key) || 0;
+    if (IG_BUSY.has(key)) return json(200, {refreshing: true});
+    if (Date.now() - last < 5 * 60e3) return json(429, {error: 'Обновляли меньше 5 минут назад', wait: Math.ceil((last + 5 * 60e3 - Date.now()) / 1000)});
+    igRefresh(p, a);
+    return json(200, {refreshing: true});
+  }
+  // A key pasted by the owner in Подключения: checked with Instagram, kept in the server's token
+  // file, never logged or sent back; the account's folder is made here and filled by a refresh.
+  if (req.method === 'POST' && url.pathname === '/api/instagram/token') {
+    if (!can('owner')) return json(403, {});
+    const t = String((await body(req)).token || '');
+    if (t.length < 20 || t.length > 1000) return json(400, {error: 'Это не похоже на ключ'});
+    try {
+      const a = await addToken(t);
+      if (!readProfile(studio, a)) writeProfile(studio, a, {account: a, media: [], source: 'api', fetchedAt: new Date().toISOString()});
+      IG_LAST.delete(`${p}/${a}`); igRefresh(p, a);
+      log(me.name, `Instagram @${a} подключён`);
+      return json(200, {account: a});
+    } catch (e) { return json(400, {error: String(e.message || e).replace(/access_token=[^&\s]+/g, '').slice(0, 160)}); }
+  }
+  // A post found in Instagram → its item («Привязать»), or set aside as not made in the studio.
+  if (req.method === 'POST' && url.pathname === '/api/instagram/link') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const a = accountOf(b.account), prof = readProfile(studio, a);
+    const m = prof?.media.find((x) => x.code === b.code);
+    if (!m) return json(404, {});
+    if (b.hide !== undefined) {
+      writeProfile(studio, a, {...prof, hidden: b.hide ? [...new Set([...(prof.hidden || []), m.code])] : (prof.hidden || []).filter((c) => c !== m.code)});
+      return json(200, {ok: true});
+    }
+    const item = changeItem(studio, String(b.item || ''), {publish: {account: a, url: m.permalink, at: m.timestamp || shortcodeTime(m.code)}}, {by: me.name});
+    if (!item) return json(404, {});
+    log(me.name, `выпуск «${item.title}» вышел в Instagram @${a}`);
+    return json(200, {item});
   }
 
   if (req.method === 'GET' && url.pathname === '/api/overview') {

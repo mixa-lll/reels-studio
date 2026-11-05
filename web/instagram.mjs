@@ -51,44 +51,95 @@ export function typical(profile) {
 
 // ---------- matching posts to items ----------
 
-const words = (t) => new Set(String(t || '').toLowerCase().replace(/#\S+/g, ' ').match(/[\p{L}\d]{4,}/gu) || []);
+// Words that say nothing about a post of this project: the place, the brand, filler.
+const STOP = new Set(['gudauri', 'гудаури', 'mygudauri', 'georgia', 'грузия', 'грузии', 'save', 'сохраняй', 'this', 'that', 'with', 'your', 'для', 'это', 'как', 'что', 'чтобы']);
+const words = (t) => new Set((String(t || '').toLowerCase().replace(/#\S+|@\S+/g, ' ').match(/[\p{L}\d]{4,}/gu) || []).filter((w) => !STOP.has(w)));
 const overlap = (a, b) => { const A = words(a), B = words(b); if (!A.size || !B.size) return 0; let n = 0; for (const w of A) if (B.has(w)) n++; return n / Math.min(A.size, B.size); };
+const cyr = (t) => { const l = String(t || '').match(/\p{L}/gu) || []; return l.length ? l.filter((c) => /[а-яё]/i.test(c)).length / l.length > 0.5 : null; };
 
-/** Posts of an account against items.json: linked ones by their link, the rest offered by date
- *  and caption. Returns {linked: [{item, media}], offers: [{media, item, score}], loose: [media]}. */
+/** Posts of an account against items.json: linked ones by their link, the rest offered by date and
+ *  caption (one offer per item, same language, the caption must share words — a date alone is not
+ *  enough). Returns {linked: [{item, media}], offers: [{media, item, score}], loose: [media]}. */
 export function match(profile, items) {
   const byCode = new Map();
   for (const it of items) for (const p of it.published || []) { const c = shortcodeOf(p.url); if (c) byCode.set(c, it); }
-  const linked = [], offers = [], loose = [];
+  const linked = [], cands = [];
   for (const m of profile.media || []) {
     const it = byCode.get(m.code);
     if (it) { linked.push({item: it, media: m}); continue; }
-    const t = Date.parse(m.timestamp);
+    if ((profile.hidden || []).includes(m.code)) continue;
+    const t = Date.parse(m.timestamp), ru = cyr(m.caption);
     let best = null;
     for (const x of items) {
-      if ((x.published || []).some((p) => accountOf(p.account) === profile.account)) continue;
+      if (x.proposed || (x.published || []).some((p) => accountOf(p.account) === profile.account)) continue;
       if (x.format && m.type && !(x.format === m.type || (x.format === 'post' && m.type === 'carousel'))) continue;
+      const text = `${x.title} ${x.idea?.about || ''} ${x.idea?.hook || ''}`;
+      if (ru !== null && cyr(x.title) !== null && cyr(x.title) !== ru) continue;
+      const words = overlap(m.caption, text);
+      if (!words) continue;
       const at = Date.parse(x.at || '');
-      const days = Number.isFinite(at) ? Math.abs(at - t) / 864e5 : 30;
-      const score = (days <= 1 ? 0.5 : days <= 3 ? 0.3 : days <= 7 ? 0.1 : 0) + overlap(m.caption, `${x.title} ${x.idea?.about || ''} ${x.caption || ''}`) * 0.5;
-      if (score >= 0.35 && (!best || score > best.score)) best = {media: m, item: x, score: Math.round(score * 100) / 100};
+      const days = Number.isFinite(at) ? Math.abs(at - t) / 864e5 : 99;
+      const score = (days <= 1 ? 0.4 : days <= 3 ? 0.25 : days <= 10 ? 0.1 : 0) + words * 0.6;
+      if (score >= 0.45 && (!best || score > best.score)) best = {media: m, item: x, score: Math.round(score * 100) / 100};
     }
-    if (best) offers.push(best); else loose.push(m);
+    cands.push(best || {media: m});
   }
+  // One post per item: the best one keeps the offer, the others stay loose.
+  const top = new Map();
+  for (const c of cands) if (c.item && !(top.get(c.item.id)?.score >= c.score)) top.set(c.item.id, c);
+  const offers = [...top.values()], loose = cands.filter((c) => !offers.includes(c)).map((c) => c.media);
   return {linked, offers, loose};
 }
 
 // ---------- the official API ----------
 // Instagram API with Instagram Login (a business or creator account). The token lives only in the
-// environment (IG_TOKEN_<ACCOUNT> with dots as _, e.g. IG_TOKEN_MY_GUDAURI): never in a file the
+// environment (IG_TOKEN_<ACCOUNT>, see envName) or the server's token file: never in a file the
 // studio serves, never in a log line or an error shown to anyone.
 
 const GRAPH = 'https://graph.instagram.com/v23.0';
-export const tokenFor = (account) => process.env[`IG_TOKEN_${String(account).toUpperCase().replace(/\./g, '_')}`] || '';
+// A long-lived token lives 60 days; refreshTokens() renews it and keeps the new one in a file next
+// to the server's own data (never under projects/, which the studio serves), readable only by it.
+let TOKENS = '';
+export const setTokenFile = (f) => { TOKENS = f; };
+// my.gudauri → IG_TOKEN_MY__GUDAURI, my_gudauri → IG_TOKEN_MY_GUDAURI: a dot is a double underscore.
+const envName = (account) => `IG_TOKEN_${String(account).toUpperCase().replace(/\./g, '__')}`;
+const saved = () => (TOKENS ? readJson(TOKENS, {}) : {});
+export const tokenFor = (account) => saved()[account]?.token || process.env[envName(account)] || '';
+/** Accounts with a token: from the file and from IG_TOKEN_* in the environment. */
+export function tokenAccounts() {
+  const fromEnv = Object.keys(process.env).filter((k) => /^IG_TOKEN_\w+$/.test(k) && process.env[k]).map((k) => k.slice(9).toLowerCase().replace(/__/g, '.'));
+  return [...new Set([...Object.keys(saved()), ...fromEnv])];
+}
+/** A token pasted in Подключения: Instagram says whose it is; it goes to the token file only. */
+export async function addToken(token, now = Date.now()) {
+  if (!TOKENS) throw new Error('нет файла ключей');
+  const me = await graph('/me', String(token).trim(), {fields: 'username'});
+  const account = accountOf(me.username);
+  if (!account) throw new Error('Instagram не назвал аккаунт');
+  const all = saved();
+  all[account] = {token: String(token).trim(), at: now};
+  writeFileSync(`${TOKENS}.tmp`, JSON.stringify(all), {mode: 0o600});
+  renameSync(`${TOKENS}.tmp`, TOKENS);
+  return account;
+}
+export async function refreshTokens(now = Date.now()) {
+  if (!TOKENS) return;
+  const all = saved();
+  for (const account of tokenAccounts()) {
+    const cur = all[account] || {token: process.env[envName(account)], at: 0};
+    if (!cur.token || now - (cur.at || 0) < 20 * 864e5) continue;
+    try {
+      const r = await graph('/refresh_access_token', cur.token, {grant_type: 'ig_refresh_token'});
+      if (r.access_token) all[account] = {token: r.access_token, at: now};
+    } catch { /* the old token keeps working until it expires; the card shows the error then */ }
+  }
+  writeFileSync(`${TOKENS}.tmp`, JSON.stringify(all), {mode: 0o600});
+  renameSync(`${TOKENS}.tmp`, TOKENS);
+}
 const TYPE = {VIDEO: 'reel', REELS: 'reel', IMAGE: 'post', CAROUSEL_ALBUM: 'carousel'};
 
 async function graph(path, token, params = {}) {
-  const u = new URL(GRAPH + path);
+  const u = new URL(path === '/refresh_access_token' ? 'https://graph.instagram.com/refresh_access_token' : GRAPH + path);
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
   u.searchParams.set('access_token', token);
   const r = await fetch(u, {signal: AbortSignal.timeout(20000)});
