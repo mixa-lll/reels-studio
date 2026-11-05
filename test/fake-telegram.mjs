@@ -46,6 +46,10 @@ export async function fakeTelegram() {
     message(from, text) {
       updates.push({update_id: nextUpdate++, message: {message_id: nextMessage++, from: {id: from, first_name: 'Test'}, chat: {id: from, type: 'private'}, date: Date.now() / 1000, text}});
     },
+    /** A tap on an inline button under message `messageId` in the user's chat. */
+    tap(from, data, messageId = 1) {
+      updates.push({update_id: nextUpdate++, callback_query: {id: String(nextUpdate), from: {id: from, first_name: 'Test'}, data, message: {message_id: messageId, chat: {id: from, type: 'private'}}}});
+    },
     /** Requests matching `fn(method, params, rawBody)` hang until `hang(null)`. */
     hang(fn) {
       hang = fn ?? (() => false);

@@ -31,6 +31,7 @@ import {authors} from './author.mjs';
 import {isEditor} from './roles.mjs';
 import {claim as claimInvite, FILE as memberFile, member, publishBot, touch} from './members.mjs';
 import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
+import {publisherUi} from './publisher.mjs';
 
 // Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
 for (const level of ['log', 'error']) {
@@ -201,6 +202,10 @@ const reels = reelsUi({tg, studio, project: () => state.project, state, save: sa
 // «Основа» (bot/itemcard.mjs): the same card for an item of any format, when lean is on.
 const items = itemsUi({tg, studio, project: () => state.project, state, save: saveState, send: (p) => enqueue(p), root: ROOT,
   panel: (item) => (panelOrigin && item.ref?.kind === 'reel' ? `${panelOrigin}/#/reel/${encodeURIComponent(item.ref.id)}` : null)});
+// «Выкладывает» (bot/publisher.mjs): packages by their time to the person who posts; the owner
+// gets only the outcome. Also «Добавить человека» from the owner's chat.
+let botUser = '';
+const pub = publisherUi({tg, studio, projectName: () => nameOf(state.project || FIRST_PROJECT), owner: () => ({chat: state.ownerId, name: state.ownerName}), botName: () => botUser});
 // Team texts: members invited from the web version (bot/members.mjs).
 const TEAM = {
   ru: {
@@ -295,6 +300,8 @@ setInterval(async () => {
     }
   }
 }, 30_000);
+
+setInterval(() => pub.tick().catch((e) => console.error('publisher', e.message)), 30_000);
 
 // Stay awake on the charger if the owner asked; re-applied as settings change.
 keepAwake(settings().keepAwake === true);
@@ -1041,11 +1048,13 @@ async function onMessage(msg) {
     // The invite link sends «/start inv_<code>»; by hand people type the 6-digit code.
     const code = msg.text?.match(/^\/start\s+inv_(\S+)/)?.[1] || msg.text?.trim().replace(/\s+/g, '').match(/^(?:inv_)?(\d{6}|[\w-]{20,})$/)?.[1];
     const joined = code && claimInvite(code, msg.from, msg.chat.id);
+    if (joined?.role === 'publisher') return pub.welcome(msg.chat.id, joined.name).catch((e) => console.error('publisher', e));
     if (joined?.role === 'author') return author.welcome(msg.chat.id, msg.from, joined.name, state.ownerName).catch((e) => console.error('author', e));
     if (joined) return tg.sendText(msg.chat.id, joined.role === 'editor' ? TEAM.welcome(joined.name) : TEAM.viewer).catch(() => {});
     return tg.sendText(msg.chat.id, T.private, {silent: true}).catch(() => {});
   }
   if (who?.role === 'author') { touch(msg.from.id); return author.onMessage(msg, who).catch((e) => console.error('author', e)); }
+  if (who?.role === 'publisher') { touch(msg.from.id); return pub.onMessage(msg).catch((e) => console.error('publisher', e)); }
   // The owner can see the bot as any role (/role): author, host, approver; owner = normal.
   if (!who && ['/role', '/as_author', '/as_owner', '🎭 Роль'].includes(msg.text)) {
     if (msg.text === '/role' || msg.text === '🎭 Роль') return tg.call('sendMessage', {chat_id: msg.chat.id, text: ROLE_PICK.text(state.actAs), reply_markup: ROLE_PICK.kb});
@@ -1054,6 +1063,7 @@ async function onMessage(msg) {
   if (!who && state.actAs === 'author') return author.onMessage(msg, {name: state.ownerName || msg.from.first_name, role: 'author'}).catch((e) => console.error('author', e));
   if (!who && state.actAs === 'host') return hostChat(msg.chat.id);
   if (!who && state.actAs === 'approver') return approverChat(msg.chat.id);
+  if (!who && !state.actAs && await pub.onOwnerMessage(msg).catch((e) => { console.error('publisher', e); return false; })) return;
   if (who && who.role !== 'editor') return tg.sendText(msg.chat.id, TEAM.viewer, {silent: true}).catch(() => {});
   if (who) touch(msg.from.id);
   if (!takeTurn(msg.chat.id, who)) return;
@@ -1207,6 +1217,8 @@ async function onButton(q) {
     const text = q.data === 'ap:all' ? `${q.message.text}\n\n✓ Одобрено. Анна получит ответ.` : `${q.message.text}\n\nНапишите замечание одним сообщением — передам Анне. (Пока заглушка: страница недели по ссылке — следующий шаг.)`;
     return tg.call('editMessageText', {chat_id: q.message.chat.id, message_id: q.message.message_id, text}).catch(() => {});
   }
+  if (q.data.startsWith('pb:')) return who?.role === 'publisher' ? pub.onButton(q).catch((e) => console.error('publisher', e)) : null;
+  if (q.from.id === state.ownerId && q.data.startsWith('po:')) return pub.onOwnerButton(q).catch((e) => console.error('publisher', e));
   if (q.from.id !== state.ownerId && who?.role !== 'editor') return;
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
@@ -1426,7 +1438,7 @@ setInterval(() => {
 // ---------- long polling ----------
 
 console.log(`reels-bot up: agent=${env.agent}, owner=${state.ownerId ?? 'none yet'}`);
-tg.call('getMe', {}).then((me) => publishBot(me.username)).catch(() => {});
+tg.call('getMe', {}).then((me) => { botUser = me.username; publishBot(me.username); }).catch(() => {});
 if (state.statusId) await deleteStatus(state.statusId);
 await announceUpdate();
 await flushOutbox().catch((e) => console.error('outbox', e));

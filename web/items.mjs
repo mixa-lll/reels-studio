@@ -199,6 +199,8 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
   if (Array.isArray(b.platforms)) item.platforms = b.platforms.map(String).slice(0, 10);
   if (b.idea && typeof b.idea === 'object') item.idea = {about: String(b.idea.about ?? item.idea?.about ?? '').slice(0, 2000), hook: String(b.idea.hook ?? item.idea?.hook ?? '').slice(0, 300), flow: (Array.isArray(b.idea.flow) ? b.idea.flow : item.idea?.flow || []).map((s) => String(s).slice(0, 300)).slice(0, 12)};
   if (Array.isArray(b.need) && item.ref?.kind !== 'reel') item.need = b.need.map((n) => ({text: String(n.text || '').slice(0, 200), have: String(n.have || '').slice(0, 200), done: !!n.done})).slice(0, 30);
+  // Where it came out (bot/publisher.mjs: the person who posts sends the link).
+  if (b.postedLink?.platform) item.posted = [...(item.posted || []).filter((x) => x.platform !== b.postedLink.platform), {platform: String(b.postedLink.platform).slice(0, 40), url: String(b.postedLink.url || '').slice(0, 300), by: String(b.postedLink.by || by || '').slice(0, 60), at: b.postedLink.at || now}];
   if (b.take) { delete item.proposed; item.takenBy = by; }
   if (b.starting) item.starting = now;
   // Links an idea to the post folder made for it (reels link themselves in syncItems).
