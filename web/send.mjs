@@ -5,7 +5,8 @@ import {appendFileSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {parseArgs} from 'node:util';
 
-const DATA = process.env.REELS_DATA;
+// Each running turn has its own channel folder, so parallel chats do not mix their messages.
+const DATA = process.env.REELS_CHANNEL || process.env.REELS_DATA;
 if (!DATA) {
   console.error('REELS_DATA is not set');
   process.exit(1);

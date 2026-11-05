@@ -133,7 +133,7 @@ const onData = (chunk) => {
     if (pct === lastPct || Date.now() - lastWrite < 1500) continue;
     lastPct = pct;
     lastWrite = Date.now();
-    writeFileSync(join(DATA, 'status.txt'), `${label} · ${pct} %${left ? ` · осталось ${left}` : ''}`);
+    writeFileSync(join(process.env.REELS_CHANNEL || DATA, 'status.txt'), `${label} · ${pct} %${left ? ` · осталось ${left}` : ''}`);
     if (jobArg) writeJob({...readJob(jobArg), pct, left});
   }
 };

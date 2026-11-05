@@ -30,8 +30,11 @@ try { process.loadEnvFile(join(BOT, '.env')); } catch {}
 const PROJECTS = join(BOT, 'projects');
 const DATA = join(HERE, 'data');
 const CHATS = join(DATA, 'chats');
-const EVENTS = join(DATA, 'events.jsonl');
-const STATUS = join(DATA, 'status.txt');
+// Every running turn gets its own folder for events.jsonl and status.txt (REELS_CHANNEL).
+const CHANNELS = join(DATA, 'channels');
+// Chats run side by side; one chat runs one turn at a time. Each turn is a Claude process,
+// so the cap keeps the subscription and the machine in check.
+const MAX_JOBS = Number(process.env.REELS_MAX_JOBS || 3);
 const SEND = join(HERE, 'send.mjs');
 const PORT = Number(process.env.PORT || 8080);
 const KEY = process.env.WEB_KEY;
@@ -54,6 +57,8 @@ const SECTION_STATUS = {'In work': 'work', 'In review': 'review', Done: 'done', 
 
 if (!KEY || KEY.length < 16) throw new Error('WEB_KEY is not set');
 mkdirSync(CHATS, {recursive: true});
+// Channels of turns cut short by a restart are left over; no turn survives a restart.
+rmSync(CHANNELS, {recursive: true, force: true});
 mkdirSync(SHARED, {recursive: true});
 // The web turns have their own state: no Telegram chat, so a stray bot/send.mjs call fails.
 if (!existsSync(join(DATA, 'state.json'))) writeFileSync(join(DATA, 'state.json'), JSON.stringify({project: 'main'}));
@@ -284,7 +289,10 @@ function preamble(p, k) {
   return lines.join('\n');
 }
 
-let job = null;
+const jobs = new Set();
+const jobOf = (p, k) => [...jobs].find((j) => j.p === p && j.key === k);
+const full = () => jobs.size >= MAX_JOBS;
+let channelSeq = 0;
 
 function startTurn(p, k, text, send) {
   const meta = chatMeta(p, k);
@@ -297,13 +305,15 @@ function startTurn(p, k, text, send) {
     // resolves links, so that real folder must be allowed too or every write there is refused.
     ...(realProject(studio) ? ['--add-dir', realProject(studio)] : []),
     ...(/^[\w-]{8,}$/.test(meta.session || '') ? ['--resume', meta.session] : [])];
-  rmSync(STATUS, {force: true});
-  let offset = existsSync(EVENTS) ? statSync(EVENTS).size : 0;
+  const channel = join(CHANNELS, `${Date.now()}-${++channelSeq}`);
+  mkdirSync(channel, {recursive: true});
+  const EVENTS = join(channel, 'events.jsonl'), STATUS = join(channel, 'status.txt');
+  let offset = 0;
   let lastStatus = '';
   let key = k;
   const child = spawn(process.env.AGENT_BIN || 'claude', args, {
     cwd: BOT,
-    env: {...process.env, REELS_BOT: '1', REELS_DATA: DATA, REELS_PROJECTS: PROJECTS, REELS_STUDIO: studio},
+    env: {...process.env, REELS_BOT: '1', REELS_DATA: DATA, REELS_CHANNEL: channel, REELS_PROJECTS: PROJECTS, REELS_STUDIO: studio},
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
@@ -368,9 +378,12 @@ function startTurn(p, k, text, send) {
       if (freed) send({freed});
     }
     send({done: true, ms: result?.duration_ms});
-    job = null;
+    jobs.delete(job);
+    rmSync(channel, {recursive: true, force: true});
   });
-  return {child, p, get key() { return key; }};
+  const job = {child, p, get key() { return key; }};
+  jobs.add(job);
+  return job;
 }
 
 // ---------- media ----------
@@ -507,13 +520,13 @@ function loginPage(res, error = '', who = '') {
 const APP_PAGE = join(HERE, 'app.html');
 // The mini app's editor hands its comments to the reel's chat, as «Собрать vN» on the page does.
 const buildFromApp = (p, r, text, shown, who) => {
-  if (job) return false;
+  if (jobOf(p, r) || full()) return false;
   record(p, r, {from: 'me', kind: 'text', text: shown, by: who});
   log(who, `собрал из мини-приложения: ${shown}`);
-  job = startTurn(p, r, `(from ${who}, mini app)\n${text}`, () => {});
+  startTurn(p, r, `(from ${who}, mini app)\n${text}`, () => {});
   return true;
 };
-const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, saveAccess, logFile: () => LOG, sandboxPaths: {projects: PROJECTS, access: ACCESS, starter: join(BOT, 'starter'), chats: CHATS, outbox: OUTBOX, log: LOG, botState: join(BOT, 'data', 'state.json')}, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: () => job && {p: job.p, key: job.key}});
+const miniApp = makeApp({BOT, PROJECTS, PAGE: () => readFileSync(APP_PAGE, 'utf8'), access, saveAccess, logFile: () => LOG, sandboxPaths: {projects: PROJECTS, access: ACCESS, starter: join(BOT, 'starter'), chats: CHATS, outbox: OUTBOX, log: LOG, botState: join(BOT, 'data', 'state.json')}, reels, log, reelDir, build: buildFromApp, chat: {history, meta: chatMeta}, busy: (p, k) => ({self: !!jobOf(p, k), full: full()})});
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -714,7 +727,7 @@ createServer(async (req, res) => {
     // «Входящие»: what people sent through the bot or the member page in the last week.
     const sentLines = read(join(studio, 'inbox', 'authors.jsonl')).split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return {}; } });
     const inboxNew = new Set(sentLines.filter((e) => e.who && e.at > Date.now() - 7 * 864e5 && e.status !== 'private').map((e) => e.id)).size;
-    return json(200, {inbox: inboxNew, reels: list, posts, rubrics, ideasCount: ideas.length, chats, busy: job ? {project: job.p, key: job.key} : null,
+    return json(200, {inbox: inboxNew, reels: list, posts, rubrics, ideasCount: ideas.length, chats, busy: [...jobs].filter((j) => j.p === p).map((j) => j.key),
       disk: disk()});
   }
   if (req.method === 'GET' && url.pathname === '/api/ideas') {
@@ -1081,33 +1094,36 @@ createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/chat') {
     const k = url.searchParams.get('key');
     if (!chatKey(k)) return json(400, {});
-    const busy = job && job.p === p && job.key === k;
-    return json(200, {messages: history(p, k), busy: !!busy, status: busy ? chatMeta(p, k).status || '' : '', otherBusy: !!job && !busy});
+    const busy = !!jobOf(p, k);
+    return json(200, {messages: history(p, k), busy, status: busy ? chatMeta(p, k).status || '' : ''});
   }
   if (req.method === 'POST' && url.pathname === '/api/chat') {
     if (!can('editor')) return json(403, {});
     const {key: k, text, shown} = await body(req);
     if (!chatKey(k) || !text?.trim()) return json(400, {});
-    if (job) return json(429, {key: job.key});
+    if (jobOf(p, k)) return json(409, {});
+    if (full()) return json(429, {max: MAX_JOBS});
     record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name});
     log(me.name, `написал в чат «${k}»: ${(shown || text).slice(0, 80)}`);
     res.writeHead(200, {'content-type': 'text/event-stream', 'cache-control': 'no-store'});
     const send = (ev) => { if (!res.writableEnded) res.write(`data: ${JSON.stringify(ev)}\n\n`); };
     // The turn goes on if the page is closed; the history keeps what it sent.
-    job = startTurn(p, k, `(from ${me.name})\n${text}`, send);
+    const job = startTurn(p, k, `(from ${me.name})\n${text}`, send);
     job.child.on('close', () => setTimeout(() => res.end(), 50));
     return;
   }
   if (req.method === 'POST' && url.pathname === '/api/stop') {
     if (!can('editor')) return json(403, {});
-    if (job) try { process.kill(-job.child.pid, 'SIGTERM'); } catch {}
-    log(me.name, 'остановил задачу');
+    const {key: k} = await body(req).catch(() => ({}));
+    // A key stops that chat's turn; without one (older pages) every turn in the project stops.
+    for (const j of jobs) if (j.p === p && (!k || j.key === k)) try { process.kill(-j.child.pid, 'SIGTERM'); } catch {}
+    log(me.name, `остановил задачу${k ? ` в «${k}»` : ''}`);
     return json(200, {});
   }
   if (req.method === 'POST' && url.pathname === '/api/chat/reset') {
     if (!can('editor')) return json(403, {});
     const {key: k} = await body(req);
-    if (!chatKey(k) || (job && job.key === k)) return json(400, {});
+    if (!chatKey(k) || jobOf(p, k)) return json(400, {});
     for (const ext of ['jsonl', 'json']) rmSync(chatFile(p, k, ext), {force: true});
     return json(200, {});
   }
@@ -1232,7 +1248,7 @@ createServer(async (req, res) => {
     const {reel} = await body(req);
     const list = reel ? [reel] : reels(p).map((r) => r.id);
     let freed = 0;
-    for (const r of list) if (!(job && job.key === r)) freed += retain(p, r);
+    for (const r of list) if (!jobOf(p, r)) freed += retain(p, r);
     log(me.name, `освободил место${reel ? ` в «${reel}»` : ''}: ${Math.round(freed / 1e6)} МБ`);
     return json(200, {freed});
   }
