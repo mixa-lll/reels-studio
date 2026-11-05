@@ -251,6 +251,7 @@ function preamble(p, k) {
     `You are running as the WEB version of the reels bot: the owner talks to you in a browser page, not in Telegram. Follow AGENTS.md and REELS.md with these differences:`,
     `- Wherever REELS.md says \`node bot/send.mjs\`, run \`node ${SEND}\` instead, with the same options (--status, --text, --keyboard, --ideas, --buttons, --file, --caption, --menu). Never run bot/send.mjs.`,
     `- Only these tools are allowed here: file tools (Read, Write, Edit, Glob, Grep), WebSearch, WebFetch, and Bash limited to \`node scripts/<new-reel|render|ffmpeg|beats|loudnorm>.mjs …\` and \`node ${SEND} …\` run from the bot folder. Do everything through them (write files with Write, not shell commands). If a step needs something else (e.g. downloading a track), say so in one line and suggest the owner attach the file on the page.`,
+    `- Always answer the owner in Russian, whatever language the files, logs or tools use; keep paths, commands and code as they are.`,
     `- The page shows videos inline, has no file size limit and keeps every version in a side panel, so you do not need to resend old versions. There are no voice messages.`,
     `- Files the owner attaches arrive as \`(attached file → <path>)\`; button taps as in REELS.md.`,
     `- Old versions are archived by the page to save disk: older ones keep only a frame, \`ARCHIVED.json\` and \`project-snapshot/\` (the reel's code at that version). To rebuild one, copy its snapshot back into the reel's \`project/\` with Read/Write and render.`,
