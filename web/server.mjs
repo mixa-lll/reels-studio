@@ -12,7 +12,7 @@ import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
-import {changeItem, createItems, followPlan, needOf, syncItems} from './items.mjs';
+import {changeItem, createItems, followPlan, needOf, purgeItems, restoreItems, syncItems, trashItems} from './items.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
@@ -880,9 +880,42 @@ createServer(async (req, res) => {
     const thumbs = {};
     for (const r of reels(p)) thumbs['reel:' + r.id] = r.thumb;
     for (const x of listPosts(studio, mediaUrl)) thumbs['post:' + x.id] = x.thumb;
-    const items = data.items.map((x) => ({...x, need: needOf(x, src), thumb: x.ref ? thumbs[`${x.ref.kind}:${x.ref.id}`] || null : null}));
+    const items = data.items.filter((x) => !x.deletedAt).map((x) => ({...x, need: needOf(x, src), thumb: x.ref ? thumbs[`${x.ref.kind}:${x.ref.id}`] || null : null}));
+    // Корзина (кусок 19): deleted items with when, who and how much their folder holds.
+    const trash = data.items.filter((x) => x.deletedAt).sort((a, b) => b.deletedAt - a.deletedAt).map((x) => ({...x, size: x.trash?.dir ? dirSize(join(studio, x.trash.dir)) : 0}));
     const rubrics = (readJson(join(studio, 'strategy.json'), {}).rubrics || []).map((r) => ({id: r.id, name: r.name, color: r.color, about: r.about || '', format: r.format || '', day: r.day || '', share: r.share || 0, template: r.template || null}));
-    return json(200, {items, rubrics});
+    return json(200, {items, rubrics, trash});
+  }
+  // Удалить выпуск (кусок 19): into the bin, back from it, or for good. A release Claude is working on
+  // right now is not deleted; its scheduled Telegram package is cancelled.
+  if (req.method === 'POST' && ['/api/items/delete', '/api/items/restore', '/api/items/purge'].includes(url.pathname)) {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const ids = (Array.isArray(b.ids) ? b.ids : [b.id]).map(String).filter(Boolean).slice(0, 200);
+    if (!ids.length) return json(400, {});
+    if (url.pathname === '/api/items/delete') {
+      const all = syncItems(studio).data.items;
+      const keyOf = (x) => (x.ref?.kind === 'reel' ? x.ref.id : x.ref?.kind === 'post' ? 'post-' + x.ref.id : null);
+      const busy = all.filter((x) => ids.includes(x.id) && job && job.p === p && keyOf(x) && job.key === keyOf(x));
+      if (busy.length) return json(409, {busy: busy.map((x) => x.title)});
+      const moved = trashItems(studio, ids, me.name);
+      const refs = new Set(moved.filter((x) => x.ref).map((x) => `${x.ref.kind}:${x.ref.id}`));
+      const out = readJson(OUTBOX, []);
+      let cancelled = 0;
+      for (const o of out) if (o.project === p && !o.sent && !o.cancelled && (refs.has(`reel:${o.reel}`) || refs.has(`post:${o.post}`))) { o.cancelled = Date.now(); cancelled++; }
+      if (cancelled) writeJson(OUTBOX, out);
+      log(me.name, `удалил в корзину: ${moved.map((x) => `«${x.title}»`).join(', ')}`);
+      return json(200, {ids: moved.map((x) => x.id), cancelled});
+    }
+    if (url.pathname === '/api/items/restore') {
+      const {back, blocked} = restoreItems(studio, ids, me.name);
+      log(me.name, `вернул из корзины: ${back.map((x) => `«${x.title}»`).join(', ')}`);
+      return json(200, {ids: back.map((x) => x.id), blocked: blocked.map((x) => x.title)});
+    }
+    const gone = purgeItems(studio, ids);
+    for (const x of gone) for (const k of [x.ref?.kind === 'reel' ? x.ref.id : x.ref?.kind === 'post' ? 'post-' + x.ref.id : null].filter(Boolean)) for (const ext of ['jsonl', 'json']) rmSync(chatFile(p, k, ext), {force: true});
+    log(me.name, `удалил навсегда: ${gone.map((x) => `«${x.title}»`).join(', ')}`);
+    return json(200, {ids: gone.map((x) => x.id)});
   }
   if (req.method === 'POST' && url.pathname === '/api/items/set') {
     if (!can('editor')) return json(403, {});
