@@ -492,7 +492,9 @@ function ownerPerson() {
 }
 // Role and flags of a new person, from an invite or the invite form.
 const personFields = (x) => ({role: x.role === 'editor' ? 'editor' : 'member', onCamera: !!x.onCamera, selfBuild: !!x.selfBuild, web: x.role === 'editor' || x.web === true,
-  deputyUntil: /^\d{4}-\d{2}-\d{2}$/.test(x.deputyUntil || '') ? x.deputyUntil : null});
+  deputyUntil: /^\d{4}-\d{2}-\d{2}$/.test(x.deputyUntil || '') ? x.deputyUntil : null,
+  // «Выкладывает» (bot/publisher.mjs): which platforms are theirs and when the package comes.
+  ...(x.role !== 'editor' && Array.isArray(x.publishes?.platforms) && x.publishes.platforms.length ? {publishes: {platforms: x.publishes.platforms.map(String).filter((y) => !/^tg$|telegram|телеграм/i.test(y)).slice(0, 8), lead: ['15m', '1h', 'morning'].includes(x.publishes.lead) ? x.publishes.lead : '1h'}} : {})});
 // Six digits to type into the bot by hand, unique among live invites.
 const newPin = (a) => { for (;;) { const pin = String(100000 + randomBytes(4).readUInt32BE(0) % 900000); if (!a.invites.some((x) => x.pin === pin && x.expires > Date.now())) return pin; } };
 // With one bot for several studios (relay dispatcher) a link carries its studio: «<node>--» in front.
@@ -1395,6 +1397,8 @@ createServer(async (req, res) => {
     const mayTouch = (x) => x && x.id !== me.id && (!x.isOwner || me.isOwner);
     if (b.action === 'invite' && b.name?.trim() && ['editor', 'member'].includes(b.role)) {
       const inv = {code: id(), pin: newPin(a), name: b.name.trim().slice(0, 60), note: String(b.note || '').slice(0, 80), ...personFields(b), expires: Date.now() + 7 * 864e5, claimed: []};
+      // The one who posts gets a link for a day, like the bot's «Добавить человека».
+      if (inv.publishes) inv.expires = Date.now() + 864e5;
       inv.telegram = !!botUsername();
       inv.web = inv.role === 'editor' || b.web === true || !inv.telegram;
       a.invites.push(inv);

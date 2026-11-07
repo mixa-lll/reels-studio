@@ -1,7 +1,7 @@
 // Team members besides the owner, invited from the web version.
 //
 // The list lives in REELS_MEMBERS (a JSON file the web version writes too):
-//   {people: [{id, name, role: 'editor'|'member', isOwner?, deputyUntil?, onCamera?, telegram?: {id, chatId, username}}],
+//   {people: [{id, name, role: 'editor'|'member', isOwner?, deputyUntil?, onCamera?, publishes?: {platforms, lead}, telegram?: {id, chatId, username}}],
 //    invites: [{code, name, role, expires, telegram: bool, web: bool, person?, claimed?: [...]}]}
 // (bot/roles.mjs; older owner / viewer / author lists read as the new shape.)
 // Without REELS_MEMBERS the bot stays a one-owner bot. Members share the owner's
@@ -34,7 +34,7 @@ function save(a) {
  */
 export function member(telegramId) {
   const p = FILE ? load().people.find((x) => x.telegram?.id === telegramId && !x.isOwner) : null;
-  if (p) return {name: p.name, role: isEditor(p) ? 'editor' : 'author', onCamera: !!p.onCamera, chatId: p.telegram.chatId};
+  if (p) return {name: p.name, role: isEditor(p) ? 'editor' : p.publishes?.platforms?.length ? 'publisher' : 'author', onCamera: !!p.onCamera, chatId: p.telegram.chatId};
   // Partners listed in the environment are editors without an invite: on the shared
   // stage the bot has one owner, and the other partner gets in through MINIAPP_OWNERS
   // (the same ids the mini app treats as owners) or BOT_EDITORS.
@@ -60,7 +60,7 @@ export function claim(code, from, chatId) {
   if (!inv) return null;
   let person = a.people.find((x) => x.id === inv.person);
   if (!person) {
-    person = normalize({id: randomBytes(18).toString('base64url'), name: inv.name, role: inv.role, onCamera: !!inv.onCamera, web: !!inv.web, deputyUntil: inv.deputyUntil || null, added: Date.now()});
+    person = normalize({id: randomBytes(18).toString('base64url'), name: inv.name, role: inv.role, onCamera: !!inv.onCamera, web: !!inv.web, deputyUntil: inv.deputyUntil || null, ...(inv.publishes ? {publishes: inv.publishes} : {}), added: Date.now()});
     a.people.push(person);
     inv.person = person.id;
   }
@@ -70,7 +70,7 @@ export function claim(code, from, chatId) {
   if (!inv.web || inv.claimed.includes('web')) a.invites = a.invites.filter((x) => x !== inv);
   save(a);
   appendLog(person.name, 'подключился к Telegram-боту по приглашению');
-  return {name: person.name, role: isEditor(person) ? 'editor' : 'author'};
+  return {name: person.name, role: isEditor(person) ? 'editor' : person.publishes?.platforms?.length ? 'publisher' : 'author'};
 }
 
 /** The bot's @username, for the web version's invite links. */
