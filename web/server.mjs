@@ -19,6 +19,7 @@ import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, exist
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
+import {bestVideo, linkPath, projectPath, readLink, signLink} from './dllink.mjs';
 import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
 import {telegramDigest} from '../bot/tgexport.mjs';
@@ -133,8 +134,12 @@ function reels(p) {
     const vs = versionDirs(dir);
     const last = vs.at(-1);
     const thumb = last && readdirSync(join(dir, 'versions', last)).find((f) => /\.(thumb\.jpg|png|jpg)$/i.test(f));
+    const best = last && bestVideo(join(dir, 'versions', last));
+    // A new version changes versions/<v>, not the reel's own folder.
+    const touched = [dir, join(dir, 'README.md'), join(dir, 'publish.json'), join(dir, 'versions'), last && join(dir, 'versions', last)].filter((f) => f && existsSync(f)).map((f) => statSync(f).mtimeMs);
     return {id: r, num: reelNumber(r), title, status: status[reelNumber(r)] || 'none', version: last || null, versions: vs.length,
-      thumb: thumb ? mediaUrl(join(dir, 'versions', last, thumb)) : null, updated: statSync(dir).mtimeMs};
+      thumb: thumb ? mediaUrl(join(dir, 'versions', last, thumb)) : null, updated: Math.max(...touched),
+      file: best ? {name: basename(best), size: statSync(best).size, url: mediaUrl(best)} : null};
   }).sort((a, b) => Number(b.num) - Number(a.num));
 }
 // The whole server disk, as the sidebar meter shows it.
@@ -402,6 +407,31 @@ function mediaPath(p) {
   } catch { return null; }
 }
 function mediaUrl(p) { return `/media?p=${encodeURIComponent(p)}`; }
+// One file with byte ranges, so players and downloads can resume.
+function sendFile(req, res, f, extra = {}) {
+  const size = statSync(f).size;
+  const headers = {'content-type': TYPES[extname(f).toLowerCase()] || 'application/octet-stream', 'accept-ranges': 'bytes', ...extra};
+  if (extname(f) === '.html' || extname(f) === '.svg') headers['content-security-policy'] = 'sandbox';
+  const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+  if (range) {
+    const start = range[1] ? Number(range[1]) : size - Number(range[2]);
+    const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+    res.writeHead(206, {...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1});
+    return req.method === 'HEAD' ? res.end() : createReadStream(f, {start, end}).pipe(res);
+  }
+  res.writeHead(200, {...headers, 'content-length': size});
+  return req.method === 'HEAD' ? res.end() : createReadStream(f).pipe(res);
+}
+function downloadByLink(req, res, url) {
+  const page = (code, text) => { res.writeHead(code, {'content-type': 'text/html; charset=utf-8', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex'}); res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Скачать ролик</title><body style="font: 16px/1.5 system-ui, sans-serif; margin: 0; display: grid; place-items: center; min-height: 100vh; padding: 24px; text-align: center">${text}`); };
+  const link = readLink(KEY, url.pathname.split('/')[2] || '');
+  if (link?.expired) return page(410, 'Срок ссылки вышел. Попросите новую в боте или в студии.');
+  // The signed path still has to lie inside the projects folder.
+  const f = link && mediaPath(join(PROJECTS, link.rel));
+  if (!f) return page(404, 'Такой ссылки нет или файл уже удалён.');
+  if (!req.headers.range) log('Ссылка', `скачан файл ${basename(f)}`);
+  return sendFile(req, res, f, {'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`, 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex'});
+}
 function toMessage(ev) {
   if (ev.type === 'file') {
     const real = mediaPath(ev.path);
@@ -586,6 +616,9 @@ createServer(async (req, res) => {
   // The Telegram mini app signs its own requests (web/app.mjs), no session needed.
   if (req.method === 'GET' && url.pathname === '/preview.js') { res.writeHead(200, {'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache'}); return res.end(readFileSync(join(HERE, 'preview.js'))); }
   if (url.pathname === '/app' || url.pathname.startsWith('/api/app/') || url.pathname.startsWith('/app/take/') || url.pathname === '/app/v') return miniApp(req, res, url);
+
+  // A direct download (web/dllink.mjs): the signed link is the permission, no session needed.
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/d/')) return downloadByLink(req, res, url);
 
   // Sign-in by password: pick yourself from the list, type your own password. Links (key,
   // invites) still work, but a link opened in Telegram's browser does not follow into Safari.
@@ -1155,6 +1188,17 @@ createServer(async (req, res) => {
     log(me.name, `запланировал выкладку ${what} на ${new Date(when).toISOString()}`);
     return json(200, item);
   }
+  // A direct link to a reel's file, for sending to someone without an account (web/dllink.mjs).
+  if (req.method === 'POST' && url.pathname === '/api/reel/link') {
+    if (!can('editor')) return json(403, {});
+    const {reel} = await body(req);
+    const v = versionDirs(reelDir(p, reel) || '').at(-1);
+    const best = v && bestVideo(join(reelDir(p, reel), 'versions', v));
+    const rel = best && projectPath(PROJECTS, best);
+    if (!rel) return json(404, {});
+    const {token, expires} = signLink(KEY, rel);
+    return json(200, {path: linkPath(token, best), expires});
+  }
   if (req.method === 'POST' && url.pathname === '/api/publish/cancel') {
     if (!can('editor')) return json(403, {});
     const {id} = await body(req);
@@ -1391,22 +1435,8 @@ createServer(async (req, res) => {
     const f = mediaPath(url.searchParams.get('p') || '');
     if (f && !isEditor(me) && !f.includes('/inbox/')) return res.writeHead(403).end();
     if (!f) return res.writeHead(404).end();
-    const size = statSync(f).size;
-    const headers = {'content-type': TYPES[extname(f).toLowerCase()] || 'application/octet-stream', 'accept-ranges': 'bytes'};
-    if (url.searchParams.has('dl')) {
-      headers['content-disposition'] = `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`;
-      log(me.name, `скачал ${basename(f)}`);
-    }
-    if (extname(f) === '.html' || extname(f) === '.svg') headers['content-security-policy'] = 'sandbox';
-    const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
-    if (range) {
-      const start = range[1] ? Number(range[1]) : size - Number(range[2]);
-      const end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
-      res.writeHead(206, {...headers, 'content-range': `bytes ${start}-${end}/${size}`, 'content-length': end - start + 1});
-      return createReadStream(f, {start, end}).pipe(res);
-    }
-    res.writeHead(200, {...headers, 'content-length': size});
-    return createReadStream(f).pipe(res);
+    if (url.searchParams.has('dl')) log(me.name, `скачал ${basename(f)}`);
+    return sendFile(req, res, f, url.searchParams.has('dl') ? {'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`} : {});
   }
   res.writeHead(404).end();
 }).listen(PORT, '127.0.0.1', () => console.log(`reels web on 127.0.0.1:${PORT}`));
