@@ -18,5 +18,5 @@
     {"tag": "v1", "new_sqlite_classes": ["Relay"]},
     {"tag": "v2", "new_sqlite_classes": ["TgQueue", "Router"]}
   ],
-  "observability": {"enabled": true}
+  "observability": {"enabled": true, "logs": {"enabled": true, "invocation_logs": false}}
 }

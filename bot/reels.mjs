@@ -8,6 +8,8 @@
 // state.focusCard the pinned card ({chat, id}) that is edited in place as the reel changes.
 import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative} from 'node:path';
+import {PROJECTS} from './config.mjs';
+import {linkButton, reelLink} from '../web/dllink.mjs';
 
 const STATUS = [
   [/^(published|опубликовано|выложен)/i, '📤 выложен'],
@@ -74,6 +76,8 @@ export function reelsUi({tg, studio, project, state, save, send, panel, root}) {
       {text: `▶️ Прислать ${cur.v}`, callback_data: `rp:${r.folder}:${cur.v}`.slice(0, 64)},
       cur.master ? {text: `📦 Мастер ${cur.v} готов`, callback_data: `rp:${r.folder}:${cur.v}:m`.slice(0, 64)} : {text: `🎞 В мастер ${cur.v}`, callback_data: `rm:${r.folder}:${cur.v}`.slice(0, 64)},
     ]);
+    const link = cur && reelLink(cur.master || cur.copy, {projects: PROJECTS});
+    if (link) rows.push([linkButton(link)]);
     rows.push([
       ...(r.versions.length > 1 ? [{text: '🗂 Все версии', callback_data: `rv:${r.folder}`.slice(0, 64)}] : []),
       ...(panel(r.folder) ? [{text: '🌐 В панели', url: panel(r.folder)}] : []),
@@ -174,7 +178,8 @@ export function reelsUi({tg, studio, project, state, save, send, panel, root}) {
       if (!file) return html(chat, `У ${v} нет видео.`);
       await tg.call('sendChatAction', {chat_id: chat, action: 'upload_video'}).catch(() => {});
       const big = m && statSync(file).size > 49e6;
-      await tg.sendFile(chat, file, {caption: `${label(r)} · ${v}${m ? ' · мастер' : ''}`, asDocument: !!m && !big}).catch((e) => html(chat, `Не получилось отправить: ${esc(e.message)}`));
+      const link = reelLink(file, {projects: PROJECTS});
+      await tg.sendFile(chat, file, {caption: `${label(r)} · ${v}${m ? ' · мастер' : ''}`, asDocument: !!m && !big, markup: link ? {inline_keyboard: [[linkButton(link)]]} : undefined}).catch((e) => html(chat, `Не получилось отправить: ${esc(e.message)}`));
       if (big && panel(folder)) await html(chat, `Полный мастер ${v} (${Math.round(statSync(file).size / 1e6)} МБ) — в панели: «Скачать мастер ${v}».`, {inline_keyboard: [[{text: '🌐 Открыть в панели', url: panel(folder)}]]});
       if (folder !== focusOf()) await setFocus(chat, folder, {quiet: !!state.focusCard});
       return;

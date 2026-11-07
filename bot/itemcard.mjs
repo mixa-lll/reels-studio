@@ -7,6 +7,8 @@ import {readFileSync} from 'node:fs';
 import {join, relative} from 'node:path';
 import {STAGES, changeItem, loadItems, needOf, readSources, syncItems} from '../web/items.mjs';
 import {listReels} from './reels.mjs';
+import {PROJECTS} from './config.mjs';
+import {linkButton, reelLink} from '../web/dllink.mjs';
 
 const STAGE = {idea: 'Идея', material: 'Материал', build: 'Сборка', ready: 'Готово', published: 'Вышло'};
 const FORMAT = {reel: 'рилс', post: 'пост', carousel: 'карусель', telegram: 'текст в Телеграм', story: 'история'};
@@ -48,6 +50,8 @@ export function itemCardKeys(item, {reel = null, panel = null} = {}) {
   if (item.stage === 'material') rows.push([b('🛠 Собрать так', 'b'), b('⏳ Подожду', 'w')]);
   if (item.stage === 'build') rows.push([...(cur ? [b(`▶️ Прислать ${cur.v}`, 'p')] : []), b('✅ Готово', 'r')]);
   if (item.stage === 'ready') rows.push([b('📤 Вышло', 'd'), b('↩️ В сборку', 'u')]);
+  const link = cur && item.stage !== 'idea' && reelLink(cur.master || cur.copy, {projects: PROJECTS});
+  if (link) rows.push([linkButton(link)]);
   rows.push([{text: '🔄 Другой выпуск', callback_data: 'itl'}, {text: '✖ Без выпуска', callback_data: 'itx'}, ...(panel ? [{text: '🌐 В студии', url: panel}] : [])]);
   return {inline_keyboard: rows};
 }
@@ -169,7 +173,8 @@ export function itemsUi({tg, studio, project, state, save, send, panel, root}) {
       const file = cur && (cur.copy || cur.master);
       if (!file) return html(chat, 'Видео пока нет.');
       await tg.call('sendChatAction', {chat_id: chat, action: 'upload_video'}).catch(() => {});
-      return tg.sendFile(chat, file, {caption: `${reelOf(item).num} «${item.title}» · ${cur.v}`}).catch((e) => html(chat, `Не получилось отправить: ${esc(e.message)}`));
+      const link = reelLink(file, {projects: PROJECTS});
+      return tg.sendFile(chat, file, {caption: `${reelOf(item).num} «${item.title}» · ${cur.v}`, markup: link ? {inline_keyboard: [[linkButton(link)]]} : undefined}).catch((e) => html(chat, `Не получилось отправить: ${esc(e.message)}`));
     }
     if (kind === 'itr') return move(chat, item, 'ready', `✅ «${esc(item.title)}» готов${item.at ? ` — выйдет ${day(item.at)}` : '.'}`);
     if (kind === 'itu') return move(chat, item, 'build', `↩️ «${esc(item.title)}» вернул в сборку — пиши правки.`);

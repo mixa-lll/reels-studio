@@ -16,7 +16,8 @@
 import {readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {parseArgs} from 'node:util';
-import {DATA, env, loadState} from './config.mjs';
+import {DATA, PROJECTS, env, loadState} from './config.mjs';
+import {linkButton, reelLink} from '../web/dllink.mjs';
 import {createMenu, customHint, deferMenu, tuneLabel} from './menu.mjs';
 import {moreIdeasLabel, replyKeyboard} from './keys.mjs';
 import {keyboard, telegram} from './telegram.mjs';
@@ -79,6 +80,12 @@ if (o.text) {
   if (reel) {
     markup ??= {inline_keyboard: []};
     markup.inline_keyboard.push([{text: process.env.BOT_LANG === 'en' ? '✎ Open the editor' : '✎ Открыть редактор', web_app: {url: `${process.env.MINIAPP_URL}?ed=${encodeURIComponent(reel)}`}}]);
+  }
+  // A file in Telegram is hard to find later: the master also gets a direct link from the site.
+  const link = reelLink(o.file, {projects: PROJECTS});
+  if (link) {
+    markup ??= {inline_keyboard: []};
+    markup.inline_keyboard.push([linkButton(link)]);
   }
   if (menuId) {
     markup ??= {inline_keyboard: []};
