@@ -1195,6 +1195,10 @@ async function relHead(kind, id, steps, tab, base, title) {
   const ed = canEdit();
   const k = LIFE.findIndex(([s]) => s === x.stage), v = LIFE.findIndex(([s]) => s === viewing);
   const back = v < k ? `<div class="rback">${svg('eye', 15)}<span style="flex: 1">Вы смотрите этап «${LIFE[v][1]}». Выпуск уже на этапе «${LIFE[k][1]}».</span><a class="ln-btn s" href="${base}${steps[x.stage][0]}">К этапу «${LIFE[k][1]}» →</a></div>` : '';
+  // Looking at a later stage: move the release there by hand (it is ready, it is already out).
+  // «Готово» and «Вышло» share a page, so that page offers both.
+  const later = (steps.ready.includes(tab) ? ['ready', 'published'] : [viewing]).filter((st) => LIFE.findIndex(([o]) => o === st) > k);
+  const ahead = ed && later.length ? `<div class="rback">${svg('eye', 15)}<span style="flex: 1">Выпуск сейчас на этапе «${LIFE[k][1]}».${later.includes('published') ? ' Уже готов или вышел — отметьте вручную.' : ''}</span>${later.map((st) => `<button type="button" class="ln-btn ${st === later.at(-1) ? 'p' : ''} s" data-setstage="${st}" data-item="${x.id}">${st === 'published' ? 'Отметить «Вышло»' : `Перевести на «${LIFE.find(([o]) => o === st)[1]}»`}</button>`).join('')}</div>` : '';
   const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
   return `<div class="rhead" data-item="${x.id}">
     <a href="#/all" class="rcrumb">‹ Выпуски</a><span class="slash">/</span>
@@ -1205,9 +1209,9 @@ async function relHead(kind, id, steps, tab, base, title) {
       <input class="rchip" data-f="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">`
     : `${r ? `<span class="small">${esc(r.name)}</span>` : ''}<span class="small muted">${whenText(x.at)}</span>`}
     <span id="dlTop" class="row" style="gap: 8px"></span>
-    ${ed && kind === 'reel' ? `<button type="button" class="ln-btn g s" data-copyreel="${esc(id)}" title="Новый рилс на основе этого: другой материал, язык или тема">По образцу</button>` : ''}
+    ${ed && kind === 'reel' ? `<button type="button" class="ln-btn s" data-copyreel="${esc(id)}" title="Новый рилс на основе этого: другой материал, язык или тема"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Сделать по образцу</button>` : ''}
     <button type="button" class="ln-btn g s" data-side="${x.id}" title="Открыть сбоку" aria-label="Открыть сбоку">${svg('panelR', 16)}</button></div>
-    ${stageTrack(x, {viewing, href: (s) => base + steps[s][0]})}${back}${subs}`;
+    ${stageTrack(x, {viewing, href: (s) => base + steps[s][0]})}${back}${ahead}${subs}`;
 }
 // «Сделать по образцу»: what changes, then the new reel opens where the work starts.
 function copyReelDialog(from) {
@@ -1237,6 +1241,11 @@ function copyReelDialog(from) {
   d.showModal();
 }
 function wireRelHead(root, redraw) {
+  root.querySelectorAll('[data-setstage]').forEach((b) => (b.onclick = async () => {
+    b.disabled = true;
+    await post('/api/items/set', {id: b.dataset.item, stage: b.dataset.setstage});
+    await loadItems(true); toast(b.dataset.setstage === 'published' ? 'Отмечено: вышло' : 'Этап сменён'); sidebar(); redraw?.();
+  }));
   root.querySelectorAll('[data-copyreel]').forEach((b) => (b.onclick = () => copyReelDialog(b.dataset.copyreel)));
   root.querySelectorAll('.rhead [data-f]').forEach((el) => (el.onchange = async () => {
     await post('/api/items/set', {id: el.closest('.rhead').dataset.item, [el.dataset.f]: el.value || null});

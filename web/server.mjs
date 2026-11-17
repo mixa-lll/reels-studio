@@ -151,7 +151,9 @@ function versions(p, r) {
     const archived = readJson(join(vdir, 'ARCHIVED.json'), null);
     // A variant (RU, EN, short cut…) is a finished parallel version, not a draft: versions/vN/variant.json.
     const variant = readJson(join(vdir, 'variant.json'), null)?.label || null;
-    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, archived, variant, at: statSync(vdir).mtimeMs};
+    // When the version was made: its own files, not the folder — cleaning a version touches the folder.
+    const made = readdirSync(vdir).filter((f) => !/^(ARCHIVED|variant)\.json$|^project-snapshot$/.test(f)).map((f) => statSync(join(vdir, f)).mtimeMs);
+    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, archived, variant, at: made.length ? Math.min(...made) : statSync(vdir).mtimeMs};
   }).reverse();
 }
 
