@@ -901,9 +901,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
         for (const f of files) {
           setBusy(true, `Загружаю ${f.name}…`);
           const toReel = !key.startsWith('_') && !key.startsWith('new-') ? `&reel=${encodeURIComponent(key)}` : '';
-          const r = await fetch(`/api/upload?project=${encodeURIComponent(P)}${toReel}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f});
-          if (!r.ok) throw new Error(r.status === 413 ? `${f.name} слишком большой для загрузки` : `${f.name} не загрузился (ошибка ${r.status})`);
-          const u = await r.json();
+          const u = await uploadFile(f, toReel, (i, n) => n > 1 && setBusy(true, `Загружаю ${f.name}… ${Math.round(i / n * 100)}%`));
           parts.push(`(attached file → ${u.path})`);
           if (u.digest) parts.push(`(Telegram export «${u.digest.name}», ${u.digest.count} messages unpacked → ${u.digest.path}; ${u.digest.photos} photos it links are in photos/ beside it — open them to see the design)`);
           shown.push('📎 ' + f.name + (u.digest ? ` · выгрузка Telegram: ${u.digest.count} сообщ., ${u.digest.photos} фото` : ''));
@@ -1503,6 +1501,19 @@ async function vReel(id, tab) {
   if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
 
+// Uploads one file in 32 MB parts (Cloudflare takes ≤100 MB per request); throws with a reason.
+async function uploadFile(f, query, onPart) {
+  const size = 32 * 1024 * 1024, parts = Math.max(1, Math.ceil(f.size / size));
+  const uid = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+  let r;
+  for (let i = 0; i < parts; i++) {
+    onPart?.(i, parts);
+    const q = parts > 1 ? `&part=${i}&parts=${parts}&uid=${uid}` : '';
+    r = await fetch(`/api/upload?project=${encodeURIComponent(P)}${query}&name=${encodeURIComponent(f.name)}${q}`, {method: 'POST', body: f.slice(i * size, (i + 1) * size)}).catch(() => null);
+    if (!r?.ok) throw new Error(`${f.name} не загрузился${r ? ` (ошибка ${r.status})` : ' — нет связи со студией'}`);
+  }
+  return r.json();
+}
 const chatOf = () => $('#chatHost > div');
 // Puts text into the reel chat's input (a timecode, a scene) without sending it.
 function draft(text) {
@@ -1824,7 +1835,7 @@ function postText(id, data, host, save) {
   $('#brightBtn')?.addEventListener('click', () => { bright = !bright; apply(); });
   host.querySelectorAll('[data-src]').forEach((b) => (b.onclick = () => { src = b.dataset.src; apply(); }));
   $('#phUp')?.addEventListener('change', async (e) => {
-    for (const f of e.target.files) await fetch(`/api/upload?project=${encodeURIComponent(P)}&post=${encodeURIComponent(id)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f});
+    for (const f of e.target.files) await uploadFile(f, `&post=${encodeURIComponent(id)}`).catch((err) => toast(err.message));
     toast(`Загружено: ${e.target.files.length}`);
     drawPost(id, 'text');
   });
@@ -1949,16 +1960,19 @@ async function reelFiles(id, data) {
     $('#src').innerHTML = f.sources.map((x) => card(x, canEdit())).join('') || '<p class="small muted">Пока пусто. Загрузи референсы или исходники — или прикрепи их в чате рилса.</p>';
     $('#srcInfo').textContent = f.sources.length ? `${f.sources.length} файлов · ${mb(f.sources.reduce((a, x) => a + x.size, 0))}` : '';
     $('#res').innerHTML = f.results.map((x) => card(x, false)).join('') || '<p class="small muted">Готовых файлов пока нет.</p>';
-    host.querySelectorAll('[data-del]').forEach((a) => (a.onclick = async (e) => { e.preventDefault(); if (!confirm(`Удалить ${a.dataset.del}?`)) return; await post('/api/files/delete', {reel: id, name: a.dataset.del}); load(); }));
+    host.querySelectorAll('[data-del]').forEach((a) => (a.onclick = async (e) => { e.preventDefault(); if (!confirm(`Удалить ${a.dataset.del}?`)) return; await post('/api/files/delete', {reel: id, name: a.dataset.del}).catch(() => toast('Не получилось удалить')); load(); }));
   }
   async function upload(files) {
     const drop = $('#drop');
+    let done = 0;
     for (const [i, f] of [...files].entries()) {
-      drop.querySelector('b').textContent = `Загружаю ${i + 1} из ${files.length}: ${f.name}…`;
-      await fetch(`/api/upload?project=${encodeURIComponent(P)}&reel=${encodeURIComponent(id)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f});
+      try {
+        await uploadFile(f, `&reel=${encodeURIComponent(id)}`, (k, n) => { drop.querySelector('b').textContent = `Загружаю ${i + 1} из ${files.length}: ${f.name}${n > 1 ? ` · ${Math.round(k / n * 100)}%` : '…'}`; });
+        done++;
+      } catch (err) { toast(err.message); }
     }
     drop.querySelector('b').textContent = 'Перетащи сюда референсы, исходники, музыку';
-    toast(`Загружено: ${files.length}`);
+    if (done) toast(`Загружено: ${done}${done < files.length ? ` из ${files.length}` : ''}`);
     load();
   }
   $('#buildCopy')?.addEventListener('click', () => chatOf().say(bo.prompt, `Собери v1 по образцу ${bo.from.slice(0, 2)}`));
@@ -2426,7 +2440,7 @@ function ideasRefs(body, data, sel, say, redraw) {
   $('#rFile')?.addEventListener('change', async (e) => {
     const files = [...e.target.files]; let last = null;
     for (const f of files) {
-      const u = await fetch(`/api/upload?project=${encodeURIComponent(P)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f}).then((x) => x.json()).catch(() => null);
+      const u = await uploadFile(f, '').catch((err) => { toast(err.message); return null; });
       if (u?.url) last = await add({url: u.url, name: f.name});
     }
     if (last) { toast(files.length > 1 ? `Добавлено ${files.length}` : 'Референс добавлен'); location.hash = '#/ideas/refs/' + last.id; }
@@ -2849,7 +2863,7 @@ async function vRubric(id, tab = 'overview', sub) {
   $('#refDel')?.addEventListener('click', async () => { await ref({id: sel.id, remove: true}); sessionStorage.removeItem('refSel:' + r.id); redraw(); });
   const addFiles = async (files) => {
     for (const f of files) {
-      const u = await fetch(`/api/upload?project=${encodeURIComponent(P)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f}).then((x) => x.json()).catch(() => null);
+      const u = await uploadFile(f, '').catch((err) => { toast(err.message); return null; });
       if (u?.url) await ref({add: {url: u.url, name: f.name, file: true}});
     }
     toast(files.length > 1 ? `Добавлено ${files.length}` : 'Референс добавлен'); sessionStorage.removeItem('refSel:' + r.id); redraw();

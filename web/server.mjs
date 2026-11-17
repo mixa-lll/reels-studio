@@ -1309,11 +1309,20 @@ createServer(async (req, res) => {
     const rdir = (reel && reelDir(p, reel)) || pdir;
     const dir = rdir ? join(rdir, 'sources') : join(studio, 'inbox', new Date().toISOString().slice(0, 10));
     mkdirSync(dir, {recursive: true});
-    const path = uniquePath(dir, rdir ? cleanName(url.searchParams.get('name')) : `web-${Date.now()}-${cleanName(url.searchParams.get('name'))}`);
+    // Big files come in parts (Cloudflare takes ≤100 MB per request): part i of n, one uid per file.
+    const parts = Number(url.searchParams.get('parts') || 1), part = Number(url.searchParams.get('part') || 0), uid = url.searchParams.get('uid') || '';
+    if (parts > 1 && (!/^[a-z0-9]{8,40}$/.test(uid) || !(part >= 0 && part < parts) || parts > 400)) return json(400, {});
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    const buf = Buffer.concat(chunks);
-    writeFileSync(path, buf);
+    let buf = Buffer.concat(chunks);
+    if (parts > 1) {
+      const tmp = join(dir, `.upload-${uid}`);
+      if (part === 0) writeFileSync(tmp, buf); else if (existsSync(tmp)) appendFileSync(tmp, buf); else return json(409, {});
+      if (part < parts - 1) return json(200, {part});
+      buf = /\.zip$/i.test(url.searchParams.get('name') || '') ? readFileSync(tmp) : null;
+    }
+    const path = uniquePath(dir, rdir ? cleanName(url.searchParams.get('name')) : `web-${Date.now()}-${cleanName(url.searchParams.get('name'))}`);
+    if (parts > 1) renameSync(join(dir, `.upload-${uid}`), path); else writeFileSync(path, buf);
     // A Telegram export (.zip): Claude can't unpack it, so the posts (posts.md) and photos go next to it.
     let digest = null;
     if (/\.zip$/i.test(path)) {
@@ -1395,7 +1404,8 @@ createServer(async (req, res) => {
     const {reel, name} = await body(req);
     const dir = reelDir(p, reel);
     const f = dir && mediaPath(join(dir, 'sources', name || ''));
-    if (!f || !f.startsWith(join(dir, 'sources') + '/')) return json(404, {});
+    // mediaPath gives the real path; the project may be a link (My Gudauri → Документы/…/студия).
+    if (!f || !f.startsWith(realpathSync(join(dir, 'sources')) + '/')) return json(404, {});
     rmSync(f);
     log(me.name, `удалил материал ${basename(f)} из рилса ${reel}`);
     return json(200, {});
