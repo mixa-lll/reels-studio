@@ -1243,10 +1243,39 @@ async function relHead(kind, id, steps, tab, base, title) {
       <input class="rchip" data-f="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">`
     : `${r ? `<span class="small">${esc(r.name)}</span>` : ''}<span class="small muted">${whenText(x.at)}</span>`}
     <span id="dlTop" class="row" style="gap: 8px"></span>
+    ${ed && kind === 'reel' ? `<button type="button" class="ln-btn g s" data-copyreel="${esc(id)}" title="Новый рилс на основе этого: другой материал, язык или тема">По образцу</button>` : ''}
     <button type="button" class="ln-btn g s" data-side="${x.id}" title="Открыть сбоку" aria-label="Открыть сбоку">${svg('panelR', 16)}</button></div>
     ${stageTrack(x, {viewing, href: (s) => base + steps[s][0]})}${back}${subs}`;
 }
+// «Сделать по образцу»: what changes, then the new reel opens where the work starts.
+function copyReelDialog(from) {
+  const d = document.createElement('dialog');
+  d.className = 'card';
+  d.style.cssText = 'max-width: 440px; border: 0; padding: 20px; border-radius: 14px';
+  const opt = (v, t, sub, on) => `<label style="display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); cursor: pointer"><input type="radio" name="cm" value="${v}" ${on ? 'checked' : ''} style="margin-top: 3px"><span><b style="font-weight: 600">${t}</b><br><span class="small muted">${sub}</span></span></label>`;
+  d.innerHTML = `<form method="dialog" style="display: flex; flex-direction: column; gap: 4px">
+    <h2 style="margin: 0 0 4px">Новый рилс по образцу ${esc(from.slice(0, 2))}</h2>
+    <p class="small muted" style="margin: 0 0 6px">Берём сценарий, структуру, ритм и оформление. Старые версии не копируются.</p>
+    ${opt('material', 'Новый материал', 'Тот же сюжет и тексты, вы загружаете новые видео и фото по сценам', true)}
+    ${opt('lang', /(^|-)en(-\d+)?$/.test(from) ? 'На русском' : 'На английском', 'Тот же материал и монтаж, Claude переводит тексты и подпись и сразу собирает')}
+    ${opt('theme', 'Новая тема', 'Только оформление и ритм; тему и материал задаёте заново')}
+    <div class="row" style="justify-content: flex-end; gap: 8px; margin-top: 12px"><button class="btn" value="">Отмена</button><button class="btn dark" value="ok">Сделать</button></div></form>`;
+  document.body.append(d);
+  d.onclose = async () => {
+    const mode = d.returnValue === 'ok' && d.querySelector('[name=cm]:checked')?.value;
+    d.remove();
+    if (!mode) return;
+    const made = await post('/api/reel/copy', {reel: from, mode}).catch(() => null);
+    if (!made?.id) return toast('Не получилось сделать копию');
+    REEL_CACHE.clear(); await loadItems(true).catch(() => null); sidebar();
+    if (mode === 'lang') sessionStorage.setItem('firstMsg:' + made.id, JSON.stringify({text: made.prompt, shown: `Переведи по образцу ${from.slice(0, 2)} и собери v1`}));
+    toast(`Рилс ${made.id.slice(0, 2)} сделан по образцу`);
+    location.hash = `#/reel/${made.id}/${mode === 'lang' ? 'edit' : mode === 'material' ? 'materials' : 'script'}`;
+  };
+  d.showModal();
+}
 function wireRelHead(root, redraw) {
+  root.querySelectorAll('[data-copyreel]').forEach((b) => (b.onclick = () => copyReelDialog(b.dataset.copyreel)));
   root.querySelectorAll('.rhead [data-f]').forEach((el) => (el.onchange = async () => {
     await post('/api/items/set', {id: el.closest('.rhead').dataset.item, [el.dataset.f]: el.value || null});
     await loadItems(); toast('Сохранено'); redraw?.();
@@ -1893,7 +1922,9 @@ async function reelFiles(id, data) {
   const host = $('#reelHost');
   const sc = Array.isArray(data?.scenes) ? data.scenes : null;
   const stColor = (t) => /готов/i.test(t || '') ? 'var(--green)' : /пересн/i.test(t || '') ? 'var(--amber)' : 'var(--blue)';
+  const bo = data?.basedOn && !(data.versions || []).length ? data.basedOn : null;
   host.innerHTML = `<div class="page" style="max-width: 1000px">
+    ${bo ? `<div class="rback" style="margin-bottom: 14px">${svg('idea', 15)}<span style="flex: 1">Сделан по образцу <a href="#/reel/${esc(bo.from)}">${esc(bo.from.slice(0, 2))}</a>. ${bo.mode === 'material' ? 'Загрузите новый материал — сцены ниже подскажут, что где нужно. Claude соберёт v1 в том же ритме и оформлении.' : bo.mode === 'theme' ? 'Напишите в чате, о чём рилс, и загрузите материал.' : 'Материал уже на месте: Claude переведёт и соберёт.'}</span>${canEdit() ? `<button type="button" class="ln-btn p s" id="buildCopy">Собрать по образцу</button>` : ''}</div>` : ''}
     ${sc ? `<section><div class="row" style="justify-content: space-between; margin-bottom: 6px"><h2>Готовность · ${sc.filter((x) => /готов/i.test(x.status || '')).length} из ${sc.length}</h2>${canEdit() ? '<button type="button" class="btn" id="shotList">Шот-лист в Телеграм</button>' : ''}</div>
       <div class="grid4 lbl" style="border-top: 0"><span>Сцена</span><span>Что нужно</span><span>Что есть</span><span>Статус</span></div>
       ${sc.map((x, i) => `<div class="grid4"><b style="font-weight: 600">${i + 1} · ${esc(x.name || '')}</b><span class="muted">${esc(x.need || x.screen || '')}</span><span class="small muted">${esc(x.have || '—')}</span><span class="st" style="color: ${stColor(x.status)}">${esc(x.status || 'нужно')}</span></div>`).join('')}</section>`
@@ -1921,6 +1952,7 @@ async function reelFiles(id, data) {
     toast(`Загружено: ${files.length}`);
     load();
   }
+  $('#buildCopy')?.addEventListener('click', () => chatOf().say(bo.prompt, `Собери v1 по образцу ${bo.from.slice(0, 2)}`));
   $('#shotList')?.addEventListener('click', () => chatOf().say('Составь шот-лист по сценам: что снять, как держать телефон, сколько секунд; отметь, что уже есть в материалах. Обнови scenes.json и пришли шот-лист сюда.', 'Шот-лист'));
   const drop = $('#drop');
   if (drop) {
