@@ -12,7 +12,8 @@ import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
-import {changeItem, createItems, loadItems, followPlan, needOf, syncItems} from './items.mjs';
+import {changeItem, createItems, loadItems, followPlan, needOf, saveItems, syncItems} from './items.mjs';
+import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
@@ -1015,7 +1016,7 @@ createServer(async (req, res) => {
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
       ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10),
-      storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}});
+      storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}, basedOn: readJson(join(dir, 'based-on.json'), null)});
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
   // point on the frame; «Собрать vN» hands the open ones to the reel chat (edits.json).
@@ -1032,6 +1033,25 @@ createServer(async (req, res) => {
     return json(200, {ok: true});
   }
   // Which version goes to «Готово» (кусок 17): one is marked, the newest by default.
+  // «Сделать по образцу» (web/copyreel.mjs): a new reel from this one, in the plan with its rubric.
+  if (req.method === 'POST' && url.pathname === '/api/reel/copy') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    if (!reelDir(p, b.reel) || !COPY_MODES.includes(b.mode)) return json(400, {});
+    const made = copyReel(join(PROJECTS, p), b.reel, {mode: b.mode, root: BOT, by: me.name});
+    const studioDir = join(PROJECTS, p);
+    syncItems(studioDir);
+    const data = loadItems(studioDir);
+    const srcItem = data.items.find((x) => x.ref?.kind === 'reel' && x.ref.id === b.reel);
+    const item = data.items.find((x) => x.ref?.kind === 'reel' && x.ref.id === made.id);
+    if (item) {
+      Object.assign(item, {title: made.title, rubric: srcItem?.rubric ?? item.rubric, basedOn: {reel: b.reel, mode: b.mode}});
+      saveItems(studioDir, data);
+      changeItem(studioDir, item.id, {stage: b.mode === 'lang' ? 'build' : b.mode === 'material' ? 'material' : 'idea'}, {by: me.name});
+    }
+    log(me.name, `сделал рилс «${made.id}» по образцу «${b.reel}» (${b.mode})`);
+    return json(200, made);
+  }
   if (req.method === 'POST' && url.pathname === '/api/reel/ready') {
     if (!can('editor')) return json(403, {});
     const b = await body(req);
