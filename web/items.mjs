@@ -142,6 +142,9 @@ export function syncItems(studio, {dry = false, now = Date.now()} = {}) {
   for (const i of src.pitches) {
     const had = byRef('idea', i.title);
     if (had) {
+      if (had.proposed && !had.batch && field(i, 'Batch')) { had.batch = field(i, 'Batch'); changed = true; }
+      if (had.proposed && had.idea && !had.idea.src && field(i, 'Source')) { had.idea.src = field(i, 'Source'); changed = true; }
+      if (had.proposed && had.idea && !had.idea.similar && field(i, 'Similar')) { had.idea.similar = field(i, 'Similar'); changed = true; }
       if (had.proposed && !had.at && pitchAt(i)) { had.at = pitchAt(i); changed = true; }
       if (had.proposed && !had.rubric && field(i, 'Rubric')) { had.rubric = field(i, 'Rubric'); changed = true; }
       if (had.proposed && had.idea && !had.idea.why && field(i, 'Why')) { had.idea.why = field(i, 'Why'); changed = true; }
@@ -149,7 +152,10 @@ export function syncItems(studio, {dry = false, now = Date.now()} = {}) {
     }
     add({id: newId(), format: guessFormat(field(i, 'Format')), title: i.title.replace(/^\p{Extended_Pictographic}️?\s*/u, ''), stage: 'idea', rubric: field(i, 'Rubric') || null, at: pitchAt(i),
       ref: {kind: 'idea', id: i.title}, proposed: true, by: i.section === "Owner's ideas" ? 'owner' : 'Claude',
-      idea: {about: field(i, 'Plot'), hook: field(i, 'Hook').replace(/^[«"]|[»"]$/g, ''), flow: [], ...(field(i, 'Why') ? {why: field(i, 'Why')} : {})}, created: now});
+      // «Накидать» (web/index.html, vIdeas): a batch of pitches carries Batch:, Source: and Similar: lines.
+      ...(field(i, 'Batch') ? {batch: field(i, 'Batch')} : {}),
+      idea: {about: field(i, 'Plot'), hook: field(i, 'Hook').replace(/^[«"]|[»"]$/g, ''), flow: [],
+        ...(field(i, 'Why') ? {why: field(i, 'Why')} : {}), ...(field(i, 'Source') ? {src: field(i, 'Source')} : {}), ...(field(i, 'Similar') ? {similar: field(i, 'Similar')} : {})}, created: now});
   }
   // A pitch that left ideas.md before anyone took it (made into a reel, cancelled) goes away.
   const before = data.items.length;
@@ -197,9 +203,11 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
   if (b.at !== undefined) item.at = b.at ? String(b.at).slice(0, 25) : null;
   if (b.group !== undefined) item.group = b.group ? String(b.group).slice(0, 40) : undefined;
   if (Array.isArray(b.platforms)) item.platforms = b.platforms.map(String).slice(0, 10);
-  if (b.idea && typeof b.idea === 'object') item.idea = {about: String(b.idea.about ?? item.idea?.about ?? '').slice(0, 2000), hook: String(b.idea.hook ?? item.idea?.hook ?? '').slice(0, 300), flow: (Array.isArray(b.idea.flow) ? b.idea.flow : item.idea?.flow || []).map((s) => String(s).slice(0, 300)).slice(0, 12)};
+  if (b.idea && typeof b.idea === 'object') item.idea = {...item.idea, ...ideaFields(b.idea, item.idea || {})};
   if (Array.isArray(b.need) && item.ref?.kind !== 'reel') item.need = b.need.map((n) => ({text: String(n.text || '').slice(0, 200), have: String(n.have || '').slice(0, 200), done: !!n.done})).slice(0, 30);
   if (b.take) { delete item.proposed; item.takenBy = by; }
+  // «Вернуть» right after «Взять» in a batch: still only an idea, so it can be a proposal again.
+  if (b.untake && item.ref?.kind === 'idea' && item.stage === 'idea' && !item.at) { item.proposed = true; delete item.takenBy; }
   // Where it came out (web/instagram.mjs links a post to its item): [{account, url, at}], one per link.
   if (b.publish?.url && /^https:\/\/(www\.)?instagram\.com\//.test(b.publish.url)) {
     const pub = {account: String(b.publish.account || '').replace(/^@/, '').slice(0, 40), url: String(b.publish.url).slice(0, 200), at: b.publish.at ? String(b.publish.at).slice(0, 30) : null};
@@ -226,6 +234,93 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
   saveItems(studio, data);
   mirrorPlan(studio, item);
   return item;
+}
+
+/**
+ * The idea card's fields (the open idea, web/index.html vItem): what a person may write.
+ * Claude writes the same shape straight into items.json.
+ * hooks: crochet variants [{text, why}], hookAt: the chosen one; shoot: [{text, done}];
+ * facts: [{text, ok}] — ok false = still to check; why, src (where it came from), similar.
+ */
+function ideaFields(v, old) {
+  const s = (x, n) => String(x ?? '').slice(0, n);
+  const out = {
+    about: s(v.about ?? old.about, 2000), hook: s(v.hook ?? old.hook, 300),
+    flow: (Array.isArray(v.flow) ? v.flow : old.flow || []).map((x) => s(x, 300)).slice(0, 12),
+  };
+  if (Array.isArray(v.hooks)) out.hooks = v.hooks.map((h) => ({text: s(h?.text ?? h, 300), why: s(h?.why, 200)})).filter((h) => h.text).slice(0, 8);
+  if (Array.isArray(v.shoot)) out.shoot = v.shoot.map((x) => ({text: s(x?.text ?? x, 300), done: !!x?.done})).filter((x) => x.text).slice(0, 20);
+  if (Array.isArray(v.facts)) out.facts = v.facts.map((x) => ({text: s(x?.text ?? x, 300), ok: !!x?.ok})).filter((x) => x.text).slice(0, 20);
+  for (const [k, n] of [['why', 400], ['src', 300], ['similar', 300]]) if (v[k] !== undefined) out[k] = s(v[k], n);
+  return out;
+}
+
+// ---------- ideas.md: a pitch moved between sections ----------
+
+/** ideas.md as sections of lines, so one «### Title» block can move without touching the rest. */
+function splitIdeas(text) {
+  const head = [], sections = [];
+  for (const line of text.split('\n')) {
+    const h2 = /^## (.+)/.exec(line);
+    if (h2) { sections.push({name: h2[1].trim(), line, blocks: [], pre: []}); continue; }
+    const cur = sections.at(-1);
+    if (!cur) { head.push(line); continue; }
+    if (/^### /.test(line)) { cur.blocks.push({title: line.slice(4).trim(), lines: [line]}); continue; }
+    if (cur.blocks.length) cur.blocks.at(-1).lines.push(line); else cur.pre.push(line);
+  }
+  return {head, sections};
+}
+const joinIdeas = ({head, sections}) => [...head, ...sections.flatMap((x) => [x.line, ...x.pre, ...x.blocks.flatMap((b) => b.lines)])].join('\n');
+
+/**
+ * Moves the pitch «### title» from one of `from` sections to the section `to` (made at the end
+ * if missing). A reason becomes a «Reason:» line; moving back drops it. Returns false if absent.
+ */
+export function moveIdea(studio, title, {from, to, reason}) {
+  const f = join(studio, 'ideas.md');
+  const doc = splitIdeas(read(f));
+  let block = null;
+  for (const sec of doc.sections.filter((x) => from.test(x.name))) {
+    const i = sec.blocks.findIndex((b) => b.title === title);
+    if (i >= 0) { [block] = sec.blocks.splice(i, 1); break; }
+  }
+  if (!block) return false;
+  // Trailing blank lines stay with the section they were in; the block keeps one.
+  while (block.lines.length > 1 && !block.lines.at(-1).trim()) block.lines.pop();
+  block.lines = block.lines.filter((l) => !/^Reason:/.test(l));
+  if (reason) block.lines.push(`Reason: ${String(reason).slice(0, 200)}`);
+  block.lines.push('');
+  let dest = doc.sections.find((x) => x.name === to);
+  if (!dest) { dest = {name: to, line: `## ${to}`, blocks: [], pre: ['']}; doc.sections.push(dest); }
+  dest.blocks.unshift(block);
+  writeFileSync(f, joinIdeas(doc));
+  return true;
+}
+
+/** «Нет» in a batch: the pitch goes to Cancelled with the reason, the proposal goes away. */
+export function dropIdea(studio, id, reason, {by, now = Date.now()} = {}) {
+  const data = loadItems(studio);
+  const item = data.items.find((x) => x.id === id);
+  if (!item || item.ref?.kind !== 'idea') return null;
+  if (!moveIdea(studio, item.ref.id, {from: IDEA_SECTIONS, to: 'Cancelled', reason: reason || 'без причины'})) return null;
+  data.items = data.items.filter((x) => x !== item);
+  saveItems(studio, data);
+  logEvent(studio, {type: 'drop', item: id, reason, by}, now);
+  return {title: item.ref.id, batch: item.batch || null};
+}
+
+/** «Вернуть»: the pitch goes back to My ideas; the next sync makes it a proposal again. */
+export function undropIdea(studio, title) {
+  return moveIdea(studio, title, {from: /^Cancelled$/, to: 'My ideas'});
+}
+
+/** Every pitch in ideas.md with its section and lines, for «Банк идей». */
+export function ideaBank(studio) {
+  return parseIdeas(studio).map((i) => ({
+    section: i.section, title: i.title,
+    format: guessFormat(field(i, 'Format')), hook: field(i, 'Hook').replace(/^[«"]|[»"]$/g, ''), plot: field(i, 'Plot'),
+    rubric: field(i, 'Rubric') || null, batch: field(i, 'Batch') || null, src: field(i, 'Source') || null, reason: field(i, 'Reason') || null,
+  }));
 }
 
 /** New items, one per format; several formats share a group (one material → several items). */

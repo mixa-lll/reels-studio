@@ -12,7 +12,8 @@ import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
-import {changeItem, createItems, loadItems, followPlan, needOf, saveItems, syncItems} from './items.mjs';
+import {changeItem, createItems, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
+import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
@@ -256,6 +257,20 @@ function preamble(p, k) {
   // The web's first launch (handbook/LEAN.md, кусок 11): an organisation, not a questionnaire.
   if (k === '_project' && onboardingDue(studio) && readJson(join(studio, 'settings.json'), {}).started) lines.push(`THIS PROJECT IS NEW and the owner started it from the web's first launch: the organisation's name and links are in settings.json (name, links). Do NOT ask REELS.md section 0's guiding questions. Read the links (WebFetch) and any files in the project, then write in one go: brief.md (what they do, for whom, how they speak); facts.json — prices, dates, places, people, each {"id":"f-<random>","text","value","source","kind":"price|date|people|other","at":"<today>"}; strategy.json by STRATEGY.md — platforms from the links with formats and perWeek, 3–5 rubrics each with name, a stable color, about (one-line formula), format (reel|post|carousel|telegram) and day (1–7), a weekly rhythm, and the voice {about, never, styles}; settings.json mode "solo", plan "video", team null — the owner turns modules on later; and 6–10 ideas for the next two weeks in ideas.md «My ideas» with Format:/Hook:/Plot: plus «Date: YYYY-MM-DDTHH:MM» and «Rubric: <id>». Then reply in 4–6 short lines: what you understood, what you could not find (mark it [нужно уточнить]). Mark a fact you are not sure of with source «проверьте».`);
   else if (k === '_project' && onboardingDue(studio)) lines.push(`THIS PROJECT IS NEW: run REELS.md section 0 (Onboarding) from where it stands, whatever the owner's message is about (a greeting too): start with the guiding questions, material and the Telegram archive link come last (step 1). Ask ONE question per turn with \`--keyboard\` buttons and stop until they answer; the next turn goes on with the next question. You are not done until \`brief.md\` is filled, \`strategy.json\` is written and \`settings.json\` has \`mode\`, \`plan\` and \`team\` (step 5), and the summary (step 6) is shown.`);
+  else if (k === '_ideas') {
+    const rel = relative(BOT, studio);
+    lines.push(`THIS CHAT makes BATCHES OF IDEAS for the page «Идеи» (handbook/IDEAS.md). Before a batch read: ${rel}/brief.md, ${rel}/PLAYBOOK.md, ${rel}/strategy.json (rubrics: id, name, about, share, rules, refs), the WHOLE ${rel}/ideas.md including Cancelled, ${rel}/items.json (what is taken, being made, out), ${rel}/refs/refs.json (the project's references: name, rubric, takes, note, skip; the frames refs/<id>/frame-N.jpg — look at them — and refs/<id>/transcript.txt), ${rel}/memory.json (questions) and ${rel}/facts.json.`,
+      `- Each idea goes into ideas.md «My ideas» as «### <title>» (unique, no emoji) with the lines Format:, Hook:, Plot: (1–2 sentences), Rubric: <rubric id from strategy.json>, Batch: <the batch id the owner's message gives>, Source: <where it came from in a few words: «референс <name> · крючок», «вопрос клиентов», «сезон», «PLAYBOOK»…>, Why: <one sentence>, and Similar: <the existing idea or reel it is close to and its state> ONLY when there is a close one.`,
+      `- Never re-pitch an idea from ideas.md or a near-duplicate, least of all a Cancelled one: its «Reason:» line says why the owner said no — learn the pattern, not just the title. Numbers and prices only from facts.json; otherwise write «[проверить]».`,
+      `- Never touch items.json: the page turns ideas.md into proposals itself. Your chat reply is 2–3 short lines: how many per rubric and what you steered away from.`,
+      `- «Поправить пачку»: rewrite this batch's entries in ideas.md in place (same Batch: line); remove the ones you replace. A general rule the owner states («меньше цен») also goes to PLAYBOOK.md.`);
+  }
+  else if (k.startsWith('idea-')) {
+    const item = loadItems(studio).items.find((x) => x.id === k.slice(5));
+    lines.push(`THIS CHAT is about ONE idea: item id ${k.slice(5)}${item ? ` «${item.title}»` : ''} in ${relative(BOT, studio)}/items.json. Edit ONLY that item (keep its other fields): title, format, rubric and idea {about, hook (the chosen crochet), hooks: [{text, why}] (variants), flow: [one line per scene, «0–2 с · what happens · on screen»], shoot: [{text, done}] (what to film), facts: [{text, ok}] (ok false = check before filming), why, src, similar}. The page redraws from the file.`,
+      `- After each change say in 1–3 lines what changed, as «было → стало». Never invent numbers or prices: take them from facts.json, else add a fact with ok false and «[проверить]».`,
+      `- Do not start a reel and do not touch other items or ideas.md here; general rules the owner states go to PLAYBOOK.md.`);
+  }
   else if (k.startsWith('new-')) lines.push('THIS CHAT starts a NEW reel. Create its folder with `node scripts/new-reel.mjs <latin-slug>` as soon as the idea is clear, before anything else; the page then moves this chat to that reel. One reel per chat.');
   else if (k.startsWith('post-')) {
     const dir = join(studio, 'posts', k.slice(5));
@@ -996,6 +1011,49 @@ createServer(async (req, res) => {
     if (!made.length) return json(400, {});
     log(me.name, `новые выпуски «${made[0].title}»: ${made.map((x) => x.format).join(', ')}`);
     return json(200, {items: made});
+  }
+  // Идеи (handbook/IDEAS.md): GET /api/ideas/bank, «Нет» with a reason and «Вернуть».
+  if (req.method === 'GET' && url.pathname === '/api/ideas/bank') {
+    syncItems(studio);
+    return json(200, {bank: ideaBank(studio)});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/ideas/drop') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const r = dropIdea(studio, String(b.id || ''), String(b.reason || '').trim(), {by: me.name});
+    if (!r) return json(404, {});
+    log(me.name, `отбросил идею «${r.title}»: ${b.reason || '—'}`);
+    return json(200, r);
+  }
+  if (req.method === 'POST' && url.pathname === '/api/ideas/undrop') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    if (!undropIdea(studio, String(b.title || ''))) return json(404, {});
+    const {data} = syncItems(studio);
+    log(me.name, `вернул идею «${b.title}»`);
+    return json(200, {item: data.items.find((x) => x.ref?.kind === 'idea' && x.ref.id === b.title) || null});
+  }
+  // Референсы проекта (web/refs.mjs): a link or an uploaded file; the server fetches it.
+  if (req.method === 'GET' && url.pathname === '/api/refs') {
+    const data = loadRefs(studio);
+    return json(200, {summary: data.summary || '', list: data.list.map((r) => refView(studio, r, mediaUrl))});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/refs') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    if (b.add) {
+      const u = String(b.add.url || '');
+      // An uploaded file comes as its /media link; only files inside the projects are taken.
+      const file = /^\/media\?p=/.test(u) ? mediaPath(decodeURIComponent(u.slice(9))) : null;
+      if (!file && !/^https?:\/\//.test(u)) return json(400, {error: 'нужна ссылка или файл'});
+      const {ref} = addRef(studio, {url: file ? null : u, name: b.add.name || (file ? basename(file) : ''), rubric: b.add.rubric, by: me.name});
+      prepRef(studio, ref.id, file ? {path: file} : {url: u});
+      log(me.name, `добавил референс ${ref.name}`);
+      return json(200, {ref});
+    }
+    const r = changeRef(studio, String(b.id || ''), b);
+    if (!r) return json(404, {});
+    return json(200, {ref: r});
   }
   if (req.method === 'GET' && url.pathname === '/api/knowledge') {
     const ds = join(studio, 'design-system', 'index.html');
