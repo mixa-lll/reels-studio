@@ -1991,7 +1991,7 @@ async function renderVersions(id, data) {
     </div>
     <div class="binfo">
       ${cur ? `<div><div class="ln-lh">Версии · ${vs.length}${withVideo.length > 1 ? `<a href="#/reel/${esc(id)}/compare">сравнить ${esc((prevOf(sel) || withVideo[1]).v)} ↔ ${esc((prevOf(sel) ? sel : withVideo[0]).v)}</a>` : ''}</div>
-        <div class="vcards">${vs.map(card).join('')}</div></div>` : '<p class="small muted">Версий пока нет. Напишите в чате справа, что снять или смонтировать.</p>'}
+        <div class="vcards">${vs.map(card).join('')}</div>${isOwner() && (data.storage?.reclaimLatest || data.storage?.trash || data.storage?.packed) ? `<p class="small muted" style="margin: 8px 0 0; display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline">${data.storage.packed ? '<span class="chip">упакован</span>' : ''}${data.storage.reclaimLatest ? `<button type="button" class="linkbtn" id="keepLatest">Оставить только последнюю · ${mb(data.storage.reclaimLatest)}</button>` : ''}${data.storage.trash ? `<button type="button" class="linkbtn" id="restoreReel">Вернуть из корзины · ${mb(data.storage.trash)}</button>` : ''}</p>` : ''}</div>` : '<p class="small muted">Версий пока нет. Напишите в чате справа, что снять или смонтировать.</p>'}
       ${cur ? editsBlock(edits, sel, cur, nextV) : ''}
       ${cur && ed && sel === cur && !hasMaster(cur) ? `<p class="small muted" style="margin: 0">Нравится ${esc(cur.v)} как есть? <button type="button" class="linkbtn" id="acceptV">Принять и собрать мастер 1440p</button></p>` : ''}
       ${script.trim() ? `<details class="blk"><summary class="lbl" style="cursor: pointer">Сценарий</summary><div class="md" style="font-size: 14px">${md(script)}</div></details>` : ''}
@@ -2028,6 +2028,8 @@ async function renderVersions(id, data) {
     await post('/api/reel/variant', {reel: id, v: b.dataset.vlabel, label}).catch(() => null);
     renderVersions(id);
   }));
+  $('#keepLatest')?.addEventListener('click', async () => { if (!confirm(`Оставить только последнюю версию? У старых уйдут видео (${mb(data.storage.reclaimLatest)}); обложки, снимки кода и мастера останутся. 30 дней их можно вернуть.`)) return; const {freed} = await post('/api/free', {reel: id, mode: 'latest'}); toast(freed ? `Освобождено ${mb(freed)}` : 'Нечего освобождать'); sidebar(); renderVersions(id); });
+  $('#restoreReel')?.addEventListener('click', async () => { const {restored} = await post('/api/reel/restore', {reel: id}); toast(restored ? `Вернули из корзины: ${restored}` : 'В корзине уже ничего нет'); sidebar(); renderVersions(id); });
   el.querySelectorAll('[data-vready]').forEach((b) => (b.onclick = async () => { await post('/api/reel/ready', {reel: id, v: b.dataset.vready}); toast(`${b.dataset.vready} идёт в «Готово»`); renderVersions(id); }));
   el.querySelectorAll('[data-eseek]').forEach((b) => b.closest('#bStrip') || (b.onclick = () => { if (rv) { rv.currentTime = Number(b.dataset.eseek); rv.pause(); rv.scrollIntoView({block: 'nearest'}); } }));
   el.querySelectorAll('[data-erm]').forEach((b) => (b.onclick = async () => { await post('/api/reel/edits', {reel: id, action: 'remove', id: b.dataset.erm}); renderVersions(id); }));
@@ -2920,16 +2922,18 @@ async function vFiles() {
   const used = OV.disk.total - OV.disk.free;
   const sw = (k, on, text) => `<div class="li"><button type="button" class="sw" role="switch" aria-checked="${on}" data-pol="${k}" ${isOwner() ? '' : 'disabled'} aria-label="${esc(text)}"></button><span style="flex: 1">${text}</span></div>`;
   view.innerHTML = `<div class="page">
-    <div class="row" style="justify-content: space-between"><div><div class="small muted">Проект</div><h1>Файлы и место</h1></div>${isOwner() ? '<button type="button" class="btn dark" id="freeAll">Применить правила ко всем рилсам</button>' : ''}</div>
+    <div class="row" style="justify-content: space-between"><div><div class="small muted">Проект</div><h1>Файлы и место</h1></div>${isOwner() && s.reclaim ? `<button type="button" class="btn dark" id="freeAll">Освободить ${mb(s.reclaim)}</button>` : ''}</div>
+    <p class="small muted" style="margin: -6px 0 14px">${s.reclaim ? `Сейчас можно освободить ${mb(s.reclaim)} — это черновые копии старых версий.` : 'Лишнего сейчас нет.'}${s.trash ? ` В корзине студии ${mb(s.trash)} — их можно вернуть 30 дней, потом корзина очищается сама.` : ''}</p>
     <div class="split">
       <section class="grow card"><div class="row" style="justify-content: space-between"><h2>Больше всего места</h2><span class="small muted">проект ${mb(s.total)} · диск ${mb(used)} из ${mb(OV.disk.total)}</span></div>
-        ${s.reels.map((r) => `<div class="li"><a href="#/reel/${r.id}" style="flex: 1; min-width: 180px; text-decoration: none"><b>${esc(r.num)}</b> ${esc(r.title)}</a><span class="small muted">версии ${mb(r.versions)} · исходники ${mb(r.sources)}</span>${isOwner() ? `<button type="button" class="btn" data-free="${esc(r.id)}" style="min-height: 34px; font-size: 13px">Освободить</button>` : ''}</div>`).join('')}
+        ${s.reels.map((r) => `<div class="li"><a href="#/reel/${r.id}" style="flex: 1; min-width: 180px; text-decoration: none"><b>${esc(r.num)}</b> ${esc(r.title)}</a><span class="small muted">${r.packed ? '<span class="chip">упакован</span> ' : ''}версии ${mb(r.versions)} · исходники ${mb(r.sources)}${r.reclaim ? ` · лишнее ${mb(r.reclaim)}` : ''}</span>${isOwner() && r.reclaim ? `<button type="button" class="btn" data-free="${esc(r.id)}" style="min-height: 34px; font-size: 13px">Освободить</button>` : ''}${isOwner() && r.trash ? `<button type="button" class="btn" data-restore="${esc(r.id)}" style="min-height: 34px; font-size: 13px" title="Вернуть из корзины ${mb(r.trash)}">Вернуть</button>` : ''}</div>`).join('')}
         <div class="li"><span style="flex: 1">Входящие файлы</span><span class="small muted">${mb(s.inbox)}</span></div></section>
       <section class="side2 card"><h2>Как экономим место</h2>
-        ${sw('keepPrevious', pol.keepPrevious, 'Новая версия готова — у прошлой стираем мастер, оставляем лёгкую копию для сравнения')}
-        ${sw('archiveOlder', pol.archiveOlder, 'Старше прошлой — только кадр и снимок проекта: пересобирается по кнопке')}
-        ${sw('finalOnly', pol.finalOnly, 'Рилс принят (в «Done») — у старых версий удаляются черновые копии; мастера (RU, EN и т. п.) не удаляются никогда')}
-        <p class="small muted">Правила применяются сами после каждой новой версии. Снимок проекта — код рилса без медиа, обычно меньше мегабайта.</p></section>
+        ${sw('keepPrevious', pol.keepPrevious, 'Новая версия готова — у прошлой остаётся одна лёгкая копия, чтобы сравнить')}
+        ${sw('archiveOlder', pol.archiveOlder, 'Старше прошлой — только кадр и снимок кода: пересобирается по кнопке')}
+        ${sw('finalOnly', pol.finalOnly, 'Рилс принят или вышел — черновые копии старых версий уходят')}
+        ${sw('pack', pol.packAfterDays > 0, `Рилс вышел ${pol.packAfterDays || 14} дней назад — упаковываем: остаются итоговая версия, обложка, сценарий и исходники, медиа проекта уходят`)}
+        <p class="small muted">Не трогаем никогда: текущую версию, выбранную в «Готово», мастера (RU, EN и т. п.) и то, что ждёт выкладки. Правила срабатывают после каждой новой версии — в студии и в боте — и раз в ночь. Файлы сначала уходят в корзину студии: 30 дней их можно вернуть кнопкой у рилса.</p></section>
     </div>
     <section id="fromAuthors" style="margin-bottom: 18px"></section><section><div class="row" style="justify-content: space-between; margin-bottom: 10px"><h2>Входящие — всё, что присылали боту и в общий чат</h2><span class="small muted">материалы рилса — во вкладке «Файлы» у рилса</span></div><div class="fgrid" id="inbox"></div></section></div>`;
   api('/api/authors').then(({authors}) => {
@@ -2942,9 +2946,10 @@ async function vFiles() {
   api('/api/files').then(({inbox}) => {
     $('#inbox').innerHTML = inbox.slice(0, 60).map((f) => `<div class="fcard"><a class="pv" href="${f.url}" target="_blank" rel="noopener" ${f.kind === 'image' ? `style="background-image: url('${f.url}')"` : ''}>${f.kind === 'video' ? `<video src="${f.url}#t=0.5" preload="metadata" muted playsinline></video>` : f.kind === 'image' ? '' : esc((f.name.split('.').pop() || '').toUpperCase())}</a><div class="meta"><b title="${esc(f.name)}">${esc(f.name.split('/').pop())}</b><span class="muted">${mb(f.size)} · ${ago(f.at)}</span><a href="${f.url}&dl=1">Скачать</a></div></div>`).join('') || '<p class="small muted">Пусто.</p>';
   });
-  view.querySelectorAll('[data-pol]').forEach((b) => (b.onclick = async () => { await post('/api/policy', {[b.dataset.pol]: b.getAttribute('aria-checked') !== 'true'}); vFiles(); }));
+  view.querySelectorAll('[data-pol]').forEach((b) => (b.onclick = async () => { const on = b.getAttribute('aria-checked') !== 'true'; await post('/api/policy', b.dataset.pol === 'pack' ? {packAfterDays: on ? 14 : 0} : {[b.dataset.pol]: on}); vFiles(); }));
+  view.querySelectorAll('[data-restore]').forEach((b) => (b.onclick = async () => { b.disabled = true; const {restored} = await post('/api/reel/restore', {reel: b.dataset.restore}); toast(restored ? `Вернули из корзины: ${restored}` : 'В корзине уже ничего нет'); sidebar(); vFiles(); }));
   view.querySelectorAll('[data-free]').forEach((b) => (b.onclick = async () => { b.disabled = true; const {freed} = await post('/api/free', {reel: b.dataset.free}); toast(freed ? `Освобождено ${mb(freed)}` : 'Здесь уже нечего освобождать'); sidebar(); vFiles(); }));
-  $('#freeAll')?.addEventListener('click', async () => { if (!confirm('Применить правила хранения ко всем рилсам? Старые версии уйдут в архив.')) return; const {freed} = await post('/api/free', {}); toast(freed ? `Освобождено ${mb(freed)}` : 'Нечего освобождать'); sidebar(); vFiles(); });
+  $('#freeAll')?.addEventListener('click', async () => { if (!confirm(`Освободить ${mb(s.reclaim)}? Черновые копии старых версий уйдут в корзину студии на 30 дней; обложки и снимки кода останутся.`)) return; const {freed} = await post('/api/free', {}); toast(freed ? `Освобождено ${mb(freed)}` : 'Нечего освобождать'); sidebar(); vFiles(); });
 }
 
 // ---------- team (handbook/ROADMAP.md этап 5; canvas D1–D5 «Доступ и роли») ----------

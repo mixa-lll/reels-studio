@@ -31,6 +31,7 @@ import {authors} from './author.mjs';
 import {isEditor} from './roles.mjs';
 import {claim as claimInvite, FILE as memberFile, member, publishBot, touch} from './members.mjs';
 import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
+import {apply as storageApply, outboxVersions, publishedAt, readPolicy} from './storage.mjs';
 
 // Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
 for (const level of ['log', 'error']) {
@@ -708,12 +709,29 @@ async function trackUsage(res) {
     const reel = touchedReel(res.startedAt);
     recordTurn({startedAt: res.startedAt, reel, before: state.limits, after: limits, cost: res.cost, tokens: res.tokens});
     if (reel) state.lastReel = reel;
+    if (reel) tidyReel(reel);
     if (limits) state.limits = {...state.limits, ...limits};
     state.warned ??= {};
     for (const w of limitWarnings(state.limits, state.warned, LANG)) await tg.sendText(state.chatId, w.text, {silent: !w.loud});
     saveState(state);
   } catch (e) {
     console.error('usage', e.message);
+  }
+}
+
+// A new version from the bot: the studio's storage rules for that reel (web/data/policy.json).
+function tidyReel(reel) {
+  try {
+    const project = state.project || FIRST_PROJECT;
+    const dir = join(PROJECTS, project, 'reels', reel);
+    if (!existsSync(dir)) return;
+    let items = [];
+    try { items = JSON.parse(readFileSync(join(PROJECTS, project, 'items.json'), 'utf8')).items || []; } catch {}
+    const outbox = process.env.REELS_MEMBERS ? join(dirname(process.env.REELS_MEMBERS), 'outbox.json') : '';
+    const freed = storageApply(dir, {policy: readPolicy(join(ROOT, 'web', 'data', 'policy.json')), accepted: Boolean(publishedAt(dir, {items})), protect: outbox ? outboxVersions(outbox, project, reel) : []});
+    if (freed) console.log(`storage ${reel}: ${Math.round(freed / 1e6)} MB to the bin`);
+  } catch (e) {
+    console.error('storage', e.message);
   }
 }
 

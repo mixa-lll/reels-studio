@@ -23,6 +23,7 @@ import {bestVideo, linkPath, projectPath, readLink, signLink} from './dllink.mjs
 import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
 import {telegramDigest} from '../bot/tgexport.mjs';
+import {apply as storageApply, dirSize, inTrash, isPacked, outboxVersions, plan as storagePlan, publishedAt, readPolicy, restore as storageRestore, sweep as storageSweep, versionDirs} from '../bot/storage.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BOT = process.env.REELS_BOT_ROOT || join(HERE, '..');
@@ -102,20 +103,6 @@ function parseIdeas(p) {
   return out;
 }
 const reelNumber = (s) => /^(\d{1,3})\b/.exec(s)?.[1]?.padStart(2, '0');
-function dirSize(p) {
-  let n = 0;
-  try {
-    const st = lstatSync(p);
-    if (st.isSymbolicLink()) return 0;
-    if (!st.isDirectory()) return st.size;
-    for (const f of readdirSync(p)) n += dirSize(join(p, f));
-  } catch {}
-  return n;
-}
-const versionDirs = (reelDir) => {
-  const d = join(reelDir, 'versions');
-  return existsSync(d) ? readdirSync(d).filter((v) => /^v\d+$/.test(v)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : [];
-};
 // The rubric templates' catalog: scene kinds and the templates built from them.
 // What a reference can lend a rubric (кусок 15).
 const REF_TAKES = ['hook', 'edit', 'plates', 'delivery', 'sound', 'cover'];
@@ -194,51 +181,37 @@ function uniquePath(dir, name) {
 // ---------- storage policy ----------
 
 const POLICY = join(DATA, 'policy.json');
-const policy = () => ({keepPrevious: true, archiveOlder: true, finalOnly: true, ...readJson(POLICY, {})});
-// Copies the reel's code (not its media) next to a version, so an archived one can be rebuilt.
-function snapshot(dir, v) {
-  const target = join(dir, 'versions', v, 'project-snapshot');
-  const project = join(dir, 'project');
-  if (existsSync(target) || !existsSync(project)) return;
-  mkdirSync(target, {recursive: true});
-  for (const f of readdirSync(project)) {
-    const full = join(project, f);
-    if (f === 'node_modules' || f === 'public' || lstatSync(full).isSymbolicLink()) continue;
-    if (lstatSync(full).isDirectory() ? f === 'src' : /\.(mjs|js|ts|tsx|json|md)$/.test(f) && f !== 'package-lock.json') cpSync(full, join(target, f), {recursive: true});
+const policy = () => readPolicy(POLICY);
+const statusOf = (p) => { const all = reels(p); return (r) => all.find((x) => x.id === r)?.status; };
+const reelItems = (p) => readJson(join(PROJECTS, p, 'items.json'), {}).items || [];
+// The rules for one reel (after each version, or the button): bot/storage.mjs.
+function retainOpts(p, r, mode = 'rules') {
+  const dir = reelDir(p, r);
+  const status = statusOf(p)(r);
+  const accepted = ['done', 'published'].includes(status) || Boolean(publishedAt(dir, {items: reelItems(p), status}));
+  return {policy: policy(), accepted, mode, protect: outboxVersions(OUTBOX, p, r)};
+}
+function retain(p, r, mode) {
+  const dir = reelDir(p, r);
+  return dir ? storageApply(dir, retainOpts(p, r, mode)) : 0;
+}
+const reclaimable = (p, r, mode) => { const dir = reelDir(p, r); return dir ? storagePlan(dir, retainOpts(p, r, mode)).reduce((s, x) => s + x.size, 0) : 0; };
+// Once a night: the rules over every reel, and packing for reels out for a while.
+function nightly() {
+  for (const {slug: p} of projects()) {
+    const {freed, reels: done, emptied} = storageSweep(join(PROJECTS, p), {policy: policy(), statusOf: statusOf(p), busy: (r) => Boolean(jobOf(p, r)), outbox: OUTBOX, project: p});
+    if (freed) console.log(`storage ${p}: ${Math.round(freed / 1e6)} MB to the bin (${done.map((x) => x.reel + (x.packed ? ' packed' : '')).join(', ')})`);
+    if (emptied) console.log(`storage ${p}: emptied ${Math.round(emptied / 1e6)} MB from the bin`);
   }
 }
-function retain(p, r) {
-  const dir = reelDir(p, r);
-  if (!dir) return 0;
-  const pol = policy();
-  const vs = versionDirs(dir);
-  if (!vs.length) return 0;
-  snapshot(dir, vs.at(-1));
-  const accepted = ['done', 'published'].includes(reels(p).find((x) => x.id === r)?.status);
-  let freed = 0;
-  vs.slice(0, -1).forEach((v, i, older) => {
-    const vdir = join(dir, 'versions', v);
-    // A master is a deliverable, not a draft: a reel can have several finished variants
-    // (RU v1, EN v2), so masters are never archived — only review copies are.
-    const keep = readdirSync(vdir).some((f) => /1440p|1080p|master/i.test(f)) || existsSync(join(vdir, 'variant.json'));
-    const videos = readdirSync(vdir).filter((f) => /\.(mp4|mov|webm)$/i.test(f) && !/1440p|1080p|master/i.test(f)).map((f) => ({f, size: statSync(join(vdir, f)).size})).sort((a, b) => a.size - b.size);
-    if (!videos.length) return;
-    // With its master kept, a version stays fully usable: its light copy stays too, for watching.
-    if (keep) return;
-    const previous = i === older.length - 1;
-    let drop = [];
-    if (accepted && pol.finalOnly) drop = videos;
-    else if (previous && pol.keepPrevious) drop = videos.slice(1);
-    else if (!previous && pol.archiveOlder) drop = videos;
-    else if (previous && !pol.keepPrevious && pol.archiveOlder) drop = videos;
-    if (!drop.length) return;
-    for (const {f, size} of drop) { rmSync(join(vdir, f), {force: true}); freed += size; }
-    const prev = readJson(join(vdir, 'ARCHIVED.json'), {freed: 0});
-    const left = videos.length - drop.length;
-    writeJson(join(vdir, 'ARCHIVED.json'), {state: left ? 'previous' : 'old', at: Date.now(), freed: prev.freed + drop.reduce((s, x) => s + x.size, 0)});
-  });
-  return freed;
-}
+
+const NIGHTLY = join(DATA, 'storage-nightly.txt');
+const today = () => new Date().toLocaleDateString('sv');
+setInterval(() => {
+  if (new Date().getHours() < 3 || read(NIGHTLY).trim() === today()) return;
+  writeFileSync(NIGHTLY, today());
+  try { nightly(); } catch (e) { console.error('storage', e.message); }
+}, 15 * 60e3).unref();
 
 // ---------- chats ----------
 // One chat per reel, plus «_project» (general) and «_ds» (design system); a new reel
@@ -1041,7 +1014,8 @@ createServer(async (req, res) => {
     if (!dir) return json(404, {});
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
       ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
-      outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10)});
+      outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10),
+      storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}});
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
   // point on the frame; «Собрать vN» hands the open ones to the reel chat (edits.json).
@@ -1349,25 +1323,36 @@ createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/storage') {
     const list = reels(p).map((r) => {
       const dir = join(studio, 'reels', r.id);
-      return {id: r.id, title: r.title, num: r.num, versions: dirSize(join(dir, 'versions')), sources: dirSize(join(dir, 'sources')) + dirSize(join(dir, 'project'))};
+      return {id: r.id, title: r.title, num: r.num, versions: dirSize(join(dir, 'versions')), sources: dirSize(join(dir, 'sources')) + dirSize(join(dir, 'project')),
+        reclaim: reclaimable(p, r.id), reclaimLatest: reclaimable(p, r.id, 'latest'), trash: inTrash(dir), packed: isPacked(dir)};
     }).sort((a, b) => b.versions + b.sources - a.versions - a.sources);
-    return json(200, {reels: list, inbox: dirSize(join(studio, 'inbox')), total: dirSize(studio), policy: policy()});
+    return json(200, {reels: list, inbox: dirSize(join(studio, 'inbox')), total: dirSize(realpathSync(studio)), reclaim: list.reduce((n, r) => n + r.reclaim, 0), trash: list.reduce((n, r) => n + r.trash, 0), policy: policy()});
   }
   if (req.method === 'POST' && url.pathname === '/api/policy') {
     if (!can('owner')) return json(403, {});
     const b = await body(req);
     const next = {...policy()};
     for (const k of ['keepPrevious', 'archiveOlder', 'finalOnly']) if (typeof b[k] === 'boolean') next[k] = b[k];
+    if (Number.isInteger(b.packAfterDays) && b.packAfterDays >= 0 && b.packAfterDays <= 365) next.packAfterDays = b.packAfterDays;
     writeJson(POLICY, next);
     log(me.name, 'поменял правила хранения');
     return json(200, next);
   }
-  if (req.method === 'POST' && url.pathname === '/api/free') {
+  if (req.method === 'POST' && url.pathname === '/api/reel/restore') {
     if (!can('owner')) return json(403, {});
     const {reel} = await body(req);
+    const dir = reelDir(p, reel);
+    if (!dir) return json(404, {});
+    const n = storageRestore(dir);
+    log(me.name, `вернул из корзины ${n} файл(а) рилса «${reel}»`);
+    return json(200, {restored: n});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/free') {
+    if (!can('owner')) return json(403, {});
+    const {reel, mode} = await body(req);
     const list = reel ? [reel] : reels(p).map((r) => r.id);
     let freed = 0;
-    for (const r of list) if (!jobOf(p, r)) freed += retain(p, r);
+    for (const r of list) if (!jobOf(p, r)) freed += retain(p, r, reel && mode === 'latest' ? 'latest' : 'rules');
     log(me.name, `освободил место${reel ? ` в «${reel}»` : ''}: ${Math.round(freed / 1e6)} МБ`);
     return json(200, {freed});
   }
