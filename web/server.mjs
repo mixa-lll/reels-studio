@@ -4,8 +4,9 @@
 // through web/send.mjs, which appends events here; this server streams them, the render
 // progress and the final reply to the page. No dependencies.
 //
-// Unlike the Telegram bot, the agent here never gets unrestricted permissions: only the
-// tools in ALLOWED run, and DENIED keeps it away from this server's own files.
+// Like the Telegram bot, the agent runs with full permissions: every tool, any command
+// (Whisper, masks, Python, downloads). Only editors reach the chats. DENIED keeps it away
+// from this server's own files (sessions, passwords, invites).
 import {createServer} from 'node:http';
 import {spawn} from 'node:child_process';
 import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
@@ -45,14 +46,6 @@ const PORT = Number(process.env.PORT || 8080);
 const KEY = process.env.WEB_KEY;
 const PAGE = readFileSync(join(HERE, 'index.html'), 'utf8');
 const TYPES = {'.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2'};
-const ALLOWED = [
-  'Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
-  ...['new-reel', 'render', 'ffmpeg', 'beats', 'loudnorm'].map((s) => `Bash(node scripts/${s}.mjs:*)`),
-  `Bash(node ${SEND}:*)`,
-  // The agent runs in BOT and often calls it by the short path.
-  `Bash(node ${relative(BOT, SEND)}:*)`,
-  'Bash(npx tsc:*)',
-];
 // People, invites and the log are shared with the Telegram bot (bot/members.mjs).
 const SHARED = process.env.REELS_MEMBERS ? dirname(process.env.REELS_MEMBERS) : join(BOT, 'data', 'shared');
 // Scheduled publishing packages; the bot sends them (bot/outbox.mjs).
@@ -238,7 +231,7 @@ function preamble(p, k) {
   const lines = [
     `You are running as the WEB version of the reels bot: the owner talks to you in a browser page, not in Telegram. Follow AGENTS.md and REELS.md with these differences:`,
     `- Wherever REELS.md says \`node bot/send.mjs\`, run \`node ${SEND}\` instead, with the same options (--status, --text, --keyboard, --ideas, --buttons, --file, --caption, --menu). Never run bot/send.mjs.`,
-    `- Only these tools are allowed here: file tools (Read, Write, Edit, Glob, Grep), WebSearch, WebFetch, and Bash limited to \`node scripts/<new-reel|render|ffmpeg|beats|loudnorm>.mjs …\` and \`node ${SEND} …\` run from the bot folder. Do everything through them (write files with Write, not shell commands). If a step needs something else (e.g. downloading a track), say so in one line and suggest the owner attach the file on the page.`,
+    `- You have every tool and any shell command, like the Telegram bot: Whisper, person masks, Python, ffmpeg, downloads. Never say a step «can't be done in the web version»; do it here. For footage use REELS.md «Footage toolkit» (scripts/transcribe.mjs, speech.mjs, mask.mjs, captions.mjs). Never touch web/ or data/ of the bot folder (the server's own files) and never restart services.`,
     `- Always answer the owner in Russian, whatever language the files, logs or tools use; keep paths, commands and code as they are.`,
     `- The page shows videos inline, has no file size limit and keeps every version in a side panel, so you do not need to resend old versions. There are no voice messages.`,
     `- Files the owner attaches arrive as \`(attached file → <path>)\`; button taps as in REELS.md.`,
@@ -296,7 +289,7 @@ function startTurn(p, k, text, send) {
   const studio = join(PROJECTS, p);
   const reelsBefore = new Set(existsSync(join(studio, 'reels')) ? readdirSync(join(studio, 'reels')) : []);
   const args = ['-p', `${preamble(p, k)}\n\n${text}`, '--output-format', 'stream-json', '--verbose',
-    '--allowedTools', ALLOWED.join(','), '--disallowedTools', DENIED.join(','),
+    '--dangerously-skip-permissions', '--disallowedTools', DENIED.join(','),
     '--setting-sources', 'project,local', '--strict-mcp-config', '--mcp-config', emptyMcp,
     // A project may be a link to a folder outside the studio (My Gudauri → Рилсы/студия): Claude
     // resolves links, so that real folder must be allowed too or every write there is refused.
