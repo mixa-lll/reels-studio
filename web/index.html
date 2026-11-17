@@ -508,6 +508,42 @@
   .cmp2 { display: flex; gap: 20px; justify-content: center; } .cmpv { display: flex; flex-direction: column; gap: 6px; align-items: center; }
   .cmpv video { height: min(520px, calc(100vh - 380px)); aspect-ratio: 9 / 16; background: #000; border-radius: 12px; }
   @media (max-width: 900px) { .bld { flex-direction: column; padding: 16px; } .bplay { width: 100%; position: static; } .cmpv video { height: 46vh; } }
+  /* Идеи (handbook/IDEAS.md): накидать пачку, разобрать, банк, референсы. */
+  .ideas { flex: 1; overflow-y: auto; min-width: 0; }
+  .ideas [hidden], .rmain [hidden] { display: none !important; }
+  .ideas .in { max-width: 1180px; padding: 24px 40px 64px; display: flex; flex-direction: column; gap: 22px; }
+  .igen { border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .igen .row1 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
+  .ipill { min-height: 36px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font: inherit; font-size: 14px; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .ipill.on { border-color: var(--ink); background: #F5F5F5; } .ipill.dark.on { background: var(--ink); color: #fff; }
+  .ipill .c { color: var(--muted); font-size: 12px; } .ipill.dark.on .c { color: #D4D4D4; }
+  .ibar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; gap: 2px; }
+  .icards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .icard { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .icard.taken { border-color: #BBE5C8; background: #F3FBF5; } .icard.no { background: #FAFAFA; opacity: .75; }
+  .icard a.t { text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: 6px; }
+  .icard a.t b { font-weight: 600; font-size: 15px; line-height: 1.3; } .icard a.t span { color: var(--ink2); }
+  .icard .sim { font-size: 12px; padding: 6px 9px; border-radius: 8px; background: #FFF7E6; color: #7A4A00; }
+  .icard .src { font-size: 12px; color: var(--muted); }
+  .icard .acts { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; flex-wrap: wrap; align-items: center; }
+  .icard .acts .ln-btn.p { flex: 1; justify-content: center; }
+  .ihead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .iprog { flex: 1 1 120px; height: 6px; border-radius: 999px; background: #F2F2F2; overflow: hidden; } .iprog i { display: block; height: 6px; background: var(--ink); }
+  .ibank { width: 100%; border-collapse: collapse; min-width: 720px; }
+  .ibank th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 10px 14px; background: #FAFAFA; }
+  .ibank td { padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: top; }
+  .istat { font-size: 12px; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .irefs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .iref { display: flex; flex-direction: column; gap: 6px; border: 0; background: none; padding: 0; text-align: left; font: inherit; color: var(--ink); cursor: pointer; }
+  .iref .th { aspect-ratio: 9 / 16; border-radius: 12px; background: #2F3B4A center / cover no-repeat; display: flex; align-items: flex-end; padding: 8px; outline: 2px solid transparent; outline-offset: 2px; }
+  .iref.on .th { outline-color: var(--ink); }
+  .iref .th span { font-size: 11px; font-weight: 600; color: #fff; background: rgba(0,0,0,.5); padding: 2px 7px; border-radius: 6px; }
+  .ifr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; } .ifr img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; border-radius: 6px; background: var(--soft); }
+  .isec { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .isec h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .ihook { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font: inherit; color: var(--ink); cursor: pointer; }
+  .ihook.on { border-color: var(--ink); background: #FAFAFA; } .ihook i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #A3A3A3; flex: none; margin-top: 3px; } .ihook.on i { border: 5px solid var(--ink); }
+  @media (max-width: 760px) { .ideas .in { padding: 16px; } }
 </style>
 <script src="/preview.js"></script>
 </head>
@@ -567,6 +603,7 @@ const ICON = {
   board: '<rect x="3" y="3" width="7" height="18" rx="2"></rect><rect x="14" y="3" width="7" height="11" rx="2"></rect>',
   chat: '<path d="M4 5h16v11H8l-4 4Z"></path>',
   idea: '<path d="M9 18h6M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"></path>',
+  spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path><path d="M19 15v4M17 17h4"></path>',
   target: '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle>',
   search: '<circle cx="11" cy="11" r="7"></circle><path d="m21 21-4.3-4.3"></path>',
   pen: '<path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path>',
@@ -670,6 +707,7 @@ async function sidebar() {
     <button type="button" class="srch" id="srchBtn">${svg('search', 15)}<span>Поиск</span><kbd>⌘K</kbd></button>
     ${item('#/', 'home', 'Сегодня')}
     ${item('#/all', 'board', 'Выпуски', `<span class="n">${OV.reels.length + (OV.posts || []).length}</span>`)}
+    ${item('#/ideas', 'spark', 'Идеи')}
     ${item('#/plan', 'cal', 'План')}
     ${item('#/memory', 'idea', 'Память')}
     ${modOn('staff') && feat('inbox') ? item('#/inbox', 'inbox', 'Входящие', OV.inbox ? `<span class="bdg">${OV.inbox}</span>` : '') : ''}
@@ -1307,8 +1345,18 @@ async function vItem(id) {
   const field = (f, label, v, rows, ph) => `<label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">${label}</span><textarea class="f" data-i="${f}" rows="${rows}" placeholder="${ph}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; line-height: 1.55; resize: vertical">${esc(v || '')}</textarea></label>`;
   const prop = (k, v) => `<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span class="muted" style="flex: 0 0 72px">${k}</span><span style="flex: 1; display: flex; justify-content: flex-end">${v}</span></div>`;
   const sel = (f, opts, cur) => `<select class="f" data-i="${f}" ${ed ? '' : 'disabled'} style="width: auto; min-height: 30px; font-size: 13px; font-weight: 600; border-color: transparent; text-align: right">${opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  // An idea from a batch (Идеи › Накидать) walks through its batch with ‹ ›.
+  const mates = x.batch ? ITEMS.items.filter((y) => y.batch === x.batch) : [];
+  const at = mates.findIndex((y) => y.id === x.id);
+  const prev = at > 0 ? mates[at - 1] : null, next = at >= 0 && at < mates.length - 1 ? mates[at + 1] : null;
+  const idea = x.idea || {};
+  const hooks = [...(idea.hooks || [])];
+  if (idea.hook && !hooks.some((h) => h.text === idea.hook)) hooks.unshift({text: idea.hook, why: 'сейчас'});
+  const sec = (h, inner, act = '') => `<section class="isec"><div class="row" style="gap: 8px"><h2 style="flex: 1">${h}</h2>${act}</div>${inner}</section>`;
+  const askBtn = (t, label) => ed ? `<button type="button" class="ln-btn s" data-ask="${esc(t)}">${label || t}</button>` : '';
   view.innerHTML = `<div class="work"><div class="rmain">
-    <div class="ln-top"><span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b>${esc(x.title)}</b><span>· ${r ? esc(r.name) + ' · ' : ''}${FMT_NAME[x.format].toLowerCase()} · ${whenText(x.at)}</span><span style="flex: 1"></span>${x.proposed ? '<span class="small muted">предложение</span>' : ''}</div>
+    <div class="ln-top">${x.batch ? `<a href="#/ideas/${esc(x.batch)}" style="color: var(--muted); text-decoration: none">Пачка ${esc(batchName(x.batch))}</a><span>›</span><span>${at + 1} из ${mates.length}</span>
+      <a class="ln-btn s" ${prev ? `href="#/item/${esc(prev.id)}"` : 'aria-disabled="true" style="opacity: .4; pointer-events: none"'} aria-label="Предыдущая идея">‹</a><a class="ln-btn s" ${next ? `href="#/item/${esc(next.id)}"` : 'aria-disabled="true" style="opacity: .4; pointer-events: none"'} aria-label="Следующая идея">›</a><span>·</span>` : ''}<span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b>${esc(x.title)}</b><span>· ${r ? esc(r.name) + ' · ' : ''}${FMT_NAME[x.format].toLowerCase()} · ${whenText(x.at)}</span><span style="flex: 1"></span>${x.proposed ? '<span class="small muted">предложение</span>' : ''}</div>
     ${x.proposed ? '' : lifeBarFor(x, {controls: false}).replace('class="lbar"', 'class="lbar" style="padding: 10px 24px"')}
     <div style="flex: 1; overflow-y: auto; padding: 28px 40px; display: flex; gap: 32px; min-height: 0">
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px">
@@ -1317,7 +1365,12 @@ async function vItem(id) {
         ${field('about', 'О чём', x.idea?.about, 3, 'Одна-две фразы: о чём выпуск')}
         ${field('hook', 'Крючок — первые 2 секунды', x.idea?.hook, 2, 'Фраза или кадр, на котором остаются')}
         ${field('flow', 'Ход — по строке на шаг', (x.idea?.flow || []).join('\n'), 4, '1 · …\n2 · …\n3 · …')}
-        ${ed ? `<div class="row" style="gap: 8px">${['Другой крючок', 'Короче, 15 секунд', 'Распиши ход', 'Сделать каруселью'].map((t) => `<button type="button" class="ln-pill" data-ask="${t}">${t}</button>`).join('')}</div>` : ''}
+        ${ed ? `<div class="row" style="gap: 8px; flex-wrap: wrap">${['Короче, 15 секунд', 'Распиши ход', 'Сделать каруселью'].map((t) => `<button type="button" class="ln-pill" data-ask="${t}">${t}</button>`).join('')}</div>` : ''}
+        ${sec('Варианты крючка', hooks.length ? hooks.map((h, i) => `<button type="button" class="ihook ${h.text === idea.hook ? 'on' : ''}" ${ed ? `data-hook="${i}"` : 'disabled'} aria-pressed="${h.text === idea.hook}"><i></i><span style="display: flex; flex-direction: column; gap: 2px"><span>«${esc(h.text)}»</span>${h.why ? `<span class="small muted">${esc(h.why)}</span>` : ''}</span></button>`).join('') : '<span class="small muted">Пока один крючок — попросите варианты.</span>', askBtn('Предложи 3 новых варианта крючка: запиши их в hooks с короткими why, hook не меняй', 'Ещё 3 варианта'))}
+        ${sec('Что снять', `${(idea.shoot || []).map((s, i) => `<label class="row" style="gap: 8px; align-items: flex-start"><input type="checkbox" data-shoot="${i}" ${s.done ? 'checked' : ''} ${ed ? '' : 'disabled'} style="margin-top: 3px">${esc(s.text)}</label>`).join('') || '<span class="small muted">Список кадров ещё не составлен.</span>'}
+          ${ed ? '<form class="row" id="shootAdd" style="gap: 8px"><input class="f" id="shootIn" placeholder="Добавить кадр…" aria-label="Добавить кадр" style="flex: 1; min-height: 34px"><button class="ln-btn s">Добавить</button></form>' : ''}`, askBtn('Составь список «что снять» в shoot: каждый кадр одной строкой, что уже есть в материалах проекта — отметь done', idea.shoot?.length ? 'Пересобрать' : 'Составить'))}
+        ${idea.facts?.length ? sec('Факты — проверить до съёмки', idea.facts.map((f) => `<div class="row small" style="gap: 8px; align-items: flex-start"><span class="istat" style="background: ${f.ok ? '#F3FBF5' : '#FFF7E6'}; color: ${f.ok ? '#166534' : '#7A4A00'}">${f.ok ? 'есть' : 'проверить'}</span><span>${esc(f.text)}</span></div>`).join('')) : ''}
+        ${idea.src || idea.why || idea.similar ? sec('Откуда и зачем', `${idea.src ? `<span class="small"><span class="muted">Откуда:</span> ${esc(idea.src)}</span>` : ''}${idea.why ? `<span class="small"><span class="muted">Почему сработает:</span> ${esc(idea.why)}</span>` : ''}${idea.similar ? `<span class="small" style="padding: 6px 9px; border-radius: 8px; background: #FFF7E6; color: #7A4A00">Похоже на ${esc(idea.similar)}</span>` : ''}`) : ''}
       </div>
       <div style="flex: 0 0 280px; display: flex; flex-direction: column; gap: 14px">
         <div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
@@ -1325,14 +1378,16 @@ async function vItem(id) {
           ${prop('Формат', sel('format', Object.entries(FMT_NAME).filter(([k]) => k !== 'story'), x.format))}
           ${prop('Дата', `<input class="f" data-i="at" type="datetime-local" value="${esc((x.at || '').slice(0, 16))}" ${ed ? '' : 'readonly'} style="width: auto; min-height: 30px; font-size: 13px; border-color: transparent">`)}
         </div>
-        ${ed && x.proposed ? '<button type="button" class="ln-btn" id="iTake" style="height: 40px; justify-content: center">Взять в план</button>' : ''}
+        ${ed && x.proposed ? '<button type="button" class="ln-btn" id="iTake" style="height: 40px; justify-content: center">Взять</button>' : ''}
+        ${ed && x.proposed && x.ref?.kind === 'idea' ? `<details><summary class="small" style="cursor: pointer; color: var(--muted)">Не берём…</summary><div class="row" style="gap: 6px; flex-wrap: wrap; padding-top: 8px">${IDEA_REASONS.map((t) => `<button type="button" class="ipill" style="min-height: 30px; font-size: 12px" data-idrop="${esc(t)}">${t}</button>`).join('')}</div></details>` : ''}
         ${ed ? '<button type="button" class="ln-btn p" id="iGo" style="height: 44px; justify-content: center">Идея готова — что снять?</button>' : ''}
         <span class="small muted" style="line-height: 1.5">Claude составит список кадров, выпуск перейдёт на этап «Материал». Правки сохраняются сами.</span>
       </div>
     </div></div>
-    <aside class="chatcol" aria-label="Обсудить идею"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Обсудить идею</b></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+    <aside class="chatcol" aria-label="Чат идеи"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат идеи</b><span class="small muted">Claude правит только эту идею</span></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   wireLifeBar(view, () => vItem(id));
-  const box = chatBox('_project', {onDone: () => { sidebar(); vItem(id); }});
+  // Each idea has its own chat (server preamble «idea-<id>»): it edits only this item.
+  const box = chatBox('idea-' + x.id, {onDone: () => { ITEMS_AT = 0; sidebar(); if (location.hash === '#/item/' + id) vItem(id); }});
   $('#chatHost').append(box);
   const save = async (patch) => { await post('/api/items/set', {id, ...patch}); };
   view.querySelectorAll('[data-i]').forEach((el) => (el.onchange = () => {
@@ -1342,8 +1397,13 @@ async function vItem(id) {
     save({idea: {about: v('about'), hook: v('hook'), flow: v('flow').split('\n').map((l) => l.trim()).filter(Boolean)}});
   }));
   // The idea lives in items.json; Claude edits it there, by its id.
-  view.querySelectorAll('[data-ask]').forEach((b) => (b.onclick = () => box.say(`Идея «${x.title}» (projects/${P}/items.json, элемент id ${x.id}, поле idea: about, hook, flow). ${b.dataset.ask}${b.dataset.ask === 'Сделать каруселью' ? ': поменяй format на carousel и перепиши ход под 5–7 слайдов' : ''}. Запиши результат в это поле и коротко скажи здесь, что поменял.`, b.dataset.ask)));
-  $('#iTake')?.addEventListener('click', async () => { await save({take: true}); toast('Взято в план'); vItem(id); });
+  view.querySelectorAll('[data-ask]').forEach((b) => (b.onclick = () => box.say(`${b.dataset.ask}${b.dataset.ask === 'Сделать каруселью' ? ': поменяй format на carousel и перепиши ход под 5–7 слайдов' : ''}. Запиши в items.json и коротко скажи здесь, что поменял.`, b.textContent)));
+  $('#iTake')?.addEventListener('click', async () => { await save({take: true}); toast('Взято — в Выпусках, этап «Идея»'); vItem(id); });
+  view.querySelectorAll('[data-hook]').forEach((b) => (b.onclick = async () => { await save({idea: {hook: hooks[Number(b.dataset.hook)].text, hooks}}); vItem(id); }));
+  const shoot = idea.shoot || [];
+  view.querySelectorAll('[data-shoot]').forEach((c) => (c.onchange = () => save({idea: {shoot: shoot.map((s, i) => (i === Number(c.dataset.shoot) ? {...s, done: c.checked} : s))}})));
+  $('#shootAdd')?.addEventListener('submit', async (e) => { e.preventDefault(); const t = $('#shootIn').value.trim(); if (!t) return; await save({idea: {shoot: [...shoot, {text: t, done: false}]}}); vItem(id); });
+  view.querySelectorAll('[data-idrop]').forEach((b) => (b.onclick = async () => { await post('/api/ideas/drop', {id: x.id, reason: b.dataset.idrop}); toast('Отброшено — Claude учтёт причину'); location.hash = next ? '#/item/' + next.id : x.batch ? '#/ideas/' + x.batch : '#/ideas'; }));
   $('#iGo')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
     await loadItems();
@@ -2111,10 +2171,259 @@ async function vNew() {
     for (const x of items.filter((y) => y !== first && y.format !== 'reel')) await startItem(x);
     location.hash = await startItem(first);
   };
-  $('#nAsk').onclick = () => { sessionStorage.setItem('planLay', '1'); location.hash = '#/plan/draft'; };
+  $('#nAsk').onclick = () => { location.hash = '#/ideas'; };
   const fromRub = sessionStorage.getItem('newRubric');
   if (fromRub) { sessionStorage.removeItem('newRubric'); $('#nRub').value = fromRub; }
   draw();
+}
+
+// ---------- Идеи (handbook/IDEAS.md; холст «Студия · экран „Идеи“») ----------
+// Three tabs: Накидать (a batch of N ideas in all rubrics by share or in one, then
+// Взять / Открыть / Нет + причина), Банк идей (every idea of the project and where it is),
+// Референсы (the project's references, fetched by the server and studied by Claude).
+// Batches are written by Claude into ideas.md (Batch:, Rubric:, Source:, Similar:) in the
+// «_ideas» chat; the column with that chat stays folded until it is needed.
+const IDEA_REASONS = ['уже было', 'не наш тон', 'не снять сейчас', 'скучно'];
+const IDEA_SECTION = {"Owner's ideas": ['не взята', '#F2F2F2', '#404040'], 'My ideas': ['не взята', '#F2F2F2', '#404040'], 'In work': ['в работе', '#E8F0FE', '#1D4ED8'],
+  'In review': ['снят · на проверке', '#FFF7E6', '#7A4A00'], Done: ['готов', '#F3FBF5', '#166534'], Published: ['вышел', '#171717', '#FFFFFF'], Cancelled: ['отброшена', '#FAFAFA', '#737373']};
+const REF_TAKE_NAMES = {hook: 'крючок', edit: 'монтаж', plates: 'плашки', delivery: 'подача', sound: 'звук', cover: 'обложка', humor: 'юмор'};
+const batchName = (b) => { const m = /^(\d{4})-(\d\d)-(\d\d)(?:-(\d\d)(\d\d))?/.exec(b || ''); if (!m) return b || ''; const d = new Date(+m[1], +m[2] - 1, +m[3]); return `${d.getDate()} ${d.toLocaleDateString('ru', {month: 'long'}).replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я')}${m[4] ? `, ${m[4]}:${m[5]}` : ''}`; };
+const newBatchId = () => { const d = new Date(), z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };
+const ideaWord = (n) => (n % 10 === 1 && n % 100 !== 11 ? 'идея' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'идеи' : 'идей');
+
+let IDEAS_DRAW = 0;
+async function vIdeas(tab = '', sel = '') {
+  title('Идеи');
+  const ed = canEdit();
+  // Quick clicks start several draws; only the last one may paint.
+  const draw = ++IDEAS_DRAW;
+  const [, bankRes, refsRes] = await Promise.all([loadItems(), api('/api/ideas/bank').catch(() => ({bank: []})), tab === 'refs' ? api('/api/refs').catch(() => ({list: []})) : Promise.resolve(null)]);
+  if (draw !== IDEAS_DRAW || !location.hash.startsWith('#/ideas')) return;
+  const bank = bankRes.bank || [];
+  const rubs = ITEMS.rubrics;
+  const refsCount = refsRes ? refsRes.list.length : null;
+  const tabs = `<nav class="tabs" aria-label="Вкладки идей">${[['', 'Накидать'], ['bank', `Банк идей · ${bank.length}`], ['refs', 'Референсы' + (refsCount != null ? ' · ' + refsCount : '')]].map(([k, t]) => `<a href="#/ideas${k ? '/' + k : ''}" class="${k === tab ? 'on' : ''}" ${k === tab ? 'aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
+  view.innerHTML = `<div class="work"><div class="rmain">
+    <div class="ln-top"><b>Идеи</b><span style="flex: 1"></span>${ed ? `<button type="button" class="ln-btn" id="iChat">${svg('chat', 14)}Чат с Claude</button>` : ''}</div>
+    <div class="ideas"><div class="in"><div style="border-bottom: 1px solid var(--line)">${tabs}</div><div id="iBody" style="display: flex; flex-direction: column; gap: 22px"></div></div></div></div>
+    <aside class="chatcol" id="iCol" aria-label="Чат идей" style="display: none"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат идей</b><button type="button" class="ln-btn s" id="iHide" aria-label="Свернуть чат">Свернуть</button></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+  const body = $('#iBody');
+  const redraw = () => vIdeas(tab, sel);
+  const box = chatBox('_ideas', {onDone: () => { ITEMS_AT = 0; sidebar(); if (location.hash.startsWith('#/ideas')) redraw(); }});
+  $('#chatHost').append(box);
+  const showChat = (on) => { $('#iCol').style.display = on ? '' : 'none'; sessionStorage.setItem('ideasChat:' + P, on ? '1' : ''); };
+  $('#iChat')?.addEventListener('click', () => showChat($('#iCol').style.display === 'none'));
+  $('#iHide').onclick = () => showChat(false);
+  // A turn still running (or opened by hand last time) keeps the column open.
+  api('/api/chat?key=_ideas').then((c) => { if (c.busy || sessionStorage.getItem('ideasChat:' + P)) showChat(true); }).catch(() => {});
+  const say = async (text, shown) => { showChat(true); await box.ready; box.say(text, shown); };
+
+  if (tab === 'bank') return ideasBank(body, bank);
+  if (tab === 'refs') return ideasRefs(body, refsRes, sel, say, redraw);
+
+  // ---- Накидать ----
+  const K = 'ideasOpt:' + P;
+  let opt = {n: 20, rub: 'all', wish: ''};
+  try { opt = {...opt, ...JSON.parse(localStorage.getItem(K) || '{}')}; } catch {}
+  if (opt.rub !== 'all' && !rubs.some((r) => r.id === opt.rub)) opt.rub = 'all';
+  const keep = () => { try { localStorage.setItem(K, JSON.stringify(opt)); } catch {} };
+  const shareSum = rubs.reduce((n, r) => n + (r.share || 0), 0) || 1;
+  const perRub = (r) => Math.round(((r.share || 0) / shareSum) * opt.n);
+  const one = rubs.find((r) => r.id === opt.rub);
+  const items = ITEMS.items.filter((x) => x.batch);
+  const batches = [...new Set([...items.map((x) => x.batch), ...bank.filter((b) => b.batch).map((b) => b.batch)])].sort();
+  const batch = sel && batches.includes(sel) ? sel : batches.at(-1);
+  const inBatch = items.filter((x) => x.batch === batch);
+  const dropped = bank.filter((b) => b.batch === batch && b.section === 'Cancelled');
+  const takenN = inBatch.filter((x) => !x.proposed).length;
+  const total = inBatch.length + dropped.length;
+  const reviewed = takenN + dropped.length;
+
+  const card = (x) => {
+    const st = x.proposed ? 'open' : 'taken';
+    return `<article class="icard ${st === 'taken' ? 'taken' : ''}" data-card="${esc(x.id)}">
+      <a class="t" href="#/item/${esc(x.id)}"><b>${esc(x.title)}</b>${x.idea?.hook ? `<span>«${esc(x.idea.hook)}»</span>` : ''}</a>
+      ${x.idea?.similar ? `<span class="sim">Похоже на ${esc(x.idea.similar)}</span>` : ''}
+      ${x.idea?.src ? `<span class="src">${esc(x.idea.src)}</span>` : ''}
+      ${st === 'open' && ed ? `<div class="acts"><button type="button" class="ln-btn p" data-take="${esc(x.id)}">Взять</button><a class="ln-btn" href="#/item/${esc(x.id)}">Открыть</a><button type="button" class="ln-btn" data-no="${esc(x.id)}">Нет</button></div>
+        <div class="acts" data-why="${esc(x.id)}" hidden><span class="small muted" style="flex-basis: 100%">Почему нет? Claude учтёт в следующих пачках</span>${IDEA_REASONS.map((r) => `<button type="button" class="ipill" style="min-height: 32px; font-size: 12px" data-drop="${esc(x.id)}" data-reason="${esc(r)}">${r}</button>`).join('')}<input class="f" data-dropother="${esc(x.id)}" placeholder="своя причина ↵" style="flex: 1 1 120px; min-height: 32px; font-size: 12px"></div>` : ''}
+      ${st === 'taken' ? `<div class="acts" style="color: #166534; font-size: 13px"><span style="flex: 1">Взято — в Выпусках, этап «Идея»</span>${ed ? `<button type="button" class="linkbtn" style="color: var(--muted); font-size: 12px" data-untake="${esc(x.id)}">Вернуть</button>` : ''}</div>` : ''}
+    </article>`;
+  };
+  const droppedCard = (b) => `<article class="icard no"><b style="font-weight: 600; font-size: 15px">${esc(b.title)}</b>${b.hook ? `<span class="small" style="color: var(--ink2)">«${esc(b.hook)}»</span>` : ''}
+    <div class="acts" style="font-size: 13px; color: #525252"><span style="flex: 1">Нет: ${esc(b.reason || '—')}</span>${ed ? `<button type="button" class="linkbtn" style="color: var(--muted); font-size: 12px" data-undrop="${esc(b.title)}">Вернуть</button>` : ''}</div></article>`;
+  const groups = [...rubs.map((r) => ({r, list: inBatch.filter((x) => x.rubric === r.id || x.rubric === r.name), no: dropped.filter((b) => b.rubric === r.id || b.rubric === r.name)})),
+    {r: null, list: inBatch.filter((x) => !rubs.some((r) => x.rubric === r.id || x.rubric === r.name)), no: dropped.filter((b) => !rubs.some((r) => b.rubric === r.id || b.rubric === r.name))}]
+    .filter((g) => g.list.length || g.no.length);
+
+  body.innerHTML = `
+    ${ed ? `<section class="igen" aria-label="Накидать идеи">
+      <div class="row1"><span>Накидать</span><span class="row" style="gap: 4px" role="group" aria-label="Сколько идей">${[10, 20, 30].map((n) => `<button type="button" class="ipill dark ${opt.n === n ? 'on' : ''}" data-n="${n}" aria-pressed="${opt.n === n}" style="min-width: 46px; justify-content: center; font-weight: 600">${n}</button>`).join('')}</span><span>идей в</span></div>
+      <div class="row" style="gap: 8px; flex-wrap: wrap" role="group" aria-label="Рубрики">
+        <button type="button" class="ipill dark ${opt.rub === 'all' ? 'on' : ''}" data-rub="all" aria-pressed="${opt.rub === 'all'}">Все рубрики по долям</button>
+        ${rubs.map((r) => `<button type="button" class="ipill ${opt.rub === r.id ? 'on' : ''}" data-rub="${esc(r.id)}" aria-pressed="${opt.rub === r.id}"><span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}<span class="c">${opt.rub === 'all' ? perRub(r) || '' : opt.rub === r.id ? opt.n : ''}</span></button>`).join('')}
+        <a class="small muted" href="#/plan/setup" style="align-self: center; margin-left: 4px">рубрики и доли</a>
+      </div>
+      ${opt.rub === 'all' ? `<div class="ibar" aria-hidden="true">${rubs.filter((r) => r.share).map((r) => `<span style="flex: ${r.share}; background: ${esc(r.color || '#A3A3A3')}"></span>`).join('')}</div>`
+        : `<div class="small" style="padding: 10px 12px; border-radius: 10px; background: #FAFAFA; color: var(--ink2)">Все ${opt.n} — в «${esc(one.name)}»${one.about ? ': ' + esc(one.about) : ''}. Claude учтёт правила, шаблон и референсы рубрики.</div>`}
+      <div class="row" style="gap: 10px; flex-wrap: wrap"><input class="f" id="iWish" value="${esc(opt.wish)}" placeholder="Пожелание, если есть: «больше про семьи», «от референса про цены»…" style="flex: 1 1 320px">
+        <button type="button" class="ln-btn p" id="iGo" style="height: 42px; padding: 0 20px; font-size: 14px">Накидать ${opt.n}</button></div>
+      <span class="small muted">Claude учтёт бриф и правила, все идеи проекта с отброшенными, что снято и вышло, <a href="#/ideas/refs">референсы</a>, вопросы клиентов и факты.</span>
+    </section>` : ''}
+    ${batch ? `<section style="display: flex; flex-direction: column; gap: 18px" aria-label="Пачка">
+      <div class="ihead"><b style="font-size: 17px; font-weight: 600">Пачка ${esc(batchName(batch))}</b>
+        ${batches.length > 1 ? `<select class="f" id="iBatch" aria-label="Другая пачка" style="width: auto; min-height: 32px; font-size: 13px">${batches.slice().reverse().map((b) => `<option value="${esc(b)}" ${b === batch ? 'selected' : ''}>${esc(batchName(b))}</option>`).join('')}</select>` : ''}
+        <span class="muted">разобрано ${reviewed} из ${total} · взято ${takenN}</span><span class="iprog"><i style="width: ${total ? Math.round(reviewed / total * 100) : 0}%"></i></span>
+        ${ed ? `<button type="button" class="ln-btn" id="iFix">Поправить пачку</button>` : ''}${takenN ? `<a class="ln-btn" href="#/plan/draft">Взятые — в План</a>` : ''}</div>
+      ${ed ? `<form class="row" id="iFixForm" hidden style="gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 14px"><input class="f" id="iFixText" placeholder="Что поменять во всей пачке: «мемы смешнее», «меньше цен»…" aria-label="Правка всей пачки" style="flex: 1; border: 0; min-width: 0"><button class="ln-btn p" style="height: 36px">Переделать</button></form>` : ''}
+      ${groups.map((g) => `<section style="display: flex; flex-direction: column; gap: 10px"><div class="row" style="gap: 8px"><span class="rsq" style="background: ${esc(g.r?.color || '#A3A3A3')}"></span><h3 style="margin: 0; font-size: 15px; font-weight: 600">${esc(g.r?.name || 'Без рубрики')}</h3><span class="small muted">${g.list.length + g.no.length} ${ideaWord(g.list.length + g.no.length)}</span></div>
+        <div class="icards">${g.list.map(card).join('')}${g.no.map(droppedCard).join('')}</div></section>`).join('')}
+    </section>` : `<p class="muted" style="margin: 0">Пачек пока нет. Выберите, сколько и в какие рубрики, — Claude накидает идеи карточками, их можно взять, открыть и доработать или отбросить с причиной.</p>`}`;
+
+  body.querySelectorAll('[data-n]').forEach((b) => (b.onclick = () => { opt.n = Number(b.dataset.n); keep(); redraw(); }));
+  body.querySelectorAll('[data-rub]').forEach((b) => (b.onclick = () => { opt.rub = b.dataset.rub === opt.rub && b.dataset.rub !== 'all' ? 'all' : b.dataset.rub; keep(); redraw(); }));
+  $('#iWish')?.addEventListener('change', (e) => { opt.wish = e.target.value.trim(); keep(); });
+  $('#iBatch')?.addEventListener('change', (e) => { location.hash = '#/ideas/' + e.target.value; });
+  $('#iGo')?.addEventListener('click', () => {
+    opt.wish = $('#iWish').value.trim(); keep();
+    const id = newBatchId();
+    const where = opt.rub === 'all'
+      ? `по всем рубрикам по долям: ${rubs.filter((r) => r.share).map((r) => `${r.name} (id ${r.id}) — ${perRub(r)}`).join(', ')}`
+      : `все в рубрику «${one.name}» (id ${one.id})${one.about ? ', формула: ' + one.about : ''}`;
+    say(`Накидай пачку из ${opt.n} идей ${where}. Batch: ${id}.${opt.wish ? ` Пожелание: ${opt.wish}.` : ''} Опирайся на референсы проекта, вопросы клиентов, сезон и то, что уже вышло; не повторяй ничего из ideas.md (особенно Cancelled — смотри причины).`,
+      `Накидать ${opt.n} ${opt.rub === 'all' ? 'по всем рубрикам' : 'в «' + one.name + '»'}${opt.wish ? ' · ' + opt.wish : ''}`);
+  });
+  $('#iFix')?.addEventListener('click', () => { const f = $('#iFixForm'); f.hidden = !f.hidden; if (!f.hidden) $('#iFixText').focus(); });
+  $('#iFixForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const t = $('#iFixText').value.trim();
+    if (!t) return;
+    const open = inBatch.filter((x) => x.proposed).map((x) => `«${x.ref?.id || x.title}»`).join(', ');
+    say(`Поправь пачку Batch: ${batch}: ${t}. Меняй только ещё не разобранные идеи этой пачки (${open || 'таких нет'}); взятые и отброшенные не трогай.`, `Поправить пачку: ${t}`);
+  });
+  body.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async () => { b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); redraw(); }));
+  body.querySelectorAll('[data-untake]').forEach((b) => (b.onclick = async () => { await post('/api/items/set', {id: b.dataset.untake, untake: true}); redraw(); }));
+  body.querySelectorAll('[data-no]').forEach((b) => (b.onclick = () => { b.closest('.acts').hidden = true; body.querySelector(`[data-why="${b.dataset.no}"]`).hidden = false; }));
+  const drop = async (id, reason) => { await post('/api/ideas/drop', {id, reason}); redraw(); };
+  body.querySelectorAll('[data-drop]').forEach((b) => (b.onclick = () => drop(b.dataset.drop, b.dataset.reason)));
+  body.querySelectorAll('[data-dropother]').forEach((i) => (i.onkeydown = (e) => { if (e.key === 'Enter' && i.value.trim()) drop(i.dataset.dropother, i.value.trim()); }));
+  body.querySelectorAll('[data-undrop]').forEach((b) => (b.onclick = async () => { await post('/api/ideas/undrop', {title: b.dataset.undrop}); redraw(); }));
+}
+
+// Банк идей: every idea in ideas.md with its state; the ones with an item open it.
+function ideasBank(body, bank) {
+  const K = 'bankOpt:' + P;
+  let opt = {q: '', st: 'all', rub: ''};
+  try { opt = {...opt, ...JSON.parse(sessionStorage.getItem(K) || '{}')}; } catch {}
+  const rubs = ITEMS.rubrics;
+  const byTitle = new Map(ITEMS.items.filter((x) => x.ref?.kind === 'idea').map((x) => [x.ref.id, x]));
+  const rows = bank.map((b) => {
+    const it = byTitle.get(b.title);
+    const taken = it && !it.proposed;
+    const st = b.section === 'Cancelled' ? 'no' : taken ? 'taken' : /ideas$/.test(b.section) ? 'open' : b.section === 'In work' || b.section === 'In review' ? 'made' : 'done';
+    const [label, bg, fg] = taken ? ['взята · идея', '#E8F0FE', '#1D4ED8'] : IDEA_SECTION[b.section] || [b.section, '#F2F2F2', '#404040'];
+    const r = rubs.find((x) => x.id === (it?.rubric || b.rubric) || x.name === (it?.rubric || b.rubric));
+    const num = /^(\d{1,3})\b/.exec(b.title)?.[1];
+    const reel = num && (OV?.reels || []).find((x) => String(x.num).padStart(2, '0') === num.padStart(2, '0'));
+    const href = it ? '#/item/' + it.id : reel ? '#/reel/' + reel.id : '';
+    return {...b, st, label: label + (b.section === 'Cancelled' && b.reason ? ': ' + b.reason : ''), bg, fg, r, href};
+  });
+  const counts = {all: rows.length, open: 0, taken: 0, made: 0, done: 0, no: 0};
+  for (const x of rows) counts[x.st]++;
+  const draw = () => {
+    const q = opt.q.toLowerCase();
+    const list = rows.filter((x) => (opt.st === 'all' || x.st === opt.st) && (!opt.rub || x.r?.id === opt.rub) && (!q || (x.title + ' ' + x.hook + ' ' + x.plot).toLowerCase().includes(q)));
+    $('#bRows').innerHTML = list.map((x) => `<tr><td>${x.href ? `<a href="${x.href}" style="text-decoration: none; color: var(--ink); font-weight: 500">${esc(x.title)}</a>` : `<span style="font-weight: 500">${esc(x.title)}</span>`}${x.hook ? `<div class="small muted">«${esc(x.hook)}»</div>` : ''}</td>
+      <td>${x.r ? `<span class="row" style="gap: 7px; color: var(--ink2)"><span class="rsq" style="background: ${esc(x.r.color || '#A3A3A3')}"></span>${esc(x.r.name)}</span>` : '<span class="muted">—</span>'}</td>
+      <td><span class="istat" style="background: ${x.bg}; color: ${x.fg}">${esc(x.label)}</span></td>
+      <td class="small muted">${esc(x.batch ? 'пачка ' + batchName(x.batch) : x.section === "Owner's ideas" ? 'твоя идея' : x.src || '')}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Ничего не нашлось</td></tr>';
+    $('#bCount').textContent = `Показано ${list.length} из ${rows.length}`;
+  };
+  body.innerHTML = `<p class="muted" style="margin: 0">Все идеи проекта: и не взятые, и снятые, и отброшенные с причиной. По ним Claude проверяет «похоже на …», чтобы не предлагать одно и то же.</p>
+    <div class="row" style="gap: 10px; flex-wrap: wrap"><input type="search" class="f" id="bQ" value="${esc(opt.q)}" placeholder="Поиск: «перевал», «цены»…" aria-label="Поиск по идеям" style="flex: 1 1 220px; max-width: 320px">
+      <span class="row" style="gap: 6px; flex-wrap: wrap" role="group" aria-label="Статус">${[['all', 'Все'], ['open', 'Не взяты'], ['taken', 'Взяты'], ['made', 'Снимаются'], ['done', 'Готовы и вышли'], ['no', 'Отброшены']].map(([k, t]) => `<button type="button" class="ipill dark ${opt.st === k ? 'on' : ''}" data-st="${k}" aria-pressed="${opt.st === k}" style="min-height: 32px; font-size: 13px">${t} · ${counts[k]}</button>`).join('')}</span>
+      <select class="f" id="bRub" aria-label="Рубрика" style="width: auto; min-height: 34px; font-size: 13px; margin-left: auto"><option value="">Все рубрики</option>${rubs.map((r) => `<option value="${esc(r.id)}" ${opt.rub === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div>
+    <div style="overflow-x: auto; border: 1px solid var(--line); border-radius: 12px"><table class="ibank"><thead><tr><th scope="col">Идея</th><th scope="col" style="width: 170px">Рубрика</th><th scope="col" style="width: 200px">Статус</th><th scope="col" style="width: 170px">Откуда</th></tr></thead><tbody id="bRows"></tbody></table></div>
+    <span class="small muted" id="bCount"></span>`;
+  const keep = () => { try { sessionStorage.setItem(K, JSON.stringify(opt)); } catch {} };
+  $('#bQ').oninput = (e) => { opt.q = e.target.value; keep(); draw(); };
+  $('#bRub').onchange = (e) => { opt.rub = e.target.value; keep(); draw(); };
+  body.querySelectorAll('[data-st]').forEach((b) => (b.onclick = () => { opt.st = b.dataset.st; keep(); body.querySelectorAll('[data-st]').forEach((y) => { y.classList.toggle('on', y === b); y.setAttribute('aria-pressed', y === b); }); draw(); }));
+  draw();
+}
+
+// Референсы проекта (web/refs.mjs): add a link or a file; the server downloads it, cuts frames
+// and transcribes the speech; «Разобрать» asks Claude to fill what we take and the summary.
+function ideasRefs(body, data, sel, say, redraw) {
+  const ed = canEdit();
+  const list = data.list || [];
+  const cur = list.find((x) => x.id === sel) || null;
+  const rubs = ITEMS.rubrics;
+  const rubOf = (x) => rubs.find((r) => r.id === x.rubric);
+  const tile = (x) => `<a class="iref ${cur?.id === x.id ? 'on' : ''}" href="#/ideas/refs/${esc(x.id)}">
+      <span class="th" style="${x.frames[2] || x.frames[0] ? `background-image: url('${esc(x.frames[2] || x.frames[0])}')` : x.status === 'error' ? 'background: #FDECEC' : 'background: #D4D4D4'}"><span>${x.status === 'prep' ? 'скачиваю…' : x.status === 'error' ? 'ошибка' : x.len ? Math.floor(x.len / 60) + ':' + String(x.len % 60).padStart(2, '0') : 'готов'}</span></span>
+      <b style="font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.name)}</b>
+      <span class="small muted" style="line-height: 1.35">${esc(x.status === 'error' ? x.error : x.note || (x.seen ? 'разобран' : 'ещё не разобран'))}</span>
+      <span class="row small" style="gap: 6px; color: var(--ink2)"><span class="rsq" style="background: ${esc(rubOf(x)?.color || '#D4D4D4')}"></span>${esc(rubOf(x)?.name || 'весь проект')}</span></a>`;
+  const unseen = list.filter((x) => x.status === 'ready' && !x.seen).length;
+  body.innerHTML = `${ed ? `<form class="row" id="rAdd" style="gap: 10px; flex-wrap: wrap; padding: 14px 16px; border: 1.5px dashed #D4D4D4; border-radius: 14px">
+      <span style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 2px"><b style="font-weight: 600">Добавить референс</b><span class="small muted">Ссылка на рилс (Instagram, TikTok, YouTube) или видео файлом. Сервер скачает, нарежет кадры и расшифрует речь</span></span>
+      <input type="url" class="f" id="rUrl" placeholder="https://www.instagram.com/reel/…" aria-label="Ссылка на референс" style="flex: 1 1 260px">
+      <button class="ln-btn p" style="height: 40px">Добавить</button>
+      <label class="ln-btn" style="height: 40px; cursor: pointer">Файл<input type="file" id="rFile" accept="video/*" multiple hidden></label></form>` : ''}
+    <div class="row" style="gap: 24px; align-items: flex-start; flex-wrap: wrap">
+      <div style="flex: 999 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+        ${list.length ? `<div class="irefs">${list.map(tile).join('')}</div>` : '<p class="muted" style="margin: 0">Референсов пока нет. Добавьте ссылку или видео — Claude будет опираться на них, когда накидывает идеи.</p>'}
+      </div>
+      <aside style="flex: 1 1 300px; max-width: 380px; display: flex; flex-direction: column; gap: 14px" aria-label="${cur ? 'Референс' : 'Общий вывод'}">
+        ${cur ? refPanel(cur, rubs, ed) : `<div class="isec" style="background: #FAFAFA"><h2>Общий вывод по референсам</h2><span class="small" style="color: var(--ink2); line-height: 1.55">${esc(data.summary || (list.length ? 'Ещё нет — нажмите «Разобрать».' : '—'))}</span>
+          ${ed && list.length ? `<button type="button" class="ln-btn" id="rStudy" style="align-self: flex-start">${unseen ? `Разобрать новые · ${unseen}` : 'Разобрать заново'}</button>` : ''}</div>
+          <div class="isec"><h2>Как это работает</h2><span class="small" style="color: var(--ink2); line-height: 1.55">Claude смотрит кадры и читает речь каждого референса, отмечает, что берём (крючок, монтаж, плашки, подачу, звук, обложку), как это будет у нас и чего не копируем. Когда вы накидываете идеи, он опирается на это и пишет на карточке, от какого референса идея.</span></div>`}
+      </aside></div>`;
+  const add = async (patch) => { const r = await post('/api/refs', {add: patch}).catch(() => null); if (!r?.ref) { toast('Не получилось добавить'); return null; } return r.ref; };
+  $('#rAdd')?.addEventListener('submit', async (e) => { e.preventDefault(); const u = $('#rUrl').value.trim(); if (!/^https?:\/\//.test(u)) return toast('Нужна ссылка с https://'); const r = await add({url: u}); if (r) { toast('Скачиваю — кадры появятся через минуту'); location.hash = '#/ideas/refs/' + r.id; } });
+  $('#rFile')?.addEventListener('change', async (e) => {
+    const files = [...e.target.files]; let last = null;
+    for (const f of files) {
+      const u = await fetch(`/api/upload?project=${encodeURIComponent(P)}&name=${encodeURIComponent(f.name)}`, {method: 'POST', body: f}).then((x) => x.json()).catch(() => null);
+      if (u?.url) last = await add({url: u.url, name: f.name});
+    }
+    if (last) { toast(files.length > 1 ? `Добавлено ${files.length}` : 'Референс добавлен'); location.hash = '#/ideas/refs/' + last.id; }
+  });
+  const studyText = (one) => `Разбери ${one ? `референс ${one.id} «${one.name}»` : 'новые референсы проекта (status ready, пустое seen)'} в refs/refs.json: посмотри кадры refs/<id>/frame-*.jpg и прочитай refs/<id>/transcript.txt, если он есть. Заполни у ${one ? 'него' : 'каждого'}: seen — что происходит в ролике (2–3 предложения), takes — что берём (hook, edit, plates, delivery, sound, cover, humor), note — как это будет у нас, с учётом нашего бриф и правил, skip — чего не копируем, rubric — id рубрики, если ясно, куда он. Потом перепиши summary — общий вывод по всем референсам в 3–4 предложения. Остальные поля не трогай. Здесь ответь в 2–3 строки.`;
+  $('#rStudy')?.addEventListener('click', () => say(studyText(null), unseen ? `Разобрать новые референсы · ${unseen}` : 'Разобрать референсы заново'));
+  if (!cur) {
+    // Downloading ones redraw themselves when they are ready.
+    if (list.some((x) => x.status === 'prep')) setTimeout(() => { if (location.hash === '#/ideas/refs') redraw(); }, 6000);
+    return;
+  }
+  const ref = (patch) => post('/api/refs', {id: cur.id, ...patch});
+  view.querySelectorAll('[data-rtake]').forEach((b) => (b.onclick = async () => { const t = new Set(cur.takes || []); t.has(b.dataset.rtake) ? t.delete(b.dataset.rtake) : t.add(b.dataset.rtake); await ref({takes: [...t]}); redraw(); }));
+  $('#rRub')?.addEventListener('change', async (e) => { await ref({rubric: e.target.value || null}); redraw(); });
+  $('#rNote')?.addEventListener('change', (e) => ref({note: e.target.value}).then(() => toast('Сохранено')));
+  $('#rSkip')?.addEventListener('change', (e) => ref({skip: e.target.value}).then(() => toast('Сохранено')));
+  $('#rDel')?.addEventListener('click', async () => { if (!confirm(`Убрать референс «${cur.name}»? Видео и кадры удалятся.`)) return; await ref({remove: true}); location.hash = '#/ideas/refs'; });
+  $('#rOne')?.addEventListener('click', () => say(studyText(cur), `Разобрать «${cur.name}»`));
+  $('#rIdeas')?.addEventListener('click', () => { try { const k = 'ideasOpt:' + P; const o = JSON.parse(localStorage.getItem(k) || '{}'); o.wish = `от референса «${cur.name}»`; if (cur.rubric) o.rub = cur.rubric; localStorage.setItem(k, JSON.stringify(o)); } catch {} location.hash = '#/ideas'; });
+  if (cur.status === 'prep' || (cur.status === 'ready' && !cur.transcript && Date.now() - new Date(cur.at).getTime() < 864e5)) setTimeout(() => { if (location.hash === '#/ideas/refs/' + cur.id) redraw(); }, 6000);
+}
+
+function refPanel(x, rubs, ed) {
+  return `<div class="isec">
+    <div class="row" style="gap: 8px"><a href="#/ideas/refs" class="small muted" style="text-decoration: none">← Все референсы</a><span style="flex: 1"></span>${x.url ? `<a class="small" href="${esc(x.url)}" target="_blank" rel="noopener">оригинал ↗</a>` : ''}</div>
+    <h2 style="font-size: 17px">${esc(x.name)}</h2>
+    ${x.status === 'prep' ? '<span class="small muted"><i class="spin" style="display: inline-block; vertical-align: -2px; margin-right: 6px"></i>Скачиваю и режу кадры…</span>' : ''}
+    ${x.status === 'error' ? `<span class="small" style="color: #B42318">${esc(x.error)}</span>` : ''}
+    ${x.video ? `<video src="${esc(x.video)}" controls playsinline preload="metadata" style="width: 100%; max-height: 420px; border-radius: 10px; background: #000"></video>` : ''}
+    ${x.frames.length ? `<div class="ifr">${x.frames.map((f) => `<img src="${esc(f)}" alt="" loading="lazy">`).join('')}</div>` : ''}
+    ${x.seen ? `<div style="display: flex; flex-direction: column; gap: 4px"><span class="lbl">Что Claude увидел</span><span class="small" style="color: var(--ink2); line-height: 1.5">${esc(x.seen)}</span></div>` : ''}
+    ${x.transcript ? `<details><summary class="small" style="cursor: pointer">Речь (расшифровка)</summary><p class="small muted" style="white-space: pre-wrap; line-height: 1.5">${esc(x.transcript)}</p></details>` : x.status === 'ready' ? '<span class="small muted">Расшифровка речи появится через пару минут</span>' : ''}
+    <div style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Что берём</span><div class="row" style="gap: 6px; flex-wrap: wrap">${Object.entries(REF_TAKE_NAMES).map(([k, t]) => `<button type="button" class="ipill dark ${(x.takes || []).includes(k) ? 'on' : ''}" ${ed ? `data-rtake="${k}"` : 'disabled'} aria-pressed="${(x.takes || []).includes(k)}" style="min-height: 32px; font-size: 13px">${t}</button>`).join('')}</div></div>
+    <label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Как это будет у нас</span><textarea class="f" id="rNote" rows="3" ${ed ? '' : 'readonly'}>${esc(x.note || '')}</textarea></label>
+    <label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Не копируем</span><textarea class="f" id="rSkip" rows="2" ${ed ? '' : 'readonly'}>${esc(x.skip || '')}</textarea></label>
+    <label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Рубрика</span><select class="f" id="rRub" ${ed ? '' : 'disabled'}><option value="">весь проект</option>${rubs.map((r) => `<option value="${esc(r.id)}" ${x.rubric === r.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+    ${ed ? `<div class="row" style="gap: 8px; flex-wrap: wrap">${x.status === 'ready' ? `<button type="button" class="ln-btn p" id="rIdeas">Идеи от этого референса</button><button type="button" class="ln-btn" id="rOne">${x.seen ? 'Разобрать заново' : 'Разобрать'}</button>` : ''}<button type="button" class="ln-btn g" id="rDel" style="color: #B42318">Убрать</button></div>` : ''}
+  </div>`;
 }
 
 // Стратегия (StratHub, StratPlatforms, StratRubrics, StratRhythm): strategy.json, edited through the project chat.
@@ -3388,6 +3697,7 @@ async function route() {
     else if ((m = /^#\/reel\/([\w-]+)(?:\/(\w+))?/.exec(h))) await vReel(m[1], m[2]);
     else if ((m = /^#\/chat\/(_project)/.exec(h))) await vChat(m[1]);
     else if (h === '#/new') await vNew();
+    else if ((m = /^#\/ideas(?:\/(bank|refs))?(?:\/([\w-]+))?$/.exec(h))) await vIdeas(m[1] || '', m[2]);
     else if ((m = /^#\/knowledge(?:\/(\w+))?(?:\/([\w-]+))?/.exec(h))) await vKnowledge(m[1], m[2]);
     else if (h === '#/start') await vStart();
     else if (h === '#/start/done') await vStartDone();
