@@ -592,6 +592,14 @@
   .kc.nt::after { content: ''; position: absolute; right: 4px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: #2F6FEB; box-shadow: 0 0 0 2px #fff; }
   .kc.dim::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,.55); z-index: 1; }
   .kc.hov { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #9A9A95; z-index: 2; }
+  .ksrc { position: absolute; inset: 0; opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 2; }
+  .pclips.trim .ksrc { opacity: 1; }
+  .pclips .kc { transition: opacity .18s, box-shadow .1s; } .pclips.trim .kc { opacity: 0; } .pclips.trim .ksel { display: none; }
+  .ksf { position: absolute; top: 0; bottom: 0; display: flex; } .ksf i { flex: none; height: 100%; background-repeat: no-repeat; }
+  .ksh { position: absolute; top: 0; bottom: 0; background: rgba(245,245,243,.74); }
+  .kwin { position: absolute; top: -2px; bottom: -2px; border: 2px solid #2F6FEB; border-radius: 9px; box-sizing: border-box; }
+  .pclips.trim .khand { background: #2F6FEB; }
+  .ptl.trimming .ruler, .ptl.trimming .bhead, .ptl.trimming #pMarks { opacity: .15; transition: opacity .18s; }
   .ksel { position: absolute; top: -2px; bottom: -2px; border: 2px solid #141413; border-radius: 9px; pointer-events: none; z-index: 3; }
   .khand { position: absolute; top: -2px; bottom: -2px; width: 12px; border: 0; padding: 0; background: #141413; cursor: ew-resize; z-index: 4; display: grid; place-items: center; touch-action: none; }
   .khand::after { content: ''; width: 2px; height: 16px; border-radius: 1px; background: #fff; }
@@ -2609,7 +2617,8 @@ function wireClips(id, rv, cut, open, ed, foot) {
   const box = $('#pClips'), tl = $('#bStrip'), pv = cut.preview, FR = 1 / (cut.fps || 30), r2 = (x) => Math.round(x * 1000) / 1000;
   if (!box) return;
   const clips = cut.clips;
-  let sel = cut.sel ?? -1, hov = -1, pps0 = null, saveT = null;
+  let sel = cut.sel ?? -1, hov = -1, saveT = null, trim = null, trimT = 0;
+  const srcDur = pv ? pv.n * pv.every : 1e9, scr = $('#tlScroll');
   const sec = (d) => `${d.toFixed(1).replace('.', ',')} с`;
   const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
   const starts = () => clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + clips[i - 1].out - clips[i - 1].in : 0), a), []);
@@ -2620,11 +2629,35 @@ function wireClips(id, rv, cut, open, ed, foot) {
   const clipAt = (ct) => Math.max(0, starts().findLastIndex((s) => ct >= s - 1e-6));
   const build = () => {
     box.innerHTML = clips.map((c, i) => `<div class="kc ${open.some((x) => x.clip === i + 1) ? 'nt' : ''}" data-k="${i}"><span class="kt"></span><b>${i + 1}</b></div>`).join('')
+      + '<div class="ksrc" aria-hidden="true"><div class="ksf"></div><i class="ksh l"></i><i class="ksh r"></i><i class="kwin"></i></div>'
       + (sel >= 0 ? `<i class="ksel"></i>${ed ? '<button type="button" class="khand l" data-h="in" aria-label="Начало куска — тяните"></button><button type="button" class="khand r" data-h="out" aria-label="Конец куска — тяните"></button>' : ''}` : '');
     wireHands();
   };
+  // Trimming: the track turns into the source around the picked clip — its neighbours fade out, the
+  // frames are the source's own, the clip is a window on it at a fixed scale. Only the dragged edge
+  // moves; nothing else on the track shifts while the hand is down.
+  const X = (t) => trim.x0 + (t - trim.v0) * trim.pps;
+  const trimFilm = () => {
+    const f = box.querySelector('.ksf'), H = box.clientHeight, tw = (H * pv.w) / pv.h;
+    const left = scr ? scr.scrollLeft : 0, vw = scr ? scr.clientWidth : tl.clientWidth, n = Math.ceil(vw / tw) + 2;
+    f.style.left = `${left - tw}px`; f.innerHTML = '<i></i>'.repeat(n);
+    [...f.children].forEach((x, j) => {
+      const t = trim.v0 + (left - tw + (j + 0.5) * tw - trim.x0) / trim.pps;
+      x.style.width = `${tw}px`;
+      if (t >= 0 && t <= srcDur) rv._cover(x, pv, t); else x.style.background = 'transparent';
+    });
+  };
+  const trimLayout = () => {
+    const c = trim.c, a = X(c.in), b = X(c.out), W = box.clientWidth;
+    const win = box.querySelector('.kwin'), sl = box.querySelector('.ksh.l'), sr = box.querySelector('.ksh.r');
+    win.style.left = `${a - 1}px`; win.style.width = `${b - a + 2}px`;
+    sl.style.left = '0'; sl.style.width = `${Math.max(0, a)}px`; sr.style.left = `${b}px`; sr.style.width = `${Math.max(0, W - b)}px`;
+    const hl = box.querySelector('.khand.l'), hr = box.querySelector('.khand.r');
+    if (hl) { hl.style.left = `${a - 1}px`; hr.style.left = `${b - 11}px`; }
+  };
   const layout = () => {
-    const W = box.clientWidth, H = box.clientHeight, pps = pps0 || W / total(), st = starts(), tw = pv ? (H * pv.w) / pv.h : 33;
+    if (trim) return trimLayout();
+    const W = box.clientWidth, H = box.clientHeight, pps = W / total(), st = starts(), tw = pv ? (H * pv.w) / pv.h : 33;
     box.querySelectorAll('.kc').forEach((el) => {
       const i = Number(el.dataset.k), c = clips[i], w = Math.max(3, (c.out - c.in) * pps - 2);
       el.style.left = `${st[i] * pps + 1}px`; el.style.width = `${w}px`;
@@ -2646,7 +2679,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
       : [[Math.max(c.in, c.out - 1.5), c.out], ...(next ? [[next.in, Math.min(next.out, next.in + 1)]] : [])];
     rv._peekPlay(pv.video, segs, `▶ Склейка ${k === 'in' ? `${i}→${i + 1}` : `${i + 1}→${i + 2}`}`);
   };
-  const pick = (i) => { if (i === sel) return; sel = i; cut.sel = i; build(); layout(); $('#eComp')?._upd?.(); };
+  const pick = (i) => { if (i === sel) return; clearTimeout(trimT); trim = null; box.classList.remove('trim'); tl.classList.remove('trimming'); sel = i; cut.sel = i; build(); layout(); $('#eComp')?._upd?.(); };
   cut.deselect = () => pick(-1);
   const save = () => { if (!ed) return; clearTimeout(saveT); saveT = setTimeout(() => post('/api/reel/cut', {reel: id, clips}).catch(() => toast('Нарезка не сохранилась')), 400); };
   function wireHands() {
@@ -2656,8 +2689,13 @@ function wireClips(id, rv, cut, open, ed, foot) {
       h.onpointermove = (e) => { if (!tl._busy) e.stopPropagation(); };
       h.onpointerdown = (e) => {
         e.preventDefault(); e.stopPropagation(); try { h.setPointerCapture(e.pointerId); } catch {} rv.pause();
-        const c = clips[sel], x0 = e.clientX, v0 = c[k], d0 = c.out - c.in, scale = tl.getBoundingClientRect().width / tl.offsetWidth;
-        tl._busy = true; pps0 = box.clientWidth / total(); h.classList.add('on'); $('#pSkl').hidden = true;
+        const c = clips[sel], cx0 = e.clientX, v0 = c[k], d0 = c.out - c.in, tr = tl.getBoundingClientRect(), scale = tr.width / tl.offsetWidth;
+        // The grabbed edge stays under the cursor; the visible width shows ~the clip and a few seconds around.
+        const vw = scr ? scr.clientWidth : tl.clientWidth, span = Math.max(6, d0 * 1.6 + 4);
+        const hb = h.getBoundingClientRect(), ex = k === 'in' ? hb.left + scale : hb.right - scale;
+        clearTimeout(trimT); trim = {c, v0, x0: (ex - tr.left) / scale, pps: vw / span};
+        tl._busy = true; h.classList.add('on'); $('#pSkl').hidden = true;
+        trimFilm(); box.classList.add('trim'); tl.classList.add('trimming'); layout();
         const show = () => {
           const d = c.out - c.in, dd = d - d0, r = h.getBoundingClientRect();
           rv._tip(r.left + r.width / 2 - tl.getBoundingClientRect().left, `${dd >= 0 ? '+' : '−'}${sec(Math.abs(dd))} · ${sec(d)}`);
@@ -2665,16 +2703,17 @@ function wireClips(id, rv, cut, open, ed, foot) {
         };
         h.onpointermove = (ev) => {
           ev.stopPropagation();
-          // Shift slows the drag 5× for frame-exact edges on a narrow track.
-          let t = Math.round((v0 + ((ev.clientX - x0) / scale / pps0) * (ev.shiftKey ? 0.2 : 1)) / FR) * FR;
-          t = k === 'in' ? Math.max(0, Math.max(v0 - 3, Math.min(t, c.out - 0.2))) : Math.min(v0 + 3, Math.max(t, c.in + 0.2));
+          // Shift slows the drag 5× for frame-exact edges.
+          let t = Math.round((v0 + ((ev.clientX - cx0) / scale / trim.pps) * (ev.shiftKey ? 0.2 : 1)) / FR) * FR;
+          t = k === 'in' ? Math.max(0, Math.min(t, c.out - 0.2)) : Math.min(srcDur, Math.max(t, c.in + 0.2));
           c[k] = r2(t); layout(); show();
         };
         h.onpointerup = (ev) => {
           ev.stopPropagation(); h.onpointermove = (x) => { if (!tl._busy) x.stopPropagation(); }; h.classList.remove('on');
-          tl._busy = false; pps0 = null; rv._peek(null); rv._tip(0, '');
-          layout(); $('#eComp')?._upd?.();
+          tl._busy = false; rv._peek(null); rv._tip(0, ''); $('#eComp')?._upd?.();
           if (c[k] !== v0) { cut.changed = true; save(); foot(); rv.currentTime = toV(starts()[sel]) + 0.02; joint(sel, k); }
+          // The source view stays a moment so the result is seen in place, then the track comes back.
+          trimT = setTimeout(() => { trim = null; box.classList.remove('trim'); tl.classList.remove('trimming'); layout(); }, 900);
         };
         show();
       };
