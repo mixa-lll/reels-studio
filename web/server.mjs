@@ -16,6 +16,7 @@ import {changeEdits, readEdits} from './edits.mjs';
 import {changeItem, createItems, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
 import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
+import {readKit} from './dskit.mjs';
 import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
@@ -1068,6 +1069,10 @@ createServer(async (req, res) => {
     const r = changeRef(studio, String(b.id || ''), b);
     if (!r) return json(404, {});
     return json(200, {ref: r});
+  }
+  // The reels style laid out in «Память › Дизайн» (web/dskit.mjs).
+  if (req.method === 'GET' && url.pathname === '/api/ds/kit') {
+    return json(200, {kit: readKit(join(studio, 'design-system'), `/ds/${p}/`)});
   }
   if (req.method === 'GET' && url.pathname === '/api/knowledge') {
     const ds = join(studio, 'design-system', 'index.html');
