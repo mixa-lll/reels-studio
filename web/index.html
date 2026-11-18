@@ -477,16 +477,25 @@
   .ttrack span { border-radius: 8px; color: #fff; padding: 8px 9px; display: flex; flex-direction: column; justify-content: space-between; min-width: 0; overflow: hidden; }
   .ttrack b { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ttrack i { font-style: normal; font-size: 11px; opacity: .85; }
   .bld { display: flex; gap: 28px; padding: 20px 28px 12px; align-items: flex-start; }
-  .bplay { flex: 0 0 auto; width: min(440px, 36vw, calc((100vh - 200px) * 9 / 16)); display: flex; flex-direction: column; gap: 10px; position: sticky; top: 0; }
-  .bplay .vwrap video { width: 100%; aspect-ratio: 9 / 16; object-fit: contain; background: #000; border-radius: 14px 14px 0 0; cursor: pointer; }
-  .pbar { margin-top: -10px; background: #F4F4F2; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 14px 14px; padding: 12px 10px 10px; display: flex; flex-direction: column; gap: 10px; }
-  .ptl { position: relative; height: 40px; cursor: pointer; user-select: none; touch-action: none; }
+  #vers { height: 100%; display: flex; flex-direction: column; }
+  #vers .bld { flex: 1; min-height: 0; padding: 16px 24px; gap: 24px; align-items: stretch; }
+  .bplay { flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; max-width: 42vw; }
+  .bplay .vwrap { height: 100%; min-height: 0; }
+  .bplay .vwrap video { height: 100%; width: auto; max-width: 100%; aspect-ratio: 9 / 16; object-fit: contain; background: #000; border-radius: 14px; cursor: pointer; }
+  #vers .binfo { overflow-y: auto; gap: 18px; padding-right: 4px; }
+  .pbar { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 0; z-index: 4; background: #fff; padding-bottom: 6px; }
+  .igl { position: absolute; inset: 0; pointer-events: none; border-radius: 14px; overflow: hidden; }
+  .igl .pv { position: absolute; inset: 0; max-width: none; width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; box-shadow: none; background: transparent; }
+  .igl .pv-full, .igl .pv-nav { display: none; } .igl .pv-capt { bottom: 3%; } .igl .pv-rr { bottom: 10%; }
+  .igbtn { position: absolute; top: 10px; right: 10px; z-index: 5; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 0; background: rgba(0,0,0,.55); color: #fff; cursor: pointer; }
+  .igbtn.on { background: #fff; color: #000; }
+  .ptl { position: relative; height: 48px; margin-top: 8px; cursor: pointer; user-select: none; touch-action: none; }
   .ptl .film { position: absolute; inset: 0; display: flex; border-radius: 6px; overflow: hidden; background: #D9D9D6; pointer-events: none; }
   .ptl .film i { flex: 1; background-repeat: no-repeat; border-right: 1px solid rgba(0,0,0,.18); }
   .ptl .done { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(0,0,0,.28); border-radius: 6px 0 0 6px; pointer-events: none; }
   .ptl .bhead { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; background: #fff; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,.5); pointer-events: none; }
   .ptl .bdot { top: -8px; z-index: 2; }
-  .ptip { position: absolute; bottom: 50px; transform: translateX(-50%); pointer-events: none; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .ptip { position: absolute; top: 56px; transform: translateX(-50%); pointer-events: none; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .ptip b { width: 90px; height: 160px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 14px rgba(0,0,0,.3); background: #222 no-repeat; }
   .ptip span { font: 12px/1.4 ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.72); padding: 1px 6px; border-radius: 5px; }
   .pctl { display: flex; align-items: center; gap: 8px; } .pctl .tcx { font: 13px ui-monospace, monospace; }
@@ -520,7 +529,7 @@
   .bfoot { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; padding: 12px 28px; border-top: 1px solid var(--line); background: #fff; }
   .cmp2 { display: flex; gap: 20px; justify-content: center; } .cmpv { display: flex; flex-direction: column; gap: 6px; align-items: center; }
   .cmpv video { height: min(520px, calc(100vh - 380px)); aspect-ratio: 9 / 16; background: #000; border-radius: 12px; }
-  @media (max-width: 900px) { .bld { flex-direction: column; padding: 16px; } .bplay { width: 100%; position: static; } .cmpv video { height: 46vh; } }
+  @media (max-width: 900px) { #vers { height: auto; } #vers .bld { flex-direction: column; padding: 16px; } .bplay { max-width: none; } .bplay .vwrap video { height: auto; width: 100%; } #vers .binfo { overflow: visible; } .cmpv video { height: 46vh; } }
   /* Идеи (handbook/IDEAS.md): накидать пачку, разобрать, банк, референсы. */
   .ideas { flex: 1; overflow-y: auto; min-width: 0; }
   .ideas [hidden], .rmain [hidden] { display: none !important; }
@@ -2055,7 +2064,7 @@ function wireEdits(id, rv, form, cur, nextV) {
 
 // The «Монтаж» player: a custom timeline under the video (frames, the frame under the mouse,
 // marks), play/pause by a click on the video, and keys: space, ←/→ a frame, ⇧ a second, E an edit.
-function wirePlayer(rv, sel, cur, edits, open) {
+function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._ac?.abort(); rv._ac = new AbortController();
   const on = {signal: rv._ac.signal}, tl = $('#bStrip'), pv = sel.preview;
   const dur = () => (Number.isFinite(rv.duration) && rv.duration) || 0;
@@ -2112,7 +2121,18 @@ function wirePlayer(rv, sel, cur, edits, open) {
   tl.onpointerleave = () => { if (!tl._drag) tip.hidden = true; };
   tl.onpointerdown = (e) => { tl._drag = true; tl.setPointerCapture(e.pointerId); rv.currentTime = timeAt(e); upd(); };
   tl.onpointerup = (e) => { tl._drag = false; tl.releasePointerCapture?.(e.pointerId); };
-  $('#pAdd')?.addEventListener('click', () => { rv.pause(); $('#eText')?.focus(); }, on);
+  // «+ Правка тут» / E opens the form under the timeline; it closes after «Добавить» or «Отмена».
+  const compose = () => { const f = $('#eComp'); if (!f) return; rv.pause(); f.hidden = false; $('#eText').focus(); };
+  $('#pAdd')?.addEventListener('click', compose, on);
+  $('#eCancel')?.addEventListener('click', () => { $('#eComp').hidden = true; }, on);
+  // «Как в Instagram»: the Reels interface over the video, to see what hides under it while editing.
+  const igB = $('#igB'), igL = $('#igL');
+  const ig = (onIg) => {
+    igB.classList.toggle('on', onIg); igB.setAttribute('aria-pressed', onIg); igL.hidden = !onIg;
+    if (onIg && !igL.innerHTML && window.Preview) igL.innerHTML = Preview.frame('reels', {caption: igCaption, name: projName(), profile: igFor()});
+    try { localStorage.setItem('reels-ig', onIg ? '1' : ''); } catch {}
+  };
+  if (igB) { igB.onclick = () => ig(igL.hidden); let k = ''; try { k = localStorage.getItem('reels-ig'); } catch {} if (k) ig(true); }
   addEventListener('resize', film, on);
   addEventListener('keydown', (e) => {
     if (!rv.isConnected) return rv._ac.abort();
@@ -2120,7 +2140,7 @@ function wirePlayer(rv, sel, cur, edits, open) {
     const fr = 1 / 30;
     if (e.key === ' ') { e.preventDefault(); toggle(); }
     else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); rv.pause(); rv.currentTime = Math.max(0, Math.min(dur(), rv.currentTime + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : fr))); }
-    else if ((e.key === 'e' || e.key === 'E' || e.key === 'у' || e.key === 'У') && $('#eText')) { e.preventDefault(); rv.pause(); $('#eText').focus(); }
+    else if ((e.key === 'e' || e.key === 'E' || e.key === 'у' || e.key === 'У') && $('#eComp')) { e.preventDefault(); compose(); }
   }, on);
 }
 
@@ -2181,24 +2201,22 @@ async function renderVersions(id, data) {
   el.innerHTML = `<div class="bld">
     <div class="bplay">
       ${sel && video(sel)
-        ? `<div class="vwrap"><video id="rv" src="${esc(playUrl(sel))}" playsinline preload="auto" ${thumb(sel) ? `poster="${thumb(sel).url}"` : ''}></video><div class="pinlayer" id="pinL" hidden></div></div>
-          <div class="pbar"><div class="ptl" id="bStrip" role="slider" tabindex="0" aria-label="Полоса времени"><div class="film" id="pFilm"></div><div class="done" id="pDone"></div><i class="bhead" id="bHead"></i><span id="pMarks"></span><div class="ptip" id="pTip" hidden><b id="pTipF"></b><span id="pTipT"></span></div></div>
-            <div class="pctl"><button type="button" class="btn ppb" id="pPlay" aria-label="Смотреть">▶</button><span class="tcx" id="pTime">0:00.0 / 0:00</span><span style="flex: 1"></span>${sel === cur && ed ? '<button type="button" class="btn" id="pAdd">+ Правка тут</button>' : ''}</div>
-            <div class="pkeys"><kbd>пробел</kbd> пауза · <kbd>←</kbd><kbd>→</kbd> кадр · <kbd>⇧</kbd>+стрелка секунда${sel === cur && ed ? ' · <kbd>E</kbd> правка' : ''}</div></div>
-          <div class="bleg"><span><i style="background: #2E8A4F"></i>изменено в ${esc(sel.v)}</span>${sel === cur ? `<span><i style="background: #E5A33C"></i>правка к ${esc(nextV)}</span>` : ''}</div>
-          ${sel === cur && ed ? `<form class="ecomp" id="eComp"><div class="row" style="gap: 6px"><b id="eT" class="tcx">0:00</b><span class="small muted">правка к ${esc(nextV)}</span></div>
-            <textarea class="f" id="eText" rows="2" placeholder="Что поменять в этот момент — словами или голосом"></textarea>
-            <div class="row" style="gap: 6px"><button type="button" class="btn" id="eMic" title="Сказать голосом">🎙 Голосом</button><button type="button" class="btn" id="ePt" title="Показать место на кадре">◎ Точка на кадре</button><button type="submit" class="btn primary" style="margin-left: auto">Добавить</button></div>
-            <span class="small muted" id="eHint">Остановите видео в нужный момент — правка привяжется к секунде</span></form>`
-          : sel !== cur ? `<span class="small muted" style="text-align: center">Смотрите ${esc(vName(sel))}. Правки пишутся к ${esc(nextV)}.</span>` : ''}
-          ${ed ? `<button type="button" class="linkbtn" data-vlabel="${esc(sel.v)}" data-cur="${esc(sel.variant || '')}" style="align-self: center">${sel.variant ? 'Переименовать вариант' : 'Назвать вариант (RU, EN…)'}</button>` : ''}`
+        ? `<div class="vwrap"><video id="rv" src="${esc(playUrl(sel))}" playsinline preload="auto" ${thumb(sel) ? `poster="${thumb(sel).url}"` : ''}></video><div class="igl" id="igL" hidden></div><div class="pinlayer" id="pinL" hidden></div>
+          <button type="button" class="igbtn" id="igB" aria-pressed="false">Как в Instagram</button></div>`
         : sel ? `<div class="vph" style="${thumb(sel) ? `background: #000 center / contain no-repeat url('${thumb(sel).url}'); color: #fff` : ''}">Видео ${esc(sel.v)} не хранится — можно пересобрать из снимка</div>${ed ? `<button type="button" class="btn" data-rebuild="${esc(sel.v)}">Пересобрать ${esc(sel.v)}</button>` : ''}`
         : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}
     </div>
     <div class="binfo">
+      ${sel && video(sel) ? `<div class="pbar"><div class="ptl" id="bStrip" role="slider" tabindex="0" aria-label="Полоса времени"><div class="film" id="pFilm"></div><div class="done" id="pDone"></div><i class="bhead" id="bHead"></i><span id="pMarks"></span><div class="ptip" id="pTip" hidden><b id="pTipF"></b><span id="pTipT"></span></div></div>
+          <div class="pctl"><button type="button" class="btn ppb" id="pPlay" aria-label="Смотреть">▶</button><span class="tcx" id="pTime">0:00.0 / 0:00</span><span class="small muted" title="Пробел — пауза, ← → — кадр, Shift — секунда, E — правка">пробел · ← → · E</span><span style="flex: 1"></span>${sel === cur && ed ? '<button type="button" class="btn" id="pAdd">+ Правка тут</button>' : ''}</div>
+          ${sel === cur && ed ? `<form class="ecomp" id="eComp" hidden><div class="row" style="gap: 6px"><b id="eT" class="tcx">0:00</b><span class="small muted">правка к ${esc(nextV)}</span><span class="small muted" id="eHint" style="margin-left: auto"></span></div>
+            <textarea class="f" id="eText" rows="2" placeholder="Что поменять в этот момент — словами или голосом"></textarea>
+            <div class="row" style="gap: 6px"><button type="button" class="btn" id="eMic" title="Сказать голосом">🎙 Голосом</button><button type="button" class="btn" id="ePt" title="Показать место на кадре">◎ Точка на кадре</button><button type="button" class="linkbtn" id="eCancel">Отмена</button><button type="submit" class="btn primary" style="margin-left: auto">Добавить</button></div></form>`
+          : sel !== cur ? `<span class="small muted">Смотрите ${esc(vName(sel))}. Правки пишутся к ${esc(nextV)}.</span>` : ''}</div>` : ''}
       ${cur ? `<div><div class="ln-lh">Версии · ${vs.length}${withVideo.length > 1 ? `<a href="#/reel/${esc(id)}/compare">сравнить ${esc((prevOf(sel) || withVideo[1]).v)} ↔ ${esc((prevOf(sel) ? sel : withVideo[0]).v)}</a>` : ''}</div>
         <div class="vcards">${vs.map(card).join('')}</div>${isOwner() && (data.storage?.reclaimLatest || data.storage?.trash || data.storage?.packed) ? `<p class="small muted" style="margin: 8px 0 0; display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline">${data.storage.packed ? '<span class="chip">упакован</span>' : ''}${data.storage.reclaimLatest ? `<button type="button" class="linkbtn" id="keepLatest">Оставить только последнюю · ${mb(data.storage.reclaimLatest)}</button>` : ''}${data.storage.trash ? `<button type="button" class="linkbtn" id="restoreReel">Вернуть из корзины · ${mb(data.storage.trash)}</button>` : ''}</p>` : ''}</div>` : '<p class="small muted">Версий пока нет. Напишите в чате справа, что снять или смонтировать.</p>'}
       ${cur ? editsBlock(edits, sel, cur, nextV) : ''}
+      ${ed && sel && video(sel) ? `<button type="button" class="linkbtn" data-vlabel="${esc(sel.v)}" data-cur="${esc(sel.variant || '')}" style="align-self: flex-start">${sel.variant ? 'Переименовать вариант' : 'Назвать вариант (RU, EN…)'}</button>` : ''}
       ${cur && ed && sel === cur && !hasMaster(cur) ? `<p class="small muted" style="margin: 0">Нравится ${esc(cur.v)} как есть? <button type="button" class="linkbtn" id="acceptV">Принять и собрать мастер 1440p</button></p>` : ''}
       ${script.trim() ? `<details class="blk"><summary class="lbl" style="cursor: pointer">Сценарий</summary><div class="md" style="font-size: 14px">${md(script)}</div></details>` : ''}
     </div>
@@ -2211,7 +2229,8 @@ async function renderVersions(id, data) {
   // under the mouse, the playhead and the marks: green changed in this version, yellow next.
   let rv = $('#rv');
   if (rv && oldRv && oldRv.getAttribute('src') === rv.getAttribute('src')) { rv.replaceWith(oldRv); rv = oldRv; }
-  if (rv) wirePlayer(rv, sel, cur, edits, open);
+  const igCaption = (Array.isArray(data.publish?.captions) && (data.publish.captions.find((c) => /insta/i.test(c.platform || '')) || data.publish.captions[0])?.text) || section(data.readme, 'Подпись').trim() || section(data.readme, 'Caption').trim();
+  if (rv) wirePlayer(rv, sel, cur, edits, open, igCaption);
   const form = $('#eComp');
   if (rv && form) wireEdits(id, rv, form, cur, nextV);
   el.querySelectorAll('[data-viewv]').forEach((b) => {
