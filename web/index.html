@@ -572,13 +572,18 @@
   .vpop { position: absolute; right: 0; top: 40px; z-index: 20; min-width: 260px; background: #fff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.14), 0 0 0 1px var(--line); padding: 6px; display: flex; flex-direction: column; }
   .vpop a, .vpop button { text-align: left; padding: 9px 10px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--ink); text-decoration: none; cursor: pointer; } .vpop a:hover, .vpop button:hover { background: #F3F3F0; }
   .tlbox { background: #F5F5F3; border-radius: 16px; padding: 0 12px 10px; display: flex; flex-direction: column; gap: 10px; }
-  .tlscroll { overflow-x: auto; overflow-y: hidden; padding: 36px 3px 6px; scrollbar-width: thin; }
+  .tlscroll { overflow-x: auto; overflow-y: hidden; padding: 34px 3px 6px; scrollbar-width: thin; }
+  .ruler { position: absolute; left: 0; right: 0; top: -30px; height: 26px; cursor: ew-resize; z-index: 4; }
+  .ruler:hover { background: rgba(0,0,0,.035); border-radius: 6px; }
+  .ruler i { position: absolute; bottom: 0; width: 1px; height: 4px; background: #CFCFCB; pointer-events: none; }
+  .ruler i.b { height: 9px; background: #A9A9A4; }
+  .ruler i.b span { position: absolute; left: 4px; bottom: 8px; font: 10px/1 ui-monospace, Menlo, monospace; color: #8A8A85; white-space: nowrap; }
   .tlscroll::-webkit-scrollbar { height: 6px; } .tlscroll::-webkit-scrollbar-thumb { background: #CFCFCB; border-radius: 3px; }
   .zctl { display: inline-flex; align-items: center; gap: 4px; }
   .zb { width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; font-size: 16px; color: var(--muted); cursor: pointer; } .zb:hover { background: #F2F2EF; color: var(--ink); }
   .zctl input[type=range] { width: 72px; accent-color: #141413; }
-  .ptl .bhead { top: -8px; bottom: -4px; width: 2px; margin-left: -1px; background: #2F6FEB; box-shadow: none; z-index: 6; border-radius: 1px; }
-  .ptl .bhead::before { content: ''; position: absolute; top: -6px; left: -5px; width: 12px; height: 12px; border-radius: 50%; background: #2F6FEB; }
+  .ptl .bhead { top: -30px; bottom: -4px; width: 2px; margin-left: -1px; background: #2F6FEB; box-shadow: none; z-index: 6; border-radius: 1px; }
+  .ptl .bhead::before { content: ''; position: absolute; top: 0; left: -5px; width: 12px; height: 12px; border-radius: 50%; background: #2F6FEB; }
   .ptl.kmode .film { display: none; }
   .pclips { position: absolute; inset: 0; }
   .kc { position: absolute; top: 0; bottom: 0; border-radius: 7px; overflow: hidden; background: #2B2B29; transition: box-shadow .1s; }
@@ -592,7 +597,7 @@
   .khand::after { content: ''; width: 2px; height: 16px; border-radius: 1px; background: #fff; }
   .khand:hover, .khand.on { background: #2F6FEB; } .khand.l { border-radius: 9px 0 0 9px; } .khand.r { border-radius: 0 9px 9px 0; }
   .pskl { position: absolute; top: -8px; bottom: 0; width: 1px; background: #141413; opacity: .55; pointer-events: none; z-index: 5; }
-  .ttip { position: absolute; top: -32px; transform: translateX(-50%); background: #141413; color: #fff; font: 500 12px/1 inherit; padding: 7px 9px; border-radius: 7px; white-space: nowrap; pointer-events: none; z-index: 8; }
+  .ttip { position: absolute; top: -33px; transform: translateX(-50%); background: #141413; color: #fff; font: 500 12px/1 inherit; padding: 7px 9px; border-radius: 7px; white-space: nowrap; pointer-events: none; z-index: 8; }
   .bflag { position: absolute; top: -14px; width: 11px; height: 13px; margin-left: -1px; border: 0; padding: 0; cursor: pointer; z-index: 7; clip-path: polygon(0 0, 100% 0, 100% 70%, 0 100%); }
   .khints { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
   .khints span { display: inline-flex; align-items: center; gap: 4px; }
@@ -2276,6 +2281,18 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     const scale = Math.max(w / pv.w, h / pv.h);
     [...f.children].forEach((x, i) => frame(x, pv, ((i + 0.5) * d) / n, scale, (w - pv.w * scale) / 2, (h - pv.h * scale) / 2));
   };
+  // The ruler: a tick step that keeps labels ~70 px apart at any zoom, minor ticks between them.
+  const ruler = () => {
+    const d = dur(), el = $('#pRuler'), W = tl.clientWidth;
+    if (!d || !el || !W) return;
+    const step = [0.5, 1, 2, 5, 10, 15, 30, 60].find((x) => (x / d) * W >= 70) || 60;
+    const minor = (step / 5 / d) * W >= 7 ? step / 5 : (step / 2 / d) * W >= 7 ? step / 2 : 0;
+    const lab = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}${step < 1 && t % 1 ? ',5' : ''}`;
+    let html = '';
+    if (minor) for (let t = 0; t <= d + 1e-6; t += minor) if (Math.abs(t / step - Math.round(t / step)) > 1e-6) html += `<i style="left: ${(t / d) * 100}%"></i>`;
+    for (let t = 0; t <= d + 1e-6; t += step) html += `<i class="b" style="left: ${(t / d) * 100}%"><span>${lab(t)}</span></i>`;
+    el.innerHTML = html;
+  };
   const marks = () => {
     const d = dur();
     if (!d) return;
@@ -2295,7 +2312,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     vw?.classList.toggle('playing', !rv.paused);
     $('#eComp')?._upd?.();
   };
-  const ready = () => { film(); marks(); upd(); };
+  const ready = () => { film(); ruler(); marks(); upd(); };
   if (rv.readyState >= 1) ready();
   rv.addEventListener('loadedmetadata', ready, on);
   ['timeupdate', 'play', 'pause', 'seeked'].forEach((e) => rv.addEventListener(e, upd, on));
@@ -2330,15 +2347,15 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._tip = (x, text) => { if (!text) { tip.hidden = true; return; } tip.hidden = false; tip.style.left = `${Math.max(60, Math.min(tl.clientWidth - 60, x))}px`; tip.textContent = text; };
   tl.onpointermove = (e) => {
     if (tl._busy) return;
-    const t = timeAt(e), x = e.clientX - tl.getBoundingClientRect().left;
+    const t = timeAt(e), x = e.clientX - tl.getBoundingClientRect().left, onRuler = !!e.target.closest?.('.ruler');
     skl.hidden = false; skl.style.left = `${x}px`;
-    rv._tip(x, tl._label?.(t) || `${t1(t)} · клик — перейти`);
-    tl._hover?.(t);
+    rv._tip(x, tl._drag && tl._scrub ? t1(t) : onRuler ? `${t1(t)} · тяните — перемотка` : tl._label?.(t) || `${t1(t)} · клик — перейти`);
+    tl._hover?.(onRuler ? null : t);
     if (tl._drag) { rv.currentTime = t; peek(null); } else peek({url: rv.currentSrc || rv.src, t, pv, label: `Просмотр · ${t1(t)}`});
   };
   tl.onpointerleave = () => { if (tl._drag || tl._busy) return; skl.hidden = true; rv._tip(0, ''); tl._hover?.(null); peek(null); };
-  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; try { tl.setPointerCapture(e.pointerId); } catch {} rv.pause(); rv.currentTime = timeAt(e); peek(null); tl._pick?.(rv.currentTime); upd(); };
-  tl.onpointerup = (e) => { tl._drag = false; tl.releasePointerCapture?.(e.pointerId); };
+  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; tl._scrub = !!e.target.closest?.('.ruler'); try { tl.setPointerCapture(e.pointerId); } catch {} rv.pause(); rv.currentTime = timeAt(e); peek(null); if (!tl._scrub) tl._pick?.(rv.currentTime); upd(); };
+  tl.onpointerup = (e) => { tl._drag = false; tl._scrub = false; tl.releasePointerCapture?.(e.pointerId); };
   // E puts the cursor in the note field under the track.
   const compose = () => { rv.pause(); $('#eText')?.focus(); };
   // «Как в Instagram»: the Reels interface over the video, to see what hides under it while editing.
@@ -2360,7 +2377,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     tl.style.width = Z === 1 ? '' : `${W}px`;
     if (anchor) scr.scrollLeft = anchor.f * W - anchor.x;
     tl._relayout?.(); if (zr && document.activeElement !== zr) zr.value = zToR(Z);
-    clearTimeout(filmT); filmT = setTimeout(film, 120);
+    ruler(); clearTimeout(filmT); filmT = setTimeout(film, 120);
     zraf = Z === Zt ? 0 : requestAnimationFrame(zstep);
   };
   const zoomTo = (z, x) => {
@@ -2377,7 +2394,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     // While playing zoomed in, the view follows the playhead.
     rv.addEventListener('timeupdate', () => { if (Z > 1 && !rv.paused && dur()) { const x = (rv.currentTime / dur()) * tl.clientWidth; if (x < scr.scrollLeft || x > scr.scrollLeft + scr.clientWidth - 40) scr.scrollLeft = x - 60; } }, on);
   }
-  const ro = new ResizeObserver(() => { if (!rv.isConnected) return ro.disconnect(); clearTimeout(filmT); filmT = setTimeout(() => { film(); tl._relayout?.(); }, 60); });
+  const ro = new ResizeObserver(() => { if (!rv.isConnected) return ro.disconnect(); clearTimeout(filmT); filmT = setTimeout(() => { film(); ruler(); tl._relayout?.(); }, 60); });
   ro.observe(scr || tl); rv._ac.signal.addEventListener('abort', () => ro.disconnect());
   addEventListener('keydown', (e) => {
     if (!rv.isConnected) return rv._ac.abort();
@@ -2735,8 +2752,8 @@ async function renderVersions(id, data) {
             <div class="zctl" aria-label="Масштаб дорожки"><button type="button" class="zb" id="zOut" aria-label="Мельче">−</button><input type="range" id="zRange" min="0" max="100" value="0" aria-label="Масштаб"><button type="button" class="zb" id="zIn" aria-label="Крупнее">+</button></div>
             ${sel === cur && ed && !data.cut ? '<button type="button" class="linkbtn small" id="kAsk">Разложить на куски</button>' : ''}
             ${sel === cur && CUT[id] ? `<button type="button" class="kswitch" id="kSw" role="switch" aria-checked="${kOn}"><span>Нарезка</span><i></i></button>` : ''}</div>
-          <div class="tlbox"><div class="tlscroll" id="tlScroll"><div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div></div>
-          <div class="khints"><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>
+          <div class="tlbox"><div class="tlscroll" id="tlScroll"><div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="ruler" id="pRuler" aria-label="Линейка времени — тяните, чтобы перемотать"></div><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div></div>
+          <div class="khints"><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>
           ${sel === cur && ed ? `<form class="ecomp2" id="eComp"><span class="etgt" id="eT">На 0:00</span><button type="button" class="ex" id="eX" hidden aria-label="Снять выбор куска">✕</button>
             <textarea id="eText" rows="1" placeholder="Что поменять в этом месте"></textarea>
             <button type="button" class="btn ic" id="eMic" title="Сказать голосом" aria-label="Сказать голосом">🎙</button><button type="button" class="btn ic" id="ePt" title="Точка на кадре" aria-label="Точка на кадре">◎</button><button type="submit" class="btn primary">Добавить</button></form><span class="small muted" id="eHint"></span>`
