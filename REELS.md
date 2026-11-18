@@ -125,6 +125,7 @@ Ready, tested tools for every step with real footage. Use them instead of writin
 8. **Real screens.** `node scripts/shot.mjs <url> project/public/img/<name>.jpg [--lang en] [--full] [--click "…"]`: fresh phone screenshots of the live site through installed Chrome (passes Cloudflare).
 9. **References and music by link.** `uvx yt-dlp -o "sources/<name>.%(ext)s" <url>` for Instagram/YouTube/TikTok; plain files with `curl -L -o`.
 10. **Beats, render, loudness:** `scripts/beats.mjs`, `scripts/render.mjs`, `scripts/loudnorm.mjs` as above (never loudnorm the owner's voice).
+Always fill the whole vertical 1080×1920 frame: a horizontal or sideways camera clip is turned (`rotate`) or scaled and cropped to 9:16 — never letterboxed with black bars; qc.mjs warns about bars.
 11. **Check before hand-over.** `node scripts/qc.mjs <rendered.mp4>`: size, frame, fps, LUFS, true peak and warnings — an echoed voice, clipping, sound at 0 s. Fix every warning that applies before sending.
 
 Start a remake from the closest earlier reel's own `project/` (copy it, keep its look and `ds/`), then swap sources, words, captions and mask.

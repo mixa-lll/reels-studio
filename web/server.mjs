@@ -139,7 +139,7 @@ function cutView(dir) {
   if (!cut?.source || !Array.isArray(cut.clips)) return null;
   const src = join(dir, cut.source);
   if (!existsSync(src)) return {...cut, missing: true};
-  const pv = previewOf(src);
+  const pv = previewOf(src, {rotate: Number(cut.rotate) || 0});
   const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
   const applied = readJson(join(dir, 'cut.applied.json'), null);
   const same = (a, b) => JSON.stringify((a?.clips || []).map((c) => [c.in, c.out])) === JSON.stringify((b?.clips || []).map((c) => [c.in, c.out]));

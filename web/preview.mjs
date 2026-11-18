@@ -17,18 +17,19 @@ const dirOf = (video) => join(dirname(video), '.preview');
 const name = (video) => basename(video).replace(/\.[^.]+$/, '');
 
 /** {video, sprite, every, cols, w, h, n} for a ready preview of this file, or null (and queues it). */
-export function previewOf(video) {
+export function previewOf(video, {rotate = 0} = {}) {
   const d = dirOf(video), n = name(video);
   const mp4 = join(d, `${n}.mp4`), meta = join(d, `${n}.json`);
   try {
     if (existsSync(meta) && statSync(meta).mtimeMs >= statSync(video).mtimeMs) {
       const m = JSON.parse(readFileSync(meta, 'utf8'));
+      if ((m.rotate || 0) !== rotate) throw new Error('turned');
       return {video: mp4, sprite: existsSync(join(d, `${n}.jpg`)) ? join(d, `${n}.jpg`) : null, ...m};
     }
   } catch {}
   // A video still being written (a render, a copy) gets its preview once it has settled.
   try { if (Date.now() - statSync(video).mtimeMs < 15000) return null; } catch { return null; }
-  if (!queued.has(video)) { queued.add(video); queue.push(video); next(); }
+  if (!queued.has(video)) { queued.add(video); queue.push({video, rotate}); next(); }
   return null;
 }
 
@@ -52,21 +53,22 @@ function run(args) {
 async function next() {
   if (busy || !queue.length) return;
   busy = true;
-  const video = queue.shift();
-  try { await make(video); } catch {}
+  const {video, rotate} = queue.shift();
+  try { await make(video, rotate); } catch {}
   queued.delete(video);
   busy = false;
   next();
 }
 
-async function make(video) {
+// rotate: a camera clip filmed sideways (cut.json «rotate»: 90 clockwise, -90, 180).
+async function make(video, rotate = 0) {
   if (!existsSync(video)) return;
   const d = dirOf(video), n = name(video);
   mkdirSync(d, {recursive: true});
   const info = videoInfo(video);
   if (!info) return;
   const tmp = join(d, `${n}.tmp.mp4`);
-  const ok = await run(['-y', '-v', 'error', '-i', video, '-vf', "scale='min(720,iw)':-2", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24',
+  const ok = await run(['-y', '-v', 'error', '-i', video, '-vf', `${{90: 'transpose=1,', [-90]: 'transpose=2,', 180: 'hflip,vflip,'}[rotate] || ''}scale='min(720,iw)':-2`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24',
     '-g', '15', '-keyint_min', '15', '-sc_threshold', '0', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', tmp]);
   if (!ok) { rmSync(tmp, {force: true}); return; }
   renameSync(tmp, join(d, `${n}.mp4`));
@@ -75,5 +77,5 @@ async function make(video) {
   const jtmp = join(d, `${n}.tmp.jpg`);
   const sprite = await run(['-y', '-v', 'error', '-i', join(d, `${n}.mp4`), '-vf', `fps=${1 / every},scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,tile=${COLS}x${rows}`, '-frames:v', '1', '-q:v', '5', jtmp]);
   if (sprite) renameSync(jtmp, join(d, `${n}.jpg`)); else rmSync(jtmp, {force: true});
-  writeFileSync(join(d, `${n}.json`), JSON.stringify({every, cols: COLS, w: W, h: H, n: count}));
+  writeFileSync(join(d, `${n}.json`), JSON.stringify({every, cols: COLS, w: W, h: H, n: count, rotate}));
 }

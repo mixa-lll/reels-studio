@@ -28,6 +28,15 @@ if (v) {
   const [n, d] = v.r_frame_rate.split('/').map(Number);
   Object.assign(out, {video: `${v.codec_name} ${v.width}×${v.height} ${+(n / d).toFixed(2)} fps`});
   if (!['1080x1920', '1440x2560', '720x1280'].includes(`${v.width}x${v.height}`)) warn.push(`frame ${v.width}×${v.height} is not 9:16 1080×1920 / 1440×2560`);
+  // Black bars: a horizontal or square shot placed into the 9:16 frame instead of filling it.
+  // Samples a few moments; a bar that stays in most of them is part of the picture.
+  const bars = [0.15, 0.4, 0.65, 0.9].map((k) => {
+    const log = run('ffmpeg', ['-v', 'info', '-ss', (dur * k).toFixed(2), '-i', file, '-t', '1', '-vf', 'cropdetect=24:2:0', '-f', 'null', '-'], {encoding: 'utf8'}).stderr || '';
+    const m = [...log.matchAll(/crop=(\d+):(\d+):/g)].at(-1);
+    return m ? [Number(m[1]), Number(m[2])] : [v.width, v.height];
+  });
+  const lost = bars.filter(([w, h]) => w < v.width * 0.96 || h < v.height * 0.96);
+  if (lost.length >= 3) warn.push(`black bars: the picture is ${lost[0][0]}×${lost[0][1]} inside ${v.width}×${v.height} — fill the whole vertical frame (scale/crop the shot, never letterbox)`);
 }
 if (size > 50 * 1024 * 1024) warn.push('over 50 MB: Telegram takes it only via the page or a link');
 if (a) {

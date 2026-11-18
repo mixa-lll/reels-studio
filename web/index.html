@@ -482,9 +482,9 @@
   .bld { display: flex; gap: 28px; padding: 20px 28px 12px; align-items: flex-start; }
   #vers { height: 100%; display: flex; flex-direction: column; }
   #vers .bld { flex: 1; min-height: 0; padding: 16px 24px; gap: 24px; align-items: stretch; }
-  .bplay { flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; min-height: 0; max-width: 42vw; }
-  .bplay .vwrap { height: 100%; min-height: 0; }
-  .bplay .vwrap video { height: 100%; width: auto; max-width: 100%; aspect-ratio: 9 / 16; object-fit: contain; background: #000; border-radius: 14px; cursor: pointer; }
+  .bplay { flex: 0 0 auto; align-self: flex-start; display: flex; flex-direction: column; gap: 10px; min-height: 0; width: 300px; aspect-ratio: 9 / 16; }
+  .bplay .vwrap { width: 100%; height: 100%; }
+  .bplay .vwrap video { width: 100%; height: 100%; display: block; object-fit: cover; background: #000; border-radius: 14px; cursor: pointer; }
   #vers .binfo { overflow-y: auto; gap: 18px; padding-right: 4px; }
   .pbar { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 0; z-index: 4; background: #fff; padding-bottom: 6px; }
   .igl { position: absolute; inset: 0; pointer-events: none; border-radius: 14px; overflow: hidden; }
@@ -2101,8 +2101,28 @@ function wireEdits(id, rv, form, cur, nextV) {
 
 // The «Монтаж» player: a custom timeline under the video (frames, the frame under the mouse,
 // marks), play/pause by a click on the video, and keys: space, ←/→ a frame, ⇧ a second, E an edit.
+// The player box takes the video's own shape (9:16 for a reel), as tall as the screen allows and at
+// most 42% wide, set once in pixels: no black bars and nothing jumps while the video loads.
+function fitPlayer(v) {
+  v._fit?.abort(); v._fit = new AbortController();
+  const fit = () => {
+    const box = v.closest('.bplay'), bld = v.closest('.bld');
+    if (!box || !bld || !v.isConnected) return v._fit.abort();
+    if (innerWidth <= 900) { box.style.width = ''; box.style.height = ''; return; }
+    const cs = getComputedStyle(bld), H = bld.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const r = v.videoWidth && v.videoHeight ? v.videoWidth / v.videoHeight : 9 / 16;
+    let h = H, w = h * r;
+    if (w > innerWidth * 0.42) { w = innerWidth * 0.42; h = w / r; }
+    box.style.aspectRatio = 'auto'; box.style.width = `${Math.floor(w)}px`; box.style.height = `${Math.floor(h)}px`;
+  };
+  fit();
+  v.addEventListener('loadedmetadata', fit, {signal: v._fit.signal});
+  addEventListener('resize', fit, {signal: v._fit.signal});
+}
+
 function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._ac?.abort(); rv._ac = new AbortController();
+  fitPlayer(rv);
   const on = {signal: rv._ac.signal}, tl = $('#bStrip'), pv = sel.preview;
   const dur = () => (Number.isFinite(rv.duration) && rv.duration) || 0;
   const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
@@ -2188,7 +2208,12 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
 async function stageCut(id, data) {
   const host = $('#reelHost');
   const cut = data.cut;
-  if (!cut) { host.innerHTML = '<div style="padding: 40px 32px; max-width: 560px" class="muted">Нарезки пока нет. Она появится, когда Claude порежет ваше видео на куски — тогда здесь можно будет подвинуть каждую склейку.</div>'; return; }
+  if (!cut) {
+    host.innerHTML = `<div style="padding: 40px 32px; max-width: 600px; display: flex; flex-direction: column; gap: 14px"><b>Нарезки пока нет</b><span class="muted">Здесь куски вашего видео стоят на ленте, как в программе монтажа: у каждого можно подвинуть вход и выход по кадру, переставить, разрезать или убрать. Она появляется, когда ролик собран из вашей съёмки.</span>
+      ${canEdit() ? '<button type="button" class="btn primary" id="cAsk" style="align-self: flex-start">Попросить Claude разложить монтаж на куски</button>' : ''}<a class="small" href="#/reel/${esc(id)}/edit">← к сборке</a></div>`;
+    $('#cAsk')?.addEventListener('click', () => chatOf().say(`Разложи монтаж этого рилса на куски для экрана «Нарезка»: запиши projects/${P}/reels/${id}/cut.json по REELS.md («Footage toolkit», шаг Takes) — исходник, fps, поворот (rotate), если клип снят боком, gainDb, если голос усиливали, и куски {in, out, text} в секундах исходника ровно как в текущей версии. Ничего не пересобирай, только cut.json и такую же копию cut.applied.json.`, 'Разложить монтаж на куски'));
+    return;
+  }
   if (cut.missing) { host.innerHTML = `<div style="padding: 40px 32px" class="muted">Исходник ${esc(cut.source)} не найден.</div>`; return; }
   if (!cut.preview) {
     host.innerHTML = '<div style="padding: 40px 32px" class="muted">Готовлю лёгкую копию исходника для нарезки — обычно минута-две. Страница обновится сама.</div>';
@@ -2211,6 +2236,7 @@ async function stageCut(id, data) {
       ${ed ? `<div class="row" style="gap: 10px; align-items: center"><button type="button" class="btn primary" id="cApply">Применить нарезку</button><span class="small muted" id="cApplyNote"></span></div>` : ''}
     </div></div></div>`;
   const v = $('#cv'), tl = $('#cTl');
+  fitPlayer(v);
   const starts = () => clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + clips[i - 1].out - clips[i - 1].in : 0), a), []);
   const total = () => clips.reduce((a, c) => a + c.out - c.in, 0);
   const frame = (el, t, scale, ox = 0, oy = 0) => {
@@ -2324,7 +2350,7 @@ async function stageCut(id, data) {
   if (ed) $('#cApply').onclick = async () => {
     clearTimeout(saveT); await post('/api/reel/cut', {reel: id, clips});
     const folder = `projects/${P}/reels/${id}`;
-    chatOf().say(`Я поправил нарезку в ${folder}/cut.json (${clips.length} кусков, ${total().toFixed(1)} с). Примени её: сначала \`node scripts/cut.mjs ${folder} map\` — как сдвинулись куски; потом \`cut\` и \`words\`, пересобери субтитры, маску ведущей по новому cut.mov (scripts/mask.mjs, в фоне, по одному тяжёлому шагу), сдвинь все времена склейки в Reel.jsx и scenes по таблице map и собери следующую версию черновиком. В README коротко: что поменялось в нарезке.`, `Применить нарезку · ${clips.length} кусков`);
+    chatOf().say(`Я поправил нарезку в ${folder}/cut.json (${clips.length} кусков, ${total().toFixed(1)} с). Примени её: сначала \`node scripts/cut.mjs ${folder} map\` — как сдвинулись куски; потом \`cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov), пересобери субтитры, маску ведущей по новому cut.mov (scripts/mask.mjs, в фоне, по одному тяжёлому шагу), сдвинь все времена склейки в Reel.jsx и scenes по таблице map и собери следующую версию черновиком. В README коротко: что поменялось в нарезке.`, `Применить нарезку · ${clips.length} кусков`);
     changed = false; note(); toast('Отправил Claude — соберёт новую версию');
   };
   addEventListener('keydown', (e) => {
@@ -2413,7 +2439,7 @@ async function renderVersions(id, data) {
             <textarea class="f" id="eText" rows="2" placeholder="Что поменять в этот момент — словами или голосом"></textarea>
             <div class="row" style="gap: 6px"><button type="button" class="btn" id="eMic" title="Сказать голосом">🎙 Голосом</button><button type="button" class="btn" id="ePt" title="Показать место на кадре">◎ Точка на кадре</button><button type="button" class="linkbtn" id="eCancel">Отмена</button><button type="submit" class="btn primary" style="margin-left: auto">Добавить</button></div></form>`
           : sel !== cur ? `<span class="small muted">Смотрите ${esc(vName(sel))}. Правки пишутся к ${esc(nextV)}.</span>` : ''}</div>` : ''}
-      ${data.cut && !data.cut.missing ? `<a class="btn" style="align-self: flex-start" href="#/reel/${esc(id)}/cut">✂ Нарезка · ${data.cut.clips.length} кусков${data.cut.changed ? ' · есть правки' : ''}</a>` : ''}
+      ${cur ? `<a class="btn" style="align-self: flex-start" href="#/reel/${esc(id)}/cut">✂ Нарезка${data.cut && !data.cut.missing ? ` · ${data.cut.clips.length} кусков${data.cut.changed ? ' · есть правки' : ''}` : ''}</a>` : ''}
       ${cur ? `<div><div class="ln-lh">Версии · ${vs.length}${withVideo.length > 1 ? `<a href="#/reel/${esc(id)}/compare">сравнить ${esc((prevOf(sel) || withVideo[1]).v)} ↔ ${esc((prevOf(sel) ? sel : withVideo[0]).v)}</a>` : ''}</div>
         <div class="vcards">${vs.map(card).join('')}</div>${isOwner() && (data.storage?.reclaimLatest || data.storage?.trash || data.storage?.packed) ? `<p class="small muted" style="margin: 8px 0 0; display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline">${data.storage.packed ? '<span class="chip">упакован</span>' : ''}${data.storage.reclaimLatest ? `<button type="button" class="linkbtn" id="keepLatest">Оставить только последнюю · ${mb(data.storage.reclaimLatest)}</button>` : ''}${data.storage.trash ? `<button type="button" class="linkbtn" id="restoreReel">Вернуть из корзины · ${mb(data.storage.trash)}</button>` : ''}</p>` : ''}</div>` : '<p class="small muted">Версий пока нет. Напишите в чате справа, что снять или смонтировать.</p>'}
       ${cur ? editsBlock(edits, sel, cur, nextV) : ''}
