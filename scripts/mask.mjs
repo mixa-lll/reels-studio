@@ -45,7 +45,7 @@ try {
   console.log(`${w}×${h}, ${fps.toFixed(2)} fps, ${from}–${to.toFixed(1)} s ≈ ${Math.round((to - from) * fps)} frames`);
   const raw = join(tmp, 'raw.mp4');
   // 1. Decode → Vision → grey mask, near-lossless.
-  const [dc, da] = ff('ffmpeg', ['-v', 'error', ...range, '-i', resolve(video), '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
+  const [dc, da] = ff('ffmpeg', ['-v', 'error', ...range, '-i', resolve(video), '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'bgra', '-']);
   const dec = spawn(dc, da, {stdio: ['ignore', 'pipe', 'inherit']});
   const vis = spawn(bin, ['matte', String(w), String(h)], {stdio: ['pipe', 'pipe', 'ignore']});
   const [ec, ea] = ff('ffmpeg', ['-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'gray', '-s', `${w}x${h}`, '-r', String(fps), '-i', '-',

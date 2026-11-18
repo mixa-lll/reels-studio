@@ -113,7 +113,7 @@ Both kinds use one format (`bot/menu.mjs` has the details):
 
 ### Footage toolkit
 
-Ready, tested tools for every step with real footage. Use them instead of writing your own; each prints its usage when run without arguments. Long steps (transcript, mask, render) go in the background. Masks and face boxes need macOS (Apple Vision); everything else runs anywhere.
+Ready, tested tools for every step with real footage. Use them instead of writing your own; each prints its usage when run without arguments. Long steps (transcript, mask, render) go in the background, ONE AT A TIME: never a mask, a transcript and a render together — on a 16 GB Mac with a nearly full disk that froze the machine (18.11.2026). Masks and face boxes need macOS (Apple Vision); everything else runs anywhere.
 
 1. **Look at the source.** `node scripts/ffmpeg.mjs ffprobe -v error -show_entries stream=width,height,r_frame_rate,codec_name:format=duration -of json <file>`; look at a few frames (`node scripts/ffmpeg.mjs -ss <s> -i <file> -frames:v 1 <out.jpg>`) before deciding anything: who speaks, framing, light.
 2. **Transcript with word times.** `node scripts/transcribe.mjs <file> --out sources/words.json --prompt "Gudauri, Kobi, Pirveli, …"` (names from the brief and facts steer the spelling; `--lang` if known, otherwise detected). It prints the text with times: from it you know the language, the takes, the repeats and what is said where. Never ask the owner for a text they already said on camera.

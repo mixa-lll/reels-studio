@@ -23,7 +23,7 @@ if (!video) {
 try {
   const bin = visionTool();
   const {w, h} = probe(resolve(video));
-  const [dc, da] = ff('ffmpeg', ['-v', 'error', '-i', resolve(video), '-vf', `fps=1/${every}`, '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
+  const [dc, da] = ff('ffmpeg', ['-v', 'error', '-i', resolve(video), '-vf', `fps=1/${every}`, '-f', 'rawvideo', '-pix_fmt', 'bgra', '-']);
   const dec = spawn(dc, da, {stdio: ['ignore', 'pipe', 'inherit']});
   const vis = spawn(bin, ['faces', String(w), String(h)], {stdio: ['pipe', 'pipe', 'ignore']});
   dec.stdout.pipe(vis.stdin);
