@@ -132,6 +132,20 @@ function disk() {
 }
 const reelDir = (p, r) => (projectDir(p) && safe(r) && existsSync(join(PROJECTS, p, 'reels', r)) ? join(PROJECTS, p, 'reels', r) : null);
 
+// The rough cut for the «Нарезка» screen: cut.json, whether it differs from the applied one, and
+// the source's light copy and frame strip (web/preview.mjs) to trim on.
+function cutView(dir) {
+  const cut = readJson(join(dir, 'cut.json'), null);
+  if (!cut?.source || !Array.isArray(cut.clips)) return null;
+  const src = join(dir, cut.source);
+  if (!existsSync(src)) return {...cut, missing: true};
+  const pv = previewOf(src);
+  const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
+  const applied = readJson(join(dir, 'cut.applied.json'), null);
+  const same = (a, b) => JSON.stringify((a?.clips || []).map((c) => [c.in, c.out])) === JSON.stringify((b?.clips || []).map((c) => [c.in, c.out]));
+  return {...cut, changed: !same(cut, applied), preview: pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
+}
+
 function versions(p, r) {
   const dir = reelDir(p, r);
   if (!dir) return [];
@@ -1076,7 +1090,20 @@ createServer(async (req, res) => {
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
       ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10),
-      storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}, basedOn: readJson(join(dir, 'based-on.json'), null)});
+      storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}, basedOn: readJson(join(dir, 'based-on.json'), null), cut: cutView(dir)});
+  }
+  // Нарезка (scripts/cut.mjs): the owner trims, moves, splits and deletes the clips of the rough cut;
+  // the page saves the whole list, the agent applies it on «Применить нарезку».
+  if (req.method === 'POST' && url.pathname === '/api/reel/cut') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel), cut = dir && readJson(join(dir, 'cut.json'), null);
+    if (!cut) return json(404, {});
+    if (!Array.isArray(b.clips) || !b.clips.length || b.clips.length > 600) return json(400, {});
+    const clips = b.clips.map((c) => ({in: Math.round(Number(c.in) * 1000) / 1000, out: Math.round(Number(c.out) * 1000) / 1000, ...(c.text ? {text: String(c.text).slice(0, 300)} : {})}));
+    if (clips.some((c) => !(c.in >= 0 && c.out > c.in + 0.03))) return json(400, {});
+    writeJson(join(dir, 'cut.json'), {...cut, clips, editedBy: me.name, editedAt: new Date().toISOString()});
+    return json(200, {ok: true});
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
   // point on the frame; «Собрать vN» hands the open ones to the reel chat (edits.json).
