@@ -2655,6 +2655,12 @@ function wireCutPlay(id, rv, cut, withGfx) {
       onEnd: () => { if (cutRun === r) { cutRun = null; hideAll(); rv.currentTime = toV(r.ct); } }});
     return true;
   };
+  // A montage-only version is the cut itself: its graphics come on top as layers while it plays.
+  if (cut._montage && items.length) {
+    const follow = () => { if (!rv.isConnected || rv._ac.signal.aborted) return; if (!cutRun?.run.alive()) show(toC(rv.currentTime)); requestAnimationFrame(follow); };
+    requestAnimationFrame(follow);
+    return;
+  }
   // Any other way out of the live cut (a seek on the track, the scrub bar) also takes the layers away.
   rv.addEventListener('seeking', () => { if (!cutRun?.run.alive()) hideAll(); }, {signal: rv._ac.signal});
 }
@@ -2858,7 +2864,7 @@ async function renderVersions(id, data) {
         : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}
     </div>
     <div class="binfo">
-      ${cur ? `<div class="vrow"><span class="small muted">Версия</span><div class="vseg" role="group" aria-label="Версии">${vs.map((v) => `<button type="button" class="vchip ${v === sel ? 'on' : ''}" data-vchip="${esc(v.v)}" aria-pressed="${v === sel}" title="${esc(`${v === vs.at(-1) ? 'первая сборка' : changes(v) ? `${changes(v)} правок` : 'сборка'} · ${ago(v.at)} · ${!video(v) ? 'хранится кадром' : hasMaster(v) ? 'мастер готов' : 'черновик'}${v === ready ? ' · идёт в «Готово»' : ''}`)}">${esc(vName(v))}${v === ready ? '<i class="rdot" aria-label="идёт в «Готово»"></i>' : ''}</button>`).join('')}</div>
+      ${cur ? `<div class="vrow"><span class="small muted">Версия</span><div class="vseg" role="group" aria-label="Версии">${vs.map((v) => `<button type="button" class="vchip ${v === sel ? 'on' : ''}" data-vchip="${esc(v.v)}" aria-pressed="${v === sel}" title="${esc(`${v === vs.at(-1) ? 'первая сборка' : changes(v) ? `${changes(v)} правок` : 'сборка'} · ${ago(v.at)} · ${!video(v) ? 'хранится кадром' : hasMaster(v) ? 'мастер готов' : v.stage === 'montage' ? 'монтаж без графики' : 'черновик'}${v === ready ? ' · идёт в «Готово»' : ''}`)}">${esc(vName(v))}${v === ready ? '<i class="rdot" aria-label="идёт в «Готово»"></i>' : ''}</button>`).join('')}</div>
         ${withVideo.length > 1 ? `<a class="small muted" href="#/reel/${esc(id)}/compare" style="text-decoration: none">сравнить ${esc((prevOf(sel) || withVideo[1]).v)} ↔ ${esc((prevOf(sel) ? sel : withVideo[0]).v)}</a>` : ''}<span style="flex: 1"></span>
         <details class="vmenu"><summary class="btn ic" aria-label="Ещё о версии ${esc(sel.v)}">⋯</summary><div class="vpop">
           ${video(sel) && mp4(sel) ? `<a href="${mp4(sel).url}&dl=1">Скачать ${esc(sel.v)} в mp4</a>` : ''}
@@ -2885,14 +2891,15 @@ async function renderVersions(id, data) {
   </div>
   ${cur && ed ? `<div class="bfoot"><span class="small muted" id="bNote"></span>
     <span style="flex: 1"></span><a class="btn" href="#/reel/${esc(id)}/publish">${svg('eye', 14)}Как увидят</a>
-    <button type="button" class="btn" id="eGfx" title="Второй этап: плашки, карточки, субтитры поверх готового монтажа">${svg('idea', 14)}Наложить графику</button>
+    <button type="button" class="btn" id="eGfx" title="Второй этап, один раз: графика, субтитры и маска поверх готового монтажа — полный рендер">${svg('idea', 14)}Собрать с графикой</button>
     <button type="button" class="btn primary" id="eBuild">Собрать ${esc(nextV)}</button></div>` : ''}`;
   // The footer counts the notes and whether the cut was trimmed; «Собрать» takes both.
   const foot = () => {
     const cutCh = !!CUT[id]?.changed, n = open.length;
     if (!$('#eBuild')) return;
     $('#eBuild').disabled = !n && !cutCh;
-    $('#eBuild').textContent = `Собрать ${nextV}${n ? ` · правок: ${n}` : ''}${cutCh ? ' · нарезка' : ''}`;
+    // Only the cut changed: the studio joins it itself in seconds. Notes in words need the agent.
+    $('#eBuild').textContent = !n && cutCh ? `Собрать монтаж ${nextV}` : `Собрать ${nextV}${n ? ` · правок: ${n}` : ''}${cutCh ? ' · нарезка' : ''}`;
     $('#bNote').textContent = n || cutCh ? [n ? `${n} ${n === 1 ? 'правка' : n < 5 ? 'правки' : 'правок'} к ${nextV}` : '', cutCh ? 'нарезка поправлена' : ''].filter(Boolean).join(' · ') : 'Новая версия собирается только по кнопке — правки сначала копятся.';
   };
   foot();
@@ -2920,7 +2927,7 @@ async function renderVersions(id, data) {
     setTimeout(again, 6000);
   }
   if (rv && kOn) wireClips(id, rv, CUT[id], open, ed, foot);
-  if (rv && sel === cur && CUT[id]) wireCutPlay(id, rv, CUT[id], !kOn);
+  if (rv && sel === cur && CUT[id]) { CUT[id]._montage = cur.stage === 'montage'; wireCutPlay(id, rv, CUT[id], !kOn); }
   const form = $('#eComp');
   if (rv && form) wireEdits(id, rv, form, cur, nextV);
   el.querySelectorAll('[data-vchip]').forEach((b) => (b.onclick = () => { VIEWV[id] = b.dataset.vchip === cur.v ? null : b.dataset.vchip; renderVersions(id, data); }));
@@ -2948,8 +2955,20 @@ async function renderVersions(id, data) {
   });
   $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1440p этой версии (без --draft, 1440×2560, CRF 15) и скажи, когда будет готов.`, `Принять ${cur.v}`));
   // Two stages (REELS.md «Сборка, потом графика»): «Собрать» is the edit only; graphics are their own pass.
-  $('#eGfx')?.addEventListener('click', () => chatOf().say(`Наложи графику на ${cur.v} — этап «Графика» (REELS.md): плашки, карточки, цифры, субтитры по сценам и дизайн-системе, поверх готового монтажа ${cur.v}. Нарезку, порядок и звук не меняй. Маску человека режь только на тех отрезках, где графика уходит за спину (scripts/mask.mjs --from --to), а не по всему ролику; если за спину ничего не уходит — без маски. Собери ${nextV} черновиком.`, `Наложить графику на ${cur.v}`));
+  $('#eGfx')?.addEventListener('click', () => chatOf().say(`Собери ${nextV} с графикой — этап «Графика» (REELS.md), один полный рендер поверх монтажа ${cur.v}${cur.stage === 'montage' ? ' (он собран студией: нарезка уже применена, времена графики в Montage.jsx перенесены через layers.mjs place — не трогай их)' : ''}. Плашки, карточки, цифры по сценам и дизайн-системе: если в Montage.jsx графика уже есть — оставь её, если нет — наложи. Субтитры по словам новой нарезки. Маску человека режь только на тех отрезках, где графика уходит за спину (scripts/mask.mjs --from --to), а не по всему ролику; за спину ничего — без маски. Нарезку, порядок и звук не меняй. После — node scripts/layers.mjs, чтобы слои совпадали. Собери ${nextV} черновиком.`, `Собрать ${nextV} с графикой`));
   $('#eBuild')?.addEventListener('click', async () => {
+    if (!open.length && CUT[id]?.changed) {
+      const b = $('#eBuild'); b.disabled = true;
+      const r = await post('/api/reel/montage', {reel: id}).catch((e) => ({state: 'error', step: e.message}));
+      const poll = async (j) => {
+        if (!b.isConnected) return;
+        if (j.state === 'run') { b.textContent = `Монтаж ${j.v}: ${j.step}…`; setTimeout(async () => poll(await api('/api/reel/montage?reel=' + encodeURIComponent(id)).catch(() => j)), 1200); return; }
+        if (j.state === 'done') { toast(`Монтаж ${j.v} готов — графика, субтитры и маска позже, кнопкой «Собрать с графикой»`); CUT[id].changed = false; renderVersions(id); return; }
+        toast('Монтаж не собрался: ' + (j.step || '')); b.disabled = false; foot();
+      };
+      poll(r);
+      return;
+    }
     const cutCh = CUT[id]?.changed, folder = `projects/${P}/reels/${id}`, clips = CUT[id]?.clips || [];
     if (open.length) await post('/api/reel/edits', {reel: id, action: 'send', forV: nextV});
     const cutLine = cutCh ? `\nНарезка поправлена в ${folder}/cut.json (${clips.length} кусков): примени её — \`node scripts/cut.mjs ${folder} cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov); если есть ${folder}/graphics.json — \`node scripts/layers.mjs ${folder} place\`: все времена графики в Montage.jsx сами переедут на новую нарезку вместе со своими словами, руками их не двигай; иначе \`node scripts/cut.mjs ${folder} map\` и сдвинь времена по таблице. Субтитры — заново по новым словам; маску — только на отрезках под графикой. Это этап «Сборка»: новую графику не добавляй.` : '';

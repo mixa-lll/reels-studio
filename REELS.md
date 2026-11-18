@@ -113,7 +113,7 @@ Both kinds use one format (`bot/menu.mjs` has the details):
 
 ### Footage: edit first, graphics second
 
-A reel from the owner's footage is built in two stages, each its own version (the owner's rule, 18.11.2026):
+A reel from the owner's footage is built in two stages, each its own version (the owner's rule, 18.11.2026). The studio's «Собрать монтаж» does stage 1 itself in seconds (cut, words, `layers.mjs place`, the joined file as `versions/vN` with `stage.json` {stage: montage}) — no render, captions or mask; when asked for the graphics build on top of such a version, do not re-apply the cut or move graphic times, they are already placed:
 1. **Сборка (edit).** Takes chosen by the text, the cut, the best voice (a separate mic if there is one), the order of lines — and nothing on top: no plates, cards, captions or masks. «Собрать vN» and «Применить нарезку» mean this stage, unless graphics are already on: then keep them and only shift their times.
 2. **Графика.** Only when the owner asks («Наложить графику») or the edit is accepted: plates, cards, numbers, captions over the finished edit, by the scenes and the project's `design-system/STYLE.md` — it wins over the fonts and styles in the reel's `ds/` copied from older reels; check a frame of every plate against it before handing over. One text per moment: no caption repeating the plate above it. The cut and the sound stay. Cut the person out only for the stretches where a graphic goes behind them (`mask.mjs --from --to` per stretch), never the whole reel; nothing behind — no mask.
 

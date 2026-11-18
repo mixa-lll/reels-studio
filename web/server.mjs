@@ -165,6 +165,8 @@ function versions(p, r) {
     const archived = readJson(join(vdir, 'ARCHIVED.json'), null);
     // A variant (RU, EN, short cut…) is a finished parallel version, not a draft: versions/vN/variant.json.
     const variant = readJson(join(vdir, 'variant.json'), null)?.label || null;
+    // A montage-only version (the cut joined, no graphics): versions/vN/stage.json {stage: 'montage'}.
+    const stage = readJson(join(vdir, 'stage.json'), null)?.stage || null;
     // When the version was made: its own files, not the folder — cleaning a version touches the folder.
     const made = readdirSync(vdir).filter((f) => !/^(ARCHIVED|variant)\.json$|^project-snapshot$/.test(f)).map((f) => statSync(join(vdir, f)).mtimeMs);
     // The player's light copy and frame strip (web/preview.mjs), made in the background.
@@ -173,7 +175,7 @@ function versions(p, r) {
     const pv = play && previewOf(join(vdir, play.name));
     const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
     const preview = pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null;
-    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, preview, archived, variant, at: made.length ? Math.min(...made) : statSync(vdir).mtimeMs};
+    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, preview, archived, variant, stage, at: made.length ? Math.min(...made) : statSync(vdir).mtimeMs};
   }).reverse();
 }
 
@@ -309,6 +311,7 @@ function preamble(p, k) {
 }
 
 const jobs = new Set();
+const MONTAGE = new Map();
 const jobOf = (p, k) => [...jobs].find((j) => j.p === p && j.key === k);
 const full = () => jobs.size >= MAX_JOBS;
 let channelSeq = 0;
@@ -1119,6 +1122,38 @@ createServer(async (req, res) => {
     if (clips.some((c) => !(c.in >= 0 && c.out > c.in + 0.03))) return json(400, {});
     writeJson(join(dir, 'cut.json'), {...cut, clips, editedBy: me.name, editedAt: new Date().toISOString()});
     return json(200, {ok: true});
+  }
+  // «Собрать монтаж»: the cut alone, without the agent and without a render — the clips joined
+  // (scripts/cut.mjs cut, words), the graphics' times moved to it (scripts/layers.mjs place) and the
+  // joined file made the next version as an mp4. Seconds, not minutes: the owner trims and checks as
+  // often as needed; graphics, subtitles and the mask come later, once, from the agent.
+  if (req.method === 'POST' && url.pathname === '/api/reel/montage') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir || !existsSync(join(dir, 'cut.json'))) return json(404, {});
+    const key = `${p}/${b.reel}`;
+    if (MONTAGE.get(key)?.state === 'run') return json(200, MONTAGE.get(key));
+    const vs = versionDirs(dir), v = `v${(Number((vs.at(-1) || 'v0').slice(1)) || 0) + 1}`;
+    const last = vs.length ? readdirSync(join(dir, 'versions', vs.at(-1))).find((f) => /-v\d+\.mp4$/.test(f)) : null;
+    const base = last ? last.replace(/-v\d+\.mp4$/, '') : basename(dir).replace(/^\d+-/, '');
+    const job = {state: 'run', v, step: 'склеиваю куски', at: Date.now()};
+    MONTAGE.set(key, job);
+    const sh = (args, step) => new Promise((ok, no) => { job.step = step; const c = spawn(args[0], args.slice(1), {cwd: BOT, stdio: ['ignore', 'ignore', 'pipe']}); let err = ''; c.stderr.on('data', (d) => (err = (err + d).slice(-600))); c.on('close', (code) => (code ? no(new Error(`${step}: ${err.trim().split('\n').pop() || code}`)) : ok())); });
+    (async () => {
+      await sh(['node', 'scripts/cut.mjs', dir, 'cut'], 'склеиваю куски');
+      await sh(['node', 'scripts/cut.mjs', dir, 'words'], 'слова по новой нарезке');
+      if (existsSync(join(dir, 'graphics.json'))) await sh(['node', 'scripts/layers.mjs', dir, 'place'], 'переношу графику');
+      const vdir = join(dir, 'versions', v);
+      mkdirSync(vdir, {recursive: true});
+      await sh(['ffmpeg', '-v', 'error', '-y', '-i', join(dir, 'sources', 'cut.mov'), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', join(vdir, `${base}-${v}.mp4`)], 'записываю версию');
+      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString()});
+      Object.assign(job, {state: 'done', step: 'готово'});
+    })().catch((e) => Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}));
+    return json(200, job);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/reel/montage') {
+    return json(200, MONTAGE.get(`${p}/${url.searchParams.get('reel')}`) || {state: 'none'});
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
   // point on the frame; «Собрать vN» hands the open ones to the reel chat (edits.json).
