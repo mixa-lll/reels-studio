@@ -2281,23 +2281,25 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._peek = peek;
   // A cut seen at once: the source plays across the joint (the end of one clip, the start of the
   // next) in the same layer, with sound, then the player returns to the version.
-  rv._peekPlay = (url, segs, label) => {
-    rv.pause(); peek({url, t: segs[0][0], label, edge: true}); want = null; clearTimeout(pkV._t);
-    const run = pk._play = {i: 0};
+  rv._peekPlay = (url, segs, label, {edge = true, onTime, onEnd} = {}) => {
+    rv.pause(); peek({url, t: segs[0][0], label, edge}); want = null; clearTimeout(pkV._t);
+    const run = pk._play = {i: 0, alive: () => pk._play === run && !run.done, stop: () => { if (pk._play === run) { run.done = true; peek(null); } }};
     const go = () => { if (pk._play !== run) return; pkV.currentTime = segs[0][0]; pkV.muted = false; pkV.classList.add('on'); pkV.play().catch(() => {}); };
     // Checked every frame and on timeupdate too (frames stop in a background tab).
     const step = () => {
       if (pk._play !== run || run.done) return;
       if (!pkV.seeking && pkV.currentTime >= segs[run.i][1] - 0.02) {
         run.i++;
-        if (run.i >= segs.length) { run.done = true; pkV.pause(); setTimeout(() => pk._play === run && peek(null), 350); return; }
+        if (run.i >= segs.length) { run.done = true; pkV.pause(); onEnd?.(); setTimeout(() => pk._play === run && peek(null), 350); return; }
         pkV.currentTime = segs[run.i][0];
       }
+      if (!pkV.seeking && pkV.currentTime >= segs[run.i][0] - 0.05) onTime?.(run.i, pkV.currentTime);
     };
     const tick = () => { step(); if (pk._play === run && !run.done) requestAnimationFrame(tick); };
     pkV.ontimeupdate = step;
     if (pkV.readyState >= 1) go(); else pkV.addEventListener('loadedmetadata', go, {once: true});
     requestAnimationFrame(tick);
+    return run;
   };
   const film = () => {
     const d = dur(), f = $('#pFilm');
@@ -2347,7 +2349,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   // Between frames of timeupdate the playhead runs smooth while playing.
   const tick = () => { if (!rv._ac.signal.aborted && rv.isConnected) { if (!rv.paused) upd(); requestAnimationFrame(tick); } };
   requestAnimationFrame(tick);
-  const toggle = () => { peek(null); return rv.paused ? rv.play() : rv.pause(); };
+  const toggle = () => { if (tl._cutPlay?.()) return; peek(null); return rv.paused ? rv.play() : rv.pause(); };
   rv.onclick = toggle;
   $('#pPlay').onclick = toggle;
   $('#pBig').onclick = toggle;
@@ -2734,6 +2736,28 @@ function wireClips(id, rv, cut, open, ed, foot) {
   tl._hover = (t) => { const i = t == null ? -1 : clipAt(toC(t)); if (i !== hov) { hov = i; layout(); } };
   tl._pick = (t) => pick(clipAt(toC(t)));
   tl._relayout = () => box.isConnected && layout();
+  // The version on the screen is a render of the cut as it was; edges moved since then are not in it
+  // until «Собрать». Until then play/space plays the new cut itself: the source, clip after clip, from
+  // the playhead — the joints exactly where the track shows them (no graphics or subtitles, they are
+  // in the render). The playhead and the time follow it.
+  let cutRun = null;
+  const setHead = (ct) => {
+    const d = vd(), p = d ? (100 * toV(ct)) / d : 0;
+    $('#bHead').style.left = `${p}%`;
+    const tt = `${t1(toV(ct))} / ${t1(d)}`; if ($('#bTime')) $('#bTime').textContent = tt; if ($('#pTime')) $('#pTime').textContent = tt;
+  };
+  tl._cutPlay = () => {
+    if (!cut.changed || !pv) return false;
+    if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; r.run.stop(); rv.currentTime = toV(r.ct); return true; }
+    cutRun = null;
+    const st = starts(); let ct = toC(rv.currentTime); if (ct >= total() - 0.1) ct = 0;
+    const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
+    const r = cutRun = {ct};
+    r.run = rv._peekPlay(pv.video, segs, '▶ Новая нарезка · без графики', {edge: false,
+      onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); },
+      onEnd: () => { if (cutRun === r) { cutRun = null; rv.currentTime = toV(r.ct); } }});
+    return true;
+  };
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel >= 0 && !e.target.closest?.('input, textarea')) pick(-1); }, {signal: rv._ac.signal});
   // A click anywhere else drops the selection, as on a canvas. The track, the note field (to write to
   // the clip), the player and the zoom keep it.
@@ -2819,7 +2843,7 @@ async function renderVersions(id, data) {
             ${sel === cur && ed && !data.cut ? '<button type="button" class="linkbtn small" id="kAsk">Разложить на куски</button>' : ''}
             ${sel === cur && CUT[id] ? `<button type="button" class="kswitch" id="kSw" role="switch" aria-checked="${kOn}"><span>Нарезка</span><i></i></button>` : ''}</div>
           <div class="tlbox"><div class="tlscroll" id="tlScroll"><div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="ruler" id="pRuler" aria-label="Линейка времени — тяните, чтобы перемотать"></div><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div></div>
-          <div class="khints"><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать, отпустил — играет склейка</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>
+          <div class="khints"><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать, отпустил — играет склейка</span><span>Пока не собрано, ▶ играет новую нарезку из исходника</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>
           ${sel === cur && ed ? `<form class="ecomp2" id="eComp"><span class="etgt" id="eT">На 0:00</span><button type="button" class="ex" id="eX" hidden aria-label="Снять выбор куска">✕</button>
             <textarea id="eText" rows="1" placeholder="Что поменять в этом месте"></textarea>
             <button type="button" class="btn ic" id="eMic" title="Сказать голосом" aria-label="Сказать голосом">🎙</button><button type="button" class="btn ic" id="ePt" title="Точка на кадре" aria-label="Точка на кадре">◎</button><button type="submit" class="btn primary">Добавить</button></form><span class="small muted" id="eHint"></span>`
