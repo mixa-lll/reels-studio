@@ -2511,6 +2511,7 @@ async function stageCut(id, data) {
 
 // Which version the «Монтаж» player shows, per reel: the current one unless another variant is picked.
 const VIEWV = {};
+const vName = (v) => `${v.v}${v.variant ? ' · ' + v.variant : ''}`;
 
 // The rough cut right in «Сборка» (scripts/cut.mjs), when «Нарезка» is on: the track under the
 // player is the clips themselves, each with its frames. Hover names the clip; a press picks it and
@@ -2570,7 +2571,8 @@ function wireClips(id, rv, cut, open, ed, foot) {
         };
         h.onpointermove = (ev) => {
           ev.stopPropagation();
-          let t = Math.round((v0 + (ev.clientX - x0) / scale / pps0) / FR) * FR;
+          // Shift slows the drag 5× for frame-exact edges on a narrow track.
+          let t = Math.round((v0 + ((ev.clientX - x0) / scale / pps0) * (ev.shiftKey ? 0.2 : 1)) / FR) * FR;
           t = k === 'in' ? Math.max(0, Math.max(v0 - 3, Math.min(t, c.out - 0.2))) : Math.min(v0 + 3, Math.max(t, c.in + 0.2));
           c[k] = r2(t); layout(); show();
         };
@@ -2581,6 +2583,17 @@ function wireClips(id, rv, cut, open, ed, foot) {
           layout(); $('#eComp')?._upd?.();
         };
         show();
+      };
+      // A focused handle moves by one frame with ← →, by a second with Shift.
+      h.onkeydown = (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault(); e.stopPropagation();
+        const c = clips[sel], d = (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : FR);
+        c[k] = r2(k === 'in' ? Math.max(0, Math.min(c.in + d, c.out - 0.2)) : Math.max(c.out + d, c.in + 0.2));
+        layout(); cut.changed = true; save(); foot();
+        rv._peek({url: pv.video, t: c[k], pv, label: `${k === 'in' ? 'Начало' : 'Конец'} куска ${sel + 1} · исходник ${t1(c[k])}`, edge: true});
+        clearTimeout(h._pk); h._pk = setTimeout(() => rv._peek(null), 1200);
+        $('#eComp')?._upd?.();
       };
     });
   }
@@ -2663,7 +2676,7 @@ async function renderVersions(id, data) {
             ${sel === cur && ed && !data.cut ? '<button type="button" class="linkbtn small" id="kAsk">Разложить на куски</button>' : ''}
             ${sel === cur && CUT[id] ? `<button type="button" class="kswitch" id="kSw" role="switch" aria-checked="${kOn}"><span>Нарезка</span><i></i></button>` : ''}</div>
           <div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div>
-          <div class="khints"><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span><span>${kOn ? 'Края — подрезать' : 'Наведение — просмотр'}</span><span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⇧</kbd><kbd>←</kbd> секунда</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div>
+          <div class="khints"><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span><span>${kOn ? 'Края — подрезать' : 'Наведение — просмотр'}</span><span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⇧</kbd><kbd>←</kbd> секунда</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>⇧</kbd> + край — точнее</span><span><kbd>Esc</kbd> снять выбор</span>' : ''}</div>
           ${sel === cur && ed ? `<form class="ecomp2" id="eComp"><span class="etgt" id="eT">На 0:00</span><button type="button" class="ex" id="eX" hidden aria-label="Снять выбор куска">✕</button>
             <textarea id="eText" rows="1" placeholder="Что поменять в этом месте"></textarea>
             <button type="button" class="btn ic" id="eMic" title="Сказать голосом" aria-label="Сказать голосом">🎙</button><button type="button" class="btn ic" id="ePt" title="Точка на кадре" aria-label="Точка на кадре">◎</button><button type="submit" class="btn primary">Добавить</button></form><span class="small muted" id="eHint"></span>`
