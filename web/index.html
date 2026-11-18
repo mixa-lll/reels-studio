@@ -2371,7 +2371,7 @@ async function stageCut(id, data) {
   if (ed) $('#cApply').onclick = async () => {
     clearTimeout(saveT); await post('/api/reel/cut', {reel: id, clips});
     const folder = `projects/${P}/reels/${id}`;
-    chatOf().say(`Я поправил нарезку в ${folder}/cut.json (${clips.length} кусков, ${total().toFixed(1)} с). Примени её: сначала \`node scripts/cut.mjs ${folder} map\` — как сдвинулись куски; потом \`cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov), пересобери субтитры, маску ведущей по новому cut.mov (scripts/mask.mjs, в фоне, по одному тяжёлому шагу), сдвинь все времена склейки в Reel.jsx и scenes по таблице map и собери следующую версию черновиком. В README коротко: что поменялось в нарезке.`, `Применить нарезку · ${clips.length} кусков`);
+    chatOf().say(`Я поправил нарезку в ${folder}/cut.json (${clips.length} кусков, ${total().toFixed(1)} с). Примени её: сначала \`node scripts/cut.mjs ${folder} map\` — как сдвинулись куски; потом \`cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov), сдвинь все времена склейки в Reel.jsx и scenes по таблице map и собери следующую версию черновиком — это этап «Сборка» (REELS.md): только монтаж, новую графику и маску не добавляй; маску пересобери, только если графика уже наложена, и только на её отрезках. В README коротко: что поменялось в нарезке.`, `Применить нарезку · ${clips.length} кусков`);
     changed = false; note(); toast('Отправил Claude — соберёт новую версию');
   };
   addEventListener('keydown', (e) => {
@@ -2553,6 +2553,7 @@ async function renderVersions(id, data) {
   </div>
   ${cur && ed ? `<div class="bfoot"><span class="small muted" id="bNote"></span>
     <span style="flex: 1"></span><a class="btn" href="#/reel/${esc(id)}/publish">${svg('eye', 14)}Как увидят</a>
+    <button type="button" class="btn" id="eGfx" title="Второй этап: плашки, карточки, субтитры поверх готового монтажа">${svg('idea', 14)}Наложить графику</button>
     <button type="button" class="btn primary" id="eBuild">Собрать ${esc(nextV)}</button></div>` : ''}`;
   // The footer counts the notes and whether the cut was trimmed; «Собрать» takes both.
   const foot = () => {
@@ -2598,10 +2599,12 @@ async function renderVersions(id, data) {
     t.onblur = () => { const v = t.textContent.trim(), x = open.find((y) => y.id === t.dataset.etext); if (!v || !x || v === x.text) { if (!v) t.textContent = x.text; return; } x.text = v; post('/api/reel/edits', {reel: id, action: 'update', id: x.id, text: v}).then(() => toast('Правка обновлена')); };
   });
   $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1440p этой версии (без --draft, 1440×2560, CRF 15) и скажи, когда будет готов.`, `Принять ${cur.v}`));
+  // Two stages (REELS.md «Сборка, потом графика»): «Собрать» is the edit only; graphics are their own pass.
+  $('#eGfx')?.addEventListener('click', () => chatOf().say(`Наложи графику на ${cur.v} — этап «Графика» (REELS.md): плашки, карточки, цифры, субтитры по сценам и дизайн-системе, поверх готового монтажа ${cur.v}. Нарезку, порядок и звук не меняй. Маску человека режь только на тех отрезках, где графика уходит за спину (scripts/mask.mjs --from --to), а не по всему ролику; если за спину ничего не уходит — без маски. Собери ${nextV} черновиком.`, `Наложить графику на ${cur.v}`));
   $('#eBuild')?.addEventListener('click', async () => {
     const cutCh = CUT[id]?.changed, folder = `projects/${P}/reels/${id}`, clips = CUT[id]?.clips || [];
     if (open.length) await post('/api/reel/edits', {reel: id, action: 'send', forV: nextV});
-    const cutLine = cutCh ? `\nНарезка поправлена в ${folder}/cut.json (${clips.length} кусков): примени её — сначала \`node scripts/cut.mjs ${folder} map\` (как сдвинулись куски), потом \`cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov), пересобери субтитры и маску по новому cut.mov (в фоне, по одному тяжёлому шагу) и сдвинь времена склейки в Reel.jsx и scenes по таблице map.` : '';
+    const cutLine = cutCh ? `\nНарезка поправлена в ${folder}/cut.json (${clips.length} кусков): примени её — сначала \`node scripts/cut.mjs ${folder} map\` (как сдвинулись куски), потом \`cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov), сдвинь времена склейки в Reel.jsx и scenes по таблице map. Это этап «Сборка»: только монтаж, новую графику и маску не добавляй; маску пересобери, только если графика уже наложена, и только на её отрезках.` : '';
     if (cutCh) CUT[id].changed = false;
     chatOf().say(`Правки к ${nextV}:\n${open.map((x, i) => `${i + 1}. ${tc(x.t)}${x.clip && clips[x.clip - 1] ? ` (кусок ${x.clip} нарезки: «${clips[x.clip - 1].text || ''}», исходник ${clips[x.clip - 1].in}–${clips[x.clip - 1].out} с)` : ''}${x.lang ? ` (только ${x.lang.toUpperCase()})` : ''} — ${x.text}${x.point ? ` (точка на кадре: ${x.point.x}% слева, ${x.point.y}% сверху)` : ''}`).join('\n') || '—'}${cutLine}\nСобери ${nextV} черновиком. В edits.json у каждой правки поставь "state": "done" и "result" — что сделано, в несколько слов; если сам поменял что-то ещё, допиши пункт с "by": "Claude", "state": "done", "forV": "${nextV}", "t" и "result".`, `Собрать ${nextV}${open.length ? ` · правок: ${open.length}` : ''}${cutCh ? ' · нарезка' : ''}`);
     renderVersions(id);
