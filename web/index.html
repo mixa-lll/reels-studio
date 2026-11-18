@@ -383,6 +383,9 @@
   .ln-grid.mo .ln-chip .t { align-items: flex-start; line-height: 1.3; }
   .ln-grid.mo .ln-chip .t .rsq { margin-top: 4px; }
   .ln-grid.mo .ln-chip .t span:last-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  .ln-chip.igc { background: #fff; border: 1px solid #EDEDED; color: var(--muted); }
+  .ln-chip.igc .t { color: var(--ink); font-weight: 500; }
+  .ln-chip.igc .t svg { flex: none; color: #C13584; }
   .ln-ig { margin-top: auto; align-self: flex-start; display: inline-flex; gap: 3px; align-items: center; font-size: 11px; color: var(--muted); }
   .ln-act { border: 0; background: none; padding: 0; font: inherit; font-size: 11px; font-weight: 600; color: #2F6FEB; cursor: pointer; }
   .ln-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; color: var(--ink2); background: #fff; white-space: nowrap; cursor: pointer; text-decoration: none; }
@@ -650,6 +653,19 @@ const projName = () => (PROJECTS.find((x) => x.slug === P) || {}).name || P;
 // avatar, name and numbers. A caption row's account, else its language, picks the profile.
 let IG = null;
 const loadIg = () => api('/api/instagram').then((d) => (IG = d.accounts || [])).catch(() => (IG = []));
+// Posts in Instagram with no item in the studio: they still stand where they came out (Plan, «Вышло»),
+// titled by the first line of their caption, so the plan shows what is really on the accounts.
+const localIso = (t) => { const d = new Date(t); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16); };
+const igLooseItems = () => (IG || []).flatMap((a) => [...(a.offers || []).map((o) => o.code), ...(a.loose || [])].map((code) => {
+  const m = a.media.find((y) => y.code === code);
+  if (!m) return null;
+  const title = (m.caption || '').split('\n')[0].replace(/#\S+/g, '').trim().slice(0, 90) || (m.type === 'reel' ? 'Рилс без подписи' : 'Пост без подписи');
+  const letters = (m.caption || '').match(/\p{L}/gu) || [];
+  const lang = letters.length ? (letters.filter((c) => /[а-яё]/i.test(c)).length / letters.length > 0.5 ? 'RU' : 'EN') : '';
+  return {ig: true, id: 'ig-' + code, code, account: a.account, lang, title, format: m.type === 'reel' ? 'reel' : m.type === 'carousel' ? 'carousel' : 'post', stage: 'published',
+    at: m.timestamp ? localIso(m.timestamp) : null, url: m.permalink, thumb: m.thumb, offer: (a.offers || []).find((o) => o.code === code) || null};
+}).filter(Boolean));
+const igStale = () => (IG || []).filter((a) => !a.connected);
 const igFor = (c = {}) => {
   const acc = String(c.account || '').replace(/^@/, '').toLowerCase();
   const en = /\b(en|eng|english)\b|англ/i.test(`${c.platform || ''} ${c.lang || ''}`);
@@ -1096,6 +1112,11 @@ const sdot = (s) => `<span class="sdot" style="color: ${LIFE_COLOR[s]}"><i style
 const itemTouched = (x) => Math.max(x.updated || 0, x.stageAt || 0, x.created || 0, (x.ref?.kind === 'reel' ? OV?.reels.find((r) => r.id === x.ref.id)?.updated : 0) || 0, (x.ref?.kind === 'post' ? OV?.posts?.find((r) => r.id === x.ref.id)?.updated : 0) || 0);
 const whenText = (at) => at ? new Date(at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short'}) : 'без даты';
 function itemCard(x) {
+  if (x.ig) return `<a class="icard" href="${esc(x.url)}" target="_blank" rel="noopener" title="Вышло в Instagram, в студии выпуска нет">
+    <span class="ich"><span style="display: inline-flex; color: #C13584">${svg('ig', 13)}</span>@${esc(x.account)}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
+    ${x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy" style="width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; background: #F2F2F2">` : ''}
+    <b>${esc(x.title)}</b>
+    <span class="small muted">${whenText(x.at)} · в студии выпуска нет${x.offer ? ` · похоже на «${esc(x.offer.title)}»` : ''}</span></a>`;
   const r = itemRubric(x);
   const need = x.need || [];
   const extra = x.stage === 'material' && need.length ? ` · снято ${need.filter((n) => n.done).length} из ${need.length}` : '';
@@ -1109,7 +1130,7 @@ function itemCard(x) {
 async function vAll(fmt = 'all') {
   title('Выпуски');
   fmt = {reels: 'reel', posts: 'post'}[fmt] || fmt;
-  await loadItems();
+  await Promise.all([loadItems(), loadIg()]);
   const mine = ITEMS.items.filter((x) => !x.proposed);
   const pitches = ITEMS.items.filter((x) => x.proposed);
   let rub = sessionStorage.getItem('allRubric') || '';
@@ -1130,8 +1151,9 @@ async function vAll(fmt = 'all') {
       $('#allBody').querySelectorAll('[data-take]').forEach((b) => (b.onclick = async () => { b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято — в колонке «Идея»'); vAll('proposed'); }));
       return;
     }
-    const list = mine.filter((x) => (fmt === 'all' || x.format === fmt) && pass(x));
-    const order = (a, b) => itemTouched(b) - itemTouched(a);
+    const list = [...mine, ...(rub ? [] : igLooseItems())].filter((x) => (fmt === 'all' || x.format === fmt) && pass(x));
+    // «Вышло» goes by the date it came out, newest first; the rest by the last change.
+    const order = (a, b) => a.stage === 'published' ? String(b.at || '').localeCompare(String(a.at || '')) : itemTouched(b) - itemTouched(a);
     $('#allBody').innerHTML = `<div class="lboard">${LIFE.map(([k, t]) => { const col = list.filter((x) => x.stage === k).sort(order); return `<section class="lcol" aria-label="${t}"><div class="lcolh">${sdot(k)}<span class="muted" style="margin-left: auto">${col.length}</span></div>${col.map(itemCard).join('') || '<p class="small muted" style="padding: 4px">Пусто.</p>'}</section>`; }).join('')}</div>`;
   };
   $('#rubSel').onchange = (e) => { rub = e.target.value; sessionStorage.setItem('allRubric', rub); draw(); };
@@ -2558,8 +2580,12 @@ async function vPlan(offset = 0, month = true) {
   const all = ITEMS.items;
   // Posts found in Instagram without an item (offers first): a muted line in their day and a list aside.
   const found = (IG || []).flatMap((a) => [...(a.offers || []).map((o) => ({a, m: a.media.find((m) => m.code === o.code), offer: o})), ...(a.loose || []).map((c) => ({a, m: a.media.find((m) => m.code === c)}))]).filter((x) => x.m);
-  const igLoose = (day) => found.filter((x) => ymd(new Date(x.m.timestamp)) === day);
-  const onDay = (d) => all.filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
+  const igAll = igLooseItems();
+  const onDay = (d) => [...all, ...igAll].filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
+  // A post that is only in Instagram: its caption, the account; a click opens it there.
+  const chipIg = (x) => `<a class="ln-chip igc" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(x.title)} — вышло в @${esc(x.account)}, в студии выпуска нет">
+      <span class="t">${svg('ig', 11)}<span>${esc(x.title)}</span></span>
+      <span class="m"><span class="mt">${month ? (x.lang ? x.lang + ' · ' : '') : '@' + esc(x.account) + ' · '}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}</span></span></a>`;
   // Month: two quiet lines per item — title, then stage dot + format (+ take/other for Claude's proposals).
   const stageName = (k) => (LIFE.find(([s]) => s === k)?.[1] || '').toLowerCase();
   const chipM = (x) => `<a class="ln-chip ${x.stage === 'idea' || x.proposed ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
@@ -2573,7 +2599,7 @@ async function vPlan(offset = 0, month = true) {
     const isToday = ymd(d) === ymd(today), out = month && d.getMonth() !== first.getMonth();
     const ev = (plan.events || []).concat(st.events || []).filter((e) => e.date === ymd(d));
     return `<div class="ln-cell${isToday ? ' today' : ''}${out ? ' out' : ''}" data-day="${ymd(d)}" style="${month ? '' : 'min-height: 420px'}"><span class="dn">${d.getDate()}</span>
-      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d).map(month ? chipM : chip).join('')}${igLoose(ymd(d)).length ? `<span class="ln-ig" title="Вышло в Instagram, в студии такого выпуска нет: ${igLoose(ymd(d)).length}">${svg('ig', 11)}+${igLoose(ymd(d)).length}</span>` : ''}</div>`;
+      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d).map((x) => x.ig ? chipIg(x) : (month ? chipM : chip)(x)).join('')}</div>`;
   }).join('');
   const shown = all.filter((x) => !x.proposed && x.at && x.at.slice(0, 10) >= ymd(days[0]) && x.at.slice(0, 10) <= ymd(days.at(-1)));
   const undated = all.filter((x) => !x.at && !x.proposed && x.stage !== 'published');
@@ -2599,6 +2625,7 @@ async function vPlan(offset = 0, month = true) {
         <div>${rubs || '<span class="small muted">Рубрик пока нет.</span>'}</div>
         ${canEdit() ? '<button type="button" id="addRub" style="align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; color: #2F6FEB; font-weight: 600; cursor: pointer">+ Рубрика</button>' : ''}
         <div class="ln-drop" data-day="" style="display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 2px"><div style="display: flex; align-items: center; margin-top: 8px"><b style="font-weight: 600">Без даты</b><span class="muted" style="margin-left: auto; font-size: 12px">${undated.length}</span></div>${undated.slice(0, 6).map(chip).join('')}${undated.length > 6 ? `<a class="small muted" href="#/all">ещё ${undated.length - 6} — в Выпусках</a>` : ''}</div>
+        ${igStale().length ? `<div class="rback" style="margin-top: 10px; align-items: flex-start">${svg('ig', 15)}<span style="flex: 1; font-size: 12.5px; line-height: 1.45">Instagram не подключён: в Плане только то, что было видно на снимке ${igStale().map((a) => `@${esc(a.account)} — ${a.media.length} из ${a.posts ?? '?'} на ${new Date(a.fetchedAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}`).join(', ')}. ${canEdit() ? '<a href="#/settings/connect">Подключить</a>' : ''}</span></div>` : ''}
         ${found.length ? `<div style="display: flex; flex-direction: column; gap: 2px; margin-top: 8px"><b style="font-weight: 600">Найдено в Instagram</b><span class="small muted" style="line-height: 1.5; padding-bottom: 4px">${found.length} без выпуска в студии. Привяжите свои — остальные можно убрать.</span>
           ${found.slice(0, 5).map(({a, m, offer}) => `<div style="display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F0F0F0"><a href="${esc(m.permalink)}" target="_blank" rel="noopener" style="flex: none"><img src="${esc(m.thumb || '')}" alt="" style="width: 40px; height: 54px; object-fit: cover; border-radius: 6px; display: block"></a>
             <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 13px"><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">${esc((m.caption || 'без подписи').split('\n')[0])}</span><span class="muted" style="font-size: 12px">@${esc(a.account)} · ${new Date(m.timestamp).toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'})}</span>
