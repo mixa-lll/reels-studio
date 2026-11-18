@@ -2648,6 +2648,9 @@ function wireClips(id, rv, cut, open, ed, foot) {
   tl._pick = (t) => pick(clipAt(toC(t)));
   tl._relayout = () => box.isConnected && layout();
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel >= 0 && !e.target.closest?.('input, textarea')) pick(-1); }, {signal: rv._ac.signal});
+  // A click anywhere else drops the selection, as on a canvas. The track, the note field (to write to
+  // the clip), the player and the zoom keep it.
+  document.addEventListener('pointerdown', (e) => { if (sel >= 0 && !e.target.closest?.('#bStrip, #eComp, .vwrap, .pctl')) pick(-1); }, {signal: rv._ac.signal});
   addEventListener('resize', () => box.isConnected && layout(), {signal: rv._ac.signal});
   const go = () => { build(); layout(); };
   if (rv.readyState >= 1) go(); else { build(); rv.addEventListener('loadedmetadata', go, {once: true, signal: rv._ac.signal}); requestAnimationFrame(layout); }
