@@ -1058,7 +1058,10 @@ createServer(async (req, res) => {
   if (req.method === 'GET' && dsPath) {
     const f = join(studio, 'design-system', decodeURIComponent(dsPath[2]));
     const real = mediaPath(f);
-    if (!real || !real.startsWith(join(studio, 'design-system') + '/')) return res.writeHead(404).end();
+    // projects/<p> may be a link (on the Mac: to Documents): compare real paths on both sides.
+    let dsRoot = join(studio, 'design-system');
+    try { dsRoot = realpathSync(dsRoot); } catch {}
+    if (!real || !real.startsWith(dsRoot + '/')) return res.writeHead(404).end();
     res.writeHead(200, {'content-type': TYPES[extname(real)] || 'application/octet-stream', 'content-security-policy': 'sandbox allow-scripts', 'cache-control': 'no-store'});
     return createReadStream(real).pipe(res);
   }
