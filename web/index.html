@@ -2254,9 +2254,12 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     pk.hidden = false; pk.classList.toggle('edge', !!o.edge); $('#pTag').textContent = o.label;
     if (o.pv?.sprite) cover(pkS, o.pv, o.t); else pkS.style.backgroundImage = '';
     if (pkV.getAttribute('src') !== o.url) { pkV.src = o.url; pkV.classList.remove('on'); }
-    if (want == null || Math.abs(o.t - want) > 0.2) pkV.classList.remove('on');
+    if (want == null || Math.abs(o.t - want) > 0.04) pkV.classList.remove('on');
+    if (!o.pv?.sprite && want != null && Math.abs(o.t - want) > 0.04) pkV.classList.add('on');
     want = o.t;
-    if (pkV.readyState >= 1 && !pkV.seeking) pkV.currentTime = want;
+    clearTimeout(pkV._t);
+    // Seek once the cursor slows down: a seek per mouse move queues up and the frame lags behind.
+    pkV._t = setTimeout(() => { if (want != null && pkV.readyState >= 1 && !pkV.seeking) pkV.currentTime = want; }, o.pv?.sprite ? 70 : 0);
   };
   if (pkV) {
     pkV.onseeked = () => { if (want == null) return; if (Math.abs(pkV.currentTime - want) > 0.06) pkV.currentTime = want; else pkV.classList.add('on'); };
@@ -2334,7 +2337,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     if (tl._drag) { rv.currentTime = t; peek(null); } else peek({url: rv.currentSrc || rv.src, t, pv, label: `Просмотр · ${t1(t)}`});
   };
   tl.onpointerleave = () => { if (tl._drag || tl._busy) return; skl.hidden = true; rv._tip(0, ''); tl._hover?.(null); peek(null); };
-  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; tl.setPointerCapture(e.pointerId); rv.pause(); rv.currentTime = timeAt(e); peek(null); tl._pick?.(rv.currentTime); upd(); };
+  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; try { tl.setPointerCapture(e.pointerId); } catch {} rv.pause(); rv.currentTime = timeAt(e); peek(null); tl._pick?.(rv.currentTime); upd(); };
   tl.onpointerup = (e) => { tl._drag = false; tl.releasePointerCapture?.(e.pointerId); };
   // E puts the cursor in the note field under the track.
   const compose = () => { rv.pause(); $('#eText')?.focus(); };
@@ -2608,7 +2611,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
       h.onpointerenter = () => { if (!tl._busy) { const r = h.getBoundingClientRect(); rv._tip(r.left + r.width / 2 - tl.getBoundingClientRect().left, k === 'in' ? 'Тяните — начало куска' : 'Тяните — конец куска'); $('#pSkl').hidden = true; } };
       h.onpointermove = (e) => { if (!tl._busy) e.stopPropagation(); };
       h.onpointerdown = (e) => {
-        e.preventDefault(); e.stopPropagation(); h.setPointerCapture(e.pointerId); rv.pause();
+        e.preventDefault(); e.stopPropagation(); try { h.setPointerCapture(e.pointerId); } catch {} rv.pause();
         const c = clips[sel], x0 = e.clientX, v0 = c[k], d0 = c.out - c.in, scale = tl.getBoundingClientRect().width / tl.offsetWidth;
         tl._busy = true; pps0 = box.clientWidth / total(); h.classList.add('on'); $('#pSkl').hidden = true;
         const show = () => {
@@ -2651,7 +2654,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel >= 0 && !e.target.closest?.('input, textarea')) pick(-1); }, {signal: rv._ac.signal});
   // A click anywhere else drops the selection, as on a canvas. The track, the note field (to write to
   // the clip), the player and the zoom keep it.
-  document.addEventListener('pointerdown', (e) => { if (sel >= 0 && !e.target.closest?.('#bStrip, #eComp, .vwrap, .pctl')) pick(-1); }, {signal: rv._ac.signal});
+  document.addEventListener('pointerdown', (e) => { if (sel >= 0 && !e.composedPath().some((n) => n.matches?.('#bStrip, #eComp, .vwrap, .pctl'))) pick(-1); }, {signal: rv._ac.signal, capture: true});
   addEventListener('resize', () => box.isConnected && layout(), {signal: rv._ac.signal});
   const go = () => { build(); layout(); };
   if (rv.readyState >= 1) go(); else { build(); rv.addEventListener('loadedmetadata', go, {once: true, signal: rv._ac.signal}); requestAnimationFrame(layout); }
