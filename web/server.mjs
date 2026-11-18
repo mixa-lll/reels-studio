@@ -144,7 +144,11 @@ function cutView(dir) {
   const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
   const applied = readJson(join(dir, 'cut.applied.json'), null);
   const same = (a, b) => JSON.stringify((a?.clips || []).map((c) => [c.in, c.out])) === JSON.stringify((b?.clips || []).map((c) => [c.in, c.out]));
-  return {...cut, changed: !same(cut, applied), preview: pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
+  // Graphics as layers (scripts/layers.mjs): each tied to a moment of the source, so the studio can lay
+  // them over the live cut while the render is still the old one.
+  const g = readJson(join(dir, 'graphics.json'), null);
+  const graphics = Array.isArray(g?.items) ? g.items.filter((x) => x.layer && existsSync(join(dir, x.layer))).map((x) => ({...x, url: stamp(join(dir, x.layer))})) : null;
+  return {...cut, graphics, changed: !same(cut, applied), preview: pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
 }
 
 function versions(p, r) {

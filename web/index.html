@@ -542,6 +542,7 @@
   .ppeek i, .ppeek video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background-repeat: no-repeat; display: block; }
   .ppeek video { opacity: 0; } .ppeek video.on { opacity: 1; }
   .ppeek.edge::after { content: ''; position: absolute; inset: 0; border: 4px solid #141413; border-radius: 14px; }
+  .pgfx { position: absolute; inset: 0; z-index: 3; pointer-events: none; } .pgfx img { position: absolute; display: block; height: auto; }
   .ptag { position: absolute; left: 12px; top: 12px; z-index: 3; font: 600 12px/1 inherit; background: #fff; color: #141413; padding: 7px 9px; border-radius: 7px; }
   .pbig { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 0; padding: 0 0 0 4px; background: rgba(255,255,255,.94); display: grid; place-items: center; z-index: 4; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .15s; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
   .vwrap:hover .pbig { opacity: 1; pointer-events: auto; } .vwrap.playing .pbig { opacity: 0; pointer-events: none; }
@@ -2606,6 +2607,53 @@ async function stageCut(id, data) {
   if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, {once: true});
 }
 
+// The cut as it is now, played live — the render on the screen is the cut as it was when it was
+// built, so moved edges are not in it until «Собрать». While the cut is changed, play/space plays the
+// cut itself: the source, clip after clip, from the playhead, the joints exactly where the track shows
+// them. With «Нарезка» off the graphics come on top as layers (graphics.json, scripts/layers.mjs), each
+// on its moment of the source, so a trimmed clip carries its graphics along. No mask: what goes behind
+// the person in the render lies over them here.
+function wireCutPlay(id, rv, cut, withGfx) {
+  const clips = cut.clips, pv = cut.preview, gl = $('#pGfx'), tl = $('#bStrip');
+  if (!pv || !tl) return;
+  const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
+  const starts = () => clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + clips[i - 1].out - clips[i - 1].in : 0), a), []);
+  const total = () => clips.reduce((a, c) => a + c.out - c.in, 0);
+  const vd = () => (Number.isFinite(rv.duration) && rv.duration) || total();
+  const toC = (t) => (t * total()) / vd(), toV = (t) => (t * vd()) / total();
+  const clipAt = (ct) => Math.max(0, starts().findLastIndex((s) => ct >= s - 1e-6));
+  // A moment of the source → the cut now: its clip's start + how far into the clip (kept inside it).
+  const place = (m, st) => { const c = clips[m.clip]; return c ? st[m.clip] + Math.max(0, Math.min(c.out - c.in, m.src - c.in)) : null; };
+  const items = withGfx && Array.isArray(cut.graphics) ? cut.graphics : [];
+  if (gl) gl.innerHTML = items.map((x, i) => `<img data-g="${i}" src="${esc(x.url)}" alt="" hidden style="left: ${(100 * x.box[0]) / 1080}%; top: ${(100 * x.box[1]) / 1920}%; width: ${(100 * x.box[2]) / 1080}%">`).join('');
+  const show = (ct) => {
+    if (!gl) return;
+    const st = starts();
+    items.forEach((x, i) => { const a = place(x.from, st), b = place(x.to, st), el = gl.children[i]; el.hidden = !(a != null && b != null && ct >= a && ct < b); });
+  };
+  const hideAll = () => gl && [...gl.children].forEach((el) => (el.hidden = true));
+  const setHead = (ct) => {
+    const d = vd(), p = d ? (100 * toV(ct)) / d : 0;
+    $('#bHead').style.left = `${p}%`;
+    const tt = `${t1(toV(ct))} / ${t1(d)}`; if ($('#bTime')) $('#bTime').textContent = tt; if ($('#pTime')) $('#pTime').textContent = tt;
+  };
+  let cutRun = null;
+  tl._cutPlay = () => {
+    if (!cut.changed) return false;
+    if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; r.run.stop(); hideAll(); rv.currentTime = toV(r.ct); return true; }
+    cutRun = null;
+    const st = starts(); let ct = toC(rv.currentTime); if (ct >= total() - 0.1) ct = 0;
+    const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
+    const r = cutRun = {ct};
+    r.run = rv._peekPlay(pv.video, segs, items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
+      onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); show(r.ct); },
+      onEnd: () => { if (cutRun === r) { cutRun = null; hideAll(); rv.currentTime = toV(r.ct); } }});
+    return true;
+  };
+  // Any other way out of the live cut (a seek on the track, the scrub bar) also takes the layers away.
+  rv.addEventListener('seeking', () => { if (!cutRun?.run.alive()) hideAll(); }, {signal: rv._ac.signal});
+}
+
 // Which version the «Монтаж» player shows, per reel: the current one unless another variant is picked.
 const VIEWV = {};
 const vName = (v) => `${v.v}${v.variant ? ' · ' + v.variant : ''}`;
@@ -2736,28 +2784,6 @@ function wireClips(id, rv, cut, open, ed, foot) {
   tl._hover = (t) => { const i = t == null ? -1 : clipAt(toC(t)); if (i !== hov) { hov = i; layout(); } };
   tl._pick = (t) => pick(clipAt(toC(t)));
   tl._relayout = () => box.isConnected && layout();
-  // The version on the screen is a render of the cut as it was; edges moved since then are not in it
-  // until «Собрать». Until then play/space plays the new cut itself: the source, clip after clip, from
-  // the playhead — the joints exactly where the track shows them (no graphics or subtitles, they are
-  // in the render). The playhead and the time follow it.
-  let cutRun = null;
-  const setHead = (ct) => {
-    const d = vd(), p = d ? (100 * toV(ct)) / d : 0;
-    $('#bHead').style.left = `${p}%`;
-    const tt = `${t1(toV(ct))} / ${t1(d)}`; if ($('#bTime')) $('#bTime').textContent = tt; if ($('#pTime')) $('#pTime').textContent = tt;
-  };
-  tl._cutPlay = () => {
-    if (!cut.changed || !pv) return false;
-    if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; r.run.stop(); rv.currentTime = toV(r.ct); return true; }
-    cutRun = null;
-    const st = starts(); let ct = toC(rv.currentTime); if (ct >= total() - 0.1) ct = 0;
-    const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
-    const r = cutRun = {ct};
-    r.run = rv._peekPlay(pv.video, segs, '▶ Новая нарезка · без графики', {edge: false,
-      onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); },
-      onEnd: () => { if (cutRun === r) { cutRun = null; rv.currentTime = toV(r.ct); } }});
-    return true;
-  };
   addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel >= 0 && !e.target.closest?.('input, textarea')) pick(-1); }, {signal: rv._ac.signal});
   // A click anywhere else drops the selection, as on a canvas. The track, the note field (to write to
   // the clip), the player and the zoom keep it.
@@ -2815,6 +2841,7 @@ async function renderVersions(id, data) {
       ${sel && video(sel)
         ? `<div class="vwrap"><video id="rv" src="${esc(playUrl(sel))}" playsinline preload="auto" ${thumb(sel) ? `poster="${thumb(sel).url}"` : ''}></video>
           <div class="ppeek" id="pPeek" hidden><i id="pPeekS"></i><video id="pPeekV" muted playsinline preload="auto"></video><span class="ptag" id="pTag"></span></div>
+          <div class="pgfx" id="pGfx" aria-hidden="true"></div>
           <div class="igl" id="igL" hidden></div>
           <button type="button" class="pbig" id="pBig" aria-label="Смотреть"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#141413"></path></svg></button>
           <div class="pctl2"><div class="pscrub" id="pScrub" role="slider" tabindex="0" aria-label="Перемотка"><i class="trk"></i><i class="ghost" id="pGhost"></i><i class="fill" id="pFill"></i><i class="knob" id="pKnob"></i><span class="stip" id="pSTip" hidden></span></div>
@@ -2888,6 +2915,7 @@ async function renderVersions(id, data) {
     setTimeout(again, 6000);
   }
   if (rv && kOn) wireClips(id, rv, CUT[id], open, ed, foot);
+  if (rv && sel === cur && CUT[id]) wireCutPlay(id, rv, CUT[id], !kOn);
   const form = $('#eComp');
   if (rv && form) wireEdits(id, rv, form, cur, nextV);
   el.querySelectorAll('[data-vchip]').forEach((b) => (b.onclick = () => { VIEWV[id] = b.dataset.vchip === cur.v ? null : b.dataset.vchip; renderVersions(id, data); }));
