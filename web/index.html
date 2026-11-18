@@ -596,8 +596,8 @@
   .khand { position: absolute; top: -2px; bottom: -2px; width: 12px; border: 0; padding: 0; background: #141413; cursor: ew-resize; z-index: 4; display: grid; place-items: center; touch-action: none; }
   .khand::after { content: ''; width: 2px; height: 16px; border-radius: 1px; background: #fff; }
   .khand:hover, .khand.on { background: #2F6FEB; } .khand.l { border-radius: 9px 0 0 9px; } .khand.r { border-radius: 0 9px 9px 0; }
-  .pskl { position: absolute; top: -8px; bottom: 0; width: 1px; background: #141413; opacity: .55; pointer-events: none; z-index: 5; }
-  .ttip { position: absolute; top: -33px; transform: translateX(-50%); background: #141413; color: #fff; font: 500 12px/1 inherit; padding: 7px 9px; border-radius: 7px; white-space: nowrap; pointer-events: none; z-index: 8; }
+  .pskl { position: absolute; top: -30px; bottom: 0; width: 1px; background: #141413; opacity: .45; pointer-events: none; z-index: 5; }
+  .ttip { position: absolute; top: -31px; transform: translateX(-50%); background: #141413; color: #fff; font: 11px/1 ui-monospace, Menlo, monospace; padding: 4px 6px; border-radius: 5px; white-space: nowrap; pointer-events: none; z-index: 8; }
   .bflag { position: absolute; top: -14px; width: 11px; height: 13px; margin-left: -1px; border: 0; padding: 0; cursor: pointer; z-index: 7; clip-path: polygon(0 0, 100% 0, 100% 70%, 0 100%); }
   .khints { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
   .khints span { display: inline-flex; align-items: center; gap: 4px; }
@@ -2369,7 +2369,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     if (tl._busy) return;
     const t = timeAt(e), x = e.clientX - tl.getBoundingClientRect().left, onRuler = !!e.target.closest?.('.ruler');
     skl.hidden = false; skl.style.left = `${x}px`;
-    rv._tip(x, tl._drag && tl._scrub ? t1(t) : onRuler ? `${t1(t)} · тяните — перемотка` : tl._label?.(t) || `${t1(t)} · клик — перейти`);
+    rv._tip(x, t1(t));
     tl._hover?.(onRuler ? null : t);
     if (tl._drag) { rv.currentTime = t; peek(null); } else peek({url: rv.currentSrc || rv.src, t, pv, label: `Просмотр · ${t1(t)}`});
   };
@@ -2652,7 +2652,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
   function wireHands() {
     box.querySelectorAll('.khand').forEach((h) => {
       const k = h.dataset.h;
-      h.onpointerenter = () => { if (!tl._busy) { const r = h.getBoundingClientRect(); rv._tip(r.left + r.width / 2 - tl.getBoundingClientRect().left, k === 'in' ? 'Тяните — начало куска' : 'Тяните — конец куска'); $('#pSkl').hidden = true; } };
+      h.onpointerenter = () => { if (!tl._busy) { rv._tip(0, ''); $('#pSkl').hidden = true; } };
       h.onpointermove = (e) => { if (!tl._busy) e.stopPropagation(); };
       h.onpointerdown = (e) => {
         e.preventDefault(); e.stopPropagation(); try { h.setPointerCapture(e.pointerId); } catch {} rv.pause();
@@ -2660,7 +2660,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
         tl._busy = true; pps0 = box.clientWidth / total(); h.classList.add('on'); $('#pSkl').hidden = true;
         const show = () => {
           const d = c.out - c.in, dd = d - d0, r = h.getBoundingClientRect();
-          rv._tip(r.left + r.width / 2 - tl.getBoundingClientRect().left, `${k === 'in' ? 'Начало' : 'Конец'} · ${dd >= 0 ? '+' : '−'}${sec(Math.abs(dd))} → ${sec(d)}`);
+          rv._tip(r.left + r.width / 2 - tl.getBoundingClientRect().left, `${dd >= 0 ? '+' : '−'}${sec(Math.abs(dd))} · ${sec(d)}`);
           rv._peek({url: pv.video, t: c[k], pv, label: `${k === 'in' ? 'Начало' : 'Конец'} куска ${sel + 1} · исходник ${t1(c[k])}`, edge: true});
         };
         h.onpointermove = (ev) => {
