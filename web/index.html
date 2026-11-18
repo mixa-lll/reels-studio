@@ -533,7 +533,68 @@
   .ptip { position: absolute; top: 56px; transform: translateX(-50%); pointer-events: none; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .ptip b { width: 90px; height: 160px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 4px 14px rgba(0,0,0,.3); background: #222 no-repeat; }
   .ptip span { font: 12px/1.4 ui-monospace, monospace; color: #fff; background: rgba(0,0,0,.72); padding: 1px 6px; border-radius: 5px; }
-  .pctl { display: flex; align-items: center; gap: 8px; } .pctl .tcx { font: 13px ui-monospace, monospace; }
+  .pctl { display: flex; align-items: center; gap: 10px; } .pctl .tcx { font: 14px ui-monospace, monospace; background: #EEF3FD; color: #2F6FEB; padding: 6px 9px; border-radius: 8px; }
+  /* Player: controls show on hover (CapCut/YouTube): big ▶ when paused, a bar with scrub and buttons. */
+  .bplay .vwrap { overflow: hidden; border-radius: 14px; }
+  .vwrap:hover video#rv { filter: brightness(.9); }
+  .ppeek { position: absolute; inset: 0; z-index: 2; background: #000; pointer-events: none; }
+  .ppeek i, .ppeek video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background-repeat: no-repeat; display: block; }
+  .ppeek video { opacity: 0; } .ppeek video.on { opacity: 1; }
+  .ppeek.edge::after { content: ''; position: absolute; inset: 0; border: 4px solid #141413; border-radius: 14px; }
+  .ptag { position: absolute; left: 12px; top: 12px; z-index: 3; font: 600 12px/1 inherit; background: #fff; color: #141413; padding: 7px 9px; border-radius: 7px; }
+  .pbig { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%; border: 0; padding: 0 0 0 4px; background: rgba(255,255,255,.94); display: grid; place-items: center; z-index: 4; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .15s; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  .vwrap:hover .pbig { opacity: 1; pointer-events: auto; } .vwrap.playing .pbig { opacity: 0; pointer-events: none; }
+  .pctl2 { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 5; padding: 6px 8px 4px; border-radius: 14px; background: rgba(20,20,19,.74); color: #fff; opacity: 0; transform: translateY(6px); transition: opacity .15s, transform .15s; pointer-events: none; }
+  .vwrap:hover .pctl2, .vwrap:focus-within .pctl2 { opacity: 1; transform: none; pointer-events: auto; }
+  .prow { display: flex; align-items: center; gap: 2px; }
+  .pcb { width: 32px; height: 32px; border: 0; background: transparent; color: #fff; border-radius: 8px; cursor: pointer; font-size: 15px; display: grid; place-items: center; padding: 0; } .pcb:hover { background: rgba(255,255,255,.14); }
+  .ptime { font: 12px ui-monospace, monospace; margin-left: 4px; white-space: nowrap; }
+  .pscrub { position: relative; height: 18px; cursor: pointer; touch-action: none; outline: none; }
+  .pscrub i { position: absolute; top: 7px; height: 4px; border-radius: 2px; transition: top .1s, height .1s; }
+  .pscrub .trk { left: 0; right: 0; background: rgba(255,255,255,.28); } .pscrub .fill { left: 0; background: #fff; } .pscrub .ghost { background: rgba(255,255,255,.5); width: 0; }
+  .pscrub .knob { top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; }
+  .pscrub:hover .trk, .pscrub:hover .fill, .pscrub:hover .ghost { top: 6px; height: 6px; }
+  .stip { position: absolute; bottom: 22px; transform: translateX(-50%); background: #fff; color: #141413; font: 600 12px/1 ui-monospace, monospace; padding: 6px 8px; border-radius: 7px; white-space: nowrap; pointer-events: none; }
+  .pthin { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,.25); z-index: 4; pointer-events: none; transition: opacity .15s; } .pthin b { display: block; height: 100%; background: #fff; width: 0; }
+  .vwrap:hover .pthin { opacity: 0; }
+  .pctl2 .igbtn { position: static; height: 24px; padding: 0 9px; font-weight: 600; border-radius: 7px; background: rgba(255,255,255,.18); color: #fff; }
+  .pctl2 .igbtn.on { background: #fff; color: #141413; }
+  .pinlayer { z-index: 6; }
+  /* The track: one row — the version's frames, or with «Нарезка» on its clips with their own frames. */
+  .ptl { height: 58px; margin-top: 26px; }
+  .ptl .bhead { top: -8px; bottom: -4px; width: 2px; margin-left: -1px; background: #2F6FEB; box-shadow: none; z-index: 6; border-radius: 1px; }
+  .ptl .bhead::before { content: ''; position: absolute; top: -6px; left: -5px; width: 12px; height: 12px; border-radius: 50%; background: #2F6FEB; }
+  .ptl.kmode .film { display: none; }
+  .pclips { position: absolute; inset: 0; }
+  .kc { position: absolute; top: 0; bottom: 0; border-radius: 7px; overflow: hidden; background: #2B2B29; transition: box-shadow .1s; }
+  .kc .kt { display: flex; height: 100%; } .kc .kt i { flex: none; height: 100%; background-repeat: no-repeat; }
+  .kc b { position: absolute; left: 4px; top: 4px; font: 700 10px/1 system-ui; color: #fff; background: rgba(20,20,19,.72); border-radius: 4px; padding: 2px 4px; }
+  .kc.nt::after { content: ''; position: absolute; right: 4px; top: 4px; width: 8px; height: 8px; border-radius: 50%; background: #2F6FEB; box-shadow: 0 0 0 2px #fff; }
+  .kc.dim::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,.55); z-index: 1; }
+  .kc.hov { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #9A9A95; z-index: 2; }
+  .ksel { position: absolute; top: -2px; bottom: -2px; border: 2px solid #141413; border-radius: 9px; pointer-events: none; z-index: 3; }
+  .khand { position: absolute; top: -2px; bottom: -2px; width: 12px; border: 0; padding: 0; background: #141413; cursor: ew-resize; z-index: 4; display: grid; place-items: center; touch-action: none; }
+  .khand::after { content: ''; width: 2px; height: 16px; border-radius: 1px; background: #fff; }
+  .khand:hover, .khand.on { background: #2F6FEB; } .khand.l { border-radius: 9px 0 0 9px; } .khand.r { border-radius: 0 9px 9px 0; }
+  .pskl { position: absolute; top: -8px; bottom: 0; width: 1px; background: #141413; opacity: .55; pointer-events: none; z-index: 5; }
+  .ttip { position: absolute; top: -32px; transform: translateX(-50%); background: #141413; color: #fff; font: 500 12px/1 inherit; padding: 7px 9px; border-radius: 7px; white-space: nowrap; pointer-events: none; z-index: 8; }
+  .bflag { position: absolute; top: -10px; width: 11px; height: 13px; margin-left: -1px; border: 0; padding: 0; cursor: pointer; z-index: 7; clip-path: polygon(0 0, 100% 0, 100% 70%, 0 100%); }
+  .khints { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .khints span { display: inline-flex; align-items: center; gap: 4px; }
+  .khints kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: 11px system-ui; color: var(--ink2); background: #fff; box-sizing: border-box; }
+  .kswitch { display: inline-flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; font: inherit; font-weight: 500; }
+  .kswitch i { position: relative; width: 34px; height: 20px; border-radius: 10px; background: #D6D6D1; transition: background .15s; }
+  .kswitch i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+  .kswitch[aria-checked="true"] i { background: #141413; } .kswitch[aria-checked="true"] i::after { left: 16px; }
+  /* One note field: tagged with the picked clip or the current second. */
+  .ecomp2 { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 14px; padding: 6px 6px 6px 8px; background: #fff; margin-top: 4px; }
+  .ecomp2:focus-within { border-color: #141413; }
+  .ecomp2 textarea { flex: 1; min-width: 0; border: 0; outline: none; resize: none; font: inherit; padding: 8px 6px; background: transparent; height: 36px; box-sizing: border-box; }
+  .etgt { display: inline-flex; align-items: center; height: 26px; padding: 0 9px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; background: #EEF3FD; color: #2F6FEB; }
+  .etgt.clip { background: #141413; color: #fff; }
+  .ex { border: 0; background: transparent; color: var(--muted); cursor: pointer; width: 26px; height: 26px; border-radius: 6px; } .ex:hover { background: #F2F2EF; }
+  .ecomp2 .btn.ic { width: 36px; padding: 0; justify-content: center; }
+  .tc.k { background: #EDEDEA; color: var(--ink); }
   .pctl .ppb { width: 38px; height: 34px; padding: 0; display: grid; place-items: center; font-size: 15px; }
   .pkeys { font-size: 11px; color: var(--muted); text-align: center; } .pkeys kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; background: #fff; }
   .binfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 22px; }
@@ -2076,7 +2137,17 @@ const section = (readme, name) => (new RegExp(`^## ${name}[^\\n]*\\n([\\s\\S]*?)
 function wireEdits(id, rv, form, cur, nextV) {
   let point = null, voice = false, rec = null, pinMode = false;
   const tEl = $('#eT'), layer = $('#pinL'), hint = $('#eHint');
-  const upd = () => { tEl.textContent = tc(rv.currentTime); };
+  // The note goes to the picked clip when «Нарезка» is on and a clip is picked, else to this second.
+  const clipK = () => { const c = CUT[id]; return c?.on && c.sel >= 0 ? c.sel : -1; };
+  const upd = () => {
+    const k = clipK(), c = CUT[id];
+    tEl.textContent = k >= 0 ? `Кусок ${k + 1} · ${(c.clips[k].out - c.clips[k].in).toFixed(1).replace('.', ',')} с` : `На ${tc(rv.currentTime)}`;
+    tEl.classList.toggle('clip', k >= 0); $('#eX').hidden = k < 0;
+    $('#eText').placeholder = k >= 0 ? 'Что сделать с куском — например, взять другой дубль' : 'Что поменять в этом месте';
+  };
+  form._upd = upd;
+  $('#eX').onclick = () => CUT[id]?.deselect?.();
+  $('#eText').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } };
   const on = {signal: rv._ac.signal};
   ['timeupdate', 'seeked', 'pause'].forEach((e) => rv.addEventListener(e, upd, on)); upd();
   $('#eText').addEventListener('focus', () => rv.pause());
@@ -2102,16 +2173,16 @@ function wireEdits(id, rv, form, cur, nextV) {
       const type = rec.mimeType || 'audio/webm'; rec = null;
       $('#eMic').textContent = '… распознаю'; $('#eMic').disabled = true;
       const r = await fetch(`/api/reel/voice?project=${encodeURIComponent(P)}&reel=${encodeURIComponent(id)}`, {method: 'POST', headers: {'content-type': type}, body: new Blob(chunks, {type})}).then((x) => x.json()).catch(() => ({}));
-      $('#eMic').textContent = '🎙 Голосом'; $('#eMic').disabled = false; $('#eMic').classList.remove('primary');
+      $('#eMic').textContent = '🎙'; $('#eMic').disabled = false; $('#eMic').classList.remove('primary');
       if (r.text) { $('#eText').value = ($('#eText').value ? $('#eText').value + ' ' : '') + r.text; voice = true; } else toast('Не расслышал — напиши словами');
     };
-    rec.start(); $('#eMic').textContent = '■ Стоп'; $('#eMic').classList.add('primary'); hint.textContent = 'Говори — нажми «Стоп», когда закончишь';
+    rec.start(); $('#eMic').textContent = '■'; $('#eMic').classList.add('primary'); hint.textContent = 'Говори — нажми «Стоп», когда закончишь';
   };
   form.onsubmit = async (e) => {
     e.preventDefault();
     const text = $('#eText').value.trim();
     if (!text) return $('#eText').focus();
-    await post('/api/reel/edits', {reel: id, action: 'add', t: rv.currentTime, text, point, voice});
+    const k = clipK(); await post('/api/reel/edits', {reel: id, action: 'add', t: rv.currentTime, text, point, voice, ...(k >= 0 ? {clip: k + 1, quote: CUT[id].clips[k].text || undefined} : {})});
     $('#eText').value = ''; point = null; layer.innerHTML = '';
     renderVersions(id);
   };
@@ -2144,39 +2215,66 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   // A file that does not open (a render cut short, e.g. by a full disk) says so instead of a black box.
   const bad = () => { const w = rv.closest('.vwrap'); if (w && !w.querySelector('.vbad')) w.insertAdjacentHTML('beforeend', `<div class="vbad">Файл ${esc(sel.v)} не открывается — похоже, рендер оборвался. Попросите в чате пересобрать ${esc(sel.v)}.</div>`); };
   if (rv.error) bad(); else rv.addEventListener('error', bad, {signal: rv._ac.signal});
-  const on = {signal: rv._ac.signal}, tl = $('#bStrip'), pv = sel.preview;
+  const on = {signal: rv._ac.signal}, tl = $('#bStrip'), pv = sel.preview, vw = rv.closest('.vwrap');
   const dur = () => (Number.isFinite(rv.duration) && rv.duration) || 0;
-  const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
-  // One frame of the strip into el, scaled, shifted by (ox, oy) to centre it in a cell.
-  const frame = (el, t, scale, ox = 0, oy = 0) => {
-    if (!pv?.sprite) return;
-    const k = Math.max(0, Math.min(pv.n - 1, Math.floor(t / pv.every)));
-    el.style.backgroundImage = `url('${pv.sprite}')`;
-    el.style.backgroundSize = `${pv.cols * pv.w * scale}px auto`;
-    el.style.backgroundPosition = `${ox - (k % pv.cols) * pv.w * scale}px ${oy - Math.floor(k / pv.cols) * pv.h * scale}px`;
+  const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
+  // One frame of a strip (web/preview.mjs) into el, scaled, shifted by (ox, oy) to centre it.
+  const frame = (el, p, t, scale, ox = 0, oy = 0) => {
+    if (!p?.sprite) return;
+    const k = Math.max(0, Math.min(p.n - 1, Math.floor(t / p.every)));
+    el.style.backgroundImage = `url('${p.sprite}')`;
+    el.style.backgroundSize = `${p.cols * p.w * scale}px auto`;
+    el.style.backgroundPosition = `${ox - (k % p.cols) * p.w * scale}px ${oy - Math.floor(k / p.cols) * p.h * scale}px`;
   };
+  const cover = (el, p, t) => { const w = el.clientWidth, h = el.clientHeight; if (!p || !w) return; const s = Math.max(w / p.w, h / p.h); frame(el, p, t, s, (w - p.w * s) / 2, (h - p.h * s) / 2); };
+  rv._cover = cover;
+  // «Просмотр»: a frame over the video without moving it — the strip's frame at once, the exact
+  // frame from a second <video> as soon as it has seeked there. The same layer shows the source at
+  // a clip's edge while it is dragged (edge: true, a dark ring).
+  const pk = $('#pPeek'), pkV = $('#pPeekV'), pkS = $('#pPeekS');
+  let want = null;
+  const peek = (o) => {
+    if (!pk) return;
+    if (!o) { pk.hidden = true; want = null; return; }
+    pk.hidden = false; pk.classList.toggle('edge', !!o.edge); $('#pTag').textContent = o.label;
+    if (o.pv?.sprite) cover(pkS, o.pv, o.t); else pkS.style.backgroundImage = '';
+    if (pkV.getAttribute('src') !== o.url) { pkV.src = o.url; pkV.classList.remove('on'); }
+    if (want == null || Math.abs(o.t - want) > 0.2) pkV.classList.remove('on');
+    want = o.t;
+    if (pkV.readyState >= 1 && !pkV.seeking) pkV.currentTime = want;
+  };
+  if (pkV) {
+    pkV.onseeked = () => { if (want == null) return; if (Math.abs(pkV.currentTime - want) > 0.06) pkV.currentTime = want; else pkV.classList.add('on'); };
+    pkV.onloadedmetadata = () => { if (want != null) pkV.currentTime = want; };
+  }
+  rv._peek = peek;
   const film = () => {
     const d = dur(), f = $('#pFilm');
     if (!d || !f) return;
-    const n = Math.max(4, Math.round(tl.clientWidth / 34)), w = tl.clientWidth / n, h = tl.clientHeight;
+    const n = Math.max(4, Math.round(tl.clientWidth / 33)), w = tl.clientWidth / n, h = tl.clientHeight;
     f.innerHTML = Array.from({length: n}, () => '<i></i>').join('');
     if (!pv?.sprite) return;
     const scale = Math.max(w / pv.w, h / pv.h);
-    [...f.children].forEach((x, i) => frame(x, ((i + 0.5) * d) / n, scale, (w - pv.w * scale) / 2, (h - pv.h * scale) / 2));
+    [...f.children].forEach((x, i) => frame(x, pv, ((i + 0.5) * d) / n, scale, (w - pv.w * scale) / 2, (h - pv.h * scale) / 2));
   };
   const marks = () => {
     const d = dur();
     if (!d) return;
     const at = (t) => Math.min(100, Math.max(0, (t / d) * 100));
-    const list = [...edits.filter((x) => x.state === 'done' && x.forV === sel.v).map((x) => [x, '#2E8A4F', x.result || x.text]), ...(sel === cur ? open.map((x) => [x, '#E5A33C', x.text]) : [])];
-    $('#pMarks').innerHTML = list.map(([x, c, t]) => `<button type="button" class="bdot" style="left: ${at(x.t)}%; background: ${c}" data-eseek="${x.t}" title="${tc(x.t)} — ${esc(t)}" aria-label="${tc(x.t)} — ${esc(t)}"></button>`).join('');
+    const list = [...edits.filter((x) => x.state === 'done' && x.forV === sel.v).map((x) => [x, '#2E8A4F', x.result || x.text]), ...(sel === cur ? open.filter((x) => !x.clip).map((x) => [x, '#2F6FEB', x.text]) : [])];
+    $('#pMarks').innerHTML = list.map(([x, c, t]) => `<button type="button" class="bflag" style="left: ${at(x.t)}%; background: ${c}" data-eseek="${x.t}" title="${tc(x.t)} — ${esc(t)}" aria-label="${tc(x.t)} — ${esc(t)}"></button>`).join('');
     $('#pMarks').querySelectorAll('[data-eseek]').forEach((b) => { b.onpointerdown = (e) => e.stopPropagation(); b.onclick = () => { rv.currentTime = Number(b.dataset.eseek); rv.pause(); }; });
   };
   const upd = () => {
     const d = dur(), p = d ? (100 * rv.currentTime) / d : 0;
-    $('#bHead').style.left = `${p}%`; $('#pDone').style.width = `${p}%`;
-    $('#pTime').textContent = `${t1(rv.currentTime)} / ${tc(d)}`;
-    $('#pPlay').textContent = rv.paused ? '▶' : '❚❚'; $('#pPlay').setAttribute('aria-label', rv.paused ? 'Смотреть' : 'Пауза');
+    $('#bHead').style.left = `${p}%`;
+    if ($('#pFill')) { $('#pFill').style.width = `${p}%`; $('#pKnob').style.left = `${p}%`; $('#pThin').style.width = `${p}%`; }
+    const tt = `${t1(rv.currentTime)} / ${t1(d)}`;
+    $('#pTime').textContent = tt; if ($('#bTime')) $('#bTime').textContent = tt;
+    const ic = rv.paused ? '▶' : '❚❚';
+    $('#pPlay').textContent = ic; $('#pPlay').setAttribute('aria-label', rv.paused ? 'Смотреть' : 'Пауза');
+    vw?.classList.toggle('playing', !rv.paused);
+    $('#eComp')?._upd?.();
   };
   const ready = () => { film(); marks(); upd(); };
   if (rv.readyState >= 1) ready();
@@ -2185,24 +2283,45 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   // Between frames of timeupdate the playhead runs smooth while playing.
   const tick = () => { if (!rv._ac.signal.aborted && rv.isConnected) { if (!rv.paused) upd(); requestAnimationFrame(tick); } };
   requestAnimationFrame(tick);
-  const toggle = () => (rv.paused ? rv.play() : rv.pause());
+  const toggle = () => { peek(null); return rv.paused ? rv.play() : rv.pause(); };
   rv.onclick = toggle;
   $('#pPlay').onclick = toggle;
-  const timeAt = (e) => { const r = tl.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * dur(); };
-  const tip = $('#pTip');
-  tl.onpointermove = (e) => {
-    const t = timeAt(e), r = tl.getBoundingClientRect();
-    tip.hidden = false; tip.style.left = `${Math.max(46, Math.min(r.width - 46, e.clientX - r.left))}px`;
-    $('#pTipT').textContent = tc(t); $('#pTipF').hidden = !pv?.sprite; frame($('#pTipF'), t, 1);
-    if (tl._drag) rv.currentTime = t;
+  $('#pBig').onclick = toggle;
+  const step = (k) => { rv.pause(); rv.currentTime = Math.max(0, Math.min(dur(), rv.currentTime + k / 30)); };
+  $('#pPrev').onclick = () => step(-1);
+  $('#pNext').onclick = () => step(1);
+  $('#pFull').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : vw.requestFullscreen?.());
+  // The scrub bar in the player: hover shows that moment in the player and its time above the bar.
+  const sc = $('#pScrub'), stip = $('#pSTip'), ghost = $('#pGhost');
+  const scAt = (e) => { const r = sc.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
+  sc.onpointermove = (e) => {
+    const f = scAt(e), t = f * dur(), now = dur() ? rv.currentTime / dur() : 0;
+    stip.hidden = false; stip.style.left = `${100 * f}%`; stip.textContent = t1(t);
+    ghost.style.left = `${100 * Math.min(f, now)}%`; ghost.style.width = `${100 * Math.abs(f - now)}%`;
+    if (sc._drag) { rv.currentTime = t; peek(null); } else peek({url: rv.currentSrc || rv.src, t, pv, label: `Просмотр · ${t1(t)}`});
   };
-  tl.onpointerleave = () => { if (!tl._drag) tip.hidden = true; };
-  tl.onpointerdown = (e) => { tl._drag = true; tl.setPointerCapture(e.pointerId); rv.currentTime = timeAt(e); upd(); };
+  sc.onpointerleave = () => { if (sc._drag) return; stip.hidden = true; ghost.style.width = '0'; peek(null); };
+  sc.onpointerdown = (e) => { e.stopPropagation(); sc._drag = true; sc.setPointerCapture(e.pointerId); rv.currentTime = scAt(e) * dur(); peek(null); };
+  sc.onpointerup = (e) => { sc._drag = false; sc.releasePointerCapture?.(e.pointerId); };
+  sc.onkeydown = (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(e.key === 'ArrowRight' ? 1 : -1); } };
+  // The track under the player: hover = a thin line, the time and that frame in the player; press =
+  // the video goes there (drag scrubs). With «Нарезка» on, wireClips adds labels and picking a clip.
+  const timeAt = (e) => { const r = tl.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * dur(); };
+  const tip = $('#pTip'), skl = $('#pSkl');
+  rv._tip = (x, text) => { if (!text) { tip.hidden = true; return; } tip.hidden = false; tip.style.left = `${Math.max(60, Math.min(tl.clientWidth - 60, x))}px`; tip.textContent = text; };
+  tl.onpointermove = (e) => {
+    if (tl._busy) return;
+    const t = timeAt(e), x = e.clientX - tl.getBoundingClientRect().left;
+    skl.hidden = false; skl.style.left = `${x}px`;
+    rv._tip(x, tl._label?.(t) || `${t1(t)} · клик — перейти`);
+    tl._hover?.(t);
+    if (tl._drag) { rv.currentTime = t; peek(null); } else peek({url: rv.currentSrc || rv.src, t, pv, label: `Просмотр · ${t1(t)}`});
+  };
+  tl.onpointerleave = () => { if (tl._drag || tl._busy) return; skl.hidden = true; rv._tip(0, ''); tl._hover?.(null); peek(null); };
+  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; tl.setPointerCapture(e.pointerId); rv.pause(); rv.currentTime = timeAt(e); peek(null); tl._pick?.(rv.currentTime); upd(); };
   tl.onpointerup = (e) => { tl._drag = false; tl.releasePointerCapture?.(e.pointerId); };
-  // «+ Правка тут» / E opens the form under the timeline; it closes after «Добавить» or «Отмена».
-  const compose = () => { const f = $('#eComp'); if (!f) return; rv.pause(); f.hidden = false; $('#eText').focus(); };
-  $('#pAdd')?.addEventListener('click', compose, on);
-  $('#eCancel')?.addEventListener('click', () => { $('#eComp').hidden = true; }, on);
+  // E puts the cursor in the note field under the track.
+  const compose = () => { rv.pause(); $('#eText')?.focus(); };
   // «Как в Instagram»: the Reels interface over the video, to see what hides under it while editing.
   const igB = $('#igB'), igL = $('#igL');
   const ig = (onIg) => {
@@ -2215,9 +2334,8 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   addEventListener('keydown', (e) => {
     if (!rv.isConnected) return rv._ac.abort();
     if (e.target.closest?.('input, textarea, select, [contenteditable]') || e.metaKey || e.ctrlKey || e.altKey) return;
-    const fr = 1 / 30;
     if (e.key === ' ') { e.preventDefault(); toggle(); }
-    else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); rv.pause(); rv.currentTime = Math.max(0, Math.min(dur(), rv.currentTime + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : fr))); }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); rv.pause(); rv.currentTime = Math.max(0, Math.min(dur(), rv.currentTime + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : 1 / 30))); }
     else if ((e.key === 'e' || e.key === 'E' || e.key === 'у' || e.key === 'У') && $('#eComp')) { e.preventDefault(); compose(); }
   }, on);
 }
@@ -2391,97 +2509,87 @@ async function stageCut(id, data) {
   if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, {once: true});
 }
 
-// The rough cut right in «Сборка» (scripts/cut.mjs): its clips as a second track under the timeline.
-// A click opens the clip below: the source around it with two handles to drag its in/out, a play
-// button, and a note about the whole clip («возьми другой дубль») that goes to the list with the others.
+// The rough cut right in «Сборка» (scripts/cut.mjs), when «Нарезка» is on: the track under the
+// player is the clips themselves, each with its frames. Hover names the clip; a press picks it and
+// puts the video on that frame; the picked clip gets two handles — dragging one trims the clip by
+// frames while the player shows the source exactly at that edge. Notes then go to the clip.
 const CUT = {};
 function wireClips(id, rv, cut, open, ed, foot) {
-  const pv = cut.preview, track = $('#kTrack'), FR = 1 / (cut.fps || 30), r2 = (x) => Math.round(x * 1000) / 1000;
-  let sel = cut.sel ?? -1, saveT = null;
-  const starts = () => cut.clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + cut.clips[i - 1].out - cut.clips[i - 1].in : 0), a), []);
-  const total = () => cut.clips.reduce((a, c) => a + c.out - c.in, 0);
-  // Cut time → the version's time: the version may add a lead or an end, so it is scaled to its length.
-  const toV = (t) => { const d = Number.isFinite(rv.duration) && rv.duration ? rv.duration : total(); return (t * d) / total(); };
-  const frame = (el, t, scale, ox = 0, oy = 0) => {
-    if (!pv?.sprite) return;
-    const k = Math.max(0, Math.min(pv.n - 1, Math.floor(t / pv.every)));
-    el.style.backgroundImage = `url('${pv.sprite}')`; el.style.backgroundSize = `${pv.cols * pv.w * scale}px auto`;
-    el.style.backgroundPosition = `${ox - (k % pv.cols) * pv.w * scale}px ${oy - Math.floor(k / pv.cols) * pv.h * scale}px`;
+  const box = $('#pClips'), tl = $('#bStrip'), pv = cut.preview, FR = 1 / (cut.fps || 30), r2 = (x) => Math.round(x * 1000) / 1000;
+  if (!box) return;
+  const clips = cut.clips;
+  let sel = cut.sel ?? -1, hov = -1, pps0 = null, saveT = null;
+  const sec = (d) => `${d.toFixed(1).replace('.', ',')} с`;
+  const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
+  const starts = () => clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + clips[i - 1].out - clips[i - 1].in : 0), a), []);
+  const total = () => clips.reduce((a, c) => a + c.out - c.in, 0);
+  // The version may add a lead or an end: cut time is scaled to the version's length.
+  const vd = () => (Number.isFinite(rv.duration) && rv.duration) || total();
+  const toC = (t) => (t * total()) / vd(), toV = (t) => (t * vd()) / total();
+  const clipAt = (ct) => Math.max(0, starts().findLastIndex((s) => ct >= s - 1e-6));
+  const build = () => {
+    box.innerHTML = clips.map((c, i) => `<div class="kc ${open.some((x) => x.clip === i + 1) ? 'nt' : ''}" data-k="${i}"><span class="kt"></span><b>${i + 1}</b></div>`).join('')
+      + (sel >= 0 ? `<i class="ksel"></i>${ed ? '<button type="button" class="khand l" data-h="in" aria-label="Начало куска — тяните"></button><button type="button" class="khand r" data-h="out" aria-label="Конец куска — тяните"></button>' : ''}` : '');
+    wireHands();
   };
-  const noted = (i) => open.some((x) => x.clip === i + 1);
-  const blocks = () => {
-    const st = starts(), T = total();
-    track.innerHTML = cut.clips.map((c, i) => `<button type="button" class="kblk ${i === sel ? 'on' : ''} ${noted(i) ? 'nt' : ''}" data-k="${i}" style="left: ${(100 * st[i]) / T}%; width: ${(100 * (c.out - c.in)) / T}%" title="Кусок ${i + 1}: ${esc(c.text || '')}">${i + 1}</button>`).join('');
-    track.querySelectorAll('.kblk').forEach((b) => { const c = cut.clips[b.dataset.k], w = b.clientWidth, h = b.clientHeight, s = pv ? Math.max(w / pv.w, h / pv.h) : 1; if (pv) frame(b, (c.in + c.out) / 2, s, (w - pv.w * s) / 2, (h - pv.h * s) / 2); b.onclick = () => toggle(Number(b.dataset.k)); });
+  const layout = () => {
+    const W = box.clientWidth, H = box.clientHeight, pps = pps0 || W / total(), st = starts(), tw = pv ? (H * pv.w) / pv.h : 33;
+    box.querySelectorAll('.kc').forEach((el) => {
+      const i = Number(el.dataset.k), c = clips[i], w = Math.max(3, (c.out - c.in) * pps - 2);
+      el.style.left = `${st[i] * pps + 1}px`; el.style.width = `${w}px`;
+      el.classList.toggle('dim', sel >= 0 && i !== sel); el.classList.toggle('hov', i === hov && i !== sel);
+      const kt = el.firstChild, n = Math.max(1, Math.ceil(w / tw));
+      if (kt.children.length !== n) kt.innerHTML = '<i></i>'.repeat(n);
+      [...kt.children].forEach((x, j) => { x.style.width = `${tw}px`; if (pv) rv._cover(x, pv, c.in + ((j + 0.5) * (c.out - c.in)) / n); });
+    });
+    if (sel < 0) return;
+    const c = clips[sel], l = st[sel] * pps, w = (c.out - c.in) * pps;
+    const f = box.querySelector('.ksel'); f.style.left = `${l - 1}px`; f.style.width = `${w + 2}px`;
+    const hl = box.querySelector('.khand.l'), hr = box.querySelector('.khand.r');
+    if (hl) { hl.style.left = `${l - 1}px`; hr.style.left = `${l + w - 11}px`; }
   };
-  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => post('/api/reel/cut', {reel: id, clips: cut.clips}).catch(() => toast('Нарезка не сохранилась')), 400); };
-  const toggle = (i) => { sel = sel === i ? -1 : i; cut.sel = sel; if (sel >= 0) { rv.pause(); rv.currentTime = toV(starts()[sel]) + 0.02; } blocks(); panel(); };
-  const panel = () => {
-    const box = $('#kPanel'), c = cut.clips[sel];
-    if (!box) return;
-    if (!c) { box.innerHTML = ''; return; }
-    const lo = Math.max(0, c.in - 3), hi = c.out + 3, pct = (t) => (100 * (t - lo)) / (hi - lo);
-    box.innerHTML = `<div class="kpan">
-      ${pv ? `<video class="kvid" id="kV" src="${esc(pv.video)}#t=${c.in}" playsinline preload="auto" muted></video>` : ''}
-      <div class="kbody">
-        <div class="row" style="gap: 8px; align-items: baseline"><b>Кусок ${sel + 1}</b><span class="small muted" id="kLen">${(c.out - c.in).toFixed(1).replace('.', ',')} с</span>${c.text ? `<span class="small muted" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1">«${esc(c.text)}»</span>` : '<span style="flex: 1"></span>'}<button type="button" class="linkbtn" id="kX" aria-label="Закрыть">✕</button></div>
-        ${pv ? `<div class="ctrim" id="kTrim"><div class="film" id="kFilm"></div><i class="shade" style="left: 0; width: ${pct(c.in)}%"></i><i class="shade" style="left: ${pct(c.out)}%; right: 0"></i><i class="cwin" style="left: ${pct(c.in)}%; width: ${pct(c.out) - pct(c.in)}%"></i><i class="bhead" id="kHead"></i>
-          ${ed ? `<button type="button" class="chand" data-h="in" style="left: ${pct(c.in)}%" aria-label="Начало куска"></button><button type="button" class="chand" data-h="out" style="left: ${pct(c.out)}%" aria-label="Конец куска"></button>` : ''}</div>
-        <div class="row small muted" style="gap: 10px"><button type="button" class="btn s" id="kPlay">▶ Кусок</button><span>${ed ? 'Тяни жёлтые края, чтобы начать или закончить кусок раньше или позже' : ''}</span></div>` : '<span class="small muted">Готовлю копию исходника — края можно будет двигать через минуту.</span>'}
-        ${ed ? `<div class="row" style="gap: 6px"><input class="f" id="kNote" placeholder="Что сделать с этим куском — например, взять другой дубль" style="flex: 1; min-width: 0"><button type="button" class="btn" id="kAdd">Правка к куску</button></div>` : ''}
-      </div></div>`;
-    $('#kX').onclick = () => toggle(sel);
-    const v = $('#kV');
-    if (ed) {
-      const add = async () => {
-        const text = $('#kNote').value.trim();
-        if (!text) return $('#kNote').focus();
-        await post('/api/reel/edits', {reel: id, action: 'add', t: toV(starts()[sel]), text, clip: sel + 1, quote: c.text || undefined});
-        renderVersions(id);
-      };
-      $('#kAdd').onclick = add;
-      $('#kNote').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
-    }
-    if (!pv) return;
-    const tr = $('#kTrim'), w = tr.clientWidth, n = Math.max(6, Math.round(w / 28)), s = Math.max(w / n / pv.w, tr.clientHeight / pv.h);
-    $('#kFilm').innerHTML = Array.from({length: n}, () => '<i></i>').join('');
-    [...$('#kFilm').children].forEach((x, i) => frame(x, lo + ((i + 0.5) * (hi - lo)) / n, s, (w / n - pv.w * s) / 2, (tr.clientHeight - pv.h * s) / 2));
-    let stopAt = 0;
-    const head = () => { if (!v.isConnected) return; $('#kHead').style.left = `${pct(Math.max(lo, Math.min(hi, v.currentTime)))}%`; if (!v.paused && v.currentTime >= stopAt) v.pause(); requestAnimationFrame(head); };
-    requestAnimationFrame(head);
-    $('#kPlay').onclick = () => { if (!v.paused) return v.pause(); rv.pause(); v.muted = false; v.currentTime = c.in; stopAt = c.out; v.play(); };
-    const tAt = (e) => lo + Math.max(0, Math.min(1, (e.clientX - tr.getBoundingClientRect().left) / tr.clientWidth)) * (hi - lo);
-    tr.onclick = (e) => { if (!e.target.closest('.chand')) { v.pause(); v.currentTime = tAt(e); } };
-    tr.querySelectorAll('.chand').forEach((h) => {
+  const pick = (i) => { if (i === sel) return; sel = i; cut.sel = i; build(); layout(); $('#eComp')?._upd?.(); };
+  cut.deselect = () => pick(-1);
+  const save = () => { if (!ed) return; clearTimeout(saveT); saveT = setTimeout(() => post('/api/reel/cut', {reel: id, clips}).catch(() => toast('Нарезка не сохранилась')), 400); };
+  function wireHands() {
+    box.querySelectorAll('.khand').forEach((h) => {
+      const k = h.dataset.h;
+      h.onpointerenter = () => { if (!tl._busy) { const r = h.getBoundingClientRect(); rv._tip(r.left + r.width / 2 - tl.getBoundingClientRect().left, k === 'in' ? 'Тяните — начало куска' : 'Тяните — конец куска'); $('#pSkl').hidden = true; } };
+      h.onpointermove = (e) => { if (!tl._busy) e.stopPropagation(); };
       h.onpointerdown = (e) => {
-        e.preventDefault(); h.setPointerCapture(e.pointerId); v.pause();
-        const k = h.dataset.h, before = c[k];
-        h.onpointermove = (ev) => {
-          let t = Math.round(tAt(ev) / FR) * FR;
-          t = k === 'in' ? Math.min(t, c.out - 0.1) : Math.max(t, c.in + 0.1);
-          c[k] = r2(t); v.currentTime = t; h.style.left = `${pct(t)}%`;
-          const win = tr.querySelector('.cwin'), sh = tr.querySelectorAll('.shade');
-          win.style.left = `${pct(c.in)}%`; win.style.width = `${pct(c.out) - pct(c.in)}%`; sh[0].style.width = `${pct(c.in)}%`; sh[1].style.left = `${pct(c.out)}%`;
-          $('#kLen').textContent = `${(c.out - c.in).toFixed(1).replace('.', ',')} с`;
+        e.preventDefault(); e.stopPropagation(); h.setPointerCapture(e.pointerId); rv.pause();
+        const c = clips[sel], x0 = e.clientX, v0 = c[k], d0 = c.out - c.in, scale = tl.getBoundingClientRect().width / tl.offsetWidth;
+        tl._busy = true; pps0 = box.clientWidth / total(); h.classList.add('on'); $('#pSkl').hidden = true;
+        const show = () => {
+          const d = c.out - c.in, dd = d - d0, r = h.getBoundingClientRect();
+          rv._tip(r.left + r.width / 2 - tl.getBoundingClientRect().left, `${k === 'in' ? 'Начало' : 'Конец'} · ${dd >= 0 ? '+' : '−'}${sec(Math.abs(dd))} → ${sec(d)}`);
+          rv._peek({url: pv.video, t: c[k], pv, label: `${k === 'in' ? 'Начало' : 'Конец'} куска ${sel + 1} · исходник ${t1(c[k])}`, edge: true});
         };
-        h.onpointerup = () => { h.onpointermove = null; if (c[k] !== before) { cut.changed = true; save(); blocks(); foot(); } };
+        h.onpointermove = (ev) => {
+          ev.stopPropagation();
+          let t = Math.round((v0 + (ev.clientX - x0) / scale / pps0) / FR) * FR;
+          t = k === 'in' ? Math.max(0, Math.max(v0 - 3, Math.min(t, c.out - 0.2))) : Math.min(v0 + 3, Math.max(t, c.in + 0.2));
+          c[k] = r2(t); layout(); show();
+        };
+        h.onpointerup = (ev) => {
+          ev.stopPropagation(); h.onpointermove = (x) => { if (!tl._busy) x.stopPropagation(); }; h.classList.remove('on');
+          tl._busy = false; pps0 = null; rv._peek(null); rv._tip(0, '');
+          if (c[k] !== v0) { cut.changed = true; save(); foot(); rv.currentTime = toV(starts()[sel]) + 0.02; }
+          layout(); $('#eComp')?._upd?.();
+        };
+        show();
       };
     });
-  };
-  const go = () => { blocks(); panel(); };
-  if (rv.readyState >= 1) go(); else rv.addEventListener('loadedmetadata', go, {once: true, signal: rv._ac.signal});
-  addEventListener('resize', () => track.isConnected && go(), {signal: rv._ac.signal});
+  }
+  tl._label = (t) => { const i = clipAt(toC(t)); return `${t1(t)} · кусок ${i + 1}${i === sel ? '' : ' · клик — выбрать'}`; };
+  tl._hover = (t) => { const i = t == null ? -1 : clipAt(toC(t)); if (i !== hov) { hov = i; layout(); } };
+  tl._pick = (t) => pick(clipAt(toC(t)));
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel >= 0 && !e.target.closest?.('input, textarea')) pick(-1); }, {signal: rv._ac.signal});
+  addEventListener('resize', () => box.isConnected && layout(), {signal: rv._ac.signal});
+  const go = () => { build(); layout(); };
+  if (rv.readyState >= 1) go(); else { build(); rv.addEventListener('loadedmetadata', go, {once: true, signal: rv._ac.signal}); requestAnimationFrame(layout); }
 }
 
-// Which version the «Монтаж» player shows, per reel: the current one unless another variant is picked.
-const VIEWV = {};
-const vName = (v) => `${v.v}${v.variant ? ' · ' + v.variant : ''}`;
-
-// Сборка (handbook/LEAN.md, кусок 17; холст L5, LR1): a version is one whole cut — v1, v2, v3, each
-// with its mp4; a new one comes only from «Собрать vN». One player, the versions as cards in a row
-// (a click switches the player), one of them marked «идёт в Готово» (the newest by default), «Что
-// изменилось в vN» to check line by line, «Правки к vN+1» that pile up until the build, and on the
-// strip under the player green dots — changed in this version, yellow — waiting for the next one.
 function editsBlock(edits, view, cur, nextV) {
   const open = edits.filter((x) => x.state === 'open'), sent = edits.filter((x) => x.state === 'sent' && x.forV === nextV);
   const done = edits.filter((x) => x.state === 'done' && x.forV === view.v);
@@ -2490,7 +2598,7 @@ function editsBlock(edits, view, cur, nextV) {
   const how = (x) => [x.clip ? `кусок ${x.clip}` : '', x.voice ? 'голосом' : 'текстом', x.shape ? ({rect: 'обведено на кадре', brush: 'кистью на кадре', point: 'точка на кадре', frame: 'весь кадр'})[x.shape.kind] : x.point ? 'точка на кадре' : ''].filter(Boolean).join(' · ');
   const doneRow = (x) => `<div class="ed"><button type="button" class="tc g" data-eseek="${x.t}">${tc(x.t)}</button><span class="tx">${esc(x.result || x.text)}<small>${x.by === 'Claude' ? 'Claude сам' : `ваша правка «${esc(x.text)}»`}</small></span>
       <span class="ac">${ed ? `<button type="button" class="eacc ${x.accepted ? 'on' : ''}" data-eacc="${x.id}" aria-pressed="${!!x.accepted}">✓ принято</button>` : x.accepted ? '<span class="eacc on">✓ принято</span>' : ''}</span></div>`;
-  const openRow = (x) => `<div class="ed" data-erow="${x.id}"><button type="button" class="tc y" data-eseek="${x.t}">${tc(x.t)}</button><span class="tx"><span class="etx" ${ed ? `contenteditable="plaintext-only" data-etext="${x.id}" role="textbox" aria-label="Текст правки"` : ''}>${esc(x.text)}</span><small>${how(x)}</small></span>
+  const openRow = (x) => `<div class="ed" data-erow="${x.id}"><button type="button" class="tc ${x.clip ? 'k' : 'y'}" data-eseek="${x.t}">${x.clip ? `Кусок ${x.clip}` : tc(x.t)}</button><span class="tx"><span class="etx" ${ed ? `contenteditable="plaintext-only" data-etext="${x.id}" role="textbox" aria-label="Текст правки"` : ''}>${esc(x.text)}</span><small>${how(x)}</small></span>
       <span class="ac">${ed ? `<select class="elang" data-elang="${x.id}" aria-label="Для каких языков"><option value="" ${x.lang ? '' : 'selected'}>RU и EN</option><option value="ru" ${x.lang === 'ru' ? 'selected' : ''}>только RU</option><option value="en" ${x.lang === 'en' ? 'selected' : ''}>только EN</option></select><button type="button" class="ln-btn s g" data-erm="${x.id}" aria-label="Убрать правку">✕</button>` : `<span class="scp">${lang(x)}</span>`}</span></div>`;
   return `${done.length ? `<div><div class="ln-lh">Что изменилось в ${esc(view.v)} · проверьте<span style="margin-left: auto" class="${ok === done.length ? 'ok' : ''}">${ok} из ${done.length} приняты</span></div>${done.map(doneRow).join('')}</div>` : ''}
     ${view === cur ? `<div><div class="ln-lh">Правки к ${esc(nextV)} · ${open.length}</div>
@@ -2527,22 +2635,36 @@ async function renderVersions(id, data) {
       <span>${!video(v) ? 'хранится кадром' : hasMaster(v) ? 'мастер готов' : 'черновик'}</span>
       ${v === ready ? '<span class="pick">идёт в «Готово»</span>' : video(v) && ed ? `<button type="button" class="vpick" data-vready="${esc(v.v)}">в «Готово»</button>` : ''}
     </div>`;
+  CUT[id] = data.cut?.clips && !data.cut.missing && data.cut.preview ? {...data.cut, clips: data.cut.clips.map((c) => ({...c})), changed: CUT[id]?.changed || data.cut.changed, sel: CUT[id]?.sel ?? -1} : null;
+  let kPref = ''; try { kPref = localStorage.getItem('reels-cut:' + id) || ''; } catch {}
+  const kOn = !!(sel === cur && CUT[id] && kPref !== '0');
+  if (CUT[id]) CUT[id].on = kOn;
   el.innerHTML = `<div class="bld">
     <div class="bplay">
       ${sel && video(sel)
-        ? `<div class="vwrap"><video id="rv" src="${esc(playUrl(sel))}" playsinline preload="auto" ${thumb(sel) ? `poster="${thumb(sel).url}"` : ''}></video><div class="igl" id="igL" hidden></div><div class="pinlayer" id="pinL" hidden></div>
-          <button type="button" class="igbtn" id="igB" aria-pressed="false">Как в Instagram</button></div>`
+        ? `<div class="vwrap"><video id="rv" src="${esc(playUrl(sel))}" playsinline preload="auto" ${thumb(sel) ? `poster="${thumb(sel).url}"` : ''}></video>
+          <div class="ppeek" id="pPeek" hidden><i id="pPeekS"></i><video id="pPeekV" muted playsinline preload="auto"></video><span class="ptag" id="pTag"></span></div>
+          <div class="igl" id="igL" hidden></div>
+          <button type="button" class="pbig" id="pBig" aria-label="Смотреть"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#141413"></path></svg></button>
+          <div class="pctl2"><div class="pscrub" id="pScrub" role="slider" tabindex="0" aria-label="Перемотка"><i class="trk"></i><i class="ghost" id="pGhost"></i><i class="fill" id="pFill"></i><i class="knob" id="pKnob"></i><span class="stip" id="pSTip" hidden></span></div>
+            <div class="prow"><button type="button" class="pcb" id="pPlay" aria-label="Смотреть">▶</button><button type="button" class="pcb" id="pPrev" aria-label="Кадр назад">‹</button><button type="button" class="pcb" id="pNext" aria-label="Кадр вперёд">›</button><span class="ptime" id="pTime"></span><span style="flex: 1"></span>
+            <button type="button" class="igbtn" id="igB" aria-pressed="false" title="Как в Instagram">IG</button><button type="button" class="pcb" id="pFull" aria-label="На весь экран"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></button></div></div>
+          <i class="pthin"><b id="pThin"></b></i>
+          <div class="pinlayer" id="pinL" hidden></div></div>`
         : sel ? `<div class="vph" style="${thumb(sel) ? `background: #000 center / contain no-repeat url('${thumb(sel).url}'); color: #fff` : ''}">Видео ${esc(sel.v)} не хранится — можно пересобрать из снимка</div>${ed ? `<button type="button" class="btn" data-rebuild="${esc(sel.v)}">Пересобрать ${esc(sel.v)}</button>` : ''}`
         : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}
     </div>
     <div class="binfo">
-      ${sel && video(sel) ? `<div class="pbar"><div class="ptl" id="bStrip" role="slider" tabindex="0" aria-label="Полоса времени"><div class="film" id="pFilm"></div><div class="done" id="pDone"></div><i class="bhead" id="bHead"></i><span id="pMarks"></span><div class="ptip" id="pTip" hidden><b id="pTipF"></b><span id="pTipT"></span></div></div>
-          <div class="pctl"><button type="button" class="btn ppb" id="pPlay" aria-label="Смотреть">▶</button><span class="tcx" id="pTime">0:00.0 / 0:00</span><span class="small muted" title="Пробел — пауза, ← → — кадр, Shift — секунда, E — правка">пробел · ← → · E</span><span style="flex: 1"></span>${sel === cur && ed ? '<button type="button" class="btn" id="pAdd">+ Правка тут</button>' : ''}</div>
-          ${sel === cur && data.cut?.clips && !data.cut.missing ? `<div class="ktrack" id="kTrack" aria-label="Куски нарезки"></div>` : sel === cur && ed && !data.cut ? `<button type="button" class="linkbtn small" id="kAsk" style="align-self: flex-start">Разложить монтаж на куски — чтобы править каждую склейку</button>` : ''}
-          ${sel === cur && ed ? `<form class="ecomp" id="eComp" hidden><div class="row" style="gap: 6px"><b id="eT" class="tcx">0:00</b><span class="small muted">правка к ${esc(nextV)}</span><span class="small muted" id="eHint" style="margin-left: auto"></span></div>
-            <textarea class="f" id="eText" rows="2" placeholder="Что поменять в этот момент — словами или голосом"></textarea>
-            <div class="row" style="gap: 6px"><button type="button" class="btn" id="eMic" title="Сказать голосом">🎙 Голосом</button><button type="button" class="btn" id="ePt" title="Показать место на кадре">◎ Точка на кадре</button><button type="button" class="linkbtn" id="eCancel">Отмена</button><button type="submit" class="btn primary" style="margin-left: auto">Добавить</button></div></form>`
-          : sel !== cur ? `<span class="small muted">Смотрите ${esc(vName(sel))}. Правки пишутся к ${esc(nextV)}.</span>` : ''}</div><div id="kPanel"></div>` : ''}
+      ${sel && video(sel) ? `<div class="pbar">
+          <div class="pctl"><span class="tcx" id="bTime">0:00,0 / 0:00,0</span>${kOn ? `<span class="small muted">${CUT[id].clips.length} кусков</span>` : ''}<span style="flex: 1"></span>
+            ${sel === cur && ed && !data.cut ? '<button type="button" class="linkbtn small" id="kAsk">Разложить на куски</button>' : ''}
+            ${sel === cur && CUT[id] ? `<button type="button" class="kswitch" id="kSw" role="switch" aria-checked="${kOn}"><span>Нарезка</span><i></i></button>` : ''}</div>
+          <div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div>
+          <div class="khints"><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span><span>${kOn ? 'Края — подрезать' : 'Наведение — просмотр'}</span><span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⇧</kbd><kbd>←</kbd> секунда</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div>
+          ${sel === cur && ed ? `<form class="ecomp2" id="eComp"><span class="etgt" id="eT">На 0:00</span><button type="button" class="ex" id="eX" hidden aria-label="Снять выбор куска">✕</button>
+            <textarea id="eText" rows="1" placeholder="Что поменять в этом месте"></textarea>
+            <button type="button" class="btn ic" id="eMic" title="Сказать голосом" aria-label="Сказать голосом">🎙</button><button type="button" class="btn ic" id="ePt" title="Точка на кадре" aria-label="Точка на кадре">◎</button><button type="submit" class="btn primary">Добавить</button></form><span class="small muted" id="eHint"></span>`
+          : sel !== cur ? `<span class="small muted">Смотрите ${esc(vName(sel))}. Правки пишутся к ${esc(nextV)}.</span>` : ''}</div>` : ''}
       ${cur ? `<div><div class="ln-lh">Версии · ${vs.length}${withVideo.length > 1 ? `<a href="#/reel/${esc(id)}/compare">сравнить ${esc((prevOf(sel) || withVideo[1]).v)} ↔ ${esc((prevOf(sel) ? sel : withVideo[0]).v)}</a>` : ''}</div>
         <div class="vcards">${vs.map(card).join('')}</div>${isOwner() && (data.storage?.reclaimLatest || data.storage?.trash || data.storage?.packed) ? `<p class="small muted" style="margin: 8px 0 0; display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline">${data.storage.packed ? '<span class="chip">упакован</span>' : ''}${data.storage.reclaimLatest ? `<button type="button" class="linkbtn" id="keepLatest">Оставить только последнюю · ${mb(data.storage.reclaimLatest)}</button>` : ''}${data.storage.trash ? `<button type="button" class="linkbtn" id="restoreReel">Вернуть из корзины · ${mb(data.storage.trash)}</button>` : ''}</p>` : ''}</div>` : '<p class="small muted">Версий пока нет. Напишите в чате справа, что снять или смонтировать.</p>'}
       ${cur ? editsBlock(edits, sel, cur, nextV) : ''}
@@ -2563,8 +2685,8 @@ async function renderVersions(id, data) {
     $('#eBuild').textContent = `Собрать ${nextV}${n ? ` · правок: ${n}` : ''}${cutCh ? ' · нарезка' : ''}`;
     $('#bNote').textContent = n || cutCh ? [n ? `${n} ${n === 1 ? 'правка' : n < 5 ? 'правки' : 'правок'} к ${nextV}` : '', cutCh ? 'нарезка поправлена' : ''].filter(Boolean).join(' · ') : 'Новая версия собирается только по кнопке — правки сначала копятся.';
   };
-  CUT[id] = data.cut?.clips && !data.cut.missing ? {...data.cut, clips: data.cut.clips.map((c) => ({...c})), changed: CUT[id]?.changed || data.cut.changed} : null;
   foot();
+  $('#kSw')?.addEventListener('click', () => { try { localStorage.setItem('reels-cut:' + id, kOn ? '0' : '1'); } catch {} if (CUT[id]) CUT[id].sel = -1; renderVersions(id, data); });
   $('#kAsk')?.addEventListener('click', () => chatOf().say(`Разложи монтаж этого рилса на куски: запиши projects/${P}/reels/${id}/cut.json по REELS.md («Footage toolkit», шаг Takes) — исходник, fps, gainDb, если голос усиливали, и куски {in, out, text} в секундах исходника ровно как в текущей версии. Ничего не пересобирай, только cut.json и такую же копию cut.applied.json.`, 'Разложить монтаж на куски'));
   // The player: the same <video> stays across re-renders (an edit added, a note accepted), so it
   // keeps its second and what it has loaded; the timeline shows frames from the strip, the frame
@@ -2573,7 +2695,7 @@ async function renderVersions(id, data) {
   if (rv && oldRv && oldRv.getAttribute('src') === rv.getAttribute('src')) { rv.replaceWith(oldRv); rv = oldRv; }
   const igCaption = (Array.isArray(data.publish?.captions) && (data.publish.captions.find((c) => /insta/i.test(c.platform || '')) || data.publish.captions[0])?.text) || section(data.readme, 'Подпись').trim() || section(data.readme, 'Caption').trim();
   if (rv) wirePlayer(rv, sel, cur, edits, open, igCaption);
-  if (rv && sel === cur && CUT[id]) wireClips(id, rv, CUT[id], open, ed, foot);
+  if (rv && kOn) wireClips(id, rv, CUT[id], open, ed, foot);
   const form = $('#eComp');
   if (rv && form) wireEdits(id, rv, form, cur, nextV);
   el.querySelectorAll('[data-viewv]').forEach((b) => {
