@@ -1,7 +1,7 @@
 // Comments for the next version of a reel (reels/<id>/edits.json), shared by the web page
 // (Д3) and the mini app's editor (SE1–SE5). One item per comment:
 //   {id, stage: 'script'|'scenes'|'video', t: seconds, text, voice, by, at, state: 'open'|'sent'|'done'|'note',
-//    quote?: words picked in the script, scene?: index in scenes.json, hint?: 'blur'|'replace'|'trim'|'remove',
+//    quote?: words picked in the script, scene?: index in scenes.json, clip?: clip of cut.json (1-based), hint?: 'blur'|'replace'|'trim'|'remove',
 //    shape?: {kind: 'rect', x, y, w, h} | {kind: 'brush', pts: [[x, y], …]} | {kind: 'point', x, y} | {kind: 'frame'}
 //            (fractions of the frame, 0–1), point?: {x, y} (% of the frame, the web's older form), forV?, result?,
 //    lang?: 'ru'|'en' — only that language's track (none: both), accepted?: the owner checked a done one}
@@ -43,6 +43,8 @@ export function changeEdits(dir, b, by) {
       text: String(b.text).trim().slice(0, 600), point, ...(shape ? {shape} : {}), ...(HINTS.includes(b.hint) ? {hint: b.hint} : {}),
       ...(typeof b.quote === 'string' && b.quote.trim() ? {quote: b.quote.trim().slice(0, 200)} : {}),
       ...(Number.isInteger(b.scene) && b.scene >= 0 ? {scene: b.scene} : {}),
+      // A clip of the rough cut (cut.json, 1-based) the note is about: «замени этот кусок», «возьми другой дубль».
+      ...(Number.isInteger(b.clip) && b.clip > 0 ? {clip: b.clip} : {}),
       ...(LANGS.includes(b.lang) ? {lang: b.lang} : {}), voice: !!b.voice, state: 'open', by, at: Date.now()});
   } else if (b.action === 'remove') list = list.filter((x) => x.id !== b.id || x.state !== 'open');
   // Before the build an open note can be reworded or narrowed to one language (Сборка, кусок 17).

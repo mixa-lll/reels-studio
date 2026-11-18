@@ -499,6 +499,13 @@
   .cblk { position: absolute; top: 0; bottom: 0; padding: 0; border: 0; border-left: 2px solid #fff; background: #D9D9D6 no-repeat; cursor: pointer; overflow: hidden; }
   .cblk span { position: absolute; left: 3px; bottom: 2px; font: 600 10px system-ui; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
   .cblk.on { outline: 3px solid #2F6FEB; outline-offset: -3px; z-index: 2; }
+  .ktrack { position: relative; height: 34px; }
+  .kblk { position: absolute; top: 0; bottom: 0; padding: 0 0 0 3px; border: 0; border-left: 2px solid #fff; background: #D9D9D6 no-repeat; cursor: pointer; overflow: hidden; font: 600 10px system-ui; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.9); text-align: left; align-content: end; border-radius: 3px; }
+  .kblk.on { outline: 3px solid #2F6FEB; outline-offset: -3px; z-index: 2; }
+  .kblk.nt::after { content: ''; position: absolute; right: 3px; top: 3px; width: 7px; height: 7px; border-radius: 50%; background: #E5A33C; box-shadow: 0 0 0 1.5px #fff; }
+  .kpan { display: flex; gap: 14px; border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 4px; }
+  .kvid { width: 108px; aspect-ratio: 9 / 16; object-fit: cover; background: #000; border-radius: 8px; flex: none; align-self: flex-start; }
+  .kbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
   .csel { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
   .ctrim { position: relative; height: 64px; border-radius: 6px; cursor: pointer; user-select: none; touch-action: none; }
   .ctrim .film { position: absolute; inset: 0; display: flex; border-radius: 6px; overflow: hidden; background: #D9D9D6; pointer-events: none; }
@@ -2375,6 +2382,88 @@ async function stageCut(id, data) {
   if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, {once: true});
 }
 
+// The rough cut right in «Сборка» (scripts/cut.mjs): its clips as a second track under the timeline.
+// A click opens the clip below: the source around it with two handles to drag its in/out, a play
+// button, and a note about the whole clip («возьми другой дубль») that goes to the list with the others.
+const CUT = {};
+function wireClips(id, rv, cut, open, ed, foot) {
+  const pv = cut.preview, track = $('#kTrack'), FR = 1 / (cut.fps || 30), r2 = (x) => Math.round(x * 1000) / 1000;
+  let sel = cut.sel ?? -1, saveT = null;
+  const starts = () => cut.clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + cut.clips[i - 1].out - cut.clips[i - 1].in : 0), a), []);
+  const total = () => cut.clips.reduce((a, c) => a + c.out - c.in, 0);
+  // Cut time → the version's time: the version may add a lead or an end, so it is scaled to its length.
+  const toV = (t) => { const d = Number.isFinite(rv.duration) && rv.duration ? rv.duration : total(); return (t * d) / total(); };
+  const frame = (el, t, scale, ox = 0, oy = 0) => {
+    if (!pv?.sprite) return;
+    const k = Math.max(0, Math.min(pv.n - 1, Math.floor(t / pv.every)));
+    el.style.backgroundImage = `url('${pv.sprite}')`; el.style.backgroundSize = `${pv.cols * pv.w * scale}px auto`;
+    el.style.backgroundPosition = `${ox - (k % pv.cols) * pv.w * scale}px ${oy - Math.floor(k / pv.cols) * pv.h * scale}px`;
+  };
+  const noted = (i) => open.some((x) => x.clip === i + 1);
+  const blocks = () => {
+    const st = starts(), T = total();
+    track.innerHTML = cut.clips.map((c, i) => `<button type="button" class="kblk ${i === sel ? 'on' : ''} ${noted(i) ? 'nt' : ''}" data-k="${i}" style="left: ${(100 * st[i]) / T}%; width: ${(100 * (c.out - c.in)) / T}%" title="Кусок ${i + 1}: ${esc(c.text || '')}">${i + 1}</button>`).join('');
+    track.querySelectorAll('.kblk').forEach((b) => { const c = cut.clips[b.dataset.k], w = b.clientWidth, h = b.clientHeight, s = pv ? Math.max(w / pv.w, h / pv.h) : 1; if (pv) frame(b, (c.in + c.out) / 2, s, (w - pv.w * s) / 2, (h - pv.h * s) / 2); b.onclick = () => toggle(Number(b.dataset.k)); });
+  };
+  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => post('/api/reel/cut', {reel: id, clips: cut.clips}).catch(() => toast('Нарезка не сохранилась')), 400); };
+  const toggle = (i) => { sel = sel === i ? -1 : i; cut.sel = sel; if (sel >= 0) { rv.pause(); rv.currentTime = toV(starts()[sel]) + 0.02; } blocks(); panel(); };
+  const panel = () => {
+    const box = $('#kPanel'), c = cut.clips[sel];
+    if (!box) return;
+    if (!c) { box.innerHTML = ''; return; }
+    const lo = Math.max(0, c.in - 3), hi = c.out + 3, pct = (t) => (100 * (t - lo)) / (hi - lo);
+    box.innerHTML = `<div class="kpan">
+      ${pv ? `<video class="kvid" id="kV" src="${esc(pv.video)}#t=${c.in}" playsinline preload="auto" muted></video>` : ''}
+      <div class="kbody">
+        <div class="row" style="gap: 8px; align-items: baseline"><b>Кусок ${sel + 1}</b><span class="small muted" id="kLen">${(c.out - c.in).toFixed(1).replace('.', ',')} с</span>${c.text ? `<span class="small muted" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1">«${esc(c.text)}»</span>` : '<span style="flex: 1"></span>'}<button type="button" class="linkbtn" id="kX" aria-label="Закрыть">✕</button></div>
+        ${pv ? `<div class="ctrim" id="kTrim"><div class="film" id="kFilm"></div><i class="shade" style="left: 0; width: ${pct(c.in)}%"></i><i class="shade" style="left: ${pct(c.out)}%; right: 0"></i><i class="cwin" style="left: ${pct(c.in)}%; width: ${pct(c.out) - pct(c.in)}%"></i><i class="bhead" id="kHead"></i>
+          ${ed ? `<button type="button" class="chand" data-h="in" style="left: ${pct(c.in)}%" aria-label="Начало куска"></button><button type="button" class="chand" data-h="out" style="left: ${pct(c.out)}%" aria-label="Конец куска"></button>` : ''}</div>
+        <div class="row small muted" style="gap: 10px"><button type="button" class="btn s" id="kPlay">▶ Кусок</button><span>${ed ? 'Тяни жёлтые края, чтобы начать или закончить кусок раньше или позже' : ''}</span></div>` : '<span class="small muted">Готовлю копию исходника — края можно будет двигать через минуту.</span>'}
+        ${ed ? `<div class="row" style="gap: 6px"><input class="f" id="kNote" placeholder="Что сделать с этим куском — например, взять другой дубль" style="flex: 1; min-width: 0"><button type="button" class="btn" id="kAdd">Правка к куску</button></div>` : ''}
+      </div></div>`;
+    $('#kX').onclick = () => toggle(sel);
+    const v = $('#kV');
+    if (ed) {
+      const add = async () => {
+        const text = $('#kNote').value.trim();
+        if (!text) return $('#kNote').focus();
+        await post('/api/reel/edits', {reel: id, action: 'add', t: toV(starts()[sel]), text, clip: sel + 1, quote: c.text || undefined});
+        renderVersions(id);
+      };
+      $('#kAdd').onclick = add;
+      $('#kNote').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } };
+    }
+    if (!pv) return;
+    const tr = $('#kTrim'), w = tr.clientWidth, n = Math.max(6, Math.round(w / 28)), s = Math.max(w / n / pv.w, tr.clientHeight / pv.h);
+    $('#kFilm').innerHTML = Array.from({length: n}, () => '<i></i>').join('');
+    [...$('#kFilm').children].forEach((x, i) => frame(x, lo + ((i + 0.5) * (hi - lo)) / n, s, (w / n - pv.w * s) / 2, (tr.clientHeight - pv.h * s) / 2));
+    let stopAt = 0;
+    const head = () => { if (!v.isConnected) return; $('#kHead').style.left = `${pct(Math.max(lo, Math.min(hi, v.currentTime)))}%`; if (!v.paused && v.currentTime >= stopAt) v.pause(); requestAnimationFrame(head); };
+    requestAnimationFrame(head);
+    $('#kPlay').onclick = () => { if (!v.paused) return v.pause(); rv.pause(); v.muted = false; v.currentTime = c.in; stopAt = c.out; v.play(); };
+    const tAt = (e) => lo + Math.max(0, Math.min(1, (e.clientX - tr.getBoundingClientRect().left) / tr.clientWidth)) * (hi - lo);
+    tr.onclick = (e) => { if (!e.target.closest('.chand')) { v.pause(); v.currentTime = tAt(e); } };
+    tr.querySelectorAll('.chand').forEach((h) => {
+      h.onpointerdown = (e) => {
+        e.preventDefault(); h.setPointerCapture(e.pointerId); v.pause();
+        const k = h.dataset.h, before = c[k];
+        h.onpointermove = (ev) => {
+          let t = Math.round(tAt(ev) / FR) * FR;
+          t = k === 'in' ? Math.min(t, c.out - 0.1) : Math.max(t, c.in + 0.1);
+          c[k] = r2(t); v.currentTime = t; h.style.left = `${pct(t)}%`;
+          const win = tr.querySelector('.cwin'), sh = tr.querySelectorAll('.shade');
+          win.style.left = `${pct(c.in)}%`; win.style.width = `${pct(c.out) - pct(c.in)}%`; sh[0].style.width = `${pct(c.in)}%`; sh[1].style.left = `${pct(c.out)}%`;
+          $('#kLen').textContent = `${(c.out - c.in).toFixed(1).replace('.', ',')} с`;
+        };
+        h.onpointerup = () => { h.onpointermove = null; if (c[k] !== before) { cut.changed = true; save(); blocks(); foot(); } };
+      };
+    });
+  };
+  const go = () => { blocks(); panel(); };
+  if (rv.readyState >= 1) go(); else rv.addEventListener('loadedmetadata', go, {once: true, signal: rv._ac.signal});
+  addEventListener('resize', () => track.isConnected && go(), {signal: rv._ac.signal});
+}
+
 // Which version the «Монтаж» player shows, per reel: the current one unless another variant is picked.
 const VIEWV = {};
 const vName = (v) => `${v.v}${v.variant ? ' · ' + v.variant : ''}`;
@@ -2389,7 +2478,7 @@ function editsBlock(edits, view, cur, nextV) {
   const done = edits.filter((x) => x.state === 'done' && x.forV === view.v);
   const ed = canEdit(), ok = done.filter((x) => x.accepted).length;
   const lang = (x) => (x.lang ? `только ${x.lang.toUpperCase()}` : 'RU и EN');
-  const how = (x) => [x.voice ? 'голосом' : 'текстом', x.shape ? ({rect: 'обведено на кадре', brush: 'кистью на кадре', point: 'точка на кадре', frame: 'весь кадр'})[x.shape.kind] : x.point ? 'точка на кадре' : ''].filter(Boolean).join(' · ');
+  const how = (x) => [x.clip ? `кусок ${x.clip}` : '', x.voice ? 'голосом' : 'текстом', x.shape ? ({rect: 'обведено на кадре', brush: 'кистью на кадре', point: 'точка на кадре', frame: 'весь кадр'})[x.shape.kind] : x.point ? 'точка на кадре' : ''].filter(Boolean).join(' · ');
   const doneRow = (x) => `<div class="ed"><button type="button" class="tc g" data-eseek="${x.t}">${tc(x.t)}</button><span class="tx">${esc(x.result || x.text)}<small>${x.by === 'Claude' ? 'Claude сам' : `ваша правка «${esc(x.text)}»`}</small></span>
       <span class="ac">${ed ? `<button type="button" class="eacc ${x.accepted ? 'on' : ''}" data-eacc="${x.id}" aria-pressed="${!!x.accepted}">✓ принято</button>` : x.accepted ? '<span class="eacc on">✓ принято</span>' : ''}</span></div>`;
   const openRow = (x) => `<div class="ed" data-erow="${x.id}"><button type="button" class="tc y" data-eseek="${x.t}">${tc(x.t)}</button><span class="tx"><span class="etx" ${ed ? `contenteditable="plaintext-only" data-etext="${x.id}" role="textbox" aria-label="Текст правки"` : ''}>${esc(x.text)}</span><small>${how(x)}</small></span>
@@ -2440,11 +2529,11 @@ async function renderVersions(id, data) {
     <div class="binfo">
       ${sel && video(sel) ? `<div class="pbar"><div class="ptl" id="bStrip" role="slider" tabindex="0" aria-label="Полоса времени"><div class="film" id="pFilm"></div><div class="done" id="pDone"></div><i class="bhead" id="bHead"></i><span id="pMarks"></span><div class="ptip" id="pTip" hidden><b id="pTipF"></b><span id="pTipT"></span></div></div>
           <div class="pctl"><button type="button" class="btn ppb" id="pPlay" aria-label="Смотреть">▶</button><span class="tcx" id="pTime">0:00.0 / 0:00</span><span class="small muted" title="Пробел — пауза, ← → — кадр, Shift — секунда, E — правка">пробел · ← → · E</span><span style="flex: 1"></span>${sel === cur && ed ? '<button type="button" class="btn" id="pAdd">+ Правка тут</button>' : ''}</div>
+          ${sel === cur && data.cut?.clips && !data.cut.missing ? `<div class="ktrack" id="kTrack" aria-label="Куски нарезки"></div>` : sel === cur && ed && !data.cut ? `<button type="button" class="linkbtn small" id="kAsk" style="align-self: flex-start">Разложить монтаж на куски — чтобы править каждую склейку</button>` : ''}
           ${sel === cur && ed ? `<form class="ecomp" id="eComp" hidden><div class="row" style="gap: 6px"><b id="eT" class="tcx">0:00</b><span class="small muted">правка к ${esc(nextV)}</span><span class="small muted" id="eHint" style="margin-left: auto"></span></div>
             <textarea class="f" id="eText" rows="2" placeholder="Что поменять в этот момент — словами или голосом"></textarea>
             <div class="row" style="gap: 6px"><button type="button" class="btn" id="eMic" title="Сказать голосом">🎙 Голосом</button><button type="button" class="btn" id="ePt" title="Показать место на кадре">◎ Точка на кадре</button><button type="button" class="linkbtn" id="eCancel">Отмена</button><button type="submit" class="btn primary" style="margin-left: auto">Добавить</button></div></form>`
-          : sel !== cur ? `<span class="small muted">Смотрите ${esc(vName(sel))}. Правки пишутся к ${esc(nextV)}.</span>` : ''}</div>` : ''}
-      ${cur ? `<a class="btn" style="align-self: flex-start" href="#/reel/${esc(id)}/cut">✂ Нарезка${data.cut && !data.cut.missing ? ` · ${data.cut.clips.length} кусков${data.cut.changed ? ' · есть правки' : ''}` : ''}</a>` : ''}
+          : sel !== cur ? `<span class="small muted">Смотрите ${esc(vName(sel))}. Правки пишутся к ${esc(nextV)}.</span>` : ''}</div><div id="kPanel"></div>` : ''}
       ${cur ? `<div><div class="ln-lh">Версии · ${vs.length}${withVideo.length > 1 ? `<a href="#/reel/${esc(id)}/compare">сравнить ${esc((prevOf(sel) || withVideo[1]).v)} ↔ ${esc((prevOf(sel) ? sel : withVideo[0]).v)}</a>` : ''}</div>
         <div class="vcards">${vs.map(card).join('')}</div>${isOwner() && (data.storage?.reclaimLatest || data.storage?.trash || data.storage?.packed) ? `<p class="small muted" style="margin: 8px 0 0; display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline">${data.storage.packed ? '<span class="chip">упакован</span>' : ''}${data.storage.reclaimLatest ? `<button type="button" class="linkbtn" id="keepLatest">Оставить только последнюю · ${mb(data.storage.reclaimLatest)}</button>` : ''}${data.storage.trash ? `<button type="button" class="linkbtn" id="restoreReel">Вернуть из корзины · ${mb(data.storage.trash)}</button>` : ''}</p>` : ''}</div>` : '<p class="small muted">Версий пока нет. Напишите в чате справа, что снять или смонтировать.</p>'}
       ${cur ? editsBlock(edits, sel, cur, nextV) : ''}
@@ -2453,9 +2542,20 @@ async function renderVersions(id, data) {
       ${script.trim() ? `<details class="blk"><summary class="lbl" style="cursor: pointer">Сценарий</summary><div class="md" style="font-size: 14px">${md(script)}</div></details>` : ''}
     </div>
   </div>
-  ${cur && ed ? `<div class="bfoot">${open.length ? `<span class="small muted">${open.length} ${open.length === 1 ? 'правка' : open.length < 5 ? 'правки' : 'правок'} к ${esc(nextV)}</span>` : `<span class="small muted">Новая версия собирается только по кнопке — правки сначала копятся.</span>`}
+  ${cur && ed ? `<div class="bfoot"><span class="small muted" id="bNote"></span>
     <span style="flex: 1"></span><a class="btn" href="#/reel/${esc(id)}/publish">${svg('eye', 14)}Как увидят</a>
-    <button type="button" class="btn primary" id="eBuild" ${open.length ? '' : 'disabled'}>Собрать ${esc(nextV)}${open.length ? ` · правок: ${open.length}` : ''}</button></div>` : ''}`;
+    <button type="button" class="btn primary" id="eBuild">Собрать ${esc(nextV)}</button></div>` : ''}`;
+  // The footer counts the notes and whether the cut was trimmed; «Собрать» takes both.
+  const foot = () => {
+    const cutCh = !!CUT[id]?.changed, n = open.length;
+    if (!$('#eBuild')) return;
+    $('#eBuild').disabled = !n && !cutCh;
+    $('#eBuild').textContent = `Собрать ${nextV}${n ? ` · правок: ${n}` : ''}${cutCh ? ' · нарезка' : ''}`;
+    $('#bNote').textContent = n || cutCh ? [n ? `${n} ${n === 1 ? 'правка' : n < 5 ? 'правки' : 'правок'} к ${nextV}` : '', cutCh ? 'нарезка поправлена' : ''].filter(Boolean).join(' · ') : 'Новая версия собирается только по кнопке — правки сначала копятся.';
+  };
+  CUT[id] = data.cut?.clips && !data.cut.missing ? {...data.cut, clips: data.cut.clips.map((c) => ({...c})), changed: CUT[id]?.changed || data.cut.changed} : null;
+  foot();
+  $('#kAsk')?.addEventListener('click', () => chatOf().say(`Разложи монтаж этого рилса на куски: запиши projects/${P}/reels/${id}/cut.json по REELS.md («Footage toolkit», шаг Takes) — исходник, fps, gainDb, если голос усиливали, и куски {in, out, text} в секундах исходника ровно как в текущей версии. Ничего не пересобирай, только cut.json и такую же копию cut.applied.json.`, 'Разложить монтаж на куски'));
   // The player: the same <video> stays across re-renders (an edit added, a note accepted), so it
   // keeps its second and what it has loaded; the timeline shows frames from the strip, the frame
   // under the mouse, the playhead and the marks: green changed in this version, yellow next.
@@ -2463,6 +2563,7 @@ async function renderVersions(id, data) {
   if (rv && oldRv && oldRv.getAttribute('src') === rv.getAttribute('src')) { rv.replaceWith(oldRv); rv = oldRv; }
   const igCaption = (Array.isArray(data.publish?.captions) && (data.publish.captions.find((c) => /insta/i.test(c.platform || '')) || data.publish.captions[0])?.text) || section(data.readme, 'Подпись').trim() || section(data.readme, 'Caption').trim();
   if (rv) wirePlayer(rv, sel, cur, edits, open, igCaption);
+  if (rv && sel === cur && CUT[id]) wireClips(id, rv, CUT[id], open, ed, foot);
   const form = $('#eComp');
   if (rv && form) wireEdits(id, rv, form, cur, nextV);
   el.querySelectorAll('[data-viewv]').forEach((b) => {
@@ -2489,8 +2590,11 @@ async function renderVersions(id, data) {
   });
   $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1440p этой версии (без --draft, 1440×2560, CRF 15) и скажи, когда будет готов.`, `Принять ${cur.v}`));
   $('#eBuild')?.addEventListener('click', async () => {
-    await post('/api/reel/edits', {reel: id, action: 'send', forV: nextV});
-    chatOf().say(`Правки к ${nextV}:\n${open.map((x, i) => `${i + 1}. ${tc(x.t)}${x.lang ? ` (только ${x.lang.toUpperCase()})` : ''} — ${x.text}${x.point ? ` (точка на кадре: ${x.point.x}% слева, ${x.point.y}% сверху)` : ''}`).join('\n')}\nСобери ${nextV} черновиком. В edits.json у каждой правки поставь "state": "done" и "result" — что сделано, в несколько слов; если сам поменял что-то ещё, допиши пункт с "by": "Claude", "state": "done", "forV": "${nextV}", "t" и "result".`, `Собрать ${nextV} · правок: ${open.length}`);
+    const cutCh = CUT[id]?.changed, folder = `projects/${P}/reels/${id}`, clips = CUT[id]?.clips || [];
+    if (open.length) await post('/api/reel/edits', {reel: id, action: 'send', forV: nextV});
+    const cutLine = cutCh ? `\nНарезка поправлена в ${folder}/cut.json (${clips.length} кусков): примени её — сначала \`node scripts/cut.mjs ${folder} map\` (как сдвинулись куски), потом \`cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov), пересобери субтитры и маску по новому cut.mov (в фоне, по одному тяжёлому шагу) и сдвинь времена склейки в Reel.jsx и scenes по таблице map.` : '';
+    if (cutCh) CUT[id].changed = false;
+    chatOf().say(`Правки к ${nextV}:\n${open.map((x, i) => `${i + 1}. ${tc(x.t)}${x.clip && clips[x.clip - 1] ? ` (кусок ${x.clip} нарезки: «${clips[x.clip - 1].text || ''}», исходник ${clips[x.clip - 1].in}–${clips[x.clip - 1].out} с)` : ''}${x.lang ? ` (только ${x.lang.toUpperCase()})` : ''} — ${x.text}${x.point ? ` (точка на кадре: ${x.point.x}% слева, ${x.point.y}% сверху)` : ''}`).join('\n') || '—'}${cutLine}\nСобери ${nextV} черновиком. В edits.json у каждой правки поставь "state": "done" и "result" — что сделано, в несколько слов; если сам поменял что-то ещё, допиши пункт с "by": "Claude", "state": "done", "forV": "${nextV}", "t" и "result".`, `Собрать ${nextV}${open.length ? ` · правок: ${open.length}` : ''}${cutCh ? ' · нарезка' : ''}`);
     renderVersions(id);
   });
   el.querySelectorAll('[data-rebuild]').forEach((b) => (b.onclick = () => chatOf().say(`Пересобери версию ${b.dataset.rebuild} этого рилса из её снимка versions/${b.dataset.rebuild}/project-snapshot/ и пришли её.`, `Пересобрать ${b.dataset.rebuild}`)));
