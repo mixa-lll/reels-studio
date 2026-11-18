@@ -2623,7 +2623,12 @@ function wireCutPlay(id, rv, cut, withGfx) {
   const toC = (t) => (t * total()) / vd(), toV = (t) => (t * vd()) / total();
   const clipAt = (ct) => Math.max(0, starts().findLastIndex((s) => ct >= s - 1e-6));
   // A moment of the source → the cut now: its clip's start + how far into the clip (kept inside it).
-  const place = (m, st) => { const c = clips[m.clip]; return c ? st[m.clip] + Math.max(0, Math.min(c.out - c.in, m.src - c.in)) : null; };
+  const place = (m, st) => {
+    const has = (c) => c && m.src >= c.in - 1e-3 && m.src <= c.out + 1e-3;
+    let j = has(clips[m.clip]) ? m.clip : clips.findIndex(has);
+    if (j < 0) { j = Math.min(m.clip, clips.length - 1); const c = clips[j]; return c ? st[j] + (m.src < c.in ? 0 : c.out - c.in) : null; }
+    return st[j] + (m.src - clips[j].in);
+  };
   const items = withGfx && Array.isArray(cut.graphics) ? cut.graphics : [];
   if (gl) gl.innerHTML = items.map((x, i) => `<img data-g="${i}" src="${esc(x.url)}" alt="" hidden style="left: ${(100 * x.box[0]) / 1080}%; top: ${(100 * x.box[1]) / 1920}%; width: ${(100 * x.box[2]) / 1080}%">`).join('');
   const show = (ct) => {
@@ -2947,7 +2952,7 @@ async function renderVersions(id, data) {
   $('#eBuild')?.addEventListener('click', async () => {
     const cutCh = CUT[id]?.changed, folder = `projects/${P}/reels/${id}`, clips = CUT[id]?.clips || [];
     if (open.length) await post('/api/reel/edits', {reel: id, action: 'send', forV: nextV});
-    const cutLine = cutCh ? `\nНарезка поправлена в ${folder}/cut.json (${clips.length} кусков): примени её — сначала \`node scripts/cut.mjs ${folder} map\` (как сдвинулись куски), потом \`cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov), сдвинь времена склейки в Reel.jsx и scenes по таблице map. Это этап «Сборка»: только монтаж, новую графику и маску не добавляй; маску пересобери, только если графика уже наложена, и только на её отрезках.` : '';
+    const cutLine = cutCh ? `\nНарезка поправлена в ${folder}/cut.json (${clips.length} кусков): примени её — \`node scripts/cut.mjs ${folder} cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov); если есть ${folder}/graphics.json — \`node scripts/layers.mjs ${folder} place\`: все времена графики в Montage.jsx сами переедут на новую нарезку вместе со своими словами, руками их не двигай; иначе \`node scripts/cut.mjs ${folder} map\` и сдвинь времена по таблице. Субтитры — заново по новым словам; маску — только на отрезках под графикой. Это этап «Сборка»: новую графику не добавляй.` : '';
     if (cutCh) CUT[id].changed = false;
     chatOf().say(`Правки к ${nextV}:\n${open.map((x, i) => `${i + 1}. ${tc(x.t)}${x.clip && clips[x.clip - 1] ? ` (кусок ${x.clip} нарезки: «${clips[x.clip - 1].text || ''}», исходник ${clips[x.clip - 1].in}–${clips[x.clip - 1].out} с)` : ''}${x.lang ? ` (только ${x.lang.toUpperCase()})` : ''} — ${x.text}${x.point ? ` (точка на кадре: ${x.point.x}% слева, ${x.point.y}% сверху)` : ''}`).join('\n') || '—'}${cutLine}\nСобери ${nextV} черновиком. В edits.json у каждой правки поставь "state": "done" и "result" — что сделано, в несколько слов; если сам поменял что-то ещё, допиши пункт с "by": "Claude", "state": "done", "forV": "${nextV}", "t" и "result".`, `Собрать ${nextV}${open.length ? ` · правок: ${open.length}` : ''}${cutCh ? ' · нарезка' : ''}`);
     renderVersions(id);

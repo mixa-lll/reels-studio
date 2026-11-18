@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Graphics of a reel as separate layers, tied to the speech instead of to seconds of the render.
 //
-//   node scripts/layers.mjs <reel folder>
+//   node scripts/layers.mjs <reel folder>           layers + graphics.json
+//   node scripts/layers.mjs <reel folder> place     move the montage's times to the cut now (see place())
 //
 // Reads the montage (project/src/Montage.jsx: graphics placed with <At a={…} b={…}>…</At>, times in
 // seconds of the montage built from cut.applied.json), renders every <At> block alone on a transparent
@@ -22,6 +23,7 @@ const proj = join(dir, 'project'), srcFile = join(proj, 'src', 'Montage.jsx');
 if (!existsSync(srcFile)) { console.error(`no ${srcFile}`); process.exit(1); }
 const applied = JSON.parse(readFileSync(join(dir, existsSync(join(dir, 'cut.applied.json')) ? 'cut.applied.json' : 'cut.json'), 'utf8'));
 const src = readFileSync(srcFile, 'utf8');
+if (process.argv[3] === 'place') { place(); process.exit(0); }
 
 // Numeric constants of the file (G0 = 13.11, TOTAL = 79.16, FPS = 30) to read a={G0}.
 const consts = {};
@@ -99,6 +101,50 @@ const at = (t, end) => {
   return {clip: i, src: Math.round((c.in + Math.min(c.out - c.in, Math.max(0, t - starts[i]))) * 1000) / 1000};
 };
 const items = blocks.map((x, i) => boxes[i] && {id: `g${String(i).padStart(2, '0')}`, label: x.label, z: x.z, layer: `layers/g${String(i).padStart(2, '0')}.png`, box: boxes[i], from: at(x.a), to: at(x.b, true)}).filter(Boolean);
-writeFileSync(join(dir, 'graphics.json'), JSON.stringify({frame: [1080, 1920], madeFrom: 'project/src/Montage.jsx', items}, null, 1) + '\n');
+writeFileSync(join(dir, 'graphics.json'), JSON.stringify({frame: [1080, 1920], madeFrom: 'project/src/Montage.jsx', base: applied.clips.map((c) => ({in: c.in, out: c.out})), items}, null, 1) + '\n');
 console.log(`${items.length} layers → ${join(dir, 'graphics.json')}`);
 for (const x of items) console.log(`  ${x.id}  ${x.z.padEnd(6)} clip ${x.from.clip} ${x.from.src}–${x.to.src}  ${x.label}`);
+
+// ── place ──
+// The owner trimmed the cut: every time in Montage.jsx is a second of the montage the graphics were made
+// on (graphics.json `base`). Each such second is a moment of the source; find that moment in the cut now
+// (cut.json) and write the new second back — At a/b, s(…), the k(…) helpers' arguments and the
+// constants they start from, TOTAL. A moment trimmed away sticks to its clip's edge. Durations written as
+// s(3.21) inside a block become s(b) - s(a) first, so they stretch with it. After it the file is in the
+// new cut's seconds and graphics.json's base is the new cut: run it once per applied cut.
+function place() {
+  const g = JSON.parse(readFileSync(join(dir, 'graphics.json'), 'utf8'));
+  const cut = JSON.parse(readFileSync(join(dir, 'cut.json'), 'utf8'));
+  if (!Array.isArray(g.base)) { console.error('graphics.json has no base cut: run `node scripts/layers.mjs <reel>` first'); process.exit(1); }
+  const st = (cl) => cl.reduce((a, c, i) => (a.push(i ? a[i - 1] + cl[i - 1].out - cl[i - 1].in : 0), a), []);
+  const bs = st(g.base), ns = st(cut.clips), btot = bs.at(-1) + g.base.at(-1).out - g.base.at(-1).in, ntot = ns.at(-1) + cut.clips.at(-1).out - cut.clips.at(-1).in;
+  const W = (t) => {
+    if (t >= btot - 1e-6) return ntot - (btot - t);
+    const i = Math.max(0, bs.findLastIndex((x) => t >= x - 1e-6)), src = g.base[i].in + (t - bs[i]);
+    let j = cut.clips.findIndex((c, k) => k === i && src >= c.in - 1e-3 && src <= c.out + 1e-3);
+    if (j < 0) j = cut.clips.findIndex((c) => src >= c.in - 1e-3 && src <= c.out + 1e-3);
+    if (j < 0) { j = Math.min(i, cut.clips.length - 1); const c = cut.clips[j]; return ns[j] + (src < c.in ? 0 : c.out - c.in); }
+    return ns[j] + (src - cut.clips[j].in);
+  };
+  const r2 = (x) => String(Math.round(x * 100) / 100);
+  let s = readFileSync(srcFile, 'utf8');
+  const before = s;
+  // durations inside a block → s(b) - s(a)
+  s = s.replace(/<At\s+a=\{([\d.]+)\}\s+b=\{([\d.]+)\}>([\s\S]*?)<\/At>/g, (all, a, b, inner) => {
+    const d = Number(b) - Number(a);
+    return all.replace(/s\(([\d.]+)\)(?!\s*-)/g, (m, x, off) => (Math.abs(Number(x) - d) < 0.02 && !/-\s*$/.test(inner.slice(0, off)) ? `(s(${b}) - s(${a}))` : m));
+  });
+  // helpers made with k(X): their numeric arguments are seconds too
+  const helpers = [...s.matchAll(/(\w+)\s*=\s*k\((\w+)\)/g)];
+  const names = ['s', ...helpers.map((m) => m[1])];
+  s = s.replace(new RegExp(`\\b(${names.join('|')})\\(([\\d.]+)\\)`, 'g'), (m, f, x) => `${f}(${r2(W(Number(x)))})`);
+  s = s.replace(/<At(\s+i=\{\d+\})?\s+a=\{([\d.]+)\}\s+b=\{([\d.]+)\}>/g, (m, i, a, b) => `<At a={${r2(W(Number(a)))}} b={${r2(W(Number(b)))}}>`);
+  // the constants the helpers start from (const G0 = 13.11, g = k(G0))
+  for (const [, , base] of helpers) s = s.replace(new RegExp(`\\b(const\\s+${base}\\s*=\\s*)([\\d.]+)`), (m, h, x) => h + r2(W(Number(x))));
+  s = s.replace(/(export\s+const\s+TOTAL\s*=\s*)([\d.]+)/, (m, h) => h + r2(ntot));
+  writeFileSync(srcFile, s);
+  g.base = cut.clips.map((c) => ({in: c.in, out: c.out}));
+  writeFileSync(join(dir, 'graphics.json'), JSON.stringify(g, null, 1) + '\n');
+  const changed = before.split('\n').filter((l, i) => l !== s.split('\n')[i]).length;
+  console.log(`Montage.jsx: ${changed} lines moved to the cut now (${r2(btot)} s → ${r2(ntot)} s); graphics.json base updated`);
+}
