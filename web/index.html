@@ -2255,7 +2255,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   let want = null;
   const peek = (o) => {
     if (!pk) return;
-    if (!o) { pk.hidden = true; want = null; return; }
+    if (!o) { pk.hidden = true; want = null; pkV.pause(); pkV.muted = true; pk._play = null; return; }
     pk.hidden = false; pk.classList.toggle('edge', !!o.edge); $('#pTag').textContent = o.label;
     if (o.pv?.sprite) cover(pkS, o.pv, o.t); else pkS.style.backgroundImage = '';
     if (pkV.getAttribute('src') !== o.url) { pkV.src = o.url; pkV.classList.remove('on'); }
@@ -2271,6 +2271,26 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     pkV.onloadedmetadata = () => { if (want != null) pkV.currentTime = want; };
   }
   rv._peek = peek;
+  // A cut seen at once: the source plays across the joint (the end of one clip, the start of the
+  // next) in the same layer, with sound, then the player returns to the version.
+  rv._peekPlay = (url, segs, label) => {
+    rv.pause(); peek({url, t: segs[0][0], label, edge: true}); want = null; clearTimeout(pkV._t);
+    const run = pk._play = {i: 0};
+    const go = () => { if (pk._play !== run) return; pkV.currentTime = segs[0][0]; pkV.muted = false; pkV.classList.add('on'); pkV.play().catch(() => {}); };
+    // Checked every frame and on timeupdate too (frames stop in a background tab).
+    const step = () => {
+      if (pk._play !== run || run.done) return;
+      if (!pkV.seeking && pkV.currentTime >= segs[run.i][1] - 0.02) {
+        run.i++;
+        if (run.i >= segs.length) { run.done = true; pkV.pause(); setTimeout(() => pk._play === run && peek(null), 350); return; }
+        pkV.currentTime = segs[run.i][0];
+      }
+    };
+    const tick = () => { step(); if (pk._play === run && !run.done) requestAnimationFrame(tick); };
+    pkV.ontimeupdate = step;
+    if (pkV.readyState >= 1) go(); else pkV.addEventListener('loadedmetadata', go, {once: true});
+    requestAnimationFrame(tick);
+  };
   const film = () => {
     const d = dur(), f = $('#pFilm');
     if (!d || !f) return;
@@ -2619,6 +2639,13 @@ function wireClips(id, rv, cut, open, ed, foot) {
     const hl = box.querySelector('.khand.l'), hr = box.querySelector('.khand.r');
     if (hl) { hl.style.left = `${l - 1}px`; hr.style.left = `${l + w - 11}px`; }
   };
+  // The joint around the edge just moved: ~1.5 s of this clip and 1 s of its neighbour, from the source.
+  const joint = (i, k) => {
+    const c = clips[i], prev = clips[i - 1], next = clips[i + 1];
+    const segs = k === 'in' ? [...(prev ? [[Math.max(prev.in, prev.out - 1), prev.out]] : []), [c.in, Math.min(c.out, c.in + 1.5)]]
+      : [[Math.max(c.in, c.out - 1.5), c.out], ...(next ? [[next.in, Math.min(next.out, next.in + 1)]] : [])];
+    rv._peekPlay(pv.video, segs, `▶ Склейка ${k === 'in' ? `${i}→${i + 1}` : `${i + 1}→${i + 2}`}`);
+  };
   const pick = (i) => { if (i === sel) return; sel = i; cut.sel = i; build(); layout(); $('#eComp')?._upd?.(); };
   cut.deselect = () => pick(-1);
   const save = () => { if (!ed) return; clearTimeout(saveT); saveT = setTimeout(() => post('/api/reel/cut', {reel: id, clips}).catch(() => toast('Нарезка не сохранилась')), 400); };
@@ -2646,8 +2673,8 @@ function wireClips(id, rv, cut, open, ed, foot) {
         h.onpointerup = (ev) => {
           ev.stopPropagation(); h.onpointermove = (x) => { if (!tl._busy) x.stopPropagation(); }; h.classList.remove('on');
           tl._busy = false; pps0 = null; rv._peek(null); rv._tip(0, '');
-          if (c[k] !== v0) { cut.changed = true; save(); foot(); rv.currentTime = toV(starts()[sel]) + 0.02; }
           layout(); $('#eComp')?._upd?.();
+          if (c[k] !== v0) { cut.changed = true; save(); foot(); rv.currentTime = toV(starts()[sel]) + 0.02; joint(sel, k); }
         };
         show();
       };
@@ -2659,7 +2686,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
         c[k] = r2(k === 'in' ? Math.max(0, Math.min(c.in + d, c.out - 0.2)) : Math.max(c.out + d, c.in + 0.2));
         layout(); cut.changed = true; save(); foot();
         rv._peek({url: pv.video, t: c[k], pv, label: `${k === 'in' ? 'Начало' : 'Конец'} куска ${sel + 1} · исходник ${t1(c[k])}`, edge: true});
-        clearTimeout(h._pk); h._pk = setTimeout(() => rv._peek(null), 1200);
+        clearTimeout(h._pk); h._pk = setTimeout(() => joint(sel, k), 450);
         $('#eComp')?._upd?.();
       };
     });
@@ -2753,7 +2780,7 @@ async function renderVersions(id, data) {
             ${sel === cur && ed && !data.cut ? '<button type="button" class="linkbtn small" id="kAsk">Разложить на куски</button>' : ''}
             ${sel === cur && CUT[id] ? `<button type="button" class="kswitch" id="kSw" role="switch" aria-checked="${kOn}"><span>Нарезка</span><i></i></button>` : ''}</div>
           <div class="tlbox"><div class="tlscroll" id="tlScroll"><div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="ruler" id="pRuler" aria-label="Линейка времени — тяните, чтобы перемотать"></div><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div></div>
-          <div class="khints"><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>
+          <div class="khints"><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать, отпустил — играет склейка</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>
           ${sel === cur && ed ? `<form class="ecomp2" id="eComp"><span class="etgt" id="eT">На 0:00</span><button type="button" class="ex" id="eX" hidden aria-label="Снять выбор куска">✕</button>
             <textarea id="eText" rows="1" placeholder="Что поменять в этом месте"></textarea>
             <button type="button" class="btn ic" id="eMic" title="Сказать голосом" aria-label="Сказать голосом">🎙</button><button type="button" class="btn ic" id="ePt" title="Точка на кадре" aria-label="Точка на кадре">◎</button><button type="submit" class="btn primary">Добавить</button></form><span class="small muted" id="eHint"></span>`
