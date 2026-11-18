@@ -148,7 +148,8 @@ function cutView(dir) {
   // them over the live cut while the render is still the old one.
   const g = readJson(join(dir, 'graphics.json'), null);
   const graphics = Array.isArray(g?.items) ? g.items.filter((x) => x.layer && existsSync(join(dir, x.layer))).map((x) => ({...x, url: stamp(join(dir, x.layer))})) : null;
-  return {...cut, graphics, changed: !same(cut, applied), preview: pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
+  const lastV = versionDirs(dir).at(-1), mont = lastV && readJson(join(dir, 'versions', lastV, 'stage.json'), null);
+  return {...cut, graphics, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
 }
 
 function versions(p, r) {
@@ -1137,17 +1138,24 @@ createServer(async (req, res) => {
     const vs = versionDirs(dir), v = `v${(Number((vs.at(-1) || 'v0').slice(1)) || 0) + 1}`;
     const last = vs.length ? readdirSync(join(dir, 'versions', vs.at(-1))).find((f) => /-v\d+\.mp4$/.test(f)) : null;
     const base = last ? last.replace(/-v\d+\.mp4$/, '') : basename(dir).replace(/^\d+-/, '');
-    const job = {state: 'run', v, step: 'склеиваю куски', at: Date.now()};
+    const job = {state: 'run', v, step: 'готовлю', at: Date.now()};
     MONTAGE.set(key, job);
     const sh = (args, step) => new Promise((ok, no) => { job.step = step; const c = spawn(args[0], args.slice(1), {cwd: BOT, stdio: ['ignore', 'ignore', 'pipe']}); let err = ''; c.stderr.on('data', (d) => (err = (err + d).slice(-600))); c.on('close', (code) => (code ? no(new Error(`${step}: ${err.trim().split('\n').pop() || code}`)) : ok())); });
+    // From the source's light copy (web/preview.mjs, already made for the player): 720p, a few seconds.
+    // The full-quality join (scripts/cut.mjs cut → sources/cut.mov) is left to the graphics build.
+    const cut = readJson(join(dir, 'cut.json'), {});
+    const pv = previewOf(join(dir, cut.source || ''), {rotate: Number(cut.rotate) || 0});
     (async () => {
-      await sh(['node', 'scripts/cut.mjs', dir, 'cut'], 'склеиваю куски');
-      await sh(['node', 'scripts/cut.mjs', dir, 'words'], 'слова по новой нарезке');
+      if (!pv?.video) throw new Error('лёгкая копия исходника ещё готовится — через минуту');
       if (existsSync(join(dir, 'graphics.json'))) await sh(['node', 'scripts/layers.mjs', dir, 'place'], 'переношу графику');
       const vdir = join(dir, 'versions', v);
       mkdirSync(vdir, {recursive: true});
-      await sh(['ffmpeg', '-v', 'error', '-y', '-i', join(dir, 'sources', 'cut.mov'), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', join(vdir, `${base}-${v}.mp4`)], 'записываю версию');
-      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString()});
+      // One input per clip, each seeked straight to its start: nothing before it is decoded.
+      const ins = cut.clips.flatMap((c) => ['-ss', String(c.in), '-t', String(Math.round((c.out - c.in) * 1000) / 1000), '-i', pv.video]);
+      const joins = cut.clips.map((c, i) => `[${i}:v][${i}:a]`).join('');
+      await sh(['ffmpeg', '-v', 'error', '-y', ...ins, '-filter_complex', `${joins}concat=n=${cut.clips.length}:v=1:a=1[v][a]`, '-map', '[v]', '-map', '[a]',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '22', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(vdir, `${base}-${v}.mp4`)], 'склеиваю куски');
+      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString(), clips: cut.clips.map((c) => ({in: c.in, out: c.out}))});
       Object.assign(job, {state: 'done', step: 'готово'});
     })().catch((e) => Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}));
     return json(200, job);
