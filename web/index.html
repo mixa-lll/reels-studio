@@ -2509,6 +2509,9 @@ async function stageCut(id, data) {
   if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, {once: true});
 }
 
+// Which version the «Монтаж» player shows, per reel: the current one unless another variant is picked.
+const VIEWV = {};
+
 // The rough cut right in «Сборка» (scripts/cut.mjs), when «Нарезка» is on: the track under the
 // player is the clips themselves, each with its frames. Hover names the clip; a press picks it and
 // puts the video on that frame; the picked clip gets two handles — dragging one trims the clip by
