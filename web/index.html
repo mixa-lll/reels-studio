@@ -537,7 +537,8 @@
   /* Player: controls show on hover (CapCut/YouTube): big ▶ when paused, a bar with scrub and buttons. */
   .bplay .vwrap { overflow: hidden; border-radius: 14px; }
   .vwrap:hover video#rv { filter: brightness(.9); }
-  .ppeek { position: absolute; inset: 0; z-index: 2; background: #000; pointer-events: none; }
+  .ppeek { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  .ppeek i:not([style*="url"]) { display: none; }
   .ppeek i, .ppeek video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background-repeat: no-repeat; display: block; }
   .ppeek video { opacity: 0; } .ppeek video.on { opacity: 1; }
   .ppeek.edge::after { content: ''; position: absolute; inset: 0; border: 4px solid #141413; border-radius: 14px; }
@@ -2760,8 +2761,22 @@ async function renderVersions(id, data) {
   // under the mouse, the playhead and the marks: green changed in this version, yellow next.
   let rv = $('#rv');
   if (rv && oldRv && oldRv.getAttribute('src') === rv.getAttribute('src')) { rv.replaceWith(oldRv); rv = oldRv; }
+  // The same version from its light copy now: carry the second over.
+  else if (rv && oldRv && oldRv.isConnected === false && VIEWV[id] === oldRv._v) { const t = oldRv.currentTime; rv.addEventListener('loadedmetadata', () => { rv.currentTime = t; }, {once: true}); }
+  if (rv) rv._v = VIEWV[id];
   const igCaption = (Array.isArray(data.publish?.captions) && (data.publish.captions.find((c) => /insta/i.test(c.platform || '')) || data.publish.captions[0])?.text) || section(data.readme, 'Подпись').trim() || section(data.readme, 'Caption').trim();
   if (rv) wirePlayer(rv, sel, cur, edits, open, igCaption);
+  // A fresh version has no light copy and strip yet (web/preview.mjs makes them in a minute or two):
+  // look again every few seconds and redraw once they are there, so the track gets its frames.
+  if (rv && sel && !sel.preview?.sprite) {
+    const again = async () => {
+      if (!rv.isConnected || $('#rv') !== rv) return;
+      const d = await api('/api/reel?reel=' + encodeURIComponent(id)).catch(() => null);
+      const v = d?.versions.find((x) => x.v === sel.v);
+      if (v?.preview?.sprite) renderVersions(id, d); else setTimeout(again, 6000);
+    };
+    setTimeout(again, 6000);
+  }
   if (rv && kOn) wireClips(id, rv, CUT[id], open, ed, foot);
   const form = $('#eComp');
   if (rv && form) wireEdits(id, rv, form, cur, nextV);
