@@ -138,7 +138,8 @@ function place() {
   const helpers = [...s.matchAll(/(\w+)\s*=\s*k\((\w+)\)/g)];
   const names = ['s', ...helpers.map((m) => m[1])];
   s = s.replace(new RegExp(`\\b(${names.join('|')})\\(([\\d.]+)\\)`, 'g'), (m, f, x) => `${f}(${r2(W(Number(x)))})`);
-  s = s.replace(/<At(\s+i=\{\d+\})?\s+a=\{([\d.]+)\}\s+b=\{([\d.]+)\}>/g, (m, i, a, b) => `<At a={${r2(W(Number(a)))}} b={${r2(W(Number(b)))}}>`);
+  // a and b of every block, each on its own: one of them may be a constant (a={G0} b={37.4}, b={TOTAL})
+  s = s.replace(/<At\b[^>]*>/g, (tag) => tag.replace(/\b([ab])=\{([\d.]+)\}/g, (m, k, x) => `${k}={${r2(W(Number(x)))}}`));
   // the constants the helpers start from (const G0 = 13.11, g = k(G0))
   for (const [, , base] of helpers) s = s.replace(new RegExp(`\\b(const\\s+${base}\\s*=\\s*)([\\d.]+)`), (m, h, x) => h + r2(W(Number(x))));
   s = s.replace(/(export\s+const\s+TOTAL\s*=\s*)([\d.]+)/, (m, h) => h + r2(ntot));
