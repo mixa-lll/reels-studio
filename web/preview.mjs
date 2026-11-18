@@ -11,6 +11,8 @@ import {ffCommand, videoInfo} from '../bot/media.mjs';
 
 const COLS = 10, W = 90, H = 160;
 const queue = [], queued = new Set();
+// A file ffmpeg could not read (a render cut short by a full disk): not retried until it changes.
+const failed = new Map();
 let busy = false;
 
 const dirOf = (video) => join(dirname(video), '.preview');
@@ -29,6 +31,7 @@ export function previewOf(video, {rotate = 0} = {}) {
   } catch {}
   // A video still being written (a render, a copy) gets its preview once it has settled.
   try { if (Date.now() - statSync(video).mtimeMs < 15000) return null; } catch { return null; }
+  try { if (failed.get(video) === statSync(video).mtimeMs) return null; } catch {}
   if (!queued.has(video)) { queued.add(video); queue.push({video, rotate}); next(); }
   return null;
 }
@@ -66,11 +69,11 @@ async function make(video, rotate = 0) {
   const d = dirOf(video), n = name(video);
   mkdirSync(d, {recursive: true});
   const info = videoInfo(video);
-  if (!info) return;
+  if (!info) { failed.set(video, statSync(video).mtimeMs); return; }
   const tmp = join(d, `${n}.tmp.mp4`);
   const ok = await run(['-y', '-v', 'error', '-i', video, '-vf', `${{90: 'transpose=1,', [-90]: 'transpose=2,', 180: 'hflip,vflip,'}[rotate] || ''}scale='min(720,iw)':-2`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24',
     '-g', '15', '-keyint_min', '15', '-sc_threshold', '0', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', tmp]);
-  if (!ok) { rmSync(tmp, {force: true}); return; }
+  if (!ok) { rmSync(tmp, {force: true}); failed.set(video, statSync(video).mtimeMs); return; }
   renameSync(tmp, join(d, `${n}.mp4`));
   // The strip: a frame every 0.5 s (every 1 s for long videos), COLS per row.
   const every = info.duration > 240 ? 1 : 0.5, count = Math.ceil(info.duration / every), rows = Math.ceil(count / COLS);

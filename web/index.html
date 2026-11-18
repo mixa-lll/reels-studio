@@ -492,6 +492,8 @@
   .igl .pv-full, .igl .pv-nav { display: none; } .igl .pv-capt { bottom: 3%; } .igl .pv-rr { bottom: 10%; }
   .igbtn { position: absolute; top: 10px; right: 10px; z-index: 5; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 0; background: rgba(0,0,0,.55); color: #fff; cursor: pointer; }
   .igbtn.on { background: #fff; color: #000; }
+  .vbad { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #fff; font-size: 14px; line-height: 1.5; }
+  .vwrap { position: relative; }
   .ctl { position: relative; height: 56px; margin-top: 8px; cursor: pointer; user-select: none; }
   .ctl .bhead, .ctrim .bhead { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; background: #E5484D; border-radius: 2px; pointer-events: none; z-index: 3; }
   .cblk { position: absolute; top: 0; bottom: 0; padding: 0; border: 0; border-left: 2px solid #fff; background: #D9D9D6 no-repeat; cursor: pointer; overflow: hidden; }
@@ -2123,6 +2125,9 @@ function fitPlayer(v) {
 function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._ac?.abort(); rv._ac = new AbortController();
   fitPlayer(rv);
+  // A file that does not open (a render cut short, e.g. by a full disk) says so instead of a black box.
+  const bad = () => { const w = rv.closest('.vwrap'); if (w && !w.querySelector('.vbad')) w.insertAdjacentHTML('beforeend', `<div class="vbad">Файл ${esc(sel.v)} не открывается — похоже, рендер оборвался. Попросите в чате пересобрать ${esc(sel.v)}.</div>`); };
+  if (rv.error) bad(); else rv.addEventListener('error', bad, {signal: rv._ac.signal});
   const on = {signal: rv._ac.signal}, tl = $('#bStrip'), pv = sel.preview;
   const dur = () => (Number.isFinite(rv.duration) && rv.duration) || 0;
   const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
