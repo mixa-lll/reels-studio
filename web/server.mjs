@@ -22,6 +22,7 @@ import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, exist
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
+import {dropOrphans, previewOf} from './preview.mjs';
 import {bestVideo, linkPath, projectPath, readLink, signLink} from './dllink.mjs';
 import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
@@ -147,7 +148,13 @@ function versions(p, r) {
     const variant = readJson(join(vdir, 'variant.json'), null)?.label || null;
     // When the version was made: its own files, not the folder — cleaning a version touches the folder.
     const made = readdirSync(vdir).filter((f) => !/^(ARCHIVED|variant)\.json$|^project-snapshot$/.test(f)).map((f) => statSync(join(vdir, f)).mtimeMs);
-    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, archived, variant, at: made.length ? Math.min(...made) : statSync(vdir).mtimeMs};
+    // The player's light copy and frame strip (web/preview.mjs), made in the background.
+    dropOrphans(vdir);
+    const play = files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name) && !/^raw/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
+    const pv = play && previewOf(join(vdir, play.name));
+    const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
+    const preview = pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null;
+    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, preview, archived, variant, at: made.length ? Math.min(...made) : statSync(vdir).mtimeMs};
   }).reverse();
 }
 
@@ -1504,7 +1511,9 @@ createServer(async (req, res) => {
     if (f && !isEditor(me) && !f.includes('/inbox/')) return res.writeHead(403).end();
     if (!f) return res.writeHead(404).end();
     if (url.searchParams.has('dl')) log(me.name, `скачал ${basename(f)}`);
-    return sendFile(req, res, f, url.searchParams.has('dl') ? {'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`} : {});
+    // A preview link carries its file's time (&m=), so the browser may keep it.
+    const keep = url.searchParams.has('m') ? {'cache-control': 'private, max-age=604800, immutable'} : {};
+    return sendFile(req, res, f, url.searchParams.has('dl') ? {'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`} : keep);
   }
   res.writeHead(404).end();
 }).listen(PORT, '127.0.0.1', () => console.log(`reels web on 127.0.0.1:${PORT}`));
