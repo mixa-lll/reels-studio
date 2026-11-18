@@ -259,6 +259,15 @@
   .ds-outs { display: flex; gap: 20px; flex-wrap: wrap; } .ds-outs figure { margin: 0; display: flex; flex-direction: column; gap: 8px; width: 200px; } .ds-outs figcaption { font-size: 13px; color: var(--muted); }
   .ds-out { position: relative; overflow: hidden; border-radius: 14px; aspect-ratio: 9/16; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); } .ds-outs figure:first-child { width: 160px; }
   iframe.ds-lib { height: 80vh; }
+  .ds-nav .ds-ng { font-size: 11.5px; color: var(--muted); padding: 14px 10px 4px; } .ds-nav .ds-ng:first-child { padding-top: 0; }
+  .ds-kit { display: block; }
+  .ds-zt { display: inline-flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--ink2); cursor: pointer; margin-top: 10px; } .ds-zt input { accent-color: var(--ink); }
+  .ds-mark { height: 120px; border-radius: 10px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); } .ds-mark svg { width: 76%; max-height: 64%; height: auto; }
+  .ds-rules { margin: 0; padding: 0; list-style: none; counter-reset: r; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .ds-rules li { counter-increment: r; display: flex; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; font-size: 14px; line-height: 1.45; }
+  .ds-rules li::before { content: counter(r); flex: none; width: 22px; height: 22px; border-radius: 6px; background: #EE4224; color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+  .ds-tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.45; } .ds-tbl th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12.5px; padding: 0 12px 10px 0; } .ds-tbl td { padding: 14px 12px 14px 0; border-top: 1px solid var(--line); vertical-align: top; } .ds-tbl td:first-child { font-weight: 600; white-space: nowrap; }
+  .ds-open { margin: 0; padding: 0 0 0 18px; color: var(--ink2); font-size: 14px; line-height: 1.7; }
   .ds-empty { margin: 32px 0; padding: 32px; border: 1px dashed var(--line); border-radius: 14px; } .ds-empty h2 { margin: 0 0 8px; font-size: 20px; } .ds-empty p { margin: 0; color: var(--ink2); line-height: 1.5; max-width: 560px; }
   .ds-chat { flex: none; width: 400px; border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: #fff; }
   @media (max-width: 900px) { .ds-nav { display: none; } .ds-inner { padding: 20px 16px 60px; } .ds-head { flex-direction: column; align-items: stretch; } .ds-row { flex-direction: column; align-items: stretch; gap: 12px; } .ds-meta { width: auto; } .ds-chat { position: fixed; inset: 0; width: auto; z-index: 50; } .ds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } .ds-chip { height: 72px; } }
@@ -2998,7 +3007,7 @@ async function vMemHub() {
     card('chat2', 'Вопросы клиентов', String(m.questions.length), Math.min(1, m.questions.length / 10), 'Что спрашивают в переписках и звонках — из них идеи выпусков', m.questions.length ? '' : 'Бросьте скриншот переписки', '#/memory/questions', ''),
     card('text', 'Голос и стиль', m.voice ? 'заполнен' : 'пусто', m.voice ? 1 : 0, 'Как мы говорим и как никогда', m.voice ? '' : 'Не описан — ответьте на вопрос о голосе', '#/memory/voice', ''),
     card('flag', 'Правила', String(m.rules), Math.min(1, m.rules / 8), 'Что нельзя говорить и показывать', '', '#/memory/rules', ''),
-    card('eye', 'Дизайн', tok?.site ? 'с сайта' : tok || m.ds ? 'есть' : 'пусто', tok || m.ds ? 1 : 0, tok ? `${(tok.colors || []).length} цветов, ${(tok.fonts || [])[0]?.family || 'шрифт'}` : 'Цвета, шрифт, скругления для плашек', tok || m.ds ? '' : 'Возьмите с сайта одной кнопкой', '#/memory/ds', tok?.site ? '' : 'Взять с сайта'),
+    card('eye', 'Дизайн', m.ds && /STYLE\.md/.test(tok?.method || '') ? 'стиль рилсов' : tok?.site ? 'с сайта' : tok || m.ds ? 'есть' : 'пусто', tok || m.ds ? 1 : 0, tok ? `${(tok.colors || []).length} цветов, ${(tok.fonts || [])[0]?.family || 'шрифт'}` : 'Цвета, шрифт, скругления для плашек', tok || m.ds ? '' : 'Возьмите с сайта одной кнопкой', '#/memory/ds', tok?.site ? '' : 'Взять с сайта'),
   ];
   const holes = gaps.length + (m.voice ? 0 : 1);
   view.innerHTML = `<div class="work"><div style="flex: 1; min-width: 0; overflow-y: auto; padding: 22px 32px 24px 40px; display: flex; flex-direction: column; gap: 18px">
@@ -3112,10 +3121,16 @@ async function vAsk(start) {
 const DS_NAV = [['ds-colors', 'Цвета'], ['ds-type', 'Шрифты'], ['ds-shape', 'Форма'], ['ds-ui', 'Кнопки и метки'], ['ds-brand', 'Логотип и фото'], ['ds-out', 'В выпусках'], ['ds-lib', 'Компоненты рилсов']];
 const dsInk = (hex) => { const n = parseInt(String(hex).replace('#', '').padEnd(6, '0').slice(0, 6), 16); const l = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; return l > 0.6 ? '#171717' : '#fff'; };
 const dsDate = (d) => (d ? new Date(d).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}) : '');
+// With a reels style kit (web/dskit.mjs) the tab reads as: the base, the techniques, the rules.
+const DS_KIT_NAME = {frame: 'Кадр и зоны', titles: 'Титры', cards: 'Перебивки', map: 'Карта трасс', grade: 'Обработка', motion: 'Движение'};
+const dsNav = (kit) => kit ? [['Основа', [['ds-colors', 'Цвета'], ['ds-type', 'Шрифты'], ['ds-shape', 'Форма'], ['ds-brand', 'Знак и съёмка']]],
+  ['Приёмы', kit.sections.map((x) => ['ds-k-' + x.id, DS_KIT_NAME[x.id] || x.title])],
+  ['Правила', [['ds-rules', 'Главное'], ...(kit.rubrics ? [['ds-rub', 'По рубрикам']] : []), ...(kit.open.length ? [['ds-open', 'Не решено']] : [])]]]
+  : [['', DS_NAV]];
 function dsSection(id, h, lead, body) {
   return `<section class="ds-sec" id="${id}"><div class="ds-sh"><h2>${h}</h2>${lead ? `<p>${lead}</p>` : ''}</div>${body}</section>`;
 }
-function dsBody(k, m) {
+function dsBody(k, m, kit) {
   const tok = normTok(m.tokens);
   if (!tok) return `<div class="ds-empty"><h2>Дизайн-системы ещё нет</h2><p>Claude откроет сайт, снимет цвета, шрифты, скругления, кнопки, метки, логотип и стиль фото и разложит здесь по разделам — так же, как устроены страницы дизайн-систем.</p></div>`;
   const C = (role, d) => tok.colors.find((c) => c.use !== false && new RegExp(role, 'i').test(c.role + ' ' + c.name))?.hex || d;
@@ -3149,6 +3164,21 @@ function dsBody(k, m) {
     <figure><div class="ds-out" style="background: ${esc(bg)}; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; color: ${esc(ink)}; aspect-ratio: 4/5"><span style="font-size: 11px; opacity: .6">1 / 6</span><b style="font-family: ${ff(font)}; font-weight: 600; letter-spacing: -0.04em; font-size: 22px; line-height: 1.05">Обложка карусели</b><span style="color: ${esc(acc)}; font-weight: 700">${esc(prices[0]?.value || 'от … ₾')}</span></div><figcaption>Карусель</figcaption></figure>
     <figure><div class="ds-out" style="background: ${esc(ink)}; padding: 14px; display: flex; flex-direction: column; gap: 8px; color: #fff; font-size: 12.5px; aspect-ratio: 4/5"><span style="opacity: .6; font-size: 11px">прайс</span>${(prices.length ? prices : [{text: 'Цена из Фактов', value: '…'}]).map((x) => `<span style="display: flex; gap: 8px; border-bottom: 1px dashed rgba(255,255,255,.2); padding-bottom: 6px"><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.text)}</span><b>${esc(x.value)}</b></span>`).join('')}</div><figcaption>Прайс</figcaption></figure></div>`;
   const lib = k.ds ? `<iframe class="dsf ds-lib" src="${k.ds.url}" sandbox="allow-scripts" title="Компоненты рилсов"></iframe>` : `<div class="ds-empty" style="margin: 0"><p>Библиотеки компонентов ещё нет. Попросите Claude собрать её из рилсов — кнопка «Изменить словами».</p></div>`;
+  if (kit) {
+    const sign = `<div class="ds-two"><div class="ds-card"><div class="ds-mark" style="background: #F5F1EA; color: #151612" title="Связка «знак слева»">${kit.marks.lock}</div><div class="ds-mark" style="background: #fff; color: #151612" title="Знак">${kit.marks.mark}</div>${tok.logo ? `<p>${esc(tok.logo)}</p>` : ''}</div>
+      ${tok.photo ? `<div class="ds-card"><div class="ds-mark" style="grid-column: 1 / -1; background: center / cover url('/ds/${encodeURIComponent(P)}/img/shot.jpg')"></div><p>${esc(tok.photo)}</p></div>` : ''}</div>`;
+    const rub = kit.rubrics ? `<table class="ds-tbl"><thead><tr>${kit.rubrics.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${kit.rubrics.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '';
+    return [
+      dsSection('ds-colors', 'Цвета', 'Нажмите на цвет, чтобы скопировать код.', colors),
+      dsSection('ds-type', 'Шрифты', 'Один шрифт — Geist. Контраст весов 400 и 800 вместо второго шрифта; обычный регистр, без капса и разрядки.', type),
+      dsSection('ds-shape', 'Форма', 'Плашки плоские и непрозрачные, без теней и контуров.', shape),
+      dsSection('ds-brand', 'Знак и съёмка', 'Целиком знак — только на обложке и в финале; внутри рилса работают его части: срез 12°, кабинка, трос, красный квадрат.', sign),
+      ...kit.sections.map((x) => dsSection('ds-k-' + x.id, esc(DS_KIT_NAME[x.id] || x.title), esc(x.lead), `<div class="ds-kit" data-kit="${esc(x.id)}"></div>`)),
+      dsSection('ds-rules', 'Главное', 'Claude проверяет каждый рилс по этим правилам.', `<ol class="ds-rules">${kit.rules.map((r) => `<li>${esc(r)}</li>`).join('')}</ol>`),
+      rub ? dsSection('ds-rub', 'По рубрикам', 'Отправная точка, а не жёсткий шаблон.', rub) : '',
+      kit.open.length ? dsSection('ds-open', 'Ещё не решено', 'Пока не выбрано — Claude берёт любой из вариантов и спрашивает.', `<ul class="ds-open">${kit.open.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>`) : '',
+    ].join('');
+  }
   return [
     dsSection('ds-colors', 'Цвета', 'Нажмите на цвет, чтобы скопировать код.', colors),
     dsSection('ds-type', 'Шрифты', '', type),
@@ -3267,21 +3297,30 @@ function igBind(redraw) {
 
 async function vDs() {
   title('Дизайн-система');
-  const [k, mem] = await Promise.all([api('/api/knowledge'), api('/api/memory')]);
+  const [k, mem, kit] = await Promise.all([api('/api/knowledge'), api('/api/memory'), api('/api/ds/kit').then((r) => r.kit).catch(() => null)]);
   const tok = normTok(mem.tokens);
   const site = tok?.site || mem.links[0] || '';
   const ed = canEdit();
   view.innerHTML = `<div class="ds-wrap">
-    <nav class="ds-nav" aria-label="Разделы дизайн-системы">${DS_NAV.map(([id, t]) => `<a href="#${id}" data-ds="${id}">${t}</a>`).join('')}</nav>
+    <nav class="ds-nav" aria-label="Разделы дизайн-системы">${dsNav(kit).map(([g, list]) => `${g ? `<span class="ds-ng">${g}</span>` : ''}${list.map(([id, t]) => `<a href="#${id}" data-ds="${id}">${t}</a>`).join('')}`).join('')}</nav>
     <div class="ds-main" id="dsMain"><div class="ds-inner">
-      <header class="ds-head"><div style="flex: 1; min-width: 0"><div class="ds-h1" role="heading" aria-level="1">Дизайн-система</div>
-        <p>${tok?.site ? `Снято с <a href="${esc(tok.site)}" target="_blank" rel="noopener">${esc(tok.site.replace(/^https?:\/\//, ''))}</a>${tok.takenAt ? ' · ' + dsDate(tok.takenAt) : ''}. Claude берёт эти цвета и шрифты для каждого выпуска.` : 'Цвета, шрифты и формы, по которым Claude собирает выпуски.'}</p></div>
-        ${ed ? `<div class="row" style="gap: 8px; flex: none"><button type="button" class="ln-btn" id="dsTake">${tok?.site ? 'Обновить с сайта' : 'Взять с сайта'}</button><button type="button" class="ln-btn p" id="dsChat">Изменить словами</button></div>` : ''}</header>
-      ${ed ? `<div class="ds-site" id="dsSiteRow" hidden><input class="f" id="dsSite" value="${esc(site)}" placeholder="Сайт: mygudauri.org"><button type="button" class="ln-btn p" id="dsGo">Снять дизайн</button></div>` : ''}
-      ${dsBody(k, mem)}
+      <header class="ds-head"><div style="flex: 1; min-width: 0"><div class="ds-h1" role="heading" aria-level="1">${kit ? 'Стиль рилсов' : 'Дизайн-система'}</div>
+        ${kit ? `<p>Действует с ${dsDate(kit.updated)}. Claude собирает каждый рилс по этой странице и правилам из <code>design-system/STYLE.md</code>.${k.ds ? ` <a href="${k.ds.url}" target="_blank" rel="noopener">Страница стиля целиком ↗</a>` : ''}</p>
+        <label class="ds-zt"><input type="checkbox" id="dsZones"> Показать зоны интерфейса и лица на кадрах</label></div>` : `<p>${tok?.site ? `Снято с <a href="${esc(tok.site)}" target="_blank" rel="noopener">${esc(tok.site.replace(/^https?:\/\//, ''))}</a>${tok.takenAt ? ' · ' + dsDate(tok.takenAt) : ''}. Claude берёт эти цвета и шрифты для каждого выпуска.` : 'Цвета, шрифты и формы, по которым Claude собирает выпуски.'}</p></div>`}
+        ${ed ? `<div class="row" style="gap: 8px; flex: none">${kit ? '' : `<button type="button" class="ln-btn" id="dsTake">${tok?.site ? 'Обновить с сайта' : 'Взять с сайта'}</button>`}<button type="button" class="ln-btn p" id="dsChat">Изменить словами</button></div>` : ''}</header>
+      ${ed && !kit ? `<div class="ds-site" id="dsSiteRow" hidden><input class="f" id="dsSite" value="${esc(site)}" placeholder="Сайт: mygudauri.org"><button type="button" class="ln-btn p" id="dsGo">Снять дизайн</button></div>` : ''}
+      ${dsBody(k, mem, kit)}
     </div></div>
     <aside class="ds-chat" id="dsChatPane" hidden aria-label="Чат дизайн-системы"><div class="chead"><h2 style="flex: 1">Изменить словами</h2><button type="button" class="ln-btn g" id="dsClose" aria-label="Закрыть">✕</button></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   wireCopy(view);
+  // Each technique's frames in a shadow root with the style page's own CSS.
+  if (kit) {
+    view.querySelectorAll('[data-kit]').forEach((host) => {
+      const sec = kit.sections.find((x) => x.id === host.dataset.kit);
+      host.attachShadow({mode: 'open'}).innerHTML = `<style>${kit.css}:host{display:block;font-family:Geist,system-ui,sans-serif;color:#151612}.kit{display:flex;flex-direction:column;gap:28px}.kit h3{font-size:16px;font-weight:600;letter-spacing:-.01em;margin:8px 0 -8px}figcaption b{font-size:14px;font-weight:600}figcaption{font-size:13px}</style><div class="kit">${sec.html}</div>`;
+    });
+    $('#dsZones')?.addEventListener('change', (e) => view.querySelectorAll('[data-kit]').forEach((h) => h.shadowRoot.querySelector('.kit').classList.toggle('zones', e.target.checked)));
+  }
   const wrap = view.querySelector('.ds-wrap');
   const fit = () => { if (!wrap.isConnected) return removeEventListener('resize', fit); wrap.style.flex = 'none'; wrap.style.height = Math.max(400, innerHeight - wrap.getBoundingClientRect().top) + 'px'; };
   fit(); addEventListener('resize', fit);
@@ -3296,8 +3335,8 @@ async function vDs() {
   const chat = () => { const p = $('#dsChatPane'); p.hidden = false; if (!box) { box = chatBox('_ds', {onDone: () => vDsRefresh()}); $('#chatHost').append(box); } return box; };
   $('#dsChat').onclick = () => { const p = $('#dsChatPane'); if (!p.hidden) return (p.hidden = true); chat(); };
   $('#dsClose').onclick = () => ($('#dsChatPane').hidden = true);
-  $('#dsTake').onclick = () => { const r = $('#dsSiteRow'); r.hidden = !r.hidden; if (!r.hidden) $('#dsSite').focus(); };
-  $('#dsGo').onclick = async () => {
+  if ($('#dsTake')) $('#dsTake').onclick = () => { const r = $('#dsSiteRow'); r.hidden = !r.hidden; if (!r.hidden) $('#dsSite').focus(); };
+  if ($('#dsGo')) $('#dsGo').onclick = async () => {
     const u = $('#dsSite').value.trim();
     if (!u) return $('#dsSite').focus();
     await post('/api/memory/set', {source: {kind: 'link', name: u + ' — дизайн'}});
