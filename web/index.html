@@ -802,6 +802,8 @@ const voiceBuf = (url) => {
   return VOICE.bufs.get(url);
 };
 // Where the source's frames come from for hover and trimming: the scrub copy once made, else the light copy.
+// Strip sheets already in the browser: only those may stand in for the exact frame (no empty flash).
+const SHEETS = new Set();
 const scrubSrc = (pv) => (pv.scrub ? {url: pv.scrub.video, pv: pv.scrub} : {url: pv.video, pv});
 const saveCut = async (id, cut, clips) => {
   try {
@@ -2283,14 +2285,15 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
       const g = Math.max(0, Math.min(p.n - 1, Math.round(t * p.fps))), sh = Math.min(p.sheets.length - 1, Math.floor(g / p.per));
       url = p.sheets[sh]; k = g - sh * p.per;
       // The sheets either side are fetched ahead, so a moving cursor never waits for one.
-      for (const j of [sh - 1, sh + 1]) if (p.sheets[j] && !(p._got ||= new Set()).has(j)) { p._got.add(j); new Image().src = p.sheets[j]; }
+      for (const j of [sh, sh - 1, sh + 1]) if (p.sheets[j] && !(p._got ||= new Set()).has(j)) { p._got.add(j); const im = new Image(); im.onload = () => SHEETS.add(im.src); im.src = new URL(p.sheets[j], location.href).href; }
     } else if (p?.sprite) { url = p.sprite; k = Math.max(0, Math.min(p.n - 1, Math.floor(t / p.every))); }
     else return;
-    el.style.backgroundImage = `url('${url}')`;
+    el.style.backgroundImage = `url('${url}')`; el._url = new URL(url, location.href).href;
     el.style.backgroundSize = `${p.cols * p.w * scale}px auto`;
     el.style.backgroundPosition = `${ox - (k % p.cols) * p.w * scale}px ${oy - Math.floor(k / p.cols) * p.h * scale}px`;
   };
-  const cover = (el, p, t) => { const w = el.clientWidth, h = el.clientHeight; if (!p || !w) return; const s = Math.max(w / p.w, h / p.h); frame(el, p, t, s, (w - p.w * s) / 2, (h - p.h * s) / 2); };
+  // Sized by its box (the <i> itself is display:none until it has a picture, so it measures 0).
+  const cover = (el, p, t) => { const box = el.parentElement || el, w = box.clientWidth, h = box.clientHeight; if (!p || !w) return; const s = Math.max(w / p.w, h / p.h); frame(el, p, t, s, (w - p.w * s) / 2, (h - p.h * s) / 2); };
   rv._cover = cover;
   // «Просмотр»: a frame over the video without moving it. Its own <video> (pkX, for the cut's source the
   // 360p scrub copy: a key frame every 5 frames) seeks at once and always to the latest spot — a seek
@@ -2311,15 +2314,18 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     if (pk._play && !pk._play.done && !o.edge && !o.own) return;
     pk.hidden = false; pk.classList.toggle('edge', !!o.edge); $('#pTag').textContent = o.label;
     if (o.own) { want = null; pkX.classList.remove('on'); return; }
-    pkV.classList.remove('on'); $('#pPeekB')?.classList.remove('on');
+    // The players' last frame (after ▶ stops) stays under until the exact frame lands on top of it.
     if (o.pv?.sprite || o.pv?.sheets) cover(pkS, o.pv, o.t); else pkS.style.backgroundImage = '';
-    if (pkX.getAttribute('src') !== o.url) { pkX.src = o.url; pkX._at = null; pkX.classList.remove('on'); }
-    else if (Math.abs(o.t - pkX.currentTime) > 0.5 && (o.pv?.sprite || o.pv?.sheets)) {
-      // A far jump: the old exact frame stays up — the new one usually lands within a frame; only if it
-      // is late does the strip's frame show instead (no blurry flash on every jump).
-      clearTimeout(pkX._late); const t = o.t; pkX._late = setTimeout(() => { if (want === t && !(pkX._at != null && Math.abs(pkX._at - t) < 0.03)) pkX.classList.remove('on'); }, 60);
-    }
+    const same = want != null && Math.abs(o.t - want) < 0.001 && (pkX.seeking || (pkX._at != null && Math.abs(pkX._at - o.t) < 0.03));
     want = o.t;
+    if (pkX.getAttribute('src') !== o.url) { pkX.src = o.url; pkX._at = null; pkX.classList.remove('on'); return; }
+    if (same) return;
+    if (pkX._at == null || Math.abs(o.t - pkX._at) > 0.5) {
+      // A far jump: the strip's frame (≤ 1/8 s off) answers at once if its sheet is in; the exact one
+      // replaces it. A close move keeps the sharp frame up — no blurry flash while moving slowly.
+      clearTimeout(pkX._late); const t = o.t;
+      pkX._late = setTimeout(() => { if (want === t && !(pkX._at != null && Math.abs(pkX._at - t) < 0.03) && SHEETS.has(pkS._url)) { pkX.classList.remove('on'); pkV.classList.remove('on'); $('#pPeekB')?.classList.remove('on'); } }, 16);
+    }
     pk._asked = performance.now();
     if (pkX.readyState >= 1 && !pkX.seeking) pkX.currentTime = want;
   };
@@ -2327,7 +2333,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     pkX.onseeked = () => {
       if (want == null) return;
       if (Math.abs(pkX.currentTime - want) > 0.03) pkX.currentTime = want;
-      else { pkX._at = pkX.currentTime; clearTimeout(pkX._late); pkX.classList.add('on'); pk._shown = performance.now(); }
+      else { pkX._at = pkX.currentTime; clearTimeout(pkX._late); pkX.classList.add('on'); pkV.classList.remove('on'); $('#pPeekB')?.classList.remove('on'); pk._shown = performance.now(); }
     };
     pkX.onloadedmetadata = () => { if (want != null) pkX.currentTime = want; };
   }
@@ -2343,7 +2349,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   // next) in the same layer, with sound, then the player returns to the version.
   rv._peekPlay = (url, segs, label, {edge = true, onTime, onEnd} = {}) => {
     pk._play?.kill?.();
-    rv.pause(); pk._play = null; peek({url, t: segs[0][0], label, edge, own: true});
+    rv.pause(); pk._play = null; peek({url, t: segs[0][0], label, edge, own: true}); $('#pPeekB')?.classList.remove('on');
     if (pkV.getAttribute('src') !== url) pkV.src = url;
     const vo = rv._voice, buf = vo && VOICE.ready.get(vo.url);
     const run = pk._play = {i: 0, alive: () => pk._play === run && !run.done, stop: () => { if (pk._play === run) { run.done = true; run.kill?.(); peek(null); } }};
@@ -2380,8 +2386,8 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
       if (pkB) pkB.ontimeupdate = () => run.step?.();
       run.kill = () => {
         nodes.forEach((n) => { try { n.stop(); } catch {} }); try { master.disconnect(); lim.disconnect(); } catch {}
-        if (pkB) { pkB.pause(); pkB.classList.remove('on'); pkB.ontimeupdate = null; }
-        if (front === pkB) { pkV.currentTime = pkB.currentTime; }
+        // Both paused where they are: whichever is in front keeps its frame up until the exact frame covers it.
+        if (pkB) { pkB.pause(); pkB.ontimeupdate = null; if (front !== pkB) pkB.classList.remove('on'); }
         run.kill = null;
       };
       const begin = () => {
@@ -2808,14 +2814,14 @@ function wireCutPlay(id, rv, cut, withGfx) {
   let cutRun = null;
   tl._cutPlay = () => {
     if (!clean && !(cut.changed && cut._montage)) return false;
-    if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; r.run.stop(); hideAll(); rv.currentTime = toV(r.ct); return true; }
+    if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; rv.currentTime = toV(r.ct); r.run.stop(); hideAll(); return true; }
     cutRun = null;
     const st = starts(); let ct = toC(rv.currentTime); if (ct >= total() - 0.1) ct = 0;
     const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
     const r = cutRun = {ct};
     r.run = rv._peekPlay(pv.video, segs, clean ? '▶ Нарезка · чистое видео' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
       onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); show(r.ct); },
-      onEnd: () => { if (cutRun === r) { cutRun = null; hideAll(); rv.currentTime = toV(r.ct); } }});
+      onEnd: () => { if (cutRun === r) { cutRun = null; rv.currentTime = toV(r.ct); hideAll(); } }});
     return true;
   };
   // «Нарезка» is the first stage — the footage alone. The version on the screen may already carry graphics,
