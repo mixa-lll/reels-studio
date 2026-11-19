@@ -679,8 +679,29 @@
   .kc .kw { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; background: rgba(255,255,255,.92); pointer-events: none; overflow: hidden; }
   .kc .kw span { position: absolute; top: 1px; border-top: 2px solid var(--ink); padding-top: 1px; font-size: 9.5px; line-height: 10px; white-space: nowrap; color: var(--ink); }
   .kc .kw span.b { top: 12px; }
-  .kjt { position: absolute; bottom: 2px; height: 40%; width: 2px; margin-left: -1px; background: #2F6FEB; border-radius: 1px; pointer-events: auto; z-index: 2; }
-  .kjt::after { content: '♪'; position: absolute; left: -4px; top: -13px; font-size: 10px; color: #2F6FEB; font-style: normal; }
+  /* The sound lane under the clips (step «Монтаж»): each clip's voice where it really plays — with J/L-cuts it
+     runs past its picture or starts before it; the overlap is hatched. Its joints drag on their own (J/L), the
+     picture joints above drag over the sound that stays (the picture laid over the neighbour's voice). */
+  .ptl.kmode { height: 96px; }
+  .ptl.kmode .pclips { bottom: 36px; }
+  .psnd { position: absolute; left: 0; right: 0; bottom: 0; height: 32px; contain: layout paint style; will-change: transform; }
+  .ksn { position: absolute; top: 0; bottom: 0; border-radius: 6px; background: #DCE5F8; overflow: hidden; transition: opacity .15s; }
+  .ksn.b { background: #D2DDF5; }
+  .ksn canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .ksn.dim { opacity: .45; } .ksn.on { box-shadow: inset 0 0 0 2px #2F6FEB; }
+  .ksx { position: absolute; top: 0; bottom: 0; pointer-events: none; z-index: 1; border-radius: 3px; background: repeating-linear-gradient(135deg, rgba(47,111,235,.28) 0 3px, transparent 3px 7px); }
+  .ksj, .kpj { position: absolute; top: -2px; bottom: -2px; width: 12px; margin-left: -6px; border: 0; padding: 0; background: transparent; cursor: ew-resize; z-index: 4; touch-action: none; }
+  .ksj::after, .kpj::after { content: ''; position: absolute; left: 5px; top: 2px; bottom: 2px; width: 2px; border-radius: 1px; background: #2F6FEB; opacity: 0; transition: opacity .1s; }
+  .kpj::after { background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+  .ksj.mv::after { opacity: .9; } .ksj.mv::before { content: '♪'; position: absolute; left: 1px; top: 1px; font-size: 10px; line-height: 1; color: #2F6FEB; }
+  .ksj:hover::after, .ksj.on::after, .kpj:hover::after, .kpj.on::after, .ksj:focus-visible::after, .kpj:focus-visible::after { opacity: 1; }
+  .ksj.on::after, .kpj.on::after { width: 3px; left: 4.5px; }
+  .ptl.trimming .psnd { opacity: .15; transition: opacity .18s; }
+  /* A clip carried to another place: it follows the cursor, a bar shows where it lands. */
+  .kc.pk { cursor: grab; }
+  .kc.mov { opacity: .85; z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,.28); transition: none; cursor: grabbing; }
+  .kins { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: #2F6FEB; z-index: 6; pointer-events: none; }
+  .ptl.moving, .ptl.moving * { cursor: grabbing !important; }
   .kp-aw { position: absolute; top: 84px; height: 44px; border: 2px solid #2F6FEB; border-radius: 6px; box-sizing: border-box; pointer-events: none; opacity: .35; }
   .kp-aw.moved { opacity: 1; }
   .kp-ah { position: absolute; top: 92px; height: 28px; width: 12px; margin-left: -6px; border: 0; padding: 0; border-radius: 4px; background: #2F6FEB; cursor: ew-resize; touch-action: none; z-index: 2; }
@@ -919,6 +940,9 @@ const voiceBuf = (url) => {
     .then((buf) => (VOICE.ready.set(url, buf), buf)).catch(() => (VOICE.bufs.delete(url), null)));
   return VOICE.bufs.get(url);
 };
+// The voice's loudness, 100 points a second (web/preview.mjs voiceOf): the wave of the sound lane and the panel.
+const loadPeaks = (cut) => cut._peaks ? Promise.resolve(cut._peaks) : !cut.voice?.peaks ? Promise.resolve(null)
+  : (cut._peaksP ||= fetch(cut.voice.peaks).then((r) => r.json()).then((j) => (cut._peaks = {rate: j.rate || 100, v: Uint8Array.from(atob(j.p), (ch) => ch.charCodeAt(0))})).catch(() => null));
 // The sound apart from the picture (scripts/join.mjs soundOf — the same rule): clip.jt moves the sound joint
 // after it, + its voice runs on under the next picture, − the next voice starts under this one; at most the
 // shorter clip minus 0.1 s, none after the last clip.
@@ -3103,7 +3127,7 @@ function wireCutPanel(id, rv, cut, ed, k) {
   const FLAG = {whole: 'чистый', slip: 'с оговоркой', cut: 'оборван'};
   let T = cut._takes || null, PK = cut._peaks || null, win = null;
   if (!T) api('/api/reel/takes?reel=' + encodeURIComponent(id)).then((j) => { T = cut._takes = j; }).catch(() => { T = cut._takes = {phrases: [], words: []}; }).then(() => { if (el.isConnected) { render(); k.layout(); } });
-  if (!PK && cut.voice?.peaks) fetch(cut.voice.peaks).then((r) => r.json()).then((j) => { PK = cut._peaks = {rate: j.rate || 100, v: Uint8Array.from(atob(j.p), (ch) => ch.charCodeAt(0))}; if (el.isConnected) wave(); }).catch(() => {});
+  if (!PK) loadPeaks(cut).then((p) => { PK = p; if (p && el.isConnected) wave(); });
   // The line of the script a clip is a take of: by its text, else by where it sits on the recording.
   const over = (c, t) => Math.max(0, Math.min(c.out, t.out) - Math.max(c.in, t.in));
   const phraseOf = (c) => {
@@ -3495,6 +3519,9 @@ function wireClips(id, rv, cut, open, ed, foot) {
   const clips = cut.clips;
   let sel = cut.sel ?? -1, hov = -1, saveT = null, trim = null, trimT = 0, panel = null;
   const srcDur = pv ? pv.n * pv.every : 1e9, scr = $('#tlScroll');
+  const snd = $('#pSnd');
+  let PK = cut._peaks || null;
+  if (!PK) loadPeaks(cut).then((p) => { PK = p; if (p && box.isConnected) layout(); });
   const sec = (d) => `${d.toFixed(1).replace('.', ',')} с`;
   const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
   const starts = () => clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + clips[i - 1].out - clips[i - 1].in : 0), a), []);
@@ -3506,8 +3533,11 @@ function wireClips(id, rv, cut, open, ed, foot) {
   const build = () => {
     box.innerHTML = clips.map((c, i) => `<div class="kc ${open.some((x) => x.clip === i + 1) ? 'nt' : ''}" data-k="${i}"><span class="kt"></span><b>${i + 1}</b></div>`).join('')
       + '<div class="ksrc" aria-hidden="true"><div class="ksf"></div><i class="ksh l"></i><i class="ksh r"></i><i class="kwin"></i></div>'
-      + (sel >= 0 ? `<i class="ksel"></i>${ed ? '<button type="button" class="khand l" data-h="in" aria-label="Начало куска — тяните"></button><button type="button" class="khand r" data-h="out" aria-label="Конец куска — тяните"></button>' : ''}` : '');
-    wireHands();
+      + (sel >= 0 ? `<i class="ksel"></i>${ed ? '<button type="button" class="khand l" data-h="in" aria-label="Начало куска — тяните"></button><button type="button" class="khand r" data-h="out" aria-label="Конец куска — тяните"></button>' : ''}` : '')
+      + (ed ? clips.slice(0, -1).map((c, i) => `<button type="button" class="kpj" data-p="${i}" aria-label="Склейка картинки ${i + 1}→${i + 2} — тяните: картинка сдвигается, звук остаётся на месте"></button>`).join('') : '');
+    if (snd) snd.innerHTML = clips.map((c, i) => `<div class="ksn ${i % 2 ? 'b' : ''}" data-s="${i}"><canvas></canvas></div>`).join('')
+      + clips.slice(0, -1).map((c, i) => `<i class="ksx" data-x="${i}" hidden></i>${ed ? `<button type="button" class="ksj" data-j="${i}" aria-label="Стык звука ${i + 1}→${i + 2} — тяните: звук раньше или позже склейки, стрелки — по кадру"></button>` : ''}`).join('');
+    wireHands(); wireJoints();
   };
   // Trimming: the track turns into the source around the picked clip — its neighbours fade out, the
   // frames are the source's own, the clip is a window on it at a fixed scale. Only the dragged edge
@@ -3538,7 +3568,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
     box.querySelectorAll('.kc').forEach((el) => {
       const i = Number(el.dataset.k), c = clips[i], w = Math.max(3, (c.out - c.in) * pps - 2);
       el.style.left = `${st[i] * pps + 1}px`; el.style.width = `${w}px`;
-      el.classList.toggle('dim', sel >= 0 && i !== sel); el.classList.toggle('hov', i === hov && i !== sel);
+      el.classList.toggle('dim', sel >= 0 && i !== sel); el.classList.toggle('hov', i === hov && i !== sel); el.classList.toggle('pk', ed && i === sel && clips.length > 1);
       const kt = el.firstChild, n = Math.max(1, Math.ceil(w / tw));
       if (kt.children.length !== n) kt.innerHTML = '<i></i>'.repeat(n);
       [...kt.children].forEach((x, j) => { x.style.width = `${tw}px`; if (pv) rv._cover(x, pv, c.in + ((j + 0.5) * (c.out - c.in)) / n); });
@@ -3559,8 +3589,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
       }
     });
     // Joints where the sound is moved off the picture (jt): a blue mark where the sound actually joins.
-    box.querySelectorAll('.kjt').forEach((m) => m.remove());
-    clips.forEach((c, i) => { const j = jtAt(clips, i); if (!j) return; const m = document.createElement('i'); m.className = 'kjt'; m.title = `Звук на стыке ${i + 1}→${i + 2}: ${j > 0 ? 'идёт дальше под следующий кадр' : 'следующий начинается раньше'} на ${Math.abs(j).toFixed(2).replace('.', ',')} с`; m.style.left = `${(st[i] + c.out - c.in + j) * pps}px`; box.append(m); });
+    sndLayout(st, pps);
     panel?.sync();
     if (sel < 0) return;
     const c = clips[sel], l = st[sel] * pps, w = (c.out - c.in) * pps;
@@ -3568,6 +3597,155 @@ function wireClips(id, rv, cut, open, ed, foot) {
     const hl = box.querySelector('.khand.l'), hr = box.querySelector('.khand.r');
     if (hl) { hl.style.left = `${l - 1}px`; hr.style.left = `${l + w - 11}px`; }
   };
+  // ── The sound lane under the clips: each clip's voice where it really plays. With a moved sound joint (jt)
+  // it runs past its picture or starts under the one before — the stretch where picture and sound come from
+  // different clips is hatched. The sound joints drag on their own (J/L-cuts); the picture joints above drag
+  // over the sound, which stays where it was (the picture laid over the neighbour's voice).
+  const sndOf = () => { const st = starts(); return clips.map((c, i) => { const d = c.out - c.in, s = i ? jtAt(clips, i - 1) : 0, e = jtAt(clips, i); return {a: st[i] + s, b: st[i] + d + e, from: c.in + s}; }); };
+  const waveTo = (cv, from, d, w) => {
+    const W = Math.max(8, Math.min(4096, Math.round(w))), key = `${from}|${d}|${Math.round(Math.log2(W) * 6)}|${!!PK}`;
+    if (cv._key === key) return;
+    cv._key = key;
+    const dpr = Math.min(2, devicePixelRatio || 1), H = 32;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const g = cv.getContext('2d'); g.scale(dpr, dpr); g.fillStyle = '#2F6FEB';
+    if (!PK) { g.globalAlpha = 0.4; g.fillRect(0, H / 2 - 0.5, W, 1); return; }
+    const per = Math.max(1, Math.round(((d * PK.rate) / W) * 2));
+    for (let x = 0; x < W; x += 2) {
+      const q = Math.floor((from + (x / W) * d) * PK.rate);
+      let m = 0; for (let z = Math.max(0, q); z < q + per && z < PK.v.length; z++) if (PK.v[z] > m) m = PK.v[z];
+      const h = Math.max(1.5, (m / 255) * (H - 6)); g.fillRect(x, (H - h) / 2, 1.4, h);
+    }
+  };
+  function sndLayout(st, pps) {
+    // A picture joint is grabbed only where both clips are wide enough to be clicked themselves (zoom in for the rest).
+    box.querySelectorAll('.kpj').forEach((h) => { const i = Number(h.dataset.p); h.style.left = `${(st[i] + clips[i].out - clips[i].in) * pps}px`; h.hidden = sel === i || sel === i + 1 || Math.min(clips[i].out - clips[i].in, clips[i + 1].out - clips[i + 1].in) * pps < 40; });
+    if (!snd) return;
+    const S = sndOf();
+    snd.querySelectorAll('.ksn').forEach((el) => {
+      const i = Number(el.dataset.s), p = S[i];
+      if (!p) return;
+      const w = Math.max(2, (p.b - p.a) * pps - 2);
+      el.style.left = `${p.a * pps + 1}px`; el.style.width = `${w}px`;
+      el.classList.toggle('dim', sel >= 0 && i !== sel); el.classList.toggle('on', i === sel);
+      waveTo(el.firstChild, p.from, p.b - p.a, w);
+    });
+    snd.querySelectorAll('.ksx').forEach((el) => { const i = Number(el.dataset.x), pj = st[i] + clips[i].out - clips[i].in, j = jtAt(clips, i); el.hidden = !j; if (j) { el.style.left = `${Math.min(pj, pj + j) * pps}px`; el.style.width = `${Math.abs(j) * pps}px`; } });
+    snd.querySelectorAll('.ksj').forEach((h) => {
+      const i = Number(h.dataset.j), j = jtAt(clips, i);
+      h.style.left = `${(st[i] + clips[i].out - clips[i].in + j) * pps}px`; h.classList.toggle('mv', !!j);
+      h.title = j ? `Звук ${i + 1}→${i + 2}: ${j > 0 ? 'идёт дальше под следующий кадр' : 'следующий начинается раньше'} на ${sec2(Math.abs(j))} · тяните; двойной клик — обратно на склейку` : `Стык звука ${i + 1}→${i + 2} — тяните, чтобы звук ушёл за склейку`;
+    });
+  }
+  const sec2 = (d) => `${d.toFixed(2).replace('.', ',')} с`;
+  const setJt = (c, j) => { if (Math.abs(j) < FR / 2) delete c.jt; else c.jt = Math.round(j * 10000) / 10000; };
+  const maxJt = (i) => Math.min(clips[i].out - clips[i].in, clips[i + 1].out - clips[i + 1].in) - 0.1;
+  const jtText = (i) => { const j = jtAt(clips, i); return !j ? `Звук ${i + 1}→${i + 2} — ровно на склейке` : j > 0 ? `Звук ${i + 1} идёт под кадр ${i + 2} ещё ${sec2(j)}` : `Звук ${i + 2} начинается под кадром ${i + 1} на ${sec2(-j)} раньше`; };
+  const tipAt = (h, text) => { const r = h.getBoundingClientRect(), tr = tl.getBoundingClientRect(); rv._tip((r.left + r.width / 2 - tr.left) / (tr.width / tl.offsetWidth), text); };
+  // A handle dragged along the track: dt — seconds of the cut under the cursor (Shift: 5× finer).
+  const dragX = (h, move, end) => {
+    h.onpointerdown = (e) => {
+      if (trim || e.button) return;
+      e.preventDefault(); e.stopPropagation(); try { h.setPointerCapture(e.pointerId); } catch {}
+      rv.pause();
+      const tr = tl.getBoundingClientRect(), scale = tr.width / tl.offsetWidth, pps = box.clientWidth / total(), x0 = e.clientX;
+      let moved = false;
+      tl._busy = true; h.classList.add('on'); $('#pSkl').hidden = true;
+      move.start?.();
+      h.onpointermove = (ev) => { ev.stopPropagation(); if (Math.abs(ev.clientX - x0) > 2) moved = true; if (moved) move(((ev.clientX - x0) / scale / pps) * (ev.shiftKey ? 0.2 : 1), pps); };
+      h.onpointerup = h.onpointercancel = (ev) => { ev.stopPropagation(); h.onpointermove = h.onpointerup = h.onpointercancel = null; h.classList.remove('on'); tl._busy = false; rv._tip(0, ''); rv._peek(null); end(moved); };
+    };
+  };
+  const touched = (i) => { cut.changed = true; save(); foot(); panel?.render(); $('#eComp')?._upd?.(); clearTimeout(touched.t); touched.t = setTimeout(() => joint(i, 'out'), 120); };
+  function wireJoints() {
+    // The sound joint after clip i: its jt — the voice later or earlier than the picture's joint.
+    snd?.querySelectorAll('.ksj').forEach((h) => {
+      const i = Number(h.dataset.j);
+      let j0 = 0;
+      const move = (dt, pps) => {
+        const max = maxJt(i);
+        if (max <= 0) return;
+        let j = Math.round((j0 + dt) / FR) * FR;
+        if (Math.abs(j * pps) < 5) j = 0; // back on the picture's joint: it snaps
+        setJt(clips[i], Math.max(-max, Math.min(max, j)));
+        layout(); tipAt(h, jtText(i));
+        // In the player: the picture under which the sound changes.
+        const jj = jtAt(clips, i), t = jj >= 0 ? clips[i + 1].in + jj : clips[i].out + jj;
+        rv._peek({...scrubSrc(pv), t: Math.max(0, t), label: jtText(i), edge: true});
+      };
+      move.start = () => { j0 = jtAt(clips, i); };
+      dragX(h, move, (moved) => { if (moved && Math.abs(jtAt(clips, i) - j0) > 1e-4) touched(i); });
+      h.ondblclick = (e) => { e.stopPropagation(); if (!jtAt(clips, i)) return; delete clips[i].jt; layout(); touched(i); };
+      h.onkeydown = (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault(); e.stopPropagation();
+        const max = maxJt(i); if (max <= 0) return;
+        setJt(clips[i], Math.max(-max, Math.min(max, jtAt(clips, i) + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1) * FR)));
+        layout(); tipAt(h, jtText(i)); touched(i);
+      };
+    });
+    // The picture joint after clip i rolled: clip i ends later (or earlier), clip i+1 starts as much later,
+    // the sound joint stays where it was — jt changes by the same amount the other way.
+    box.querySelectorAll('.kpj').forEach((h) => {
+      const i = Number(h.dataset.p), c = clips[i], n = clips[i + 1];
+      let o0 = 0, n0 = 0, j0 = 0;
+      const ok = (d) => { const out = o0 + d, nin = n0 + d, dc = out - c.in, dn = n.out - nin, j = j0 - d; return out <= srcDur && nin >= 0 && dc >= 0.2 && dn >= 0.2 && (Math.abs(j) < FR / 2 || Math.abs(j) <= Math.min(dc, dn) - 0.1); };
+      const text = (d) => `Картинка ${i + 1}→${i + 2}: склейка ${!d ? 'на месте' : `${d > 0 ? 'позже' : 'раньше'} на ${sec2(Math.abs(d))}`} · звук не двигается`;
+      const apply = (d) => { c.out = r2(o0 + d); n.in = r2(n0 + d); setJt(c, j0 - d); };
+      const move = (dt, pps) => {
+        let d = Math.round(dt / FR) * FR;
+        if (j0 && Math.abs((d - j0) * pps) < 5) d = j0; // picture back on the sound's joint: it snaps
+        while (d && !ok(d)) d = Math.abs(d) <= FR ? 0 : d - Math.sign(d) * FR;
+        apply(d); layout(); tipAt(h, text(d));
+        rv._peek({...scrubSrc(pv), t: d >= 0 ? c.out - FR : n.in, label: text(d), edge: true});
+      };
+      move.start = () => { o0 = c.out; n0 = n.in; j0 = jtAt(clips, i); };
+      dragX(h, move, (moved) => { if (moved && Math.abs(c.out - o0) > 1e-4) { rv._upd?.(); touched(i); } });
+      h.onkeydown = (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault(); e.stopPropagation();
+        move.start(); const d = (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1) * FR;
+        if (!ok(d)) return;
+        apply(d); layout(); tipAt(h, text(d)); rv._upd?.(); touched(i);
+      };
+    });
+  }
+  // The picked clip carried to another place: press on it and drag; a blue bar shows where it lands. Its
+  // moved sound joints go back onto the picture (its neighbours change).
+  box.addEventListener('pointerdown', (e) => {
+    const k = e.target.closest?.('.kc');
+    if (!k || !ed || trim || e.button || Number(k.dataset.k) !== sel || clips.length < 2) return;
+    e.stopPropagation(); e.preventDefault();
+    try { box.setPointerCapture(e.pointerId); } catch {}
+    const tr = tl.getBoundingClientRect(), scale = tr.width / tl.offsetWidth, x0 = e.clientX;
+    const ctAt = (ev) => Math.max(0, Math.min(1, (ev.clientX - tr.left) / tr.width)) * total();
+    let moving = false, to = sel, ins = null;
+    const mv = (ev) => {
+      if (!moving && Math.abs(ev.clientX - x0) < 6) return;
+      if (!moving) { moving = true; tl._busy = true; tl.classList.add('moving'); k.classList.add('mov'); rv.pause(); ins = document.createElement('i'); ins.className = 'kins'; box.append(ins); $('#pSkl').hidden = true; }
+      k.style.transform = `translateX(${(ev.clientX - x0) / scale}px)`;
+      const ct = ctAt(ev), st = starts(), pps = box.clientWidth / total(), others = clips.map((c, i) => i).filter((i) => i !== sel);
+      to = others.filter((i) => st[i] + (clips[i].out - clips[i].in) / 2 < ct).length;
+      ins.hidden = to === sel; ins.style.left = `${(to < others.length ? st[others[to]] : total()) * pps}px`;
+      rv._tip((ev.clientX - tr.left) / scale, to === sel ? `Кусок ${sel + 1} — на своём месте` : `Кусок ${sel + 1} → на место ${to + 1}`);
+    };
+    const up = (ev) => {
+      box.removeEventListener('pointermove', mv); box.removeEventListener('pointerup', up); box.removeEventListener('pointercancel', up);
+      if (!moving) { rv.pause(); rv._go(toV(ctAt(ev))); return; } // a plain click: the playhead goes there
+      tl._busy = false; tl.classList.remove('moving'); ins?.remove(); k.style.transform = ''; k.classList.remove('mov'); rv._tip(0, '');
+      if (to === sel) return layout();
+      const c = clips[sel];
+      if (sel > 0) delete clips[sel - 1].jt;
+      delete c.jt;
+      clips.splice(sel, 1); clips.splice(to, 0, c);
+      if (to > 0) delete clips[to - 1].jt;
+      sel = to; cut.sel = sel; build(); layout(); panel?.render(); rv._upd?.(); $('#eComp')?._upd?.();
+      cut.changed = true; save(); foot();
+      rv._go(toV(starts()[sel]) + 0.02);
+      toast(`Кусок переставлен на место ${sel + 1}`);
+    };
+    box.addEventListener('pointermove', mv); box.addEventListener('pointerup', up); box.addEventListener('pointercancel', up);
+  }, {signal: rv._ac.signal});
   // The joint around the edge just moved: ~1.5 s of this clip and 1 s of its neighbour, from the source.
   const joint = (i, k) => {
     const c = clips[i], prev = clips[i - 1], next = clips[i + 1];
@@ -3634,7 +3812,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
       };
     });
   }
-  tl._label = (t) => { const i = clipAt(toC(t)); return `${t1(t)} · кусок ${i + 1}${i === sel ? '' : ' · клик — выбрать'}`; };
+  tl._label = (t) => { const i = clipAt(toC(t)); return `${t1(t)} · кусок ${i + 1}${i === sel ? (ed && clips.length > 1 ? ' · тяните — переставить' : '') : ' · клик — выбрать'}`; };
   tl._hover = (t) => { const i = t == null ? -1 : clipAt(toC(t)); if (i !== hov) { hov = i; layout(); } };
   tl._pick = (t) => pick(clipAt(toC(t)));
   tl._relayout = () => box.isConnected && layout();
@@ -3732,7 +3910,7 @@ async function renderVersions(id, data) {
             <div class="zctl" aria-label="Масштаб дорожки"><button type="button" class="zb" id="zOut" aria-label="Мельче">−</button><input type="range" id="zRange" min="0" max="100" value="0" aria-label="Масштаб"><button type="button" class="zb" id="zIn" aria-label="Крупнее">+</button></div>
             ${sel === cur && ed && !data.cut ? '<button type="button" class="linkbtn small" id="kAsk">Разложить на дубли</button>' : ''}
 </div>
-          <div class="tlbox"><div class="tlscroll" id="tlScroll"><div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="ruler" id="pRuler" aria-label="Линейка времени — тяните, чтобы перемотать"></div><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div>${!kOn && sel === cur ? '<div class="glanes" id="gLanes"></div>' : ''}</div>
+          <div class="tlbox"><div class="tlscroll" id="tlScroll"><div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="ruler" id="pRuler" aria-label="Линейка времени — тяните, чтобы перемотать"></div><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div><div class="psnd" id="pSnd" aria-label="Звук"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div>${!kOn && sel === cur ? '<div class="glanes" id="gLanes"></div>' : ''}</div>
           <div class="khints" hidden><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать, отпустил — играет склейка</span><span>▶ играет чистое видео по кускам, без графики</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>${kOn ? '<div class="kpanel" id="kPanel"></div>' : sel === cur ? '<div class="gcard" id="gCard" hidden></div>' : ''}
           ${sel === cur && ed ? `<form class="ecomp2" id="eComp"><span class="etgt" id="eT">На 0:00</span><button type="button" class="ex" id="eX" hidden aria-label="Снять выбор куска">✕</button>
             <textarea id="eText" rows="1" placeholder="Что поменять в этом месте"></textarea>
