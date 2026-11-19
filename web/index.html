@@ -650,6 +650,9 @@
   .gl-b { top: 0; background: #E9E9E5; color: var(--ink2); font-weight: 600; } .gl-b:hover { background: #DEDED9; }
   .gl-lanes { position: relative; margin-top: 4px; }
   .gl-e { background: #DCE6FB; color: #1F4FB0; } .gl-e.bh { background: #EDE3F8; color: #6B3FA0; }
+  .gl-e.gone { background: #FFF1D6; color: #9A5B00; box-shadow: inset 0 0 0 1.5px #E5A33C; }
+  .gl-stale { position: sticky; left: 0; display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; background: #FFF6E5; font-size: 13px; line-height: 1.4; }
+  .gl-stale > span:nth-child(2) { flex: 1; } .gl-dot { width: 8px; height: 8px; border-radius: 50%; background: #E5A33C; flex: none; } .gl-stale .btn { min-height: 30px; font-size: 13px; flex: none; }
   .gl-e:hover, .gl-e.with { box-shadow: 0 0 0 2px #2F6FEB; } .gl-e.on { background: var(--ink); color: #fff; box-shadow: none; }
   .gsel { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
   .gsel i { position: absolute; border: 2px solid #2F6FEB; border-radius: 6px; box-shadow: 0 0 0 9999px rgba(0,0,0,.45); }
@@ -3408,7 +3411,9 @@ function wireGfx(id, rv, cut, scenes, nextV) {
     return st[j] + (m.src - clips[j].in);
   };
   const st = starts();
-  const els = items.map((x, i) => ({i, x, a: place(x.from, st), b: place(x.to, st)})).filter((e) => e.a != null && e.b != null && e.b > e.a + 0.02).map((e) => ({...e, a: toV(e.a), b: toV(e.b)}));
+  // An element whose words left the cut (its moment is in no clip now) will not be in the next version as it is.
+  const inCut = (m) => clips.some((c) => m.src >= c.in - 1e-3 && m.src <= c.out + 1e-3);
+  const els = items.map((x, i) => ({i, x, gone: !inCut(x.from) && !inCut(x.to), a: place(x.from, st), b: place(x.to, st)})).filter((e) => e.a != null && e.b != null && (e.gone || e.b > e.a + 0.02)).map((e) => ({...e, a: toV(e.a), b: toV(e.gone ? Math.max(e.b, e.a + 0.4) : e.b)}));
   // Lanes: each element on the first lane free at its start.
   const ends = [];
   els.sort((p, q) => p.a - q.a).forEach((e) => { let l = ends.findIndex((x) => x <= e.a + 0.01); if (l < 0) { l = ends.length; ends.push(0); } ends[l] = e.b; e.lane = l; });
@@ -3420,10 +3425,15 @@ function wireGfx(id, rv, cut, scenes, nextV) {
   const S = (cut._gfx ||= {sel: -1});
   let fold = false; try { fold = localStorage.getItem('reels-gfold') === '1'; } catch {}
   const pc = (t) => `${(100 * t) / vd()}%`;
+  const gone = items.filter((x) => !inCut(x.from) && !inCut(x.to));
   const draw = () => {
-    lanesEl.innerHTML = `<div class="gl-head"><button type="button" class="gl-fold" aria-expanded="${!fold}">${'<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>'}Графика</button><span class="muted small">${fold ? `${els.length} элементов — скрыто · клик по видео ставит правку в это место` : 'клик по элементу — он в плеере и в правке'}</span></div>
+    // Г6: the cut changed after the version with graphics — the graphics follow their words by themselves;
+    // what lost its words is named; one button rebuilds.
+    const stale = cut.changed && !cut._montage ? `<div class="gl-stale"><span class="gl-dot"></span><span><b>Монтаж поменялся после этой версии.</b> Графика переедет вместе со словами сама${gone.length ? `; слов больше нет у: ${gone.map((x) => `«${esc(x.label || x.id)}»`).join(', ')} — они выпадут` : ''}.</span>${$('#eGfx') ? '<button type="button" class="btn dark" data-a="regfx">Пересобрать с графикой</button>' : ''}</div>` : '';
+    lanesEl.innerHTML = `${stale}<div class="gl-head"><button type="button" class="gl-fold" aria-expanded="${!fold}">${'<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>'}Графика</button><span class="muted small">${fold ? `${els.length} элементов — скрыто · клик по видео ставит правку в это место` : 'клик по элементу — он в плеере и в правке'}</span></div>
       ${blocks.length ? `<div class="gl-blocks">${blocks.map((b, k) => `<button type="button" class="gl-b" data-b="${k}" style="left: ${pc(b.a)}; width: calc(${pc(b.b - b.a)} - 2px)" title="${esc(b.name)} · ${t1(b.a)}">${esc(b.name)}</button>`).join('')}</div>` : ''}
-      ${fold ? '' : `<div class="gl-lanes" style="height: ${ends.length * 24}px">${els.map((e) => `<button type="button" class="gl-e ${e.x.z === 'behind' ? 'bh' : ''} ${S.sel === e.i ? 'on' : ''}" data-e="${e.i}" style="left: ${pc(e.a)}; width: calc(${pc(e.b - e.a)} - 2px); top: ${e.lane * 24}px" title="${esc(name(e))} · ${t1(e.a)}–${t1(e.b)}">${esc(name(e))}</button>`).join('')}</div>`}`;
+      ${fold ? '' : `<div class="gl-lanes" style="height: ${ends.length * 24}px">${els.map((e) => `<button type="button" class="gl-e ${e.x.z === 'behind' ? 'bh' : ''} ${e.gone ? 'gone' : ''} ${S.sel === e.i ? 'on' : ''}" data-e="${e.i}" style="left: ${pc(e.a)}; width: calc(${pc(e.b - e.a)} - 2px); top: ${e.lane * 24}px" title="${esc(name(e))} · ${t1(e.a)}–${t1(e.b)}">${esc(name(e))}</button>`).join('')}</div>`}`;
+    lanesEl.querySelector('[data-a="regfx"]')?.addEventListener('click', () => $('#eGfx')?.click());
     lanesEl.querySelector('.gl-fold').onclick = () => { fold = !fold; try { localStorage.setItem('reels-gfold', fold ? '1' : ''); } catch {} draw(); };
     lanesEl.querySelectorAll('.gl-e').forEach((b) => {
       const e = els.find((x) => x.i === Number(b.dataset.e));
