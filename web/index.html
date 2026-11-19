@@ -2240,6 +2240,7 @@ function fitPlayer(v) {
 
 function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._ac?.abort(); rv._ac = new AbortController();
+  rv._pkStop?.(); rv._clean = null;
   fitPlayer(rv);
   // A file that does not open (a render cut short, e.g. by a full disk) says so instead of a black box.
   const bad = () => { const w = rv.closest('.vwrap'); if (w && !w.querySelector('.vbad')) w.insertAdjacentHTML('beforeend', `<div class="vbad">Файл ${esc(sel.v)} не открывается — похоже, рендер оборвался. Попросите в чате пересобрать ${esc(sel.v)}.</div>`); };
@@ -2264,7 +2265,11 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   let want = null;
   const peek = (o) => {
     if (!pk) return;
-    if (!o) { pk.hidden = true; want = null; pkV.pause(); pkV.muted = true; pk._play = null; return; }
+    if (!o) {
+      pkV.pause(); pkV.muted = true; pk._play = null;
+      o = rv._clean?.at();
+      if (!o) { pk.hidden = true; want = null; return; }
+    }
     pk.hidden = false; pk.classList.toggle('edge', !!o.edge); $('#pTag').textContent = o.label;
     if (o.pv?.sprite) cover(pkS, o.pv, o.t); else pkS.style.backgroundImage = '';
     if (pkV.getAttribute('src') !== o.url) { pkV.src = o.url; pkV.classList.remove('on'); }
@@ -2280,6 +2285,9 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     pkV.onloadedmetadata = () => { if (want != null) pkV.currentTime = want; };
   }
   rv._peek = peek;
+  rv._pkStop = () => { if (pk) pk._play = null; try { pkV.pause(); pkV.removeAttribute('src'); pkV.load(); } catch {} };
+  // What a hover shows: the version's frame, or in «Нарезка» the source's (no graphics).
+  const pvAt = (t, label) => (rv._clean ? {...rv._clean.at(t), label} : {url: rv.currentSrc || rv.src, t, pv, label});
   // A cut seen at once: the source plays across the joint (the end of one clip, the start of the
   // next) in the same layer, with sound, then the player returns to the version.
   rv._peekPlay = (url, segs, label, {edge = true, onTime, onEnd} = {}) => {
@@ -2289,6 +2297,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     // Checked every frame and on timeupdate too (frames stop in a background tab).
     const step = () => {
       if (pk._play !== run || run.done) return;
+      if (!pkV.isConnected) { run.done = true; pkV.pause(); return; }
       if (!pkV.seeking && pkV.currentTime >= segs[run.i][1] - 0.02) {
         run.i++;
         if (run.i >= segs.length) { run.done = true; pkV.pause(); onEnd?.(); setTimeout(() => pk._play === run && peek(null), 350); return; }
@@ -2340,7 +2349,8 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     $('#pTime').textContent = tt; if ($('#bTime')) $('#bTime').textContent = tt;
     const ic = rv.paused ? '▶' : '❚❚';
     $('#pPlay').textContent = ic; $('#pPlay').setAttribute('aria-label', rv.paused ? 'Смотреть' : 'Пауза');
-    vw?.classList.toggle('playing', !rv.paused);
+    vw?.classList.toggle('playing', !rv.paused || !!pk?._play);
+    if (rv._clean && pk && !pk._play && !tl._busy && !tl._drag) peek(null);
     $('#eComp')?._upd?.();
   };
   const ready = () => { film(); ruler(); marks(); upd(); };
@@ -2348,7 +2358,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv.addEventListener('loadedmetadata', ready, on);
   ['timeupdate', 'play', 'pause', 'seeked'].forEach((e) => rv.addEventListener(e, upd, on));
   // Between frames of timeupdate the playhead runs smooth while playing.
-  const tick = () => { if (!rv._ac.signal.aborted && rv.isConnected) { if (!rv.paused) upd(); requestAnimationFrame(tick); } };
+  const tick = () => { if (!on.signal.aborted && rv.isConnected) { if (!rv.paused) upd(); requestAnimationFrame(tick); } };
   requestAnimationFrame(tick);
   const toggle = () => { if (tl._cutPlay?.()) return; peek(null); return rv.paused ? rv.play() : rv.pause(); };
   rv.onclick = toggle;
@@ -2365,7 +2375,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     const f = scAt(e), t = f * dur(), now = dur() ? rv.currentTime / dur() : 0;
     stip.hidden = false; stip.style.left = `${100 * f}%`; stip.textContent = t1(t);
     ghost.style.left = `${100 * Math.min(f, now)}%`; ghost.style.width = `${100 * Math.abs(f - now)}%`;
-    if (sc._drag) { rv.currentTime = t; peek(null); } else peek({url: rv.currentSrc || rv.src, t, pv, label: `Просмотр · ${t1(t)}`});
+    if (sc._drag) { rv.currentTime = t; peek(null); } else peek(pvAt(t, `Просмотр · ${t1(t)}`));
   };
   sc.onpointerleave = () => { if (sc._drag) return; stip.hidden = true; ghost.style.width = '0'; peek(null); };
   sc.onpointerdown = (e) => { e.stopPropagation(); sc._drag = true; sc.setPointerCapture(e.pointerId); rv.currentTime = scAt(e) * dur(); peek(null); };
@@ -2382,7 +2392,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     skl.hidden = false; skl.style.left = `${x}px`;
     rv._tip(x, t1(t));
     tl._hover?.(onRuler ? null : t);
-    if (tl._drag) { rv.currentTime = t; peek(null); } else peek({url: rv.currentSrc || rv.src, t, pv, label: `Просмотр · ${t1(t)}`});
+    if (tl._drag) { rv.currentTime = t; peek(null); } else peek(pvAt(t, `Просмотр · ${t1(t)}`));
   };
   tl.onpointerleave = () => { if (tl._drag || tl._busy) return; skl.hidden = true; rv._tip(0, ''); tl._hover?.(null); peek(null); };
   tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; tl._scrub = !!e.target.closest?.('.ruler'); try { tl.setPointerCapture(e.pointerId); } catch {} rv.pause(); rv.currentTime = timeAt(e); peek(null); if (!tl._scrub) tl._pick?.(rv.currentTime); upd(); };
@@ -2614,7 +2624,7 @@ async function stageCut(id, data) {
 // on its moment of the source, so a trimmed clip carries its graphics along. No mask: what goes behind
 // the person in the render lies over them here.
 function wireCutPlay(id, rv, cut, withGfx) {
-  const clips = cut.clips, pv = cut.preview, gl = $('#pGfx'), tl = $('#bStrip');
+  const clips = cut.clips, pv = cut.preview, gl = $('#pGfx'), tl = $('#bStrip'), clean = !withGfx, sig = rv._ac.signal;
   if (!pv || !tl) return;
   const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
   const starts = () => clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + clips[i - 1].out - clips[i - 1].in : 0), a), []);
@@ -2644,20 +2654,27 @@ function wireCutPlay(id, rv, cut, withGfx) {
   };
   let cutRun = null;
   tl._cutPlay = () => {
-    if (!cut.changed) return false;
+    if (!cut.changed && !clean) return false;
     if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; r.run.stop(); hideAll(); rv.currentTime = toV(r.ct); return true; }
     cutRun = null;
     const st = starts(); let ct = toC(rv.currentTime); if (ct >= total() - 0.1) ct = 0;
     const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
     const r = cutRun = {ct};
-    r.run = rv._peekPlay(pv.video, segs, items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
+    r.run = rv._peekPlay(pv.video, segs, clean ? '▶ Нарезка · чистое видео' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
       onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); show(r.ct); },
       onEnd: () => { if (cutRun === r) { cutRun = null; hideAll(); rv.currentTime = toV(r.ct); } }});
     return true;
   };
+  // «Нарезка» is the first stage — the footage alone. The version on the screen may already carry graphics,
+  // so here the player shows and plays the source by the cut: paused it holds the source frame at the
+  // playhead, play runs the clips one after another. Graphics are the second stage, with «Нарезка» off.
+  if (clean) {
+    rv._clean = {at: (t = rv.currentTime) => { const ct = Math.min(toC(t), total() - 0.01), i = clipAt(ct); return {url: pv.video, t: clips[i].in + (ct - starts()[i]), pv, label: 'Нарезка · чистое видео'}; }};
+    rv.pause(); rv._peek(null);
+  }
   // A montage-only version is the cut itself: its graphics come on top as layers while it plays.
   if (cut._montage && items.length) {
-    const follow = () => { if (!rv.isConnected || rv._ac.signal.aborted) return; if (!cutRun?.run.alive()) show(toC(rv.currentTime)); requestAnimationFrame(follow); };
+    const follow = () => { if (!rv.isConnected || sig.aborted) return; if (!cutRun?.run.alive()) show(toC(rv.currentTime)); requestAnimationFrame(follow); };
     requestAnimationFrame(follow);
     return;
   }
@@ -2881,7 +2898,7 @@ async function renderVersions(id, data) {
             ${sel === cur && ed && !data.cut ? '<button type="button" class="linkbtn small" id="kAsk">Разложить на куски</button>' : ''}
             ${sel === cur && CUT[id] ? `<button type="button" class="kswitch" id="kSw" role="switch" aria-checked="${kOn}"><span>Нарезка</span><i></i></button>` : ''}</div>
           <div class="tlbox"><div class="tlscroll" id="tlScroll"><div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="ruler" id="pRuler" aria-label="Линейка времени — тяните, чтобы перемотать"></div><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div></div>
-          <div class="khints"><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать, отпустил — играет склейка</span><span>Пока не собрано, ▶ играет новую нарезку из исходника</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>
+          <div class="khints"><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать, отпустил — играет склейка</span><span>▶ играет чистое видео по кускам, без графики</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>
           ${sel === cur && ed ? `<form class="ecomp2" id="eComp"><span class="etgt" id="eT">На 0:00</span><button type="button" class="ex" id="eX" hidden aria-label="Снять выбор куска">✕</button>
             <textarea id="eText" rows="1" placeholder="Что поменять в этом месте"></textarea>
             <button type="button" class="btn ic" id="eMic" title="Сказать голосом" aria-label="Сказать голосом">🎙</button><button type="button" class="btn ic" id="ePt" title="Точка на кадре" aria-label="Точка на кадре">◎</button><button type="submit" class="btn primary">Добавить</button></form><span class="small muted" id="eHint"></span>`
