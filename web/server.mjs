@@ -18,6 +18,7 @@ import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {readKit} from './dskit.mjs';
 import {fpsOf, joinArgs, snapClips, voiceOf as voiceFileOf} from '../scripts/join.mjs';
+import {firstCut, footageOf, takesOf} from '../scripts/takes.mjs';
 import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
@@ -320,6 +321,7 @@ function preamble(p, k) {
 
 const jobs = new Set();
 const MONTAGE = new Map();
+const AUTOCUT = new Map();
 const jobOf = (p, k) => [...jobs].find((j) => j.p === p && j.key === k);
 const full = () => jobs.size >= MAX_JOBS;
 let channelSeq = 0;
@@ -1135,6 +1137,46 @@ createServer(async (req, res) => {
     const clips = snapClips(b.clips.map((c) => ({in: Number(c.in), out: Number(c.out), ...(c.text ? {text: String(c.text).slice(0, 300)} : {})})), fpsOf(cut));
     writeJson(join(dir, 'cut.json'), {...cut, clips, rev: rev + 1, editedBy: me.name, editedAt: new Date().toISOString()});
     return json(200, {ok: true, rev: rev + 1, clips: clips.map((c) => ({in: c.in, out: c.out}))});
+  }
+  // Takes of every line of the script found in the recording by its words (scripts/takes.mjs), and the
+  // words themselves — for the panel under the track: other takes of a clip, words under the trim strip.
+  if (req.method === 'GET' && url.pathname === '/api/reel/takes') {
+    const dir = reelDir(p, url.searchParams.get('reel')), cut = dir && readJson(join(dir, 'cut.json'), null);
+    if (!cut) return json(404, {});
+    const vf = voiceFileOf(dir, cut), vo = voiceOf(vf || join(dir, cut.source || ''));
+    return json(200, takesOf(dir, vo?.peaks) || {phrases: [], words: []});
+  }
+  // «Разложить на дубли»: a new recording into its first cut with no agent — the transcript with word
+  // times if there is none yet (local Whisper), the takes of every line of the script, the last clean
+  // take of each into cut.json. The owner then swaps takes and trims in the studio.
+  if (req.method === 'POST' && url.pathname === '/api/reel/cut/auto') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir) return json(404, {});
+    if (existsSync(join(dir, 'cut.json'))) return json(200, {state: 'done', step: 'нарезка уже есть'});
+    const key = `${p}/${b.reel}`;
+    if (AUTOCUT.get(key)?.state === 'run') return json(200, AUTOCUT.get(key));
+    const job = {state: 'run', step: 'готовлю', at: Date.now()};
+    AUTOCUT.set(key, job);
+    const sh = (args, step) => new Promise((ok, no) => { job.step = step; const c = spawn(args[0], args.slice(1), {cwd: BOT, stdio: ['ignore', 'ignore', 'pipe']}); let err = ''; c.stderr.on('data', (d) => (err = (err + d).slice(-600))); c.on('close', (code) => (code ? no(new Error(`${step}: ${err.trim().split('\n').pop() || code}`)) : ok())); });
+    (async () => {
+      const source = footageOf(dir);
+      if (!source) throw new Error('в «Материалах» нет видео съёмки');
+      const wf = join(dir, 'sources', 'words.json'), vf = voiceFileOf(dir, {}) || join(dir, source);
+      if (!existsSync(wf)) await sh(['node', 'scripts/transcribe.mjs', vf, '--out', wf], 'расшифровываю запись по словам');
+      // The voice's loudness (web/preview.mjs) sharpens the takes' edges; made in the background — wait a little for it.
+      job.step = 'ищу дубли каждой фразы';
+      let vo = voiceOf(vf);
+      for (let i = 0; i < 40 && !vo; i++) { await new Promise((r) => setTimeout(r, 1500)); vo = voiceOf(vf); }
+      const {cut, missing} = firstCut(dir, {source, peaksFile: vo?.peaks});
+      writeJson(join(dir, 'cut.json'), {...cut, rev: 1, editedBy: me.name, editedAt: new Date().toISOString()});
+      Object.assign(job, {state: 'done', step: 'готово', clips: cut.clips.length, missing});
+    })().catch((e) => Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}));
+    return json(200, job);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/reel/cut/auto') {
+    return json(200, AUTOCUT.get(`${p}/${url.searchParams.get('reel')}`) || {state: 'none'});
   }
   // «Собрать монтаж»: the cut alone, without the agent and without a render — the clips joined
   // (scripts/cut.mjs cut, words), the graphics' times moved to it (scripts/layers.mjs place) and the
