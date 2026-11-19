@@ -3,10 +3,12 @@
 // shows and the owner trims, moves, splits and deletes. One format for the agent and the page:
 //   {"source": "sources/IMG_0656.MOV", "fps": 30, "words": "sources/words-host.json",
 //    "clips": [{"in": 17.8, "out": 21.95, "text": "Don't know where to stay…"}, …]}
-// Optional: "rotate": 90 | -90 | 180 (a camera clip filmed sideways), "gainDb": voice gain, linear.
-// in/out are seconds of the source; the clips play one after another with hard cuts.
+// Optional: "rotate": 90 | -90 | 180 (a camera clip filmed sideways), "gainDb": voice gain, linear,
+// "voice": the lavalier file (default sources/mic-synced.wav when it exists), "rev": the studio's revision.
+// in/out are seconds of the source on its frame grid; the clips play one after another with hard cuts.
+// The join itself is scripts/join.mjs — the same recipe as the studio's «Собрать монтаж».
 //
-//   node scripts/cut.mjs <reel> cut    → sources/cut.mov (the clips joined, mono, fps) + cut.applied.json
+//   node scripts/cut.mjs <reel> cut    → sources/cut.mov (the clips joined: frames, lavalier voice, fades) + cut.applied.json
 //   node scripts/cut.mjs <reel> words  → sources/words-cut.json (the source transcript in cut time)
 //   node scripts/cut.mjs <reel> map    → how the cut changed since cut.applied.json: for each old clip
 //                                         its old start in the cut → new start (or «removed»), and the
@@ -16,6 +18,7 @@ import {execFileSync} from 'node:child_process';
 import {copyFileSync, existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {joinArgs, lengthOf} from './join.mjs';
 
 const BOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [reelArg, cmd, arg] = process.argv.slice(2);
@@ -28,14 +31,9 @@ const starts = (cs) => cs.reduce((a, c, i) => (a.push(i ? a[i - 1] + (cs[i - 1].
 const len = (cs) => cs.reduce((a, c) => a + c.out - c.in, 0);
 
 if (cmd === 'cut') {
-  const fps = cut.fps || 30;
-  const parts = clips.map((c, i) => `[0:v]trim=${c.in}:${c.out},setpts=PTS-STARTPTS,fps=${fps}[v${i}];[0:a]atrim=${c.in}:${c.out},asetpts=PTS-STARTPTS,aformat=channel_layouts=mono,afade=t=in:d=0.012,afade=t=out:st=${(c.out - c.in - 0.012).toFixed(3)}:d=0.012[a${i}]`).join(';');
-  const turn = {90: 'transpose=1,', [-90]: 'transpose=2,', 180: 'hflip,vflip,'}[cut.rotate] || '';
-  const cat = clips.map((_, i) => `[v${i}][a${i}]`).join('') + `concat=n=${clips.length}:v=1:a=1[vc][ac];[vc]${turn}setsar=1[v];[ac]volume=${Number(cut.gainDb) || 0}dB[a]`;
-  execFileSync('node', [join(BOT, 'scripts/ffmpeg.mjs'), '-v', 'error', '-y', '-i', join(reel, cut.source), '-filter_complex', `${parts};${cat}`,
-    '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-crf', '14', '-preset', 'fast', '-pix_fmt', 'yuv420p', '-c:a', 'pcm_s16le', join(reel, 'sources/cut.mov')], {stdio: 'inherit'});
+  execFileSync('node', [join(BOT, 'scripts/ffmpeg.mjs'), ...joinArgs({reel, cut, video: join(reel, cut.source), out: join(reel, 'sources/cut.mov'), draft: false})], {stdio: 'inherit'});
   copyFileSync(join(reel, 'cut.json'), join(reel, 'cut.applied.json'));
-  console.log(`sources/cut.mov · ${clips.length} clips · ${len(clips).toFixed(2)} s`);
+  console.log(`sources/cut.mov · ${clips.length} clips · ${lengthOf(cut).toFixed(2)} s`);
 } else if (cmd === 'words') {
   const j = read(cut.words || 'sources/words-host.json');
   const st = starts(clips), words = [];

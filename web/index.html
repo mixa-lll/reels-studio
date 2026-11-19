@@ -788,6 +788,19 @@ const api = async (path, opts) => {
   return r.json();
 };
 const post = (path, b) => { ITEMS_AT = 0; REEL_CACHE.clear(); return api(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(b || {})}); };
+// Saves the cut with its revision (server: 409 when it changed meanwhile) and takes back the times
+// snapped to the source's frames, so the track shows exactly what «Собрать монтаж» will cut.
+const saveCut = async (id, cut, clips) => {
+  try {
+    const r = await post('/api/reel/cut', {reel: id, clips, rev: cut.rev ?? null});
+    cut.rev = r.rev;
+    (r.clips || []).forEach((c, i) => { if (clips[i]) { clips[i].in = c.in; clips[i].out = c.out; } });
+    return true;
+  } catch (e) {
+    toast(e.status === 409 ? 'Нарезку поменяли в другой вкладке или агент — обновите страницу, чтобы не затереть' : 'Нарезка не сохранилась');
+    return false;
+  }
+};
 const toast = (t) => { const el = document.createElement('div'); el.className = 'toast'; el.textContent = t; document.body.append(el); setTimeout(() => el.remove(), 3500); };
 const isOwner = () => ME?.isOwner === true;
 const canEdit = () => ME?.role === 'editor';
@@ -2542,7 +2555,7 @@ async function stageCut(id, data) {
   // The selected clip: its in/out on the source with a few seconds around, draggable handles.
   const win = (c) => [Math.max(0, c.in - 4), Math.min(v.duration || c.out + 4, c.out + 4)];
   const change = (fn) => { hist.push(JSON.stringify(clips)); if (hist.length > 100) hist.shift(); fn(); clips.forEach((c) => { c.in = r2(Math.max(0, c.in)); c.out = r2(c.out); }); changed = true; blocks(); panel(); save(); };
-  const save = () => { if (!ed) return; $('#cSave').textContent = 'Сохраняю…'; clearTimeout(saveT); saveT = setTimeout(async () => { try { await post('/api/reel/cut', {reel: id, clips}); $('#cSave').textContent = 'Сохранено'; } catch { $('#cSave').textContent = 'Не сохранилось'; } note(); }, 500); };
+  const save = () => { if (!ed) return; $('#cSave').textContent = 'Сохраняю…'; clearTimeout(saveT); saveT = setTimeout(async () => { $('#cSave').textContent = (await saveCut(id, cut, clips)) ? 'Сохранено' : 'Не сохранилось'; note(); }, 500); };
   const note = () => { const n = $('#cApplyNote'); if (n) n.textContent = changed ? 'Claude перережет видео, сдвинет субтитры и плашки и соберёт новую версию' : 'Нарезка совпадает с последней сборкой'; };
   const panel = () => {
     const c = clips[sel];
@@ -2596,7 +2609,7 @@ async function stageCut(id, data) {
   const split = () => { const c = clips[sel], t = v.currentTime; if (t <= c.in + 0.1 || t >= c.out - 0.1) return toast('Поставьте кадр внутри куска, где разрезать'); change(() => { clips.splice(sel + 1, 0, {in: t, out: c.out}); c.out = t; }); };
   const pick = (i, seek) => { sel = i; blocks(); panel(); if (seek) { v.pause(); mode = null; v.currentTime = clips[i].in; } };
   if (ed) $('#cApply').onclick = async () => {
-    clearTimeout(saveT); await post('/api/reel/cut', {reel: id, clips});
+    clearTimeout(saveT); if (!(await saveCut(id, cut, clips))) return;
     const folder = `projects/${P}/reels/${id}`;
     chatOf().say(`Я поправил нарезку в ${folder}/cut.json (${clips.length} кусков, ${total().toFixed(1)} с). Примени её: сначала \`node scripts/cut.mjs ${folder} map\` — как сдвинулись куски; потом \`cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov), сдвинь все времена склейки в Reel.jsx и scenes по таблице map и собери следующую версию черновиком — это этап «Сборка» (REELS.md): только монтаж, новую графику и маску не добавляй; маску пересобери, только если графика уже наложена, и только на её отрезках. В README коротко: что поменялось в нарезке.`, `Применить нарезку · ${clips.length} кусков`);
     changed = false; note(); toast('Отправил Claude — соберёт новую версию');
@@ -2760,7 +2773,14 @@ function wireClips(id, rv, cut, open, ed, foot) {
   };
   const pick = (i) => { if (i === sel) return; clearTimeout(trimT); trim = null; box.classList.remove('trim'); tl.classList.remove('trimming'); sel = i; cut.sel = i; build(); layout(); $('#eComp')?._upd?.(); };
   cut.deselect = () => pick(-1);
-  const save = () => { if (!ed) return; clearTimeout(saveT); saveT = setTimeout(() => post('/api/reel/cut', {reel: id, clips}).catch(() => toast('Нарезка не сохранилась')), 400); };
+  // A save waits 400 ms for more edits; «Собрать монтаж» flushes it first (cut.flush), so the build
+  // never takes the cut from before the last drag.
+  const save = () => {
+    if (!ed) return;
+    clearTimeout(saveT);
+    cut.flush = () => { clearTimeout(saveT); cut.flush = null; return saveCut(id, cut, clips).then((ok) => { if (ok) layout(); return ok; }); };
+    saveT = setTimeout(() => cut.flush?.(), 400);
+  };
   function wireHands() {
     box.querySelectorAll('.khand').forEach((h) => {
       const k = h.dataset.h;
@@ -2977,6 +2997,7 @@ async function renderVersions(id, data) {
   $('#eBuild')?.addEventListener('click', async () => {
     if (!open.length && CUT[id]?.changed) {
       const b = $('#eBuild'); b.disabled = true;
+      if (CUT[id].flush && !(await CUT[id].flush())) { b.disabled = false; return; }
       const r = await post('/api/reel/montage', {reel: id}).catch((e) => ({state: 'error', step: e.message}));
       const poll = async (j) => {
         if (!b.isConnected) return;

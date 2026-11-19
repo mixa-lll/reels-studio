@@ -17,6 +17,7 @@ import {changeItem, createItems, dropIdea, ideaBank, loadItems, followPlan, need
 import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {readKit} from './dskit.mjs';
+import {fpsOf, joinArgs, snapClips} from '../scripts/join.mjs';
 import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
@@ -1119,10 +1120,15 @@ createServer(async (req, res) => {
     const dir = reelDir(p, b.reel), cut = dir && readJson(join(dir, 'cut.json'), null);
     if (!cut) return json(404, {});
     if (!Array.isArray(b.clips) || !b.clips.length || b.clips.length > 600) return json(400, {});
-    const clips = b.clips.map((c) => ({in: Math.round(Number(c.in) * 1000) / 1000, out: Math.round(Number(c.out) * 1000) / 1000, ...(c.text ? {text: String(c.text).slice(0, 300)} : {})}));
-    if (clips.some((c) => !(c.in >= 0 && c.out > c.in + 0.03))) return json(400, {});
-    writeJson(join(dir, 'cut.json'), {...cut, clips, editedBy: me.name, editedAt: new Date().toISOString()});
-    return json(200, {ok: true});
+    if (b.clips.some((c) => !(Number(c.in) >= 0 && Number(c.out) > Number(c.in)))) return json(400, {});
+    // Revision: a save made over an older cut (another tab, the agent) is refused, not silently lost.
+    const rev = Number(cut.rev) || 0;
+    if (b.rev != null && Number(b.rev) !== rev) return json(409, {rev, clips: cut.clips});
+    // In and out on the frame grid of the source (scripts/join.mjs): the player, «Собрать монтаж»
+    // and the final join all cut the same frames.
+    const clips = snapClips(b.clips.map((c) => ({in: Number(c.in), out: Number(c.out), ...(c.text ? {text: String(c.text).slice(0, 300)} : {})})), fpsOf(cut));
+    writeJson(join(dir, 'cut.json'), {...cut, clips, rev: rev + 1, editedBy: me.name, editedAt: new Date().toISOString()});
+    return json(200, {ok: true, rev: rev + 1, clips: clips.map((c) => ({in: c.in, out: c.out}))});
   }
   // «Собрать монтаж»: the cut alone, without the agent and without a render — the clips joined
   // (scripts/cut.mjs cut, words), the graphics' times moved to it (scripts/layers.mjs place) and the
@@ -1145,19 +1151,21 @@ createServer(async (req, res) => {
     // The full-quality join (scripts/cut.mjs cut → sources/cut.mov) is left to the graphics build.
     const cut = readJson(join(dir, 'cut.json'), {});
     const pv = previewOf(join(dir, cut.source || ''), {rotate: Number(cut.rotate) || 0});
+    // All or nothing: the join goes to a temporary file first; only when it is whole are the
+    // graphics moved (layers.mjs place) and the version folder made — a failure leaves no half state.
+    const tmp = join(dir, `.montage-${v}.mp4`);
     (async () => {
       if (!pv?.video) throw new Error('лёгкая копия исходника ещё готовится — через минуту');
+      // The same recipe as the final join (scripts/join.mjs): frames of the source, the lavalier
+      // when there is one, 12 ms fades at the joints, gain and a limiter.
+      await sh(['ffmpeg', ...joinArgs({reel: dir, cut, video: pv.video, out: tmp, draft: true})], 'склеиваю куски');
       if (existsSync(join(dir, 'graphics.json'))) await sh(['node', 'scripts/layers.mjs', dir, 'place'], 'переношу графику');
       const vdir = join(dir, 'versions', v);
       mkdirSync(vdir, {recursive: true});
-      // One input per clip, each seeked straight to its start: nothing before it is decoded.
-      const ins = cut.clips.flatMap((c) => ['-ss', String(c.in), '-t', String(Math.round((c.out - c.in) * 1000) / 1000), '-i', pv.video]);
-      const joins = cut.clips.map((c, i) => `[${i}:v][${i}:a]`).join('');
-      await sh(['ffmpeg', '-v', 'error', '-y', ...ins, '-filter_complex', `${joins}concat=n=${cut.clips.length}:v=1:a=1[v][a]`, '-map', '[v]', '-map', '[a]',
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '22', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', join(vdir, `${base}-${v}.mp4`)], 'склеиваю куски');
-      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString(), clips: cut.clips.map((c) => ({in: c.in, out: c.out}))});
+      renameSync(tmp, join(vdir, `${base}-${v}.mp4`));
+      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString(), rev: cut.rev || 0, clips: cut.clips.map((c) => ({in: c.in, out: c.out}))});
       Object.assign(job, {state: 'done', step: 'готово'});
-    })().catch((e) => Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}));
+    })().catch((e) => { try { rmSync(tmp, {force: true}); } catch {} Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}); });
     return json(200, job);
   }
   if (req.method === 'GET' && url.pathname === '/api/reel/montage') {
