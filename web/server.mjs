@@ -17,14 +17,14 @@ import {changeItem, createItems, dropIdea, ideaBank, loadItems, followPlan, need
 import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {readKit} from './dskit.mjs';
-import {fpsOf, joinArgs, snapClips} from '../scripts/join.mjs';
+import {fpsOf, joinArgs, snapClips, voiceOf as voiceFileOf} from '../scripts/join.mjs';
 import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
-import {dropOrphans, previewOf} from './preview.mjs';
+import {dropOrphans, previewOf, voiceOf} from './preview.mjs';
 import {bestVideo, linkPath, projectPath, readLink, signLink} from './dllink.mjs';
 import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
@@ -150,7 +150,11 @@ function cutView(dir) {
   const g = readJson(join(dir, 'graphics.json'), null);
   const graphics = Array.isArray(g?.items) ? g.items.filter((x) => x.layer && existsSync(join(dir, x.layer))).map((x) => ({...x, url: stamp(join(dir, x.layer))})) : null;
   const lastV = versionDirs(dir).at(-1), mont = lastV && readJson(join(dir, 'versions', lastV, 'stage.json'), null);
-  return {...cut, graphics, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
+  // The voice the player plays under the cut — the same one «Собрать монтаж» joins (the lavalier, else
+  // the camera's sound), with the same gain: what the owner hears while trimming is what gets built.
+  const vf = voiceFileOf(dir, cut), vo = voiceOf(vf || src);
+  const voice = vo ? {url: stamp(vo.audio), peaks: stamp(vo.peaks), lav: !!vf, gainDb: Number(cut.gainDb) || 0} : null;
+  return {...cut, graphics, voice, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
 }
 
 function versions(p, r) {

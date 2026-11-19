@@ -790,6 +790,17 @@ const api = async (path, opts) => {
 const post = (path, b) => { ITEMS_AT = 0; REEL_CACHE.clear(); return api(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(b || {})}); };
 // Saves the cut with its revision (server: 409 when it changed meanwhile) and takes back the times
 // snapped to the source's frames, so the track shows exactly what «Собрать монтаж» will cut.
+// The voice of the live cut in WebAudio (the lavalier, else the camera's sound: cut.voice from the
+// server, the same file and gain «Собрать монтаж» joins). The whole recording is decoded once (24 kHz
+// mono, ~70 MB for 12 min) and every clip is scheduled on the audio clock with 12 ms fades, so joints
+// neither click nor drop out; the picture follows that clock.
+const VOICE = {ctx: null, bufs: new Map(), ready: new Map()};
+const voiceCtx = () => VOICE.ctx || (VOICE.ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 24000, latencyHint: 'interactive'}));
+const voiceBuf = (url) => {
+  if (!VOICE.bufs.has(url)) VOICE.bufs.set(url, fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))).then((b) => voiceCtx().decodeAudioData(b))
+    .then((buf) => (VOICE.ready.set(url, buf), buf)).catch(() => (VOICE.bufs.delete(url), null)));
+  return VOICE.bufs.get(url);
+};
 const saveCut = async (id, cut, clips) => {
   try {
     const r = await post('/api/reel/cut', {reel: id, clips, rev: cut.rev ?? null});
@@ -2254,7 +2265,7 @@ function fitPlayer(v) {
 
 function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._ac?.abort(); rv._ac = new AbortController();
-  rv._pkStop?.(); rv._clean = null; rv.closest('.vwrap')?.classList.remove('clean');
+  rv._pkStop?.(); rv._clean = null; rv._voice = null; rv.closest('.vwrap')?.classList.remove('clean');
   fitPlayer(rv);
   // A file that does not open (a render cut short, e.g. by a full disk) says so instead of a black box.
   const bad = () => { const w = rv.closest('.vwrap'); if (w && !w.querySelector('.vbad')) w.insertAdjacentHTML('beforeend', `<div class="vbad">Файл ${esc(sel.v)} не открывается — похоже, рендер оборвался. Попросите в чате пересобрать ${esc(sel.v)}.</div>`); };
@@ -2280,10 +2291,12 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   const peek = (o) => {
     if (!pk) return;
     if (!o) {
-      pkV.pause(); pkV.muted = true; pk._play = null;
+      pkV.pause(); pkV.muted = true; pkV.playbackRate = 1; pk._play?.kill?.(); pk._play = null;
       o = rv._clean?.at();
       if (!o) { pk.hidden = true; want = null; return; }
     }
+    // A playing cut keeps its picture: hovering the track does not seek the element that plays.
+    if (pk._play && !pk._play.done && !o.edge && !o.own) return;
     pk.hidden = false; pk.classList.toggle('edge', !!o.edge); $('#pTag').textContent = o.label;
     if (o.pv?.sprite) cover(pkS, o.pv, o.t); else pkS.style.backgroundImage = '';
     if (pkV.getAttribute('src') !== o.url) { pkV.src = o.url; pkV.classList.remove('on'); }
@@ -2305,23 +2318,80 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   // A cut seen at once: the source plays across the joint (the end of one clip, the start of the
   // next) in the same layer, with sound, then the player returns to the version.
   rv._peekPlay = (url, segs, label, {edge = true, onTime, onEnd} = {}) => {
-    rv.pause(); peek({url, t: segs[0][0], label, edge}); want = null; clearTimeout(pkV._t);
-    const run = pk._play = {i: 0, alive: () => pk._play === run && !run.done, stop: () => { if (pk._play === run) { run.done = true; peek(null); } }};
-    const go = () => { if (pk._play !== run) return; pkV.currentTime = segs[0][0]; pkV.muted = false; pkV.classList.add('on'); pkV.play().catch(() => {}); };
+    pk._play?.kill?.();
+    rv.pause(); pk._play = null; peek({url, t: segs[0][0], label, edge, own: true}); want = null; clearTimeout(pkV._t);
+    const vo = rv._voice, buf = vo && VOICE.ready.get(vo.url);
+    const run = pk._play = {i: 0, alive: () => pk._play === run && !run.done, stop: () => { if (pk._play === run) { run.done = true; run.kill?.(); peek(null); } }};
+    const end = () => { run.done = true; run.kill?.(); pkV.pause(); pkV.playbackRate = 1; onEnd?.(); setTimeout(() => pk._play === run && peek(null), 350); };
+    let step;
+    if (buf) {
+      // The voice is the clock: every clip scheduled at once on the audio timeline; the picture
+      // (muted) is nudged after it — a slightly faster or slower rate for a small lag, a seek with a
+      // little lead for a big one or at a joint.
+      const ctx = voiceCtx(); ctx.resume?.();
+      const lens = segs.map((x) => x[1] - x[0]), acc = lens.reduce((a, d, k) => (a.push(k ? a[k - 1] + lens[k - 1] : 0), a), []), total = acc.at(-1) + lens.at(-1);
+      const master = ctx.createGain(), lim = ctx.createDynamicsCompressor(), nodes = [];
+      master.gain.value = 10 ** ((vo.gainDb || 0) / 20);
+      // A limiter at −1.5 dBFS, as in the joined file.
+      lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.002; lim.release.value = 0.1;
+      master.connect(lim).connect(ctx.destination);
+      let t0 = null;
+      run.kill = () => { nodes.forEach((n) => { try { n.stop(); } catch {} }); try { master.disconnect(); lim.disconnect(); } catch {} run.kill = null; };
+      const begin = () => {
+        if (pk._play !== run || run.done || t0 != null) return;
+        t0 = ctx.currentTime + 0.05;
+        segs.forEach((x, k) => {
+          const src = ctx.createBufferSource(), g = ctx.createGain(), at = t0 + acc[k], d = lens[k], F = Math.min(0.012, d / 3);
+          src.buffer = buf;
+          g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(1, at + F); g.gain.setValueAtTime(1, at + d - F); g.gain.linearRampToValueAtTime(0, at + d);
+          src.connect(g).connect(master); src.start(at, x[0], d); nodes.push(src);
+        });
+        pkV.muted = true; pkV.classList.add('on'); pkV.play().catch(() => {});
+      };
+      // What is heard now: the audio clock minus the output's latency.
+      const heard = () => ctx.currentTime - t0 - (ctx.outputLatency || ctx.baseLatency || 0);
+      step = () => {
+        if (pk._play !== run || run.done) return;
+        if (!pkV.isConnected) { run.done = true; run.kill?.(); pkV.pause(); return; }
+        if (t0 == null) return;
+        const e = heard();
+        if (e < 0) return;
+        if (e >= total) return end();
+        const i = Math.max(0, acc.findLastIndex((a) => e >= a)), sv = segs[i][0] + (e - acc[i]);
+        if (i !== run.i) { run.i = i; pkV.playbackRate = 1; pkV.currentTime = Math.min(segs[i][1], sv + 0.12); }
+        else if (!pkV.seeking) {
+          // run.lag: how far the picture is from the voice, seconds (checked by the tests).
+          const lag = run.lag = pkV.currentTime - sv;
+          if (Math.abs(lag) > 0.25) pkV.currentTime = Math.min(segs[i][1], sv + 0.12);
+          else pkV.playbackRate = Math.abs(lag) < 0.015 ? 1 : lag < 0 ? 1.15 : 0.87;
+        }
+        onTime?.(i, sv);
+      };
+      const go = () => {
+        if (pk._play !== run) return;
+        pkV.addEventListener('seeked', begin, {once: true}); setTimeout(begin, 700);
+        pkV.currentTime = segs[0][0];
+      };
+      if (pkV.readyState >= 1) go(); else pkV.addEventListener('loadedmetadata', go, {once: true});
+    } else {
+      // No voice yet (still being made): the light copy's own sound, the clip boundary from the video.
+      if (vo) voiceBuf(vo.url);
+      const go = () => { if (pk._play !== run) return; pkV.currentTime = segs[0][0]; pkV.muted = false; pkV.classList.add('on'); pkV.play().catch(() => {}); };
+      step = () => {
+        if (pk._play !== run || run.done) return;
+        if (!pkV.isConnected) { run.done = true; pkV.pause(); return; }
+        if (!pkV.seeking && pkV.currentTime >= segs[run.i][1] - 0.02) {
+          run.i++;
+          if (run.i >= segs.length) return end();
+          pkV.currentTime = segs[run.i][0];
+        }
+        if (!pkV.seeking && pkV.currentTime >= segs[run.i][0] - 0.05) onTime?.(run.i, pkV.currentTime);
+      };
+      if (pkV.readyState >= 1) go(); else pkV.addEventListener('loadedmetadata', go, {once: true});
+    }
     // Checked every frame and on timeupdate too (frames stop in a background tab).
-    const step = () => {
-      if (pk._play !== run || run.done) return;
-      if (!pkV.isConnected) { run.done = true; pkV.pause(); return; }
-      if (!pkV.seeking && pkV.currentTime >= segs[run.i][1] - 0.02) {
-        run.i++;
-        if (run.i >= segs.length) { run.done = true; pkV.pause(); onEnd?.(); setTimeout(() => pk._play === run && peek(null), 350); return; }
-        pkV.currentTime = segs[run.i][0];
-      }
-      if (!pkV.seeking && pkV.currentTime >= segs[run.i][0] - 0.05) onTime?.(run.i, pkV.currentTime);
-    };
     const tick = () => { step(); if (pk._play === run && !run.done) requestAnimationFrame(tick); };
     pkV.ontimeupdate = step;
-    if (pkV.readyState >= 1) go(); else pkV.addEventListener('loadedmetadata', go, {once: true});
     requestAnimationFrame(tick);
     return run;
   };
@@ -2640,6 +2710,9 @@ async function stageCut(id, data) {
 function wireCutPlay(id, rv, cut, withGfx) {
   const clips = cut.clips, pv = cut.preview, gl = $('#pGfx'), tl = $('#bStrip'), clean = !withGfx, sig = rv._ac.signal;
   if (!pv || !tl) return;
+  // The voice is fetched and decoded now, so the first ▶ already plays it.
+  rv._voice = cut.voice || null;
+  if (cut.voice) voiceBuf(cut.voice.url);
   const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
   const starts = () => clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + clips[i - 1].out - clips[i - 1].in : 0), a), []);
   const total = () => clips.reduce((a, c) => a + c.out - c.in, 0);

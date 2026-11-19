@@ -36,6 +36,47 @@ export function previewOf(video, {rotate = 0} = {}) {
   return null;
 }
 
+/** The voice for the studio player: {audio, peaks} — a small mono m4a (24 kHz, the whole recording
+ *  decoded once into WebAudio) and its loudness, 100 points a second (peaks.json: {rate, n, p} with p
+ *  base64 bytes 0–255), for the waveform. Made from the lavalier or the camera's sound; null while queued. */
+export function voiceOf(file) {
+  const d = dirOf(file), n = name(file);
+  const audio = join(d, `${n}.voice.m4a`), peaks = join(d, `${n}.peaks.json`);
+  try { if (existsSync(peaks) && statSync(peaks).mtimeMs >= statSync(file).mtimeMs && existsSync(audio)) return {audio, peaks}; } catch {}
+  try { if (Date.now() - statSync(file).mtimeMs < 15000) return null; } catch { return null; }
+  const key = file + '#voice';
+  try { if (failed.get(key) === statSync(file).mtimeMs) return null; } catch {}
+  if (!queued.has(key)) { queued.add(key); queue.unshift({video: file, voice: true, key}); next(); }
+  return null;
+}
+
+async function makeVoice(file) {
+  if (!existsSync(file)) return;
+  const d = dirOf(file), n = name(file), key = file + '#voice';
+  mkdirSync(d, {recursive: true});
+  const tmp = join(d, `${n}.voice.tmp.m4a`);
+  if (!(await run(['-y', '-v', 'error', '-i', file, '-vn', '-ac', '1', '-ar', '24000', '-c:a', 'aac', '-b:a', '64k', '-movflags', '+faststart', tmp]))) {
+    rmSync(tmp, {force: true}); failed.set(key, statSync(file).mtimeMs); return;
+  }
+  // Peaks: the loudest sample of every 10 ms, from 8 kHz mono.
+  const [cmd, full] = ffCommand('ffmpeg', ['-v', 'error', '-i', file, '-vn', '-ac', '1', '-ar', '8000', '-f', 's16le', '-']);
+  const pcm = await new Promise((ok) => {
+    const c = spawn('nice', ['-n', '15', cmd, ...full], {stdio: ['ignore', 'pipe', 'ignore']}), parts = [];
+    c.stdout.on('data', (b) => parts.push(b));
+    c.on('close', (code) => ok(code === 0 ? Buffer.concat(parts) : null));
+    c.on('error', () => ok(null));
+  });
+  if (!pcm) { rmSync(tmp, {force: true}); failed.set(key, statSync(file).mtimeMs); return; }
+  const S = 80, count = Math.ceil(pcm.length / 2 / S), out = Buffer.alloc(count);
+  for (let i = 0; i < count; i++) {
+    let m = 0;
+    for (let j = i * S, e = Math.min(pcm.length / 2, j + S); j < e; j++) { const v = Math.abs(pcm.readInt16LE(j * 2)); if (v > m) m = v; }
+    out[i] = Math.min(255, Math.round(Math.sqrt(m / 32768) * 255));
+  }
+  renameSync(tmp, join(d, `${n}.voice.m4a`));
+  writeFileSync(join(d, `${n}.peaks.json`), JSON.stringify({rate: 100, n: count, scale: 'sqrt', p: out.toString('base64')}));
+}
+
 /** Previews whose video is gone (the version was cleaned): removed, they would only take space. */
 export function dropOrphans(vdir) {
   const d = join(vdir, '.preview');
@@ -56,9 +97,9 @@ function run(args) {
 async function next() {
   if (busy || !queue.length) return;
   busy = true;
-  const {video, rotate} = queue.shift();
-  try { await make(video, rotate); } catch {}
-  queued.delete(video);
+  const {video, rotate, voice, key} = queue.shift();
+  try { if (voice) await makeVoice(video); else await make(video, rotate); } catch {}
+  queued.delete(key || video);
   busy = false;
   next();
 }
