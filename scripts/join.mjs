@@ -61,6 +61,8 @@ export function framesOf(cut) {
 }
 
 export function voiceOf(reel, cut) {
+  // «camera»: the owner chose the camera's own sound in the studio, even with a lavalier there.
+  if (cut.voice === 'camera') return null;
   if (cut.voice) return existsSync(join(reel, cut.voice)) ? join(reel, cut.voice) : null;
   const mic = join(reel, 'sources/mic-synced.wav');
   return existsSync(mic) ? mic : null;

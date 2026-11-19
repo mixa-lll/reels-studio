@@ -640,6 +640,20 @@
   .kp-h.l { border-radius: 10px 0 0 10px; } .kp-h.r { border-radius: 0 10px 10px 0; margin-left: -14px; }
   .kp-h::after { content: ''; position: absolute; left: 6px; top: calc(50% - 11px); width: 2px; height: 22px; background: #fff; border-radius: 1px; }
   .kp-h:hover, .kp-h.on, .kp-h:focus-visible { background: #2F6FEB; }
+  .ks-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; } .ks-row > b { width: 80px; font-size: 13px; }
+  .ks-seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: 8px; }
+  .ks-seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font-size: 12px; font-weight: 600; color: var(--ink2); }
+  .ks-seg button[aria-pressed="true"] { background: var(--ink); color: #fff; } .ks-seg button:disabled { color: #BDBDB8; cursor: default; }
+  #ksGain { width: 180px; accent-color: var(--ink); } .ks-val { width: 64px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ks-mic { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #F1F8F3; flex-wrap: wrap; }
+  .ks-mic > span:nth-child(2) { flex: 1; min-width: 200px; display: flex; flex-direction: column; } .ks-ok { width: 18px; height: 18px; border-radius: 50%; background: #1FA35B; color: #fff; display: grid; place-items: center; font-size: 11px; flex: none; }
+  .ks-nudge { display: inline-flex; align-items: center; gap: 6px; } .ks-nudge button { height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); font-size: 12px; }
+  .ks-job { display: flex; align-items: center; gap: 10px; font-size: 13px; } .ks-job.err { color: #B42318; }
+  .ks-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #2F6FEB; border-right-color: transparent; animation: ksspin .8s linear infinite; } @keyframes ksspin { to { transform: rotate(360deg); } }
+  .ks-bar { position: relative; width: 160px; height: 4px; border-radius: 2px; background: var(--line); } .ks-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #2F6FEB; }
+  .ks-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px; border: 2px dashed #BDBDB8; border-radius: 14px; background: var(--card); color: var(--ink); text-align: center; }
+  .ks-drop:hover, .ks-drop.over { border-color: #2F6FEB; background: #EEF3FD; color: #1F4FB0; }
+  .ks-l { display: flex; gap: 8px; align-items: baseline; font-size: 13px; } .ks-wave { width: 100%; height: 64px; border-radius: 8px; background: #EEF3FD; }
   .kjt { position: absolute; bottom: 2px; height: 40%; width: 2px; margin-left: -1px; background: #2F6FEB; border-radius: 1px; pointer-events: auto; z-index: 2; }
   .kjt::after { content: '♪'; position: absolute; left: -4px; top: -13px; font-size: 10px; color: #2F6FEB; font-style: normal; }
   .kp-aw { position: absolute; top: 84px; height: 44px; border: 2px solid #2F6FEB; border-radius: 6px; box-sizing: border-box; pointer-events: none; opacity: .35; }
@@ -3101,6 +3115,86 @@ function wireCutPanel(id, rv, cut, ed, k) {
       const ci = clips.findIndex((c) => phraseOf(c) === pi);
       return `<div class="kp-row ${ci >= 0 && ci === k.sel() ? 'sel' : ''}"><button type="button" class="kp-rowb" data-row="${pi}" aria-expanded="${S.open === pi}">${CH}<span class="kp-rt">${esc(p.text)}</span><span class="small muted">${p.takes.length ? many(p.takes.length) : 'в записи не найдена'}${ci < 0 ? ' · нет в монтаже' : ''}</span></button>${S.open === pi ? rows(p, pi, ci) : ''}</div>`;
     }).join(''));
+  // «Звук»: the voice of the cut — the camera's or the lavalier's — its gain, and the lavalier itself: dropped
+  // here, uploaded, synced to the camera by the sound (scripts/micsync.mjs), nudged by a frame if needed.
+  const fmtS = (v, d = 2) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(d).replace('.', ',')}`;
+  const sndHtml = () => {
+    const mic = cut.mic, onMic = !!(mic && mic.on), g = Number(cut.gainDb) || 0, job = S.micJob;
+    return `<div class="ks-row"><b>Голос</b><span class="ks-seg" role="group" aria-label="Чей звук"><button type="button" data-voice="camera" aria-pressed="${!onMic}">камера</button><button type="button" data-voice="mic" aria-pressed="${onMic}" ${mic ? '' : 'disabled title="Петлички ещё нет — перетащите её файл ниже"'}>петличка</button></span>
+        <span class="muted small">${onMic ? 'голос с петлички — как в сборке' : mic ? 'звук камеры — с эхом комнаты' : 'звук камеры'}</span></div>
+      <div class="ks-row"><b>Громкость</b><input type="range" id="ksGain" min="-12" max="18" step="0.5" value="${g}" aria-label="Громкость голоса, дБ" ${ed ? '' : 'disabled'}><span class="ks-val" id="ksGainV">${g ? fmtS(g, 1) : '0'} дБ</span><span class="muted small">пики держатся на −1,5 дБ</span></div>
+      ${mic ? `<div class="ks-mic"><span class="ks-ok">✓</span><span><b>♪ ${esc((mic.from || mic.file).split('/').pop())}</b><span class="muted small">${mic.offset != null ? `сведена с камерой · сдвиг ${fmtS(mic.offset, 3)} с${mic.drift ? ` · часы разошлись на ${Math.abs(mic.drift)} мс — выровнено` : ''} · совпадение ${Math.round((mic.score || 0) * 100)} %` : 'сведена с камерой'}</span></span>
+          ${ed && mic.from ? `<span class="ks-nudge"><span class="muted small">сдвиг</span><button type="button" data-nudge="-1" title="Петличка на кадр раньше">‹ кадр</button><button type="button" data-nudge="1" title="Петличка на кадр позже">кадр ›</button></span>` : ''}${ed ? '<button type="button" class="linkbtn small" data-a="micpick">Заменить</button>' : ''}</div>` : ''}
+      ${job?.state === 'run' ? `<div class="ks-job"><span class="ks-spin"></span><span>${esc(job.step)}…</span>${job.pct != null ? `<span class="ks-bar"><i style="width: ${job.pct}%"></i></span>` : ''}</div>` : job?.state === 'error' ? `<div class="ks-job err">Не получилось: ${esc(job.step)}</div>` : ''}
+      ${ed && !mic && job?.state !== 'run' ? `<button type="button" class="ks-drop" data-a="micpick"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"></rect><path d="M6 11a6 6 0 0 0 12 0M12 17v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg><b>Перетащите звук с петлички</b><span class="muted small">.wav, .m4a, .mp3 — или нажмите, чтобы выбрать. Сведу с камерой по звуку сам, хлопушка не нужна.</span></button>` : ''}
+      <input type="file" id="ksFile" accept="audio/*,.wav,.m4a,.mp3,.aac,.flac,.aif,.aiff" hidden>
+      <div class="ks-l"><b>Голос в монтаже</b><span class="muted small">${PK ? 'волна по всему ролику · черточки — склейки звука' : 'волна появится, когда голос будет готов'}</span></div>
+      <canvas class="ks-wave" id="ksWave"></canvas>`;
+  };
+  const drawCutWave = () => {
+    const cv = $('#ksWave');
+    if (!cv || !PK) return;
+    const W = cv.clientWidth, H = cv.clientHeight, dpr = devicePixelRatio || 1, tot = clips.reduce((a, c) => a + c.out - c.in, 0);
+    cv.width = W * dpr; cv.height = H * dpr;
+    const g = cv.getContext('2d'); g.scale(dpr, dpr);
+    const pieces = cutSound(clips, 0, tot);
+    pieces.forEach(([at, from, d], n) => {
+      g.fillStyle = n % 2 ? '#2F6FEB' : '#5B8DEF';
+      for (let x = Math.floor((at / tot) * W); x < ((at + d) / tot) * W; x += 2) {
+        const t = from + ((x / W) * tot - at), q = Math.floor(t * PK.rate);
+        let m = 0; for (let z = q; z < q + Math.max(1, Math.round((tot / W) * 2 * PK.rate)) && z < PK.v.length; z++) if (PK.v[z] > m) m = PK.v[z];
+        const h = Math.max(2, (m / 255) * (H - 8)); g.fillRect(x, (H - h) / 2, 1.4, h);
+      }
+      if (n) { g.fillStyle = '#141413'; g.fillRect(Math.round((at / tot) * W), 0, 1, H); }
+    });
+  };
+  const micPoll = async (j) => {
+    S.micJob = j;
+    while (S.micJob?.state === 'run') { if (el.isConnected && S.tab === 'snd') render(); await new Promise((r) => setTimeout(r, 1200)); S.micJob = await api('/api/reel/mic?reel=' + encodeURIComponent(id)).catch(() => S.micJob); }
+    if (S.micJob?.state === 'done') { toast(`Петличка сведена: сдвиг ${fmtS(S.micJob.offset, 3)} с${S.micJob.drift ? `, дрейф ${Math.abs(S.micJob.drift)} мс выровнен` : ''}`); REEL_CACHE.clear(); renderVersions(id); return; }
+    if (el.isConnected) render();
+  };
+  const micUpload = async (f) => {
+    if (!f) return;
+    if (!/\.(wav|m4a|mp3|aac|flac|aif|aiff|ogg)$/i.test(f.name) && !/^audio\//.test(f.type)) return toast('Нужен звуковой файл: .wav, .m4a, .mp3');
+    S.micJob = {state: 'run', step: `загружаю ${f.name}`, pct: 0}; render();
+    try {
+      const u = await uploadFile(f, `&reel=${encodeURIComponent(id)}`, (i, n) => { S.micJob.pct = Math.round((100 * i) / n); render(); });
+      S.micJob = {state: 'run', step: 'свожу с камерой по звуку'}; render();
+      micPoll(await post('/api/reel/mic', {reel: id, file: u.path}));
+    } catch (e) { S.micJob = {state: 'error', step: e.message}; render(); }
+  };
+  const setVoice = async (patch) => {
+    try { const r = await post('/api/reel/voice', {reel: id, rev: cut.rev ?? null, ...patch}); cut.rev = r.rev; cut.changed = true; return true; }
+    catch (e) { toast(e.status === 409 ? 'Нарезку поменяли в другой вкладке — обновите страницу' : 'Не сохранилось'); return false; }
+  };
+  function wireSnd() {
+    drawCutWave();
+    el.querySelectorAll('[data-voice]').forEach((b) => (b.onclick = async () => {
+      if (b.getAttribute('aria-pressed') === 'true' || !ed) return;
+      const v = b.dataset.voice === 'mic' ? cut.mic.file : 'camera';
+      if (await setVoice({voice: v})) { toast(v === 'camera' ? 'Голос — звук камеры' : 'Голос — петличка'); REEL_CACHE.clear(); renderVersions(id); }
+    }));
+    const gi = $('#ksGain');
+    if (gi) {
+      gi.oninput = () => { const v = Number(gi.value); $('#ksGainV').textContent = `${v ? fmtS(v, 1) : '0'} дБ`; if (rv._voice) rv._voice.gainDb = v; };
+      gi.onchange = async () => { const v = Number(gi.value); cut.gainDb = v; if (await setVoice({gainDb: v})) toast('Громкость сохранена — в просмотре и в сборке'); };
+    }
+    const file = $('#ksFile');
+    el.querySelectorAll('[data-a="micpick"]').forEach((b) => (b.onclick = () => file.click()));
+    file.onchange = () => micUpload(file.files[0]);
+    el.querySelectorAll('[data-nudge]').forEach((b) => (b.onclick = async () => {
+      const fps = cut.fps || 30, n = (Number(cut.mic.nudge) || 0) + Number(b.dataset.nudge) / fps;
+      S.micJob = {state: 'run', step: 'сдвигаю петличку'}; render();
+      micPoll(await post('/api/reel/mic', {reel: id, file: cut.mic.from, nudge: n}).catch((e) => ({state: 'error', step: e.message})));
+    }));
+    const drop = el.querySelector('.ks-drop');
+    if (drop) {
+      drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); drop.querySelector('b').textContent = 'Отпустите — загружу и сведу с камерой'; };
+      drop.ondragleave = () => { drop.classList.remove('over'); drop.querySelector('b').textContent = 'Перетащите звук с петлички'; };
+      drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove('over'); micUpload(e.dataTransfer.files[0]); };
+    }
+  }
   const wave = () => {
     const cv = el.querySelector('.kp-wv');
     if (!cv || !PK || !win) return;
@@ -3149,14 +3243,15 @@ function wireCutPanel(id, rv, cut, ed, k) {
   const moved = (kk) => { const i = k.sel(); k.touched(); rv._go(k.startV(i) + 0.02); k.joint(i, kk); };
   function render() {
     const i = k.sel(), c = clips[i];
-    el.innerHTML = `<div class="kp-tabs" role="tablist">${[['clip', 'Кусок'], ['all', 'Все фразы']].map(([key, l]) => `<button type="button" role="tab" aria-selected="${S.tab === key}" data-tab="${key}">${l}</button>`).join('')}<span style="flex: 1"></span><span class="small muted" id="kpSrc"></span></div>
-      <div class="kp-body">${S.tab === 'all' ? allHtml() : c ? clipHtml(c, i) : '<p class="muted" style="margin: 0">Выберите кусок на дорожке — он откроется здесь крупно: подрезка по кадрам, голосу и словам, и другие дубли этой фразы.</p>'}</div>`;
+    el.innerHTML = `<div class="kp-tabs" role="tablist">${[['clip', 'Кусок'], ['all', 'Все фразы'], ['snd', 'Звук']].map(([key, l]) => `<button type="button" role="tab" aria-selected="${S.tab === key}" data-tab="${key}">${l}</button>`).join('')}<span style="flex: 1"></span><span class="small muted" id="kpSrc"></span></div>
+      <div class="kp-body">${S.tab === 'snd' ? sndHtml() : S.tab === 'all' ? allHtml() : c ? clipHtml(c, i) : '<p class="muted" style="margin: 0">Выберите кусок на дорожке — он откроется здесь крупно: подрезка по кадрам, голосу и словам, и другие дубли этой фразы.</p>'}</div>`;
     if (S.tab === 'clip' && c) {
       const pi = phraseOf(c), p = pi >= 0 ? T.phrases[pi] : null, cur = takeOf(c, p);
       $('#kpSrc').textContent = `${p && cur >= 0 ? `дубль ${cur + 1} из ${p.takes.length} · ` : ''}запись ${t1(c.in)}–${t1(c.out)}`;
       drawStrip();
     }
     if (T) thumbs();
+    if (S.tab === 'snd') wireSnd();
     el.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { S.tab = b.dataset.tab; render(); }));
     el.querySelectorAll('[data-row]').forEach((b) => (b.onclick = () => {
       const pi = Number(b.dataset.row), ci = clips.findIndex((x) => phraseOf(x) === pi);
@@ -3241,6 +3336,8 @@ function wireCutPanel(id, rv, cut, ed, k) {
     });
   }
   addEventListener('resize', () => el.isConnected && S.tab === 'clip' && drawStrip(), {signal: rv._ac.signal});
+  // The lavalier just synced: its light voice copy is made in the background — look again until it is there.
+  if (cut.mic?.on && !cut.voice && !S.waitVoice) { S.waitVoice = true; setTimeout(() => { S.waitVoice = false; if (el.isConnected) { REEL_CACHE.clear(); renderVersions(id); } }, 4000); }
   render();
   return {render, sync};
 }

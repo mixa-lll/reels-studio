@@ -19,10 +19,11 @@ import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {readKit} from './dskit.mjs';
 import {fpsOf, joinArgs, snapClips, voiceOf as voiceFileOf} from '../scripts/join.mjs';
 import {firstCut, footageOf, takesOf} from '../scripts/takes.mjs';
+import {micSync} from '../scripts/micsync.mjs';
 import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
-import {basename, dirname, extname, join, relative} from 'node:path';
+import {basename, dirname, extname, join, relative, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
 import {dropOrphans, previewOf, scrubOf, voiceOf} from './preview.mjs';
@@ -146,7 +147,8 @@ function cutView(dir) {
   const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
   const applied = readJson(join(dir, 'cut.applied.json'), null);
   // Changed = the clips or where their sound joins (jt) differ.
-  const same = (a, b) => JSON.stringify((a?.clips || []).map((c) => [c.in, c.out, c.jt || 0])) === JSON.stringify((b?.clips || []).map((c) => [c.in, c.out, c.jt || 0]));
+  const sig = (x) => JSON.stringify([(x?.clips || []).map((c) => [c.in, c.out, c.jt || 0]), x?.voice || '', Number(x?.gainDb) || 0]);
+  const same = (a, b) => sig(a) === sig(b);
   // Graphics as layers (scripts/layers.mjs): each tied to a moment of the source, so the studio can lay
   // them over the live cut while the render is still the old one.
   const g = readJson(join(dir, 'graphics.json'), null);
@@ -158,7 +160,10 @@ function cutView(dir) {
   const so = pv?.video ? scrubOf(pv.video) : null;
   const scrub = so ? {sheets: so.sheets.map(stamp), fps: so.fps, per: so.per, cols: so.cols, w: so.w, h: so.h, n: so.n} : null;
   const voice = vo ? {url: stamp(vo.audio), peaks: stamp(vo.peaks), lav: !!vf, gainDb: Number(cut.gainDb) || 0} : null;
-  return {...cut, graphics, voice, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {scrub, video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
+  // The lavalier the reel has, chosen or not: the «Звук» tab switches between it and the camera.
+  const micFile = cut.voice && cut.voice !== 'camera' ? cut.voice : existsSync(join(dir, 'sources/mic-synced.wav')) ? 'sources/mic-synced.wav' : null;
+  const mic = micFile ? {file: micFile, on: !!vf, ...(cut.mic || {})} : null;
+  return {...cut, graphics, voice, mic, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {scrub, video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
 }
 
 function versions(p, r) {
@@ -323,6 +328,7 @@ function preamble(p, k) {
 const jobs = new Set();
 const MONTAGE = new Map();
 const AUTOCUT = new Map();
+const MICSYNC = new Map();
 const jobOf = (p, k) => [...jobs].find((j) => j.p === p && j.key === k);
 const full = () => jobs.size >= MAX_JOBS;
 let channelSeq = 0;
@@ -1179,6 +1185,48 @@ createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/reel/cut/auto') {
     return json(200, AUTOCUT.get(`${p}/${url.searchParams.get('reel')}`) || {state: 'none'});
   }
+  // The lavalier: an uploaded recording synced to the camera by their sound (scripts/micsync.mjs) — the offset,
+  // the clocks' drift — written as sources/<name>-synced.wav on the camera's timeline; the voice becomes it.
+  if (req.method === 'POST' && url.pathname === '/api/reel/mic') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel), cut = dir && readJson(join(dir, 'cut.json'), null);
+    if (!cut?.source) return json(404, {});
+    // The uploaded file (its absolute path from /api/upload) or one already in the reel (sources/…, a nudge).
+    const src = /^sources\//.test(String(b.file || '')) ? resolve(dir, String(b.file)) : resolve(String(b.file || ''));
+    if (!src.startsWith(join(dir, 'sources') + '/') || !existsSync(src) || !/\.(wav|m4a|mp3|aac|flac|aif|aiff|ogg|mp4|mov)$/i.test(src)) return json(400, {});
+    const key = `${p}/${b.reel}`;
+    if (MICSYNC.get(key)?.state === 'run') return json(200, MICSYNC.get(key));
+    const job = {state: 'run', step: 'свожу с камерой по звуку', at: Date.now()};
+    MICSYNC.set(key, job);
+    const name = basename(src).replace(/\.[^.]+$/, '').replace(/-synced$/, ''), rel = `sources/${name}-synced.wav`;
+    (async () => {
+      const r = await micSync(join(dir, cut.source), src, join(dir, rel), {nudge: Number(b.nudge) || 0});
+      if (r.score < 0.25) throw new Error(`не похоже на звук этой записи (совпадение ${Math.round(r.score * 100)} %) — тот ли файл?`);
+      const now = readJson(join(dir, 'cut.json'), cut);
+      writeJson(join(dir, 'cut.json'), {...now, voice: rel, mic: {from: `sources/${basename(src)}`, offset: r.offset, drift: r.drift, score: r.score, nudge: Number(b.nudge) || 0}, rev: (Number(now.rev) || 0) + 1, editedBy: me.name, editedAt: new Date().toISOString()});
+      Object.assign(job, {state: 'done', step: 'готово', ...r});
+    })().catch((e) => Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}));
+    return json(200, job);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/reel/mic') {
+    return json(200, MICSYNC.get(`${p}/${url.searchParams.get('reel')}`) || {state: 'none'});
+  }
+  // The voice of the cut: the camera's sound or the lavalier, and its gain — for the player and every join.
+  if (req.method === 'POST' && url.pathname === '/api/reel/voice') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel), cut = dir && readJson(join(dir, 'cut.json'), null);
+    if (!cut) return json(404, {});
+    const rev = Number(cut.rev) || 0;
+    if (b.rev != null && Number(b.rev) !== rev) return json(409, {rev});
+    const next = {...cut};
+    if (b.voice === 'camera') next.voice = 'camera';
+    else if (typeof b.voice === 'string' && /^sources\/[^/]+\.wav$/.test(b.voice) && existsSync(join(dir, b.voice))) next.voice = b.voice;
+    if (b.gainDb != null) next.gainDb = Math.max(-12, Math.min(18, Math.round(Number(b.gainDb) * 2) / 2)) || 0;
+    writeJson(join(dir, 'cut.json'), {...next, rev: rev + 1, editedBy: me.name, editedAt: new Date().toISOString()});
+    return json(200, {ok: true, rev: rev + 1});
+  }
   // «Собрать монтаж»: the cut alone, without the agent and without a render — the clips joined
   // (scripts/cut.mjs cut, words), the graphics' times moved to it (scripts/layers.mjs place) and the
   // joined file made the next version as an mp4. Seconds, not minutes: the owner trims and checks as
@@ -1212,7 +1260,7 @@ createServer(async (req, res) => {
       const vdir = join(dir, 'versions', v);
       mkdirSync(vdir, {recursive: true});
       renameSync(tmp, join(vdir, `${base}-${v}.mp4`));
-      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString(), rev: cut.rev || 0, clips: cut.clips.map((c) => ({in: c.in, out: c.out, ...(c.jt ? {jt: c.jt} : {})}))});
+      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString(), rev: cut.rev || 0, ...(cut.voice ? {voice: cut.voice} : {}), ...(cut.gainDb ? {gainDb: cut.gainDb} : {}), clips: cut.clips.map((c) => ({in: c.in, out: c.out, ...(c.jt ? {jt: c.jt} : {})}))});
       Object.assign(job, {state: 'done', step: 'готово'});
     })().catch((e) => { try { rmSync(tmp, {force: true}); } catch {} Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}); });
     return json(200, job);
