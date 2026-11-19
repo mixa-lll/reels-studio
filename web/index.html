@@ -640,6 +640,14 @@
   .kp-h.l { border-radius: 10px 0 0 10px; } .kp-h.r { border-radius: 0 10px 10px 0; margin-left: -14px; }
   .kp-h::after { content: ''; position: absolute; left: 6px; top: calc(50% - 11px); width: 2px; height: 22px; background: #fff; border-radius: 1px; }
   .kp-h:hover, .kp-h.on, .kp-h:focus-visible { background: #2F6FEB; }
+  .kjt { position: absolute; bottom: 2px; height: 40%; width: 2px; margin-left: -1px; background: #2F6FEB; border-radius: 1px; pointer-events: auto; z-index: 2; }
+  .kjt::after { content: '♪'; position: absolute; left: -4px; top: -13px; font-size: 10px; color: #2F6FEB; font-style: normal; }
+  .kp-aw { position: absolute; top: 84px; height: 44px; border: 2px solid #2F6FEB; border-radius: 6px; box-sizing: border-box; pointer-events: none; opacity: .35; }
+  .kp-aw.moved { opacity: 1; }
+  .kp-ah { position: absolute; top: 92px; height: 28px; width: 12px; margin-left: -6px; border: 0; padding: 0; border-radius: 4px; background: #2F6FEB; cursor: ew-resize; touch-action: none; z-index: 2; }
+  .kp-ah::after { content: '♪'; position: absolute; left: 0; right: 0; top: 5px; color: #fff; font-size: 10px; line-height: 1; text-align: center; }
+  .kp-ah:hover, .kp-ah.on, .kp-ah:focus-visible { background: #1F4FB0; }
+  .kp-snd { margin-top: -4px; } .kp-snd b { color: #2F6FEB; }
   .kp-tc { display: flex; align-items: center; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; } .kp-tc > span { display: inline-flex; align-items: center; gap: 5px; } .kp-tc > :nth-child(2) { flex: 1; justify-content: center; }
   .kp-tc button { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); padding: 0; line-height: 1; }
   .kp-takes { border-top: 1px solid var(--soft); padding-top: 8px; }
@@ -872,6 +880,28 @@ const voiceBuf = (url) => {
     .then((buf) => (VOICE.ready.set(url, buf), buf)).catch(() => (VOICE.bufs.delete(url), null)));
   return VOICE.bufs.get(url);
 };
+// The sound apart from the picture (scripts/join.mjs soundOf — the same rule): clip.jt moves the sound joint
+// after it, + its voice runs on under the next picture, − the next voice starts under this one; at most the
+// shorter clip minus 0.1 s, none after the last clip.
+const jtAt = (clips, k) => {
+  const c = clips[k], n = clips[k + 1];
+  if (!c || !n || !Number(c.jt)) return 0;
+  const max = Math.min(c.out - c.in, n.out - n.in) - 0.1;
+  return max > 0 ? Math.max(-max, Math.min(max, Number(c.jt))) : 0;
+};
+/** The sound to play for the cut's time from..to: [[at (s from «from»), source second, duration]]. */
+const cutSound = (clips, from, to) => {
+  const out = [];
+  let st = 0;
+  clips.forEach((c, k) => {
+    const d = c.out - c.in, s = k ? jtAt(clips, k - 1) : 0, e = jtAt(clips, k);
+    const t0 = st + s, t1 = st + d + e;
+    st += d;
+    const a = Math.max(t0, from), b = Math.min(t1, to);
+    if (b - a > 0.005) out.push([a - from, c.in + s + (a - t0), b - a]);
+  });
+  return out;
+};
 // Where the source's frames come from for hover and trimming: the scrub copy once made, else the light copy.
 // Strip sheets already in the browser: only those may stand in for the exact frame (no empty flash).
 const SHEETS = new Set();
@@ -922,7 +952,7 @@ const saveCut = async (id, cut, clips) => {
   try {
     const r = await post('/api/reel/cut', {reel: id, clips, rev: cut.rev ?? null});
     cut.rev = r.rev;
-    (r.clips || []).forEach((c, i) => { if (clips[i]) { clips[i].in = c.in; clips[i].out = c.out; } });
+    (r.clips || []).forEach((c, i) => { if (clips[i]) { clips[i].in = c.in; clips[i].out = c.out; if (c.jt) clips[i].jt = c.jt; else delete clips[i].jt; } });
     return true;
   } catch (e) {
     toast(e.status === 409 ? 'Нарезку поменяли в другой вкладке или агент — обновите страницу, чтобы не затереть' : 'Нарезка не сохранилась');
@@ -2484,7 +2514,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   const pvAt = (t, label) => (rv._clean ? {...rv._clean.at(t), label} : {url: rv.currentSrc || rv.src, t, pv, label});
   // A cut seen at once: the source plays across the joint (the end of one clip, the start of the
   // next) in the same layer, with sound, then the player returns to the version.
-  rv._peekPlay = (url, segs, label, {edge = true, onTime, onEnd, noVoice} = {}) => {
+  rv._peekPlay = (url, segs, label, {edge = true, onTime, onEnd, noVoice, sound} = {}) => {
     pk._play?.kill?.();
     rv.pause(); pk._play = null; peek({url, t: segs[0][0], label, edge, own: true}); $('#pPeekB')?.classList.remove('on');
     if (pkV.getAttribute('src') !== url) pkV.src = url;
@@ -2537,16 +2567,17 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
         if (ctx.state !== 'running') {
           if (run.waiting) return;
           if (!run.waitedVoice) { run.waitedVoice = run.waiting = true; Promise.race([ctx.resume?.(), new Promise((r) => setTimeout(r, 600))]).catch(() => {}).then(() => { run.waiting = false; begin(); }); return; }
-          run.kill?.(); pk._play = null; run.next = rv._peekPlay(url, segs, label, {edge, onTime, onEnd, noVoice: true}); return;
+          run.kill?.(); pk._play = null; run.next = rv._peekPlay(url, segs, label, {edge, onTime, onEnd, noVoice: true, sound}); return;
         }
         if (run.begun) return;
         run.begun = true;
         t0 = ctx.currentTime + 0.05;
-        segs.forEach((x, k) => {
-          const src = ctx.createBufferSource(), g = ctx.createGain(), at = t0 + acc[k], d = lens[k], F = Math.min(0.012, d / 3);
+        // The sound pieces: given (the sound joints moved by jt — J- and L-cuts), else each clip's own.
+        (sound || segs.map((x, k) => [acc[k], x[0], lens[k]])).forEach(([rel, from, d]) => {
+          const src = ctx.createBufferSource(), g = ctx.createGain(), at = t0 + rel, F = Math.min(0.012, d / 3);
           src.buffer = buf;
           g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(1, at + F); g.gain.setValueAtTime(1, at + d - F); g.gain.linearRampToValueAtTime(0, at + d);
-          src.connect(g).connect(master); src.start(at, x[0], d); nodes.push(src);
+          src.connect(g).connect(master); src.start(at, from, d); nodes.push(src);
         });
         pkV.muted = true; pkV.classList.add('on'); pkX.classList.remove('on'); pkV.play().catch(() => {});
         prep(1);
@@ -2980,11 +3011,11 @@ function wireCutPlay(id, rv, cut, withGfx) {
     if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; rv._go(toV(r.ct)); r.run.stop(); hideAll(); return true; }
     cutRun = null;
     const st = starts(); let ct = toC(rv._t()); if (ct >= total() - 0.1) ct = 0;
-    const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
+    const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]), sound = cutSound(clips, ct, total());
     const r = cutRun = {ct};
     r.run = rv._peekPlay(srcOf(pv), segs, clean ? '▶ Монтаж · без графики' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
       onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); show(r.ct); },
-      onEnd: () => { if (cutRun === r) { cutRun = null; rv._go(toV(r.ct)); hideAll(); } }});
+      onEnd: () => { if (cutRun === r) { cutRun = null; rv._go(toV(r.ct)); hideAll(); } }, sound});
     return true;
   };
   // «Нарезка» is the first stage — the footage alone. The version on the screen may already carry graphics,
@@ -3054,11 +3085,14 @@ function wireCutPanel(id, rv, cut, ed, k) {
     return `<div class="kp-head"><span class="kp-q">${c.text ? `«${esc(c.text)}»` : `Кусок ${i + 1}`}</span>
         <button type="button" class="btn" data-a="play">▶ Кусок</button>${ed ? '<button type="button" class="btn" data-a="split" title="Разрезать там, где стоит головка">Разрезать</button><button type="button" class="btn" data-a="del">Удалить</button>' : ''}</div>
       <div class="kp-l"><b>Подрезка</b><span class="muted">кусок на своей записи с запасом по краям · кадры, голос, слова · тяните края</span></div>
-      <div class="kp-strip" id="kpStrip"><div class="kp-fr"></div><canvas class="kp-wv"></canvas><div class="kp-wd"></div><i class="kp-sh l"></i><i class="kp-sh r"></i><i class="kp-win"></i>
-        ${ed ? '<button type="button" class="kp-h l" data-h="in" aria-label="Начало куска — тяните, стрелки — по кадру"></button><button type="button" class="kp-h r" data-h="out" aria-label="Конец куска — тяните, стрелки — по кадру"></button>' : ''}</div>
+      <div class="kp-strip" id="kpStrip"><div class="kp-fr"></div><canvas class="kp-wv"></canvas><div class="kp-wd"></div><i class="kp-sh l"></i><i class="kp-sh r"></i><i class="kp-win"></i><i class="kp-aw" aria-hidden="true"></i>
+        ${ed ? `<button type="button" class="kp-h l" data-h="in" aria-label="Начало куска — тяните, стрелки — по кадру"></button><button type="button" class="kp-h r" data-h="out" aria-label="Конец куска — тяните, стрелки — по кадру"></button>${i > 0 ? '<button type="button" class="kp-ah l" data-ah="s" title="Звук начала куска — тяните: раньше или позже картинки" aria-label="Звук начала — тяните, стрелки — по кадру"></button>' : ''}${i < clips.length - 1 ? '<button type="button" class="kp-ah r" data-ah="e" title="Звук конца куска — тяните: дальше под следующий кадр или раньше" aria-label="Звук конца — тяните, стрелки — по кадру"></button>' : ''}` : ''}</div>
       <div class="kp-tc"><span><b>Начало</b> ${ed ? '<button type="button" data-n="in:-1" aria-label="Начало на кадр раньше">‹</button>' : ''}<span id="kpIn"></span>${ed ? '<button type="button" data-n="in:1" aria-label="Начало на кадр позже">›</button>' : ''}</span>
         <span class="muted" id="kpLen"></span>
         <span>${ed ? '<button type="button" data-n="out:-1" aria-label="Конец на кадр раньше">‹</button>' : ''}<span id="kpOut"></span>${ed ? '<button type="button" data-n="out:1" aria-label="Конец на кадр позже">›</button>' : ''} <b>Конец</b></span></div>
+      <div class="kp-tc kp-snd"><span><b>Звук</b>${i > 0 && ed ? '<button type="button" data-j="s:-1" aria-label="Звук начала на кадр раньше">‹</button>' : ''}<span id="kpSs"></span>${i > 0 && ed ? '<button type="button" data-j="s:1" aria-label="Звук начала на кадр позже">›</button>' : ''}</span>
+        <span class="muted" id="kpSnote"></span>
+        <span>${i < clips.length - 1 && ed ? '<button type="button" data-j="e:-1" aria-label="Звук конца на кадр раньше">‹</button>' : ''}<span id="kpSe"></span>${i < clips.length - 1 && ed ? '<button type="button" data-j="e:1" aria-label="Звук конца на кадр позже">›</button>' : ''}</span></div>
       ${!T ? '<p class="small muted" style="margin: 0">Ищу дубли этой фразы в записи…</p>' : !p || !others ? '<p class="small muted" style="margin: 0">Других дублей этой фразы в записи не нашлось.</p>'
         : `<div class="kp-takes"><button type="button" class="kp-fold" data-a="fold" aria-expanded="${S.fold}">${CH}<span>Другие дубли этой фразы · ${others}</span><span class="muted" style="font-weight: 400">${S.fold ? '' : cur >= 0 ? `в монтаже дубль ${cur + 1}` : 'в монтаже свой отрезок'}</span></button>${S.fold ? rows(p, pi, i) : ''}</div>`}`;
   };
@@ -3089,6 +3123,13 @@ function wireCutPanel(id, rv, cut, ed, k) {
     const hl = st.querySelector('.kp-h.l'), hr = st.querySelector('.kp-h.r'); if (hl) { hl.style.left = `${a}%`; hr.style.left = `${b}%`; }
     st.querySelectorAll('.kp-wd span').forEach((x) => x.classList.toggle('in', Number(x.dataset.m) >= c.in - 0.02 && Number(x.dataset.m) <= c.out + 0.02));
     $('#kpIn').textContent = t1(c.in); $('#kpOut').textContent = t1(c.out); $('#kpLen').textContent = `длина ${sec(c.out - c.in)}`;
+    // The sound: where it starts and ends against the picture (the joints' jt).
+    const i = k.sel(), js = i ? jtAt(clips, i - 1) : 0, je = jtAt(clips, i), sa = X(c.in + js), sb = X(c.out + je);
+    const aw = st.querySelector('.kp-aw'); aw.style.left = `${sa}%`; aw.style.width = `${sb - sa}%`; aw.classList.toggle('moved', !!(js || je));
+    const al = st.querySelector('.kp-ah.l'), ar = st.querySelector('.kp-ah.r'); if (al) al.style.left = `${sa}%`; if (ar) ar.style.left = `${sb}%`;
+    const fmt = (v) => (v ? `${v > 0 ? '+' : '−'}${Math.abs(v).toFixed(2).replace('.', ',')} с` : '0');
+    $('#kpSs').textContent = i ? fmt(js) : '—'; $('#kpSe').textContent = i < clips.length - 1 ? fmt(je) : '—';
+    $('#kpSnote').textContent = js || je ? [js < 0 ? 'звук начинается раньше картинки' : js > 0 ? 'под началом — звук прошлого куска' : '', je > 0 ? 'звук идёт под следующий кадр' : je < 0 ? 'под концом — звук следующего куска' : ''].filter(Boolean).join(' · ') : 'звук склеен там же, где картинка';
   };
   const drawStrip = () => {
     const c = clips[k.sel()], st = $('#kpStrip');
@@ -3151,6 +3192,35 @@ function wireCutPanel(id, rv, cut, ed, k) {
       k.layout(); rv._peek({...scrubSrc(pv), t: c[kk], label: edgeLabel(kk, c), edge: true});
       clearTimeout(b._t); b._t = setTimeout(() => moved(kk), 500);
     }));
+    // The sound joints: the left handle is the joint before (clip i−1's jt), the right one the joint after (clip i's).
+    const setJ = (side, v) => {
+      const kk = side === 's' ? i - 1 : i, cc = clips[kk], n = clips[kk + 1];
+      if (!cc || !n) return;
+      const max = Math.min(cc.out - cc.in, n.out - n.in) - 0.1, j = r2(Math.round(Math.max(-max, Math.min(max, v)) / FR) * FR);
+      if (Math.abs(j) < FR / 2) delete cc.jt; else cc.jt = j;
+      k.layout();
+    };
+    const jMoved = (side) => { k.touched(); k.joint(i, side === 's' ? 'in' : 'out'); };
+    el.querySelectorAll('[data-j]').forEach((b) => (b.onclick = () => {
+      const [side, d] = b.dataset.j.split(':'), cur = side === 's' ? jtAt(clips, i - 1) : jtAt(clips, i);
+      setJ(side, cur + d * FR); clearTimeout(b._t); b._t = setTimeout(() => jMoved(side), 500);
+    }));
+    el.querySelectorAll('.kp-ah').forEach((h) => {
+      const side = h.dataset.ah;
+      h.onpointerdown = (e) => {
+        e.preventDefault(); e.stopPropagation(); try { h.setPointerCapture(e.pointerId); } catch {} rv.pause();
+        const v0 = side === 's' ? jtAt(clips, i - 1) : jtAt(clips, i), x0 = e.clientX, w = $('#kpStrip').getBoundingClientRect().width;
+        h.classList.add('on');
+        h.onpointermove = (ev) => setJ(side, v0 + ((ev.clientX - x0) / w) * (win.hi - win.lo) * (ev.shiftKey ? 0.2 : 1));
+        h.onpointerup = () => { h.onpointermove = h.onpointerup = null; h.classList.remove('on'); if ((side === 's' ? jtAt(clips, i - 1) : jtAt(clips, i)) !== v0) jMoved(side); render(); };
+      };
+      h.onkeydown = (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault(); e.stopPropagation();
+        setJ(side, (side === 's' ? jtAt(clips, i - 1) : jtAt(clips, i)) + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1) * FR);
+        clearTimeout(h._t); h._t = setTimeout(() => jMoved(side), 500);
+      };
+    });
     el.querySelectorAll('.kp-h').forEach((h) => {
       const kk = h.dataset.h;
       const set = (t) => { c[kk] = r2(kk === 'in' ? Math.max(0, Math.min(t, c.out - 0.2)) : Math.min(k.srcDur, Math.max(t, c.in + 0.2))); k.layout(); rv._peek({...scrubSrc(pv), t: c[kk], label: edgeLabel(kk, c), edge: true}); };
@@ -3228,6 +3298,9 @@ function wireClips(id, rv, cut, open, ed, foot) {
       if (kt.children.length !== n) kt.innerHTML = '<i></i>'.repeat(n);
       [...kt.children].forEach((x, j) => { x.style.width = `${tw}px`; if (pv) rv._cover(x, pv, c.in + ((j + 0.5) * (c.out - c.in)) / n); });
     });
+    // Joints where the sound is moved off the picture (jt): a blue mark where the sound actually joins.
+    box.querySelectorAll('.kjt').forEach((m) => m.remove());
+    clips.forEach((c, i) => { const j = jtAt(clips, i); if (!j) return; const m = document.createElement('i'); m.className = 'kjt'; m.title = `Звук на стыке ${i + 1}→${i + 2}: ${j > 0 ? 'идёт дальше под следующий кадр' : 'следующий начинается раньше'} на ${Math.abs(j).toFixed(2).replace('.', ',')} с`; m.style.left = `${(st[i] + c.out - c.in + j) * pps}px`; box.append(m); });
     panel?.sync();
     if (sel < 0) return;
     const c = clips[sel], l = st[sel] * pps, w = (c.out - c.in) * pps;
@@ -3240,7 +3313,8 @@ function wireClips(id, rv, cut, open, ed, foot) {
     const c = clips[i], prev = clips[i - 1], next = clips[i + 1];
     const segs = k === 'in' ? [...(prev ? [[Math.max(prev.in, prev.out - 1), prev.out]] : []), [c.in, Math.min(c.out, c.in + 1.5)]]
       : [[Math.max(c.in, c.out - 1.5), c.out], ...(next ? [[next.in, Math.min(next.out, next.in + 1)]] : [])];
-    rv._peekPlay(srcOf(pv), segs, `▶ Склейка ${k === 'in' ? `${i}→${i + 1}` : `${i + 1}→${i + 2}`}`);
+    const st = starts(), a = k === 'in' ? st[i] - (prev ? Math.min(1, prev.out - prev.in) : 0) : st[i] + (c.out - c.in) - Math.min(1.5, c.out - c.in);
+    rv._peekPlay(srcOf(pv), segs, `▶ Склейка ${k === 'in' ? `${i}→${i + 1}` : `${i + 1}→${i + 2}`}`, {sound: cutSound(clips, a, a + segs.reduce((s, x) => s + x[1] - x[0], 0))});
   };
   const pick = (i) => { if (i === sel) return; clearTimeout(trimT); trim = null; box.classList.remove('trim'); tl.classList.remove('trimming'); sel = i; cut.sel = i; build(); layout(); panel?.render(); $('#eComp')?._upd?.(); };
   cut.deselect = () => pick(-1);

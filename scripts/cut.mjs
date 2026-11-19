@@ -5,6 +5,8 @@
 //    "clips": [{"in": 17.8, "out": 21.95, "text": "Don't know where to stay…"}, …]}
 // Optional: "rotate": 90 | -90 | 180 (a camera clip filmed sideways), "gainDb": voice gain, linear,
 // "voice": the lavalier file (default sources/mic-synced.wav when it exists), "rev": the studio's revision.
+// A clip's "jt": the sound joint after it moved off the picture joint, seconds — + its voice runs on under
+// the next picture (L-cut), − the next voice starts under this one (J-cut); the owner sets it in the studio.
 // in/out are seconds of the source on its frame grid; the clips play one after another with hard cuts.
 // The join itself is scripts/join.mjs — the same recipe as the studio's «Собрать монтаж».
 //

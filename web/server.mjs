@@ -145,7 +145,8 @@ function cutView(dir) {
   const pv = previewOf(src, {rotate: Number(cut.rotate) || 0});
   const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
   const applied = readJson(join(dir, 'cut.applied.json'), null);
-  const same = (a, b) => JSON.stringify((a?.clips || []).map((c) => [c.in, c.out])) === JSON.stringify((b?.clips || []).map((c) => [c.in, c.out]));
+  // Changed = the clips or where their sound joins (jt) differ.
+  const same = (a, b) => JSON.stringify((a?.clips || []).map((c) => [c.in, c.out, c.jt || 0])) === JSON.stringify((b?.clips || []).map((c) => [c.in, c.out, c.jt || 0]));
   // Graphics as layers (scripts/layers.mjs): each tied to a moment of the source, so the studio can lay
   // them over the live cut while the render is still the old one.
   const g = readJson(join(dir, 'graphics.json'), null);
@@ -1134,9 +1135,9 @@ createServer(async (req, res) => {
     if (b.rev != null && Number(b.rev) !== rev) return json(409, {rev, clips: cut.clips});
     // In and out on the frame grid of the source (scripts/join.mjs): the player, «Собрать монтаж»
     // and the final join all cut the same frames.
-    const clips = snapClips(b.clips.map((c) => ({in: Number(c.in), out: Number(c.out), ...(c.text ? {text: String(c.text).slice(0, 300)} : {})})), fpsOf(cut));
+    const clips = snapClips(b.clips.map((c) => ({in: Number(c.in), out: Number(c.out), ...(c.text ? {text: String(c.text).slice(0, 300)} : {}), ...(Number(c.jt) ? {jt: Number(c.jt)} : {})})), fpsOf(cut));
     writeJson(join(dir, 'cut.json'), {...cut, clips, rev: rev + 1, editedBy: me.name, editedAt: new Date().toISOString()});
-    return json(200, {ok: true, rev: rev + 1, clips: clips.map((c) => ({in: c.in, out: c.out}))});
+    return json(200, {ok: true, rev: rev + 1, clips: clips.map((c) => ({in: c.in, out: c.out, jt: c.jt || 0}))});
   }
   // Takes of every line of the script found in the recording by its words (scripts/takes.mjs), and the
   // words themselves — for the panel under the track: other takes of a clip, words under the trim strip.
@@ -1211,7 +1212,7 @@ createServer(async (req, res) => {
       const vdir = join(dir, 'versions', v);
       mkdirSync(vdir, {recursive: true});
       renameSync(tmp, join(vdir, `${base}-${v}.mp4`));
-      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString(), rev: cut.rev || 0, clips: cut.clips.map((c) => ({in: c.in, out: c.out}))});
+      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString(), rev: cut.rev || 0, clips: cut.clips.map((c) => ({in: c.in, out: c.out, ...(c.jt ? {jt: c.jt} : {})}))});
       Object.assign(job, {state: 'done', step: 'готово'});
     })().catch((e) => { try { rmSync(tmp, {force: true}); } catch {} Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}); });
     return json(200, job);
