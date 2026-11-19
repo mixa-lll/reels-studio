@@ -2250,7 +2250,7 @@ function wireEdits(id, rv, form, cur, nextV) {
   const clipK = () => { const c = CUT[id]; return c?.on && c.sel >= 0 ? c.sel : -1; };
   const upd = () => {
     const k = clipK(), c = CUT[id];
-    tEl.textContent = k >= 0 ? `Кусок ${k + 1} · ${(c.clips[k].out - c.clips[k].in).toFixed(1).replace('.', ',')} с` : `На ${tc(rv.currentTime)}`;
+    tEl.textContent = k >= 0 ? `Кусок ${k + 1} · ${(c.clips[k].out - c.clips[k].in).toFixed(1).replace('.', ',')} с` : `На ${tc(rv._t())}`;
     tEl.classList.toggle('clip', k >= 0); $('#eX').hidden = k < 0;
     $('#eText').placeholder = k >= 0 ? 'Что сделать с куском — например, взять другой дубль' : 'Что поменять в этом месте';
   };
@@ -2291,7 +2291,7 @@ function wireEdits(id, rv, form, cur, nextV) {
     e.preventDefault();
     const text = $('#eText').value.trim();
     if (!text) return $('#eText').focus();
-    const k = clipK(); await post('/api/reel/edits', {reel: id, action: 'add', t: rv.currentTime, text, point, voice, ...(k >= 0 ? {clip: k + 1, quote: CUT[id].clips[k].text || undefined} : {})});
+    const k = clipK(); await post('/api/reel/edits', {reel: id, action: 'add', t: rv._t(), text, point, voice, ...(k >= 0 ? {clip: k + 1, quote: CUT[id].clips[k].text || undefined} : {})});
     $('#eText').value = ''; point = null; layer.innerHTML = '';
     renderVersions(id);
   };
@@ -2320,7 +2320,13 @@ function fitPlayer(v) {
 
 function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._ac?.abort(); rv._ac = new AbortController();
-  rv._pkStop?.(); rv._clean = null; rv._voice = null; rv.closest('.vwrap')?.classList.remove('clean');
+  rv._pkStop?.(); rv._clean = null; rv._voice = null;
+  // The time on the track. In «Нарезка» it is a number of our own (rv._ct): the version's video is hidden
+  // there and is not touched — seeking it over the network was slow, and a late answer to an old seek
+  // threw the playhead back after ■. Outside «Нарезка» it is the video's own time.
+  rv._ct = null;
+  rv._t = () => (rv._clean && rv._ct != null ? rv._ct : rv.currentTime);
+  rv._go = (t) => { if (rv._clean) { rv._ct = Math.max(0, t); rvWant = null; rv._upd?.(); } else rv.currentTime = t; }; rv.closest('.vwrap')?.classList.remove('clean');
   fitPlayer(rv);
   // A file that does not open (a render cut short, e.g. by a full disk) says so instead of a black box.
   const bad = () => { const w = rv.closest('.vwrap'); if (w && !w.querySelector('.vbad')) w.insertAdjacentHTML('beforeend', `<div class="vbad">Файл ${esc(sel.v)} не открывается — похоже, рендер оборвался. Попросите в чате пересобрать ${esc(sel.v)}.</div>`); };
@@ -2395,7 +2401,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._peek = peek;
   // Dragging the playhead: one seek of the version in flight, then straight to the latest spot.
   let rvWant = null;
-  const seekRv = (t) => { if (rv.seeking) { rvWant = t; return; } rvWant = null; rv.currentTime = t; };
+  const seekRv = (t) => { if (rv._clean) return rv._go(t); if (rv.seeking) { rvWant = t; return; } rvWant = null; rv.currentTime = t; };
   rv.addEventListener('seeked', () => { if (rvWant != null) { const t = rvWant; rvWant = null; rv.currentTime = t; } }, {signal: rv._ac?.signal});
   rv._pkStop = () => { if (pk) { pk._play?.kill?.(); pk._play = null; } for (const el of [pkV, $('#pPeekB'), pkX]) try { el.pause(); el.removeAttribute('src'); el.load(); } catch {} };
   // What a hover shows: the version's frame, or in «Нарезка» the source's (no graphics).
@@ -2563,13 +2569,13 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     const at = (t) => Math.min(100, Math.max(0, (t / d) * 100));
     const list = sel === cur ? open.filter((x) => !x.clip).map((x) => [x, '#2F6FEB', x.text]) : [];
     $('#pMarks').innerHTML = list.map(([x, c, t]) => `<button type="button" class="bflag" style="left: ${at(x.t)}%; background: ${c}" data-eseek="${x.t}" title="${tc(x.t)} — ${esc(t)}" aria-label="${tc(x.t)} — ${esc(t)}"></button>`).join('');
-    $('#pMarks').querySelectorAll('[data-eseek]').forEach((b) => { b.onpointerdown = (e) => e.stopPropagation(); b.onclick = () => { rv.currentTime = Number(b.dataset.eseek); rv.pause(); }; });
+    $('#pMarks').querySelectorAll('[data-eseek]').forEach((b) => { b.onpointerdown = (e) => e.stopPropagation(); b.onclick = () => { rv._go(Number(b.dataset.eseek)); rv.pause(); }; });
   };
   const upd = () => {
-    const d = dur(), p = d ? (100 * rv.currentTime) / d : 0;
+    const d = dur(), p = d ? (100 * rv._t()) / d : 0;
     $('#bHead').style.left = `${p}%`;
     if ($('#pFill')) { $('#pFill').style.width = `${p}%`; $('#pKnob').style.left = `${p}%`; $('#pThin').style.width = `${p}%`; }
-    const tt = `${t1(rv.currentTime)} / ${t1(d)}`;
+    const tt = `${t1(rv._t())} / ${t1(d)}`;
     $('#pTime').textContent = tt; if ($('#bTime')) $('#bTime').textContent = tt;
     // The cut playing (its own players) counts as playing too.
     const idle = rv.paused && !(pk?._play && !pk._play.done), ic = idle ? '▶' : '❚❚';
@@ -2590,7 +2596,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv.onclick = toggle;
   $('#pPlay').onclick = toggle;
   $('#pBig').onclick = toggle;
-  const step = (k) => { rv.pause(); rv.currentTime = Math.max(0, Math.min(dur(), rv.currentTime + k / 30)); };
+  const step = (k) => { rv.pause(); rv._go(Math.max(0, Math.min(dur(), rv._t() + k / 30))); };
   $('#pPrev').onclick = () => step(-1);
   $('#pNext').onclick = () => step(1);
   $('#pFull').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : vw.requestFullscreen?.());
@@ -2598,13 +2604,13 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   const sc = $('#pScrub'), stip = $('#pSTip'), ghost = $('#pGhost');
   const scAt = (e) => { const r = sc.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
   sc.onpointermove = (e) => {
-    const f = scAt(e), t = f * dur(), now = dur() ? rv.currentTime / dur() : 0;
+    const f = scAt(e), t = f * dur(), now = dur() ? rv._t() / dur() : 0;
     stip.hidden = false; stip.style.left = `${100 * f}%`; stip.textContent = t1(t);
     ghost.style.left = `${100 * Math.min(f, now)}%`; ghost.style.width = `${100 * Math.abs(f - now)}%`;
     if (sc._drag) { seekRv(t); peek(rv._clean ? pvAt(t, rv._clean.at(t).label) : null); }
   };
   sc.onpointerleave = () => { if (sc._drag) return; stip.hidden = true; ghost.style.width = '0'; peek(null); };
-  sc.onpointerdown = (e) => { e.stopPropagation(); sc._drag = true; sc.setPointerCapture(e.pointerId); rv.currentTime = scAt(e) * dur(); peek(null); };
+  sc.onpointerdown = (e) => { e.stopPropagation(); sc._drag = true; sc.setPointerCapture(e.pointerId); rv._go(scAt(e) * dur()); peek(null); };
   sc.onpointerup = (e) => { sc._drag = false; sc.releasePointerCapture?.(e.pointerId); };
   sc.onkeydown = (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(e.key === 'ArrowRight' ? 1 : -1); } };
   // The track under the player: hover = a thin line, the time and that frame in the player; press =
@@ -2622,7 +2628,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     if (tl._drag) { seekRv(t); peek(rv._clean ? pvAt(t, rv._clean.at(t).label) : null); }
   };
   tl.onpointerleave = () => { if (tl._drag || tl._busy) return; skl.hidden = true; rv._tip(0, ''); tl._hover?.(null); peek(null); };
-  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; tl.classList.add('dragging'); tl._scrub = !!e.target.closest?.('.ruler, .bhead'); try { tl.setPointerCapture(e.pointerId); } catch {} rv.pause(); rv.currentTime = timeAt(e); peek(null); if (!tl._scrub) tl._pick?.(rv.currentTime); upd(); };
+  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; tl.classList.add('dragging'); tl._scrub = !!e.target.closest?.('.ruler, .bhead'); try { tl.setPointerCapture(e.pointerId); } catch {} rv.pause(); rv._go(timeAt(e)); peek(null); if (!tl._scrub) tl._pick?.(rv._t()); upd(); };
   tl.onpointerup = (e) => { tl._drag = false; tl._scrub = false; tl.classList.remove('dragging'); tl.releasePointerCapture?.(e.pointerId); };
   // E puts the cursor in the note field under the track.
   const compose = () => { rv.pause(); $('#eText')?.focus(); };
@@ -2650,7 +2656,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   };
   const zoomTo = (z, x) => {
     Zt = Math.max(1, Math.min(16, z));
-    const d = dur(), hx = d ? (rv.currentTime / d) * tl.clientWidth - scr.scrollLeft : scr.clientWidth / 2;
+    const d = dur(), hx = d ? (rv._t() / d) * tl.clientWidth - scr.scrollLeft : scr.clientWidth / 2;
     const cx = x ?? (hx >= 0 && hx <= scr.clientWidth ? hx : scr.clientWidth / 2);
     anchor = {x: cx, f: (scr.scrollLeft + cx) / (scr.clientWidth * Z)};
     if (!zraf) zraf = requestAnimationFrame(zstep);
@@ -2668,7 +2674,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     if (!rv.isConnected) return rv._ac.abort();
     if (e.target.closest?.('input, textarea, select, [contenteditable]') || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === ' ') { e.preventDefault(); toggle(); }
-    else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); rv.pause(); rv.currentTime = Math.max(0, Math.min(dur(), rv.currentTime + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : 1 / 30))); }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); rv.pause(); rv._go(Math.max(0, Math.min(dur(), rv._t() + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : 1 / 30)))); }
     else if (scr && (e.key === '=' || e.key === '+')) zoomTo(Zt * 1.8);
     else if (scr && (e.key === '-' || e.key === '_')) zoomTo(Zt / 1.8);
     else if ((e.key === 'e' || e.key === 'E' || e.key === 'у' || e.key === 'У') && $('#eComp')) { e.preventDefault(); compose(); }
@@ -2895,26 +2901,27 @@ function wireCutPlay(id, rv, cut, withGfx) {
   let cutRun = null;
   tl._cutPlay = () => {
     if (!clean && !(cut.changed && cut._montage)) return false;
-    if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; rv.currentTime = toV(r.ct); r.run.stop(); hideAll(); return true; }
+    if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; rv._go(toV(r.ct)); r.run.stop(); hideAll(); return true; }
     cutRun = null;
-    const st = starts(); let ct = toC(rv.currentTime); if (ct >= total() - 0.1) ct = 0;
+    const st = starts(); let ct = toC(rv._t()); if (ct >= total() - 0.1) ct = 0;
     const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
     const r = cutRun = {ct};
     r.run = rv._peekPlay(srcOf(pv), segs, clean ? '▶ Нарезка · чистое видео' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
       onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); show(r.ct); },
-      onEnd: () => { if (cutRun === r) { cutRun = null; rv.currentTime = toV(r.ct); hideAll(); } }});
+      onEnd: () => { if (cutRun === r) { cutRun = null; rv._go(toV(r.ct)); hideAll(); } }});
     return true;
   };
   // «Нарезка» is the first stage — the footage alone. The version on the screen may already carry graphics,
   // so here the player shows and plays the source by the cut: paused it holds the source frame at the
   // playhead, play runs the clips one after another. Graphics are the second stage, with «Нарезка» off.
   if (clean) {
-    rv._clean = {at: (t = rv.currentTime) => { const ct = Math.min(toC(t), total() - 0.01), i = clipAt(ct); return {...scrubSrc(pv), t: clips[i].in + (ct - starts()[i]), label: 'Нарезка · чистое видео'}; }};
+    rv._ct = rv.currentTime;
+    rv._clean = {at: (t = rv._t()) => { const ct = Math.min(toC(t), total() - 0.01), i = clipAt(ct); return {...scrubSrc(pv), t: clips[i].in + (ct - starts()[i]), label: 'Нарезка · чистое видео'}; }};
     rv.closest('.vwrap')?.classList.add('clean'); rv.pause(); rv._peek(null);
   }
   // A montage-only version is the cut itself: its graphics come on top as layers while it plays.
   if (cut._montage && items.length) {
-    const follow = () => { if (!rv.isConnected || sig.aborted) return; if (!cutRun?.run.alive()) show(toC(rv.currentTime)); requestAnimationFrame(follow); };
+    const follow = () => { if (!rv.isConnected || sig.aborted) return; if (!cutRun?.run.alive()) show(toC(rv._t())); requestAnimationFrame(follow); };
     requestAnimationFrame(follow);
     return;
   }
@@ -3036,7 +3043,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
         h.onpointerup = (ev) => {
           ev.stopPropagation(); h.onpointermove = (x) => { if (!tl._busy) x.stopPropagation(); }; h.classList.remove('on');
           tl._busy = false; rv._peek(null); rv._tip(0, ''); $('#eComp')?._upd?.();
-          if (c[k] !== v0) { cut.changed = true; save(); foot(); rv.currentTime = toV(starts()[sel]) + 0.02; joint(sel, k); }
+          if (c[k] !== v0) { cut.changed = true; save(); foot(); rv._go(toV(starts()[sel]) + 0.02); joint(sel, k); }
           // The source view stays a moment so the result is seen in place, then the track comes back.
           trimT = setTimeout(() => { trim = null; box.classList.remove('trim'); tl.classList.remove('trimming'); layout(); }, 900);
         };
@@ -3175,7 +3182,7 @@ async function renderVersions(id, data) {
   let rv = $('#rv');
   if (rv && oldRv && oldRv.getAttribute('src') === rv.getAttribute('src')) { rv.replaceWith(oldRv); rv = oldRv; }
   // The same version from its light copy now: carry the second over.
-  else if (rv && oldRv && oldRv.isConnected === false && VIEWV[id] === oldRv._v) { const t = oldRv.currentTime; rv.addEventListener('loadedmetadata', () => { rv.currentTime = t; }, {once: true}); }
+  else if (rv && oldRv && oldRv.isConnected === false && VIEWV[id] === oldRv._v) { const t = oldRv._t ? oldRv._t() : oldRv.currentTime; rv.addEventListener('loadedmetadata', () => { rv.currentTime = t; }, {once: true}); }
   if (rv) rv._v = VIEWV[id];
   const igCaption = (Array.isArray(data.publish?.captions) && (data.publish.captions.find((c) => /insta/i.test(c.platform || '')) || data.publish.captions[0])?.text) || section(data.readme, 'Подпись').trim() || section(data.readme, 'Caption').trim();
   if (rv) wirePlayer(rv, sel, cur, edits, open, igCaption);
@@ -3209,7 +3216,7 @@ async function renderVersions(id, data) {
   $('#keepLatest')?.addEventListener('click', async () => { if (!confirm(`Оставить только последнюю версию? У старых уйдут видео (${mb(data.storage.reclaimLatest)}); обложки, снимки кода и мастера останутся. 30 дней их можно вернуть.`)) return; const {freed} = await post('/api/free', {reel: id, mode: 'latest'}); toast(freed ? `Освобождено ${mb(freed)}` : 'Нечего освобождать'); sidebar(); renderVersions(id); });
   $('#restoreReel')?.addEventListener('click', async () => { const {restored} = await post('/api/reel/restore', {reel: id}); toast(restored ? `Вернули из корзины: ${restored}` : 'В корзине уже ничего нет'); sidebar(); renderVersions(id); });
   el.querySelectorAll('[data-vready]').forEach((b) => (b.onclick = async () => { await post('/api/reel/ready', {reel: id, v: b.dataset.vready}); toast(`${b.dataset.vready} идёт в «Готово»`); renderVersions(id); }));
-  el.querySelectorAll('[data-eseek]').forEach((b) => b.closest('#bStrip') || (b.onclick = () => { if (rv) { rv.currentTime = Number(b.dataset.eseek); rv.pause(); } }));
+  el.querySelectorAll('[data-eseek]').forEach((b) => b.closest('#bStrip') || (b.onclick = () => { if (rv) { rv._go ? rv._go(Number(b.dataset.eseek)) : (rv.currentTime = Number(b.dataset.eseek)); rv.pause(); } }));
   el.querySelectorAll('[data-erm]').forEach((b) => (b.onclick = async () => { await post('/api/reel/edits', {reel: id, action: 'remove', id: b.dataset.erm}); renderVersions(id); }));
   el.querySelectorAll('[data-eacc]').forEach((b) => (b.onclick = async () => { await post('/api/reel/edits', {reel: id, action: 'accept', id: b.dataset.eacc, accepted: b.getAttribute('aria-pressed') !== 'true'}); renderVersions(id); }));
   el.querySelectorAll('[data-elang]').forEach((s) => (s.onchange = () => post('/api/reel/edits', {reel: id, action: 'update', id: s.dataset.elang, lang: s.value}).then(() => toast('Сохранено'))));
