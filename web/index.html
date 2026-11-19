@@ -537,6 +537,7 @@
   /* Player: controls show on hover (CapCut/YouTube): big ▶ when paused, a bar with scrub and buttons. */
   .bplay .vwrap { overflow: hidden; border-radius: 14px; }
   .vwrap:hover video#rv { filter: brightness(.9); }
+  .vwrap.clean { background: #000; } .vwrap.clean video#rv { visibility: hidden; }
   .ppeek { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
   .ppeek i:not([style*="url"]) { display: none; }
   .ppeek i, .ppeek video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background-repeat: no-repeat; display: block; }
@@ -2240,7 +2241,7 @@ function fitPlayer(v) {
 
 function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._ac?.abort(); rv._ac = new AbortController();
-  rv._pkStop?.(); rv._clean = null;
+  rv._pkStop?.(); rv._clean = null; rv.closest('.vwrap')?.classList.remove('clean');
   fitPlayer(rv);
   // A file that does not open (a render cut short, e.g. by a full disk) says so instead of a black box.
   const bad = () => { const w = rv.closest('.vwrap'); if (w && !w.querySelector('.vbad')) w.insertAdjacentHTML('beforeend', `<div class="vbad">Файл ${esc(sel.v)} не открывается — похоже, рендер оборвался. Попросите в чате пересобрать ${esc(sel.v)}.</div>`); };
@@ -2654,7 +2655,7 @@ function wireCutPlay(id, rv, cut, withGfx) {
   };
   let cutRun = null;
   tl._cutPlay = () => {
-    if (!cut.changed && !clean) return false;
+    if (!clean && !(cut.changed && cut._montage)) return false;
     if (cutRun && cutRun.run.alive()) { const r = cutRun; cutRun = null; r.run.stop(); hideAll(); rv.currentTime = toV(r.ct); return true; }
     cutRun = null;
     const st = starts(); let ct = toC(rv.currentTime); if (ct >= total() - 0.1) ct = 0;
@@ -2670,7 +2671,7 @@ function wireCutPlay(id, rv, cut, withGfx) {
   // playhead, play runs the clips one after another. Graphics are the second stage, with «Нарезка» off.
   if (clean) {
     rv._clean = {at: (t = rv.currentTime) => { const ct = Math.min(toC(t), total() - 0.01), i = clipAt(ct); return {url: pv.video, t: clips[i].in + (ct - starts()[i]), pv, label: 'Нарезка · чистое видео'}; }};
-    rv.pause(); rv._peek(null);
+    rv.closest('.vwrap')?.classList.add('clean'); rv.pause(); rv._peek(null);
   }
   // A montage-only version is the cut itself: its graphics come on top as layers while it plays.
   if (cut._montage && items.length) {
