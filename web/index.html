@@ -10,7 +10,9 @@
   /* One design system (handbook/ROADMAP.md): Manrope, neutral greys, black primary button. */
   :root { --bg:#FFFFFF; --side:#FAFAFA; --card:#fff; --ink:#171717; --ink2:#525252; --muted:#737373; --line:#EBEBEB; --soft:#F4F4F4; --hov:#F0F0F0; --sel:#E8E8E8; --accent:#171717; --blue:#1D4ED8; --blueBg:#EEF3FD; --amber:#B45309; --green:#1E7A3D; --me:#F0F0F0; --meInk:#171717; --badge:#2F6FEB; }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  /* An app, not a page: the window never slides sideways or springs on a two-finger swipe (nor goes back in history). */
+  html, body { height: 100%; margin: 0; overflow-x: hidden; overscroll-behavior: none; }
+  * { overscroll-behavior-x: none; }
   body { background: var(--bg); color: var(--ink); font: 14px/1.5 Manrope, -apple-system, system-ui, sans-serif; letter-spacing: -0.005em; }
   a { color: inherit; }
   button, input, select, textarea { font: inherit; color: inherit; }
@@ -408,8 +410,26 @@
   .lsub { display: flex; gap: 4px; padding: 8px 28px 0; }
   /* the canvas-look pages scroll inside the view, the header stays */
   #view > div[style*="overflow-y: auto"], #tabHost > div[style*="overflow-y: auto"] { min-height: 0; }
+  .spills { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; }
+  .spills .sp { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 13px; color: var(--muted); text-decoration: none; white-space: nowrap; }
+  .spills .sp:hover { background: var(--soft); color: var(--ink); }
+  .spills .sp.done, .spills .sp.now { color: var(--ink2); } .spills .sp.now { font-weight: 600; }
+  .spills .sp.view { background: var(--ink); color: #fff; } .spills .sp.view .sp-ok { color: #fff; }
+  .sp-ok { color: var(--green); font-size: 11px; } .sp-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  @media (max-width: 1100px) { .spills { order: 9; width: 100%; margin: 0; overflow-x: auto; } }
   .rhead { min-height: 52px; flex: none; display: flex; align-items: center; gap: 12px; padding: 6px 20px 6px 24px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .rtitle { font-weight: 600; font-size: 15px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rmeta { position: relative; } .rmeta summary { list-style: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; line-height: 28px; }
+  .rmeta summary::-webkit-details-marker { display: none; } .rmeta .rsq { width: 8px; height: 8px; }
+  .rmeta-pop { position: absolute; right: 0; top: 36px; z-index: 30; display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+  .rmeta-pop label { display: flex; flex-direction: column; gap: 4px; } .rmeta-pop .rchip { width: 200px; }
+  .rhead { flex-wrap: nowrap; overflow: hidden; gap: 8px; } .rhead > * { flex-shrink: 0; } .rhead .rtitle { flex-shrink: 1; min-width: 60px; }
+  .rhead .rfmt { align-items: center; gap: 5px; }
+  .rhead .rlbl2 { display: none; } @media (min-width: 1700px) { .rhead .rlbl2 { display: inline-flex; } }
+  @media (max-width: 1600px) { .rhead .rside { display: none; } }
+  @media (max-width: 1500px) { .spills .sp { padding: 0 7px; } .rmeta summary { max-width: 150px; overflow: hidden; text-overflow: ellipsis; } }
+  .rhead .rlbl { display: none; } @media (min-width: 1800px) { .rhead .rlbl { display: inline; } }
+  .rhead input.rchip[type=datetime-local] { width: 168px; }
+  .rtitle { font-weight: 600; font-size: 15px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lbar.mini { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; font-size: 12px; }
   .lbar.mini .lstep .c { width: 14px; height: 14px; font-size: 8px; }
   .lbar.mini .lstep.on .c::after { width: 4px; height: 4px; }
@@ -1506,6 +1526,16 @@ function stageTrack(x, {viewing = x.stage, href = null, cmp = false} = {}) {
     return `<${tag} class="sg ${i < k ? 'done' : i === k ? 'now' : 'fut'} ${s === viewing ? 'view' : ''}" ${href ? `href="${href(s)}"` : ''} ${s === viewing ? 'aria-current="step"' : ''} title="${t}"><span class="bar">${fill}</span><span class="nm">${o}${t}</span><span class="note">${note}</span></${tag}>`;
   }).join('')}</nav>`;
 }
+// The five stages in one row of the release's header (new design): small pills — done ✓, the current one
+// with its colour dot, the one open dark. What each stage holds is in its tooltip.
+function stagePills(x, {viewing = x.stage, href}) {
+  const k = LIFE.findIndex(([s]) => s === x.stage);
+  return `<nav class="spills" aria-label="Этапы выпуска">${LIFE.map(([s, t], i) => {
+    const note = stageNote(x, s, i, k), col = LIFE_COLOR[s];
+    const mark = i < k ? '<span class="sp-ok">✓</span>' : i === k ? `<span class="sp-dot" style="background: ${col}"></span>` : '';
+    return `<a class="sp ${i < k ? 'done' : i === k ? 'now' : 'fut'} ${s === viewing ? 'view' : ''}" href="${href(s)}" ${s === viewing ? 'aria-current="step"' : ''} title="${esc(t + (i === k ? ' · сейчас' : '') + (note ? ' · ' + note : ''))}">${mark}${t}</a>`;
+  }).join('')}</nav>`;
+}
 // Where a stage of a release opens on its full page.
 const stageHref = (x) => x.ref?.kind === 'reel' ? (s) => `#/reel/${x.ref.id}/${REEL_STEPS[s][0]}` : x.ref?.kind === 'post' ? (s) => `#/post/${x.ref.id}/${POST_STEPS(x.format)[s][0]}` : null;
 // A release's header (LR0): a crumb, the title, rubric and date in one row; the five stages under
@@ -1525,17 +1555,19 @@ async function relHead(kind, id, steps, tab, base, title) {
   const ahead = ed && later.length ? `<div class="rback">${svg('eye', 15)}<span style="flex: 1">Выпуск сейчас на этапе «${LIFE[k][1]}».${later.includes('published') ? ' Уже готов или вышел — отметьте вручную.' : ''}</span>${later.map((st) => `<button type="button" class="ln-btn ${st === later.at(-1) ? 'p' : ''} s" data-setstage="${st}" data-item="${x.id}">${st === 'published' ? 'Отметить «Вышло»' : `Перевести на «${LIFE.find(([o]) => o === st)[1]}»`}</button>`).join('')}</div>` : '';
   const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
   return `<div class="rhead" data-item="${x.id}">
-    <a href="#/all" class="rcrumb">‹ Выпуски</a><span class="slash">/</span>
+    <a href="#/all" class="rcrumb" title="Все выпуски">‹<span class="rlbl2"> Выпуски</span></a><span class="slash rlbl2">/</span>
     <span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b class="rtitle" title="${esc(title)}">${esc(title)}</b>
-    <span class="small muted" style="display: inline-flex; align-items: center; gap: 5px">${svg(FMT_ICON[x.format], 14)}${FMT_NAME[x.format]}</span>
+    <span class="small muted rlbl2 rfmt">${svg(FMT_ICON[x.format], 14)}${FMT_NAME[x.format]}</span>
+    ${stagePills(x, {viewing, href: (s) => base + steps[s][0]})}
     <span style="flex: 1"></span>
-    ${ed ? `<select class="rchip" data-f="rubric" aria-label="Рубрика"><option value="">без рубрики</option>${ITEMS.rubrics.map((y) => `<option value="${esc(y.id)}" ${r?.id === y.id ? 'selected' : ''}>${esc(y.name)}</option>`).join('')}</select>
-      <input class="rchip" data-f="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}">`
+    ${ed ? `<details class="rmeta"><summary class="rchip" title="Рубрика и дата выхода">${r ? `<i class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></i>${esc(r.name)}` : 'без рубрики'} · ${esc(whenText(x.at))}</summary><div class="rmeta-pop">
+      <label class="small muted">Рубрика<select class="rchip" data-f="rubric" aria-label="Рубрика"><option value="">без рубрики</option>${ITEMS.rubrics.map((y) => `<option value="${esc(y.id)}" ${r?.id === y.id ? 'selected' : ''}>${esc(y.name)}</option>`).join('')}</select></label>
+      <label class="small muted">Дата выхода<input class="rchip" data-f="at" type="datetime-local" aria-label="Дата выхода" value="${esc((x.at || '').slice(0, 16))}"></label></div></details>`
     : `${r ? `<span class="small">${esc(r.name)}</span>` : ''}<span class="small muted">${whenText(x.at)}</span>`}
     <span id="dlTop" class="row" style="gap: 8px"></span>
-    ${ed && kind === 'reel' ? `<button type="button" class="ln-btn s" data-copyreel="${esc(id)}" title="Новый рилс на основе этого: другой материал, язык или тема"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>Сделать по образцу</button>` : ''}
-    <button type="button" class="ln-btn g s" data-side="${x.id}" title="Открыть сбоку" aria-label="Открыть сбоку">${svg('panelR', 16)}</button></div>
-    ${stageTrack(x, {viewing, href: (s) => base + steps[s][0]})}${back}${ahead}${subs}`;
+    ${ed && kind === 'reel' ? `<button type="button" class="ln-btn s" data-copyreel="${esc(id)}" title="Новый рилс на основе этого: другой материал, язык или тема"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span class="rlbl">Сделать по образцу</span></button>` : ''}
+    <button type="button" class="ln-btn g s rside" data-side="${x.id}" title="Открыть сбоку" aria-label="Открыть сбоку">${svg('panelR', 16)}</button></div>
+    ${back}${ahead}${subs}`;
 }
 // «Сделать по образцу»: what changes, then the new reel opens where the work starts.
 function copyReelDialog(from) {
