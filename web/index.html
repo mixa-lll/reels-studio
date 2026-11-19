@@ -3299,7 +3299,11 @@ async function renderVersions(id, data) {
   data ||= await api('/api/reel?reel=' + encodeURIComponent(id));
   const el = $('#vers');
   if (!el) return;
-  const vs = data.versions, ed = canEdit();
+  // The newest version's folder with nothing in it yet is a build in progress (the agent made the folder,
+  // the render is still running): it is not a version to look at — the last finished one stays the current
+  // one, with its player, «Нарезка» and the clip panel; a chip says the next one is being built.
+  const building = data.versions[0] && !data.versions[0].files.length && !data.versions[0].archived ? data.versions[0] : null;
+  const vs = building ? data.versions.slice(1) : data.versions, ed = canEdit();
   const video = (v) => v.files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
   // The player takes the light copy when the server has made it (web/preview.mjs).
   const playUrl = (v) => v.preview?.video || video(v).url;
@@ -3309,7 +3313,7 @@ async function renderVersions(id, data) {
   const cur = vs[0];
   const sel = vs.find((v) => v.v === VIEWV[id]) || cur;
   const ready = vs.find((v) => v.v === data.ready && video(v)) || vs.find((v) => video(v));
-  const nextV = cur ? 'v' + (Number(cur.v.replace(/\D/g, '')) + 1) : 'v1';
+  const nextV = data.versions[0] ? 'v' + (Number(data.versions[0].v.replace(/\D/g, '')) + 1) : 'v1';
   const edits = data.edits || [];
   const open = edits.filter((x) => x.state === 'open');
   const withVideo = vs.filter((v) => video(v));
@@ -3339,7 +3343,7 @@ async function renderVersions(id, data) {
         : '<div class="vph">Видео появится, когда Claude смонтирует первую версию</div>'}
     </div>
     <div class="binfo">
-      ${cur ? `<div class="vrow"><span class="small muted">Версия</span><div class="vseg" role="group" aria-label="Версии">${vs.map((v) => `<button type="button" class="vchip ${v === sel ? 'on' : ''}" data-vchip="${esc(v.v)}" aria-pressed="${v === sel}" title="${esc(`${v === vs.at(-1) ? 'первая сборка' : changes(v) ? `${changes(v)} правок` : 'сборка'} · ${ago(v.at)} · ${!video(v) ? 'хранится кадром' : hasMaster(v) ? 'мастер готов' : v.stage === 'montage' ? 'монтаж без графики' : 'черновик'}${v === ready ? ' · идёт в «Готово»' : ''}`)}">${esc(vName(v))}${v === ready ? '<i class="rdot" aria-label="идёт в «Готово»"></i>' : ''}</button>`).join('')}</div>
+      ${cur ? `<div class="vrow"><span class="small muted">Версия</span>${building ? `<span class="chip" title="Claude рендерит её — видео появится здесь само">${esc(building.v)} собирается…</span>` : ''}<div class="vseg" role="group" aria-label="Версии">${vs.map((v) => `<button type="button" class="vchip ${v === sel ? 'on' : ''}" data-vchip="${esc(v.v)}" aria-pressed="${v === sel}" title="${esc(`${v === vs.at(-1) ? 'первая сборка' : changes(v) ? `${changes(v)} правок` : 'сборка'} · ${ago(v.at)} · ${!video(v) ? 'хранится кадром' : hasMaster(v) ? 'мастер готов' : v.stage === 'montage' ? 'монтаж без графики' : 'черновик'}${v === ready ? ' · идёт в «Готово»' : ''}`)}">${esc(vName(v))}${v === ready ? '<i class="rdot" aria-label="идёт в «Готово»"></i>' : ''}</button>`).join('')}</div>
         ${withVideo.length > 1 ? `<a class="small muted" href="#/reel/${esc(id)}/compare" style="text-decoration: none">сравнить ${esc((prevOf(sel) || withVideo[1]).v)} ↔ ${esc((prevOf(sel) ? sel : withVideo[0]).v)}</a>` : ''}<span style="flex: 1"></span>
         <details class="vmenu"><summary class="btn ic" aria-label="Ещё о версии ${esc(sel.v)}">⋯</summary><div class="vpop">
           ${video(sel) && mp4(sel) ? `<a href="${mp4(sel).url}&dl=1">Скачать ${esc(sel.v)} в mp4</a>` : ''}
