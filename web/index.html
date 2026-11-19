@@ -673,6 +673,9 @@
   .ks-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px; border: 2px dashed #BDBDB8; border-radius: 14px; background: var(--card); color: var(--ink); text-align: center; }
   .ks-drop:hover, .ks-drop.over { border-color: #2F6FEB; background: #EEF3FD; color: #1F4FB0; }
   .ks-l { display: flex; gap: 8px; align-items: baseline; font-size: 13px; } .ks-wave { width: 100%; height: 64px; border-radius: 8px; background: #EEF3FD; }
+  .kc .kw { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; background: rgba(255,255,255,.92); pointer-events: none; overflow: hidden; }
+  .kc .kw span { position: absolute; top: 1px; border-top: 2px solid var(--ink); padding-top: 1px; font-size: 9.5px; line-height: 10px; white-space: nowrap; color: var(--ink); }
+  .kc .kw span.b { top: 12px; }
   .kjt { position: absolute; bottom: 2px; height: 40%; width: 2px; margin-left: -1px; background: #2F6FEB; border-radius: 1px; pointer-events: auto; z-index: 2; }
   .kjt::after { content: '♪'; position: absolute; left: -4px; top: -13px; font-size: 10px; color: #2F6FEB; font-style: normal; }
   .kp-aw { position: absolute; top: 84px; height: 44px; border: 2px solid #2F6FEB; border-radius: 6px; box-sizing: border-box; pointer-events: none; opacity: .35; }
@@ -3096,7 +3099,7 @@ function wireCutPanel(id, rv, cut, ed, k) {
   const CH = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
   const FLAG = {whole: 'чистый', slip: 'с оговоркой', cut: 'оборван'};
   let T = cut._takes || null, PK = cut._peaks || null, win = null;
-  if (!T) api('/api/reel/takes?reel=' + encodeURIComponent(id)).then((j) => { T = cut._takes = j; }).catch(() => { T = cut._takes = {phrases: [], words: []}; }).then(() => el.isConnected && render());
+  if (!T) api('/api/reel/takes?reel=' + encodeURIComponent(id)).then((j) => { T = cut._takes = j; }).catch(() => { T = cut._takes = {phrases: [], words: []}; }).then(() => { if (el.isConnected) { render(); k.layout(); } });
   if (!PK && cut.voice?.peaks) fetch(cut.voice.peaks).then((r) => r.json()).then((j) => { PK = cut._peaks = {rate: j.rate || 100, v: Uint8Array.from(atob(j.p), (ch) => ch.charCodeAt(0))}; if (el.isConnected) wave(); }).catch(() => {});
   // The line of the script a clip is a take of: by its text, else by where it sits on the recording.
   const over = (c, t) => Math.max(0, Math.min(c.out, t.out) - Math.max(c.in, t.in));
@@ -3529,6 +3532,21 @@ function wireClips(id, rv, cut, open, ed, foot) {
       const kt = el.firstChild, n = Math.max(1, Math.ceil(w / tw));
       if (kt.children.length !== n) kt.innerHTML = '<i></i>'.repeat(n);
       [...kt.children].forEach((x, j) => { x.style.width = `${tw}px`; if (pv) rv._cover(x, pv, c.in + ((j + 0.5) * (c.out - c.in)) / n); });
+      // Zoomed in far enough (≥ 60 px a second) the clip shows its words, each under its place in the video —
+      // from the same transcript the takes come from: drawing only, no model.
+      let kw = el.querySelector('.kw');
+      const words = pps >= 60 && cut._takes?.words;
+      if (!words) { if (kw) kw.hidden = true; }
+      else {
+        if (!kw) { kw = document.createElement('span'); kw.className = 'kw'; el.append(kw); }
+        kw.hidden = false;
+        const key = `${c.in}|${c.out}|${Math.round(w)}`;
+        if (kw._key !== key) {
+          kw._key = key;
+          const d = c.out - c.in, ws = words.filter((x) => x[2] > c.in + 0.02 && x[1] < c.out - 0.02);
+          kw.innerHTML = ws.map((x, q) => { const a = Math.max(c.in, Math.max(x[1], x[2] - 0.6)), b = Math.min(c.out, x[2]); return `<span class="${q % 2 ? 'b' : ''}" style="left: ${(100 * (a - c.in)) / d}%; width: calc(${(100 * (b - a)) / d}% - 1px)">${esc(x[0])}</span>`; }).join('');
+        }
+      }
     });
     // Joints where the sound is moved off the picture (jt): a blue mark where the sound actually joins.
     box.querySelectorAll('.kjt').forEach((m) => m.remove());
