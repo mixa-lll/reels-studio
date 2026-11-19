@@ -565,7 +565,14 @@
   .pinlayer { z-index: 6; }
   /* The track: one row — the version's frames, or with «Нарезка» on its clips with their own frames. */
   .ptl { height: 58px; margin-top: 0; }
-  .vrow { display: flex; align-items: center; gap: 10px; }
+  .vrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ksteps { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-right: 4px; flex: none; }
+  .pctl { flex-wrap: wrap; row-gap: 8px; }
+  .ksteps button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 12px; border: 0; border-radius: 9px; background: none; color: var(--ink2); line-height: 1.2; text-align: left; }
+  .ksteps button b { font-size: 13px; font-weight: 600; } .ksteps button span { font-size: 11px; color: var(--muted); }
+  .ksteps button:hover { background: var(--soft); }
+  .ksteps button[aria-pressed="true"] { background: var(--ink); color: #fff; } .ksteps button[aria-pressed="true"] span { color: rgba(255,255,255,.75); }
+  .ksteps i { font-style: normal; color: var(--muted); }
   .vseg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: #F2F2EF; }
   .vchip { position: relative; height: 28px; padding: 0 11px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
   .vchip:hover { color: var(--ink); } .vchip.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
@@ -2943,7 +2950,7 @@ function wireCutPlay(id, rv, cut, withGfx) {
     const st = starts(); let ct = toC(rv._t()); if (ct >= total() - 0.1) ct = 0;
     const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
     const r = cutRun = {ct};
-    r.run = rv._peekPlay(srcOf(pv), segs, clean ? '▶ Нарезка · чистое видео' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
+    r.run = rv._peekPlay(srcOf(pv), segs, clean ? '▶ Монтаж · без графики' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
       onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); show(r.ct); },
       onEnd: () => { if (cutRun === r) { cutRun = null; rv._go(toV(r.ct)); hideAll(); } }});
     return true;
@@ -2953,7 +2960,7 @@ function wireCutPlay(id, rv, cut, withGfx) {
   // playhead, play runs the clips one after another. Graphics are the second stage, with «Нарезка» off.
   if (clean) {
     rv._ct = rv.currentTime;
-    rv._clean = {at: (t = rv._t()) => { const ct = Math.min(toC(t), total() - 0.01), i = clipAt(ct); return {...scrubSrc(pv), t: clips[i].in + (ct - starts()[i]), label: 'Нарезка · чистое видео'}; }};
+    rv._clean = {at: (t = rv._t()) => { const ct = Math.min(toC(t), total() - 0.01), i = clipAt(ct); return {...scrubSrc(pv), t: clips[i].in + (ct - starts()[i]), label: 'Монтаж · без графики'}; }};
     rv.closest('.vwrap')?.classList.add('clean'); rv._refit?.(); rv.pause(); rv._peek(null);
   }
   // A montage-only version is the cut itself: its graphics come on top as layers while it plays.
@@ -3355,10 +3362,10 @@ async function renderVersions(id, data) {
           ${isOwner() && data.storage?.trash ? `<button type="button" id="restoreReel">Вернуть из корзины · ${mb(data.storage.trash)}</button>` : ''}
         </div></details></div>` : `<p class="small muted">Версий пока нет. Напишите в чате справа, что снять или смонтировать.</p>${ed ? '<p><button type="button" class="btn" id="kAsk0" title="Студия сама: расшифровка по словам, дубли каждой фразы текста, последний чистый дубль — в монтаж">Разложить съёмку на дубли и собрать монтаж</button></p>' : ''}`}
       ${sel && video(sel) ? `<div class="pbar">
-          <div class="pctl"><span class="tcx" id="bTime">0:00,0 / 0:00,0</span><span style="flex: 1"></span>
+          <div class="pctl">${sel === cur && CUT[id] ? `<div class="ksteps" role="group" aria-label="Шаг сборки"><button type="button" data-kstep="1" aria-pressed="${kOn}" title="Только видео и звук: куски, дубли, подрезка — играет сразу, без рендера"><b>1 · Монтаж</b></button><i aria-hidden="true">→</i><button type="button" data-kstep="0" aria-pressed="${!kOn}" title="Версия с плашками, субтитрами и маской — её рендерит Claude"><b>2 · Графика</b></button></div>` : ''}<span class="tcx" id="bTime">0:00,0 / 0:00,0</span><span style="flex: 1"></span>
             <div class="zctl" aria-label="Масштаб дорожки"><button type="button" class="zb" id="zOut" aria-label="Мельче">−</button><input type="range" id="zRange" min="0" max="100" value="0" aria-label="Масштаб"><button type="button" class="zb" id="zIn" aria-label="Крупнее">+</button></div>
             ${sel === cur && ed && !data.cut ? '<button type="button" class="linkbtn small" id="kAsk">Разложить на дубли</button>' : ''}
-            ${sel === cur && CUT[id] ? `<button type="button" class="kswitch" id="kSw" role="switch" aria-checked="${kOn}"><span>Нарезка</span><i></i></button>` : ''}</div>
+</div>
           <div class="tlbox"><div class="tlscroll" id="tlScroll"><div class="ptl ${kOn ? 'kmode' : ''}" id="bStrip" aria-label="Дорожка"><div class="ruler" id="pRuler" aria-label="Линейка времени — тяните, чтобы перемотать"></div><div class="film" id="pFilm"></div>${kOn ? '<div class="pclips" id="pClips"></div>' : ''}<span id="pMarks"></span><i class="bhead" id="bHead"></i><i class="pskl" id="pSkl" hidden></i><span class="ttip" id="pTip" hidden></span></div></div>
           <div class="khints" ${kOn ? 'hidden' : ''}><span>Линейка — перемотка</span><span>${kOn ? 'Клик — кусок и кадр' : 'Клик — перейти к кадру'}</span>${kOn ? '<span>Края — подрезать, отпустил — играет склейка</span><span>▶ играет чистое видео по кускам, без графики</span>' : ''}<span><kbd>←</kbd><kbd>→</kbd> кадр</span><span><kbd>⌘</kbd> + колесо — масштаб</span><span><kbd>E</kbd> правка</span>${kOn ? '<span><kbd>Esc</kbd> снять выбор</span>' : ''}</div></div>${kOn ? '<div class="kpanel" id="kPanel"></div>' : ''}
           ${sel === cur && ed ? `<form class="ecomp2" id="eComp"><span class="etgt" id="eT">На 0:00</span><button type="button" class="ex" id="eX" hidden aria-label="Снять выбор куска">✕</button>
@@ -3382,7 +3389,8 @@ async function renderVersions(id, data) {
     $('#bNote').textContent = n || cutCh ? [n ? `${n} ${n === 1 ? 'правка' : n < 5 ? 'правки' : 'правок'} к ${nextV}` : '', cutCh ? 'нарезка поправлена' : ''].filter(Boolean).join(' · ') : 'Новая версия собирается только по кнопке — правки сначала копятся.';
   };
   foot();
-  $('#kSw')?.addEventListener('click', () => { try { localStorage.setItem('reels-cut:' + id, kOn ? '0' : '1'); } catch {} if (CUT[id]) CUT[id].sel = -1; renderVersions(id, data); });
+  // The two steps of «Сборка»: 1 · Монтаж (the cut: clips, takes, trimming — live) and 2 · Графика (the rendered version).
+  el.querySelectorAll('[data-kstep]').forEach((b) => (b.onclick = () => { if ((b.dataset.kstep === '1') === kOn) return; try { localStorage.setItem('reels-cut:' + id, b.dataset.kstep); } catch {} if (CUT[id]) CUT[id].sel = -1; renderVersions(id, data); }));
   // «Разложить на дубли»: the studio itself — the transcript by words if there is none, the takes of every line,
   // the last clean take of each into the cut; with no version yet, the montage is built right after.
   document.querySelectorAll('#kAsk, #kAsk0').forEach((b) => b.addEventListener('click', async () => {
