@@ -586,6 +586,15 @@
   .zctl input[type=range] { width: 72px; accent-color: #141413; }
   .ptl .bhead { top: -30px; bottom: -4px; width: 2px; margin-left: -1px; background: #2F6FEB; box-shadow: none; z-index: 6; border-radius: 1px; }
   .ptl .bhead::before { content: ''; position: absolute; top: 0; left: -5px; width: 12px; height: 12px; border-radius: 50%; background: #2F6FEB; }
+  /* Zoomed in, the track is thousands of px of frame tiles: each of these is its own layer, so moving the
+     playhead, the hover line or the tip repaints only itself, not every tile under it. */
+  .ptl #pFilm, .ptl #pClips, .ptl #pRuler { contain: layout paint style; will-change: transform; }
+  .ptl .bhead, .ptl #pSkl, .ptl #pTip { will-change: transform, left; }
+  /* The playhead is a handle: grab it (a 14 px wide strip around the line) and drag — the video follows. */
+  .ptl .bhead { pointer-events: auto; cursor: grab; }
+  .ptl .bhead::after { content: ''; position: absolute; top: 0; bottom: 0; left: -7px; right: -7px; }
+  .ptl .bhead:hover::before, .ptl.dragging .bhead::before { transform: scale(1.25); }
+  .ptl.dragging, .ptl.dragging .bhead { cursor: grabbing; }
   .ptl.kmode .film { display: none; }
   .pclips { position: absolute; inset: 0; }
   .kc { position: absolute; top: 0; bottom: 0; border-radius: 7px; overflow: hidden; background: #2B2B29; transition: box-shadow .1s; }
@@ -804,7 +813,49 @@ const voiceBuf = (url) => {
 // Where the source's frames come from for hover and trimming: the scrub copy once made, else the light copy.
 // Strip sheets already in the browser: only those may stand in for the exact frame (no empty flash).
 const SHEETS = new Set();
-const scrubSrc = (pv) => (pv.scrub ? {url: pv.scrub.video, pv: pv.scrub} : {url: pv.video, pv});
+// The cut's recording (its 720p light copy) kept whole in the browser. Through the relay every jump in a
+// streamed video is a new request (~0.5 s) and the link gives ~1.5 MB/s, so playing, hovering and the
+// second player waiting at a joint fought over it. Downloaded once (Cache Storage, survives reloads),
+// then everything reads a local blob: seeks in milliseconds, nothing on the network.
+const LOCAL = new Map();
+const localCopy = (url) => {
+  let e = LOCAL.get(url);
+  if (e) return e;
+  e = {done: 0, total: 0, blob: null, subs: new Set()};
+  LOCAL.set(url, e);
+  const tell = () => e.subs.forEach((f) => { try { f(e); } catch {} });
+  (async () => {
+    const key = new URL(url, location.href).href, base = key.split('&m=')[0];
+    const box = 'caches' in window ? await caches.open('reels-cut-1').catch(() => null) : null;
+    const hit = box && (await box.match(key).catch(() => null));
+    let blob;
+    if (hit) blob = await hit.blob();
+    else {
+      const res = await fetch(url);
+      if (!res.ok || !res.body) throw new Error(res.status);
+      e.total = Number(res.headers.get('content-length')) || 0;
+      const parts = [], rd = res.body.getReader();
+      for (let last = 0; ;) {
+        const {done, value} = await rd.read();
+        if (done) break;
+        parts.push(value); e.done += value.length;
+        if (performance.now() - last > 250) { last = performance.now(); tell(); }
+      }
+      blob = new Blob(parts, {type: 'video/mp4'});
+      if (box) {
+        // One copy per recording: an older one (another &m= stamp) goes.
+        for (const k of await box.keys().catch(() => [])) if (k.url.split('&m=')[0] === base && k.url !== key) await box.delete(k).catch(() => {});
+        await box.put(key, new Response(blob, {headers: {'content-type': 'video/mp4'}})).catch(() => {});
+      }
+    }
+    e.blob = URL.createObjectURL(blob);
+    tell();
+  })().catch(() => { LOCAL.delete(url); e.failed = true; tell(); });
+  return e;
+};
+// The light copy to read: the local blob once it is whole, else the stream.
+const srcOf = (pv) => LOCAL.get(pv.video)?.blob || pv.video;
+const scrubSrc = (pv) => ({url: srcOf(pv), pv: pv.scrub || pv});
 const saveCut = async (id, cut, clips) => {
   try {
     const r = await post('/api/reel/cut', {reel: id, clips, rev: cut.rev ?? null});
@@ -2292,8 +2343,10 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     el.style.backgroundSize = `${p.cols * p.w * scale}px auto`;
     el.style.backgroundPosition = `${ox - (k % p.cols) * p.w * scale}px ${oy - Math.floor(k / p.cols) * p.h * scale}px`;
   };
-  // Sized by its box (the <i> itself is display:none until it has a picture, so it measures 0).
-  const cover = (el, p, t) => { const box = el.parentElement || el, w = box.clientWidth, h = box.clientHeight; if (!p || !w) return; const s = Math.max(w / p.w, h / p.h); frame(el, p, t, s, (w - p.w * s) / 2, (h - p.h * s) / 2); };
+  // Sized by itself; the player's strip layer (display:none until it has a picture, so it measures 0) by its box.
+  // Never by the parent for a visible tile: a clip's tile would take the whole clip's width and scale the
+  // strip to tens of thousands of px — at a high zoom that froze the track.
+  const cover = (el, p, t) => { const box = el.clientWidth ? el : el.parentElement || el, w = box.clientWidth, h = box.clientHeight; if (!p || !w) return; const s = Math.max(w / p.w, h / p.h); frame(el, p, t, s, (w - p.w * s) / 2, (h - p.h * s) / 2); };
   rv._cover = cover;
   // «Просмотр»: a frame over the video without moving it. Its own <video> (pkX, for the cut's source the
   // 360p scrub copy: a key frame every 5 frames) seeks at once and always to the latest spot — a seek
@@ -2306,14 +2359,16 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   const peek = (o) => {
     if (!pk) return;
     if (!o) {
+      const was = pk._play;
       pkV.pause(); pkV.muted = true; pkV.playbackRate = 1; pk._play?.kill?.(); pk._play = null;
       o = rv._clean?.at();
+      if (was) setTimeout(() => rv._upd?.(), 0);
       if (!o) { pk.hidden = true; want = null; return; }
     }
     // A playing cut keeps its picture: hovering the track does not touch it.
     if (pk._play && !pk._play.done && !o.edge && !o.own) return;
     pk.hidden = false; pk.classList.toggle('edge', !!o.edge); $('#pTag').textContent = o.label;
-    if (o.own) { want = null; pkX.classList.remove('on'); return; }
+    if (o.own) { want = null; return; }
     // The players' last frame (after ▶ stops) stays under until the exact frame lands on top of it.
     if (o.pv?.sprite || o.pv?.sheets) cover(pkS, o.pv, o.t); else pkS.style.backgroundImage = '';
     const same = want != null && Math.abs(o.t - want) < 0.001 && (pkX.seeking || (pkX._at != null && Math.abs(pkX._at - o.t) < 0.03));
@@ -2347,19 +2402,22 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   const pvAt = (t, label) => (rv._clean ? {...rv._clean.at(t), label} : {url: rv.currentSrc || rv.src, t, pv, label});
   // A cut seen at once: the source plays across the joint (the end of one clip, the start of the
   // next) in the same layer, with sound, then the player returns to the version.
-  rv._peekPlay = (url, segs, label, {edge = true, onTime, onEnd} = {}) => {
+  rv._peekPlay = (url, segs, label, {edge = true, onTime, onEnd, noVoice} = {}) => {
     pk._play?.kill?.();
     rv.pause(); pk._play = null; peek({url, t: segs[0][0], label, edge, own: true}); $('#pPeekB')?.classList.remove('on');
     if (pkV.getAttribute('src') !== url) pkV.src = url;
-    const vo = rv._voice, buf = vo && VOICE.ready.get(vo.url);
-    const run = pk._play = {i: 0, alive: () => pk._play === run && !run.done, stop: () => { if (pk._play === run) { run.done = true; run.kill?.(); peek(null); } }};
-    const end = () => { run.done = true; run.kill?.(); pkV.pause(); pkV.playbackRate = 1; onEnd?.(); setTimeout(() => pk._play === run && peek(null), 350); };
+    const vo = rv._voice, buf = !noVoice && vo && VOICE.ready.get(vo.url);
+    if (buf) voiceCtx().resume?.().catch(() => {});
+    // run.next: the same playing continued another way (the camera's sound when the voice could not start) —
+    // alive() and stop() follow it, so ■ always stops what is playing.
+    const run = pk._play = {i: 0, alive: () => (run.next ? run.next.alive() : pk._play === run && !run.done), stop: () => { if (run.next) return run.next.stop(); if (pk._play === run) { run.done = true; run.kill?.(); peek(null); } }};
+    const end = () => { run.done = true; run.kill?.(); pkV.pause(); pkV.playbackRate = 1; onEnd?.(); rv._upd?.(); setTimeout(() => pk._play === run && peek(null), 350); };
     let step;
     if (buf) {
       // The voice is the clock: every clip scheduled at once on the audio timeline; the picture
       // (muted) is nudged after it — a slightly faster or slower rate for a small lag, a seek with a
       // little lead for a big one or at a joint.
-      const ctx = voiceCtx(); ctx.resume?.();
+      const ctx = voiceCtx();
       const lens = segs.map((x) => x[1] - x[0]), acc = lens.reduce((a, d, k) => (a.push(k ? a[k - 1] + lens[k - 1] : 0), a), []), total = acc.at(-1) + lens.at(-1);
       const master = ctx.createGain(), lim = ctx.createDynamicsCompressor(), nodes = [];
       master.gain.value = 10 ** ((vo.gainDb || 0) / 20);
@@ -2392,6 +2450,15 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
       };
       const begin = () => {
         if (pk._play !== run || run.done || t0 != null) return;
+        // The audio starts asynchronously after the click: wait for it (≤ 0.6 s). If the browser does not let
+        // the voice start, the same run plays on with the camera's sound.
+        if (ctx.state !== 'running') {
+          if (run.waiting) return;
+          if (!run.waitedVoice) { run.waitedVoice = run.waiting = true; Promise.race([ctx.resume?.(), new Promise((r) => setTimeout(r, 600))]).catch(() => {}).then(() => { run.waiting = false; begin(); }); return; }
+          run.kill?.(); pk._play = null; run.next = rv._peekPlay(url, segs, label, {edge, onTime, onEnd, noVoice: true}); return;
+        }
+        if (run.begun) return;
+        run.begun = true;
         t0 = ctx.currentTime + 0.05;
         segs.forEach((x, k) => {
           const src = ctx.createBufferSource(), g = ctx.createGain(), at = t0 + acc[k], d = lens[k], F = Math.min(0.012, d / 3);
@@ -2399,7 +2466,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
           g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(1, at + F); g.gain.setValueAtTime(1, at + d - F); g.gain.linearRampToValueAtTime(0, at + d);
           src.connect(g).connect(master); src.start(at, x[0], d); nodes.push(src);
         });
-        pkV.muted = true; pkV.classList.add('on'); pkV.play().catch(() => {});
+        pkV.muted = true; pkV.classList.add('on'); pkX.classList.remove('on'); pkV.play().catch(() => {});
         prep(1);
       };
       // What is heard now: the audio clock minus the output's latency.
@@ -2431,10 +2498,10 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
             run.swaps = (run.swaps || 0) + 1;
           } else { front.playbackRate = 1; front.currentTime = Math.min(segs[i][1], sv + 0.12); run.seeks = (run.seeks || 0) + 1; }
           prep(i + 1);
-        } else if (!front.seeking) {
+        } else if (!front.seeking && front.readyState >= 3) {
           // run.lag: how far the picture is from the voice, seconds (checked by the tests).
-          const lag = run.lag = front.currentTime - sv;
-          if (Math.abs(lag) > 0.25) front.currentTime = Math.min(segs[i][1], sv + 0.12);
+          const lag = run.lag = front.currentTime - sv, now = performance.now();
+          if (Math.abs(lag) > 0.25) { if (now - (run.fixAt || 0) > 1000) { run.fixAt = now; front.currentTime = Math.min(segs[i][1], sv + 0.12); } }
           else front.playbackRate = Math.abs(lag) < 0.015 ? 1 : lag < 0 ? 1.15 : 0.87;
         }
         onTime?.(i, sv);
@@ -2448,7 +2515,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     } else {
       // No voice yet (still being made): the light copy's own sound, the clip boundary from the video.
       if (vo) voiceBuf(vo.url);
-      const go = () => { if (pk._play !== run) return; pkV.currentTime = segs[0][0]; pkV.muted = false; pkV.classList.add('on'); pkV.play().catch(() => {}); };
+      const go = () => { if (pk._play !== run) return; pkV.currentTime = segs[0][0]; pkV.muted = false; pkV.classList.add('on'); pkX.classList.remove('on'); pkV.play().catch(() => {}); };
       step = () => {
         if (pk._play !== run || run.done) return;
         if (!pkV.isConnected) { run.done = true; pkV.pause(); return; }
@@ -2465,6 +2532,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     const tick = () => { step(); if (pk._play === run && !run.done) requestAnimationFrame(tick); };
     pkV.ontimeupdate = step;
     requestAnimationFrame(tick);
+    setTimeout(() => rv._upd?.(), 0);
     return run;
   };
   const film = () => {
@@ -2503,12 +2571,14 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     if ($('#pFill')) { $('#pFill').style.width = `${p}%`; $('#pKnob').style.left = `${p}%`; $('#pThin').style.width = `${p}%`; }
     const tt = `${t1(rv.currentTime)} / ${t1(d)}`;
     $('#pTime').textContent = tt; if ($('#bTime')) $('#bTime').textContent = tt;
-    const ic = rv.paused ? '▶' : '❚❚';
-    $('#pPlay').textContent = ic; $('#pPlay').setAttribute('aria-label', rv.paused ? 'Смотреть' : 'Пауза');
+    // The cut playing (its own players) counts as playing too.
+    const idle = rv.paused && !(pk?._play && !pk._play.done), ic = idle ? '▶' : '❚❚';
+    $('#pPlay').textContent = ic; $('#pPlay').setAttribute('aria-label', idle ? 'Смотреть' : 'Пауза');
     vw?.classList.toggle('playing', !rv.paused || !!pk?._play);
-    if (rv._clean && pk && !pk._play && !tl._busy && !tl._drag) peek(null);
+    if (rv._clean && pk && !pk._play && !tl._busy && !tl._drag && rvWant == null) peek(null);
     $('#eComp')?._upd?.();
   };
+  rv._upd = () => { if (rv.isConnected) upd(); };
   const ready = () => { film(); ruler(); marks(); upd(); };
   if (rv.readyState >= 1) ready();
   rv.addEventListener('loadedmetadata', ready, on);
@@ -2531,7 +2601,7 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     const f = scAt(e), t = f * dur(), now = dur() ? rv.currentTime / dur() : 0;
     stip.hidden = false; stip.style.left = `${100 * f}%`; stip.textContent = t1(t);
     ghost.style.left = `${100 * Math.min(f, now)}%`; ghost.style.width = `${100 * Math.abs(f - now)}%`;
-    if (sc._drag) { seekRv(t); peek(null); } else peek(pvAt(t, `Просмотр · ${t1(t)}`));
+    if (sc._drag) { seekRv(t); peek(rv._clean ? pvAt(t, rv._clean.at(t).label) : null); }
   };
   sc.onpointerleave = () => { if (sc._drag) return; stip.hidden = true; ghost.style.width = '0'; peek(null); };
   sc.onpointerdown = (e) => { e.stopPropagation(); sc._drag = true; sc.setPointerCapture(e.pointerId); rv.currentTime = scAt(e) * dur(); peek(null); };
@@ -2548,11 +2618,12 @@ function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
     skl.hidden = false; skl.style.left = `${x}px`;
     rv._tip(x, t1(t));
     tl._hover?.(onRuler ? null : t);
-    if (tl._drag) { seekRv(t); peek(null); } else peek(pvAt(t, `Просмотр · ${t1(t)}`));
+    // Hovering only shows the line and the time; the player changes when the playhead is dragged.
+    if (tl._drag) { seekRv(t); peek(rv._clean ? pvAt(t, rv._clean.at(t).label) : null); }
   };
   tl.onpointerleave = () => { if (tl._drag || tl._busy) return; skl.hidden = true; rv._tip(0, ''); tl._hover?.(null); peek(null); };
-  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; tl._scrub = !!e.target.closest?.('.ruler'); try { tl.setPointerCapture(e.pointerId); } catch {} rv.pause(); rv.currentTime = timeAt(e); peek(null); if (!tl._scrub) tl._pick?.(rv.currentTime); upd(); };
-  tl.onpointerup = (e) => { tl._drag = false; tl._scrub = false; tl.releasePointerCapture?.(e.pointerId); };
+  tl.onpointerdown = (e) => { if (tl._busy) return; tl._drag = true; tl.classList.add('dragging'); tl._scrub = !!e.target.closest?.('.ruler, .bhead'); try { tl.setPointerCapture(e.pointerId); } catch {} rv.pause(); rv.currentTime = timeAt(e); peek(null); if (!tl._scrub) tl._pick?.(rv.currentTime); upd(); };
+  tl.onpointerup = (e) => { tl._drag = false; tl._scrub = false; tl.classList.remove('dragging'); tl.releasePointerCapture?.(e.pointerId); };
   // E puts the cursor in the note field under the track.
   const compose = () => { rv.pause(); $('#eText')?.focus(); };
   // «Как в Instagram»: the Reels interface over the video, to see what hides under it while editing.
@@ -2782,9 +2853,19 @@ async function stageCut(id, data) {
 function wireCutPlay(id, rv, cut, withGfx) {
   const clips = cut.clips, pv = cut.preview, gl = $('#pGfx'), tl = $('#bStrip'), clean = !withGfx, sig = rv._ac.signal;
   if (!pv || !tl) return;
-  // The voice is fetched and decoded now, so the first ▶ already plays it.
+  // The voice is fetched and decoded now, so the first ▶ already plays it; the recording comes into the
+  // browser in the background, its progress over the player.
   rv._voice = cut.voice || null;
   if (cut.voice) voiceBuf(cut.voice.url);
+  const lc = localCopy(pv.video), load = $('#pLoad');
+  const showLoad = (e) => {
+    if (!load || !load.isConnected) return lc.subs.delete(showLoad);
+    load.hidden = !!e.blob || e.failed || !e.total;
+    if (!load.hidden) load.textContent = `Запись загружается в браузер · ${Math.floor((100 * e.done) / e.total)} %`;
+    if (e.blob && !pk?._play && rv._clean) rv._peek?.(null);
+  };
+  const pk = $('#pPeek');
+  lc.subs.add(showLoad); showLoad(lc);
   const t1 = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0').replace('.', ',')}`;
   const starts = () => clips.reduce((a, c, i) => (a.push(i ? a[i - 1] + clips[i - 1].out - clips[i - 1].in : 0), a), []);
   const total = () => clips.reduce((a, c) => a + c.out - c.in, 0);
@@ -2819,7 +2900,7 @@ function wireCutPlay(id, rv, cut, withGfx) {
     const st = starts(); let ct = toC(rv.currentTime); if (ct >= total() - 0.1) ct = 0;
     const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]);
     const r = cutRun = {ct};
-    r.run = rv._peekPlay(pv.video, segs, clean ? '▶ Нарезка · чистое видео' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
+    r.run = rv._peekPlay(srcOf(pv), segs, clean ? '▶ Нарезка · чистое видео' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
       onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); show(r.ct); },
       onEnd: () => { if (cutRun === r) { cutRun = null; rv.currentTime = toV(r.ct); hideAll(); } }});
     return true;
@@ -2914,7 +2995,7 @@ function wireClips(id, rv, cut, open, ed, foot) {
     const c = clips[i], prev = clips[i - 1], next = clips[i + 1];
     const segs = k === 'in' ? [...(prev ? [[Math.max(prev.in, prev.out - 1), prev.out]] : []), [c.in, Math.min(c.out, c.in + 1.5)]]
       : [[Math.max(c.in, c.out - 1.5), c.out], ...(next ? [[next.in, Math.min(next.out, next.in + 1)]] : [])];
-    rv._peekPlay(pv.video, segs, `▶ Склейка ${k === 'in' ? `${i}→${i + 1}` : `${i + 1}→${i + 2}`}`);
+    rv._peekPlay(srcOf(pv), segs, `▶ Склейка ${k === 'in' ? `${i}→${i + 1}` : `${i + 1}→${i + 2}`}`);
   };
   const pick = (i) => { if (i === sel) return; clearTimeout(trimT); trim = null; box.classList.remove('trim'); tl.classList.remove('trimming'); sel = i; cut.sel = i; build(); layout(); $('#eComp')?._upd?.(); };
   cut.deselect = () => pick(-1);
@@ -3034,7 +3115,7 @@ async function renderVersions(id, data) {
     <div class="bplay">
       ${sel && video(sel)
         ? `<div class="vwrap"><video id="rv" src="${esc(playUrl(sel))}" playsinline preload="auto" ${thumb(sel) ? `poster="${thumb(sel).url}"` : ''}></video>
-          <div class="ppeek" id="pPeek" hidden><i id="pPeekS"></i><video id="pPeekV" muted playsinline preload="auto"></video><video id="pPeekB" muted playsinline preload="auto"></video><video id="pPeekX" muted playsinline preload="auto"></video><span class="ptag" id="pTag"></span></div>
+          <div class="ppeek" id="pPeek" hidden><i id="pPeekS"></i><video id="pPeekV" muted playsinline preload="auto"></video><video id="pPeekB" muted playsinline preload="auto"></video><video id="pPeekX" muted playsinline preload="auto"></video><span class="ptag" id="pTag"></span><span class="ptag" id="pLoad" hidden style="top: auto; bottom: 10px"></span></div>
           <div class="pgfx" id="pGfx" aria-hidden="true"></div>
           <div class="igl" id="igL" hidden></div>
           <button type="button" class="pbig" id="pBig" aria-label="Смотреть"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#141413"></path></svg></button>

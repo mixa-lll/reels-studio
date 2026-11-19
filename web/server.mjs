@@ -154,7 +154,7 @@ function cutView(dir) {
   // the camera's sound), with the same gain: what the owner hears while trimming is what gets built.
   const vf = voiceFileOf(dir, cut), vo = voiceOf(vf || src);
   const so = pv?.video ? scrubOf(pv.video) : null;
-  const scrub = so ? {video: stamp(so.video), sheets: so.sheets.map(stamp), fps: so.fps, per: so.per, cols: so.cols, w: so.w, h: so.h, n: so.n} : null;
+  const scrub = so ? {sheets: so.sheets.map(stamp), fps: so.fps, per: so.per, cols: so.cols, w: so.w, h: so.h, n: so.n} : null;
   const voice = vo ? {url: stamp(vo.audio), peaks: stamp(vo.peaks), lav: !!vf, gainDb: Number(cut.gainDb) || 0} : null;
   return {...cut, graphics, voice, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {scrub, video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
 }
