@@ -24,7 +24,7 @@ import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, exist
 import {basename, dirname, extname, join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
-import {dropOrphans, previewOf, voiceOf} from './preview.mjs';
+import {dropOrphans, previewOf, scrubOf, voiceOf} from './preview.mjs';
 import {bestVideo, linkPath, projectPath, readLink, signLink} from './dllink.mjs';
 import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
@@ -153,8 +153,10 @@ function cutView(dir) {
   // The voice the player plays under the cut — the same one «Собрать монтаж» joins (the lavalier, else
   // the camera's sound), with the same gain: what the owner hears while trimming is what gets built.
   const vf = voiceFileOf(dir, cut), vo = voiceOf(vf || src);
+  const so = pv?.video ? scrubOf(pv.video) : null;
+  const scrub = so ? {video: stamp(so.video), sheets: so.sheets.map(stamp), fps: so.fps, per: so.per, cols: so.cols, w: so.w, h: so.h, n: so.n} : null;
   const voice = vo ? {url: stamp(vo.audio), peaks: stamp(vo.peaks), lav: !!vf, gainDb: Number(cut.gainDb) || 0} : null;
-  return {...cut, graphics, voice, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
+  return {...cut, graphics, voice, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {scrub, video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
 }
 
 function versions(p, r) {

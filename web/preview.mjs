@@ -50,6 +50,42 @@ export function voiceOf(file) {
   return null;
 }
 
+/** For scrubbing the cut's source (hover, dragging a clip's edge): {video, sheets, fps, per, cols, w, h, n}
+ *  — a 360p copy with a key frame every 5 frames (an exact frame in a few ms) and the strip at 4 frames
+ *  a second in sheets of 100 (one JPEG per 25 s, so only the sheets near the cursor are loaded).
+ *  Made from the light copy (already turned) next to it; null while queued. */
+export function scrubOf(light) {
+  const d = dirname(light), n = name(light), meta = join(d, `${n}.scrub.json`);
+  try {
+    if (existsSync(meta) && statSync(meta).mtimeMs >= statSync(light).mtimeMs) {
+      const m = JSON.parse(readFileSync(meta, 'utf8'));
+      return {...m, video: join(d, `${n}.scrub.mp4`), sheets: Array.from({length: m.count}, (_, i) => join(d, `${n}.s${String(i).padStart(3, '0')}.jpg`))};
+    }
+  } catch {}
+  const key = light + '#scrub';
+  try { if (failed.get(key) === statSync(light).mtimeMs) return null; } catch { return null; }
+  if (!queued.has(key)) { queued.add(key); queue.push({video: light, scrub: true, key}); next(); }
+  return null;
+}
+
+async function makeScrub(light) {
+  if (!existsSync(light)) return;
+  const d = dirname(light), n = name(light), key = light + '#scrub', FPS = 4, PER = 100;
+  const tmp = join(d, `${n}.scrub.tmp.mp4`);
+  if (!(await run(['-y', '-v', 'error', '-i', light, '-an', '-vf', 'scale=360:-2', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '26', '-tune', 'fastdecode',
+    '-g', '5', '-keyint_min', '5', '-sc_threshold', '0', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', tmp]))) { rmSync(tmp, {force: true}); failed.set(key, statSync(light).mtimeMs); return; }
+  for (const f of readdirSync(d)) if (new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.s\\d{3}\\.jpg$`).test(f)) rmSync(join(d, f), {force: true});
+  const ok = await run(['-y', '-v', 'error', '-i', light, '-vf', `fps=${FPS},scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,tile=${COLS}x${PER / COLS}`, '-q:v', '6', join(d, `${n}.s%03d.jpg`)]);
+  const count = readdirSync(d).filter((f) => f.startsWith(`${n}.s`) && /\.s\d{3}\.jpg$/.test(f)).length;
+  if (!ok || !count) { rmSync(tmp, {force: true}); failed.set(key, statSync(light).mtimeMs); return; }
+  // ffmpeg numbers the sheets from 1: shift to 0.
+  for (let i = 1; i <= count; i++) renameSync(join(d, `${n}.s${String(i).padStart(3, '0')}.jpg`), join(d, `${n}.s${String(i - 1).padStart(3, '0')}.x.jpg`));
+  for (let i = 0; i < count; i++) renameSync(join(d, `${n}.s${String(i).padStart(3, '0')}.x.jpg`), join(d, `${n}.s${String(i).padStart(3, '0')}.jpg`));
+  renameSync(tmp, join(d, `${n}.scrub.mp4`));
+  const info = videoInfo(light);
+  writeFileSync(join(d, `${n}.scrub.json`), JSON.stringify({fps: FPS, per: PER, cols: COLS, w: W, h: H, n: Math.ceil((info?.duration || count * PER / FPS) * FPS), count}));
+}
+
 async function makeVoice(file) {
   if (!existsSync(file)) return;
   const d = dirOf(file), n = name(file), key = file + '#voice';
@@ -97,8 +133,8 @@ function run(args) {
 async function next() {
   if (busy || !queue.length) return;
   busy = true;
-  const {video, rotate, voice, key} = queue.shift();
-  try { if (voice) await makeVoice(video); else await make(video, rotate); } catch {}
+  const {video, rotate, voice, scrub, key} = queue.shift();
+  try { if (voice) await makeVoice(video); else if (scrub) await makeScrub(video); else await make(video, rotate); } catch {}
   queued.delete(key || video);
   busy = false;
   next();
