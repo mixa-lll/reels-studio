@@ -2492,11 +2492,14 @@ function fitPlayer(v) {
 
 function wirePlayer(rv, sel, cur, edits, open, igCaption = '') {
   rv._ac?.abort(); rv._ac = new AbortController();
-  rv._pkStop?.(); rv._clean = null; rv._voice = null;
   // The time on the track. In «Нарезка» it is a number of our own (rv._ct): the version's video is hidden
   // there and is not touched — seeking it over the network was slow, and a late answer to an old seek
-  // threw the playhead back after ■. Outside «Нарезка» it is the video's own time.
-  rv._ct = null;
+  // threw the playhead back after ■. Outside «Нарезка» it is the video's own time. The page re-renders
+  // the same player (a note added, the agent answered, the chat moved): the cut's time stays as it was —
+  // read back from the hidden video it threw the playhead to where it had last been seeked.
+  const keepCt = rv._clean && rv._ct != null ? rv._ct : null;
+  rv._pkStop?.(); rv._clean = null; rv._voice = null;
+  rv._ct = keepCt;
   rv._t = () => (rv._clean && rv._ct != null ? rv._ct : rv.currentTime);
   rv._go = (t) => { if (rv._clean) { rv._ct = Math.max(0, t); rvWant = null; rv._upd?.(); } else rv.currentTime = t; }; rv.closest('.vwrap')?.classList.remove('clean');
   fitPlayer(rv);
@@ -3080,7 +3083,8 @@ function wireCutPlay(id, rv, cut, withGfx) {
     const i0 = clipAt(ct), segs = clips.slice(i0).map((c, j) => [j ? c.in : c.in + (ct - st[i0]), c.out]), sound = cutSound(clips, ct, total());
     const r = cutRun = {ct};
     r.run = rv._peekPlay(srcOf(pv), segs, clean ? '▶ Монтаж · без графики' : items.length ? '▶ Новая нарезка · графика слоями' : '▶ Новая нарезка · без графики', {edge: false,
-      onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); setHead(r.ct); show(r.ct); },
+      // The cut's own time follows the play too: a re-render while it plays (it stops it) keeps the place.
+      onTime: (j, t) => { r.ct = st[i0 + j] + (t - clips[i0 + j].in); if (rv._clean) rv._ct = toV(r.ct); setHead(r.ct); show(r.ct); },
       onEnd: () => { if (cutRun === r) { cutRun = null; rv._go(toV(r.ct)); hideAll(); } }, sound});
     return true;
   };
@@ -3088,11 +3092,13 @@ function wireCutPlay(id, rv, cut, withGfx) {
   // so here the player shows and plays the source by the cut: paused it holds the source frame at the
   // playhead, play runs the clips one after another. Graphics are the second stage, with «Нарезка» off.
   if (clean) {
-    rv._ct = rv.currentTime;
+    if (rv._ct == null) rv._ct = rv.currentTime;
     rv._clean = {at: (t = rv._t()) => { const ct = Math.min(toC(t), total() - 0.01), i = clipAt(ct); return {...scrubSrc(pv), t: clips[i].in + (ct - starts()[i]), label: 'Монтаж · без графики'}; }};
-    rv.closest('.vwrap')?.classList.add('clean'); rv._refit?.(); rv.pause(); rv._peek(null);
+    rv.closest('.vwrap')?.classList.add('clean'); rv._refit?.(); rv.pause(); rv._peek(null); setHead(toC(rv._ct));
   }
   // A montage-only version is the cut itself: its graphics come on top as layers while it plays.
+  // From «Монтаж» into «Графика» (the same player re-wired): the version's video goes to the cut's place.
+  if (!clean && rv._ct != null) { rv.currentTime = rv._ct; rv._ct = null; }
   if (cut._montage && items.length) {
     const follow = () => { if (!rv.isConnected || sig.aborted) return; if (!cutRun?.run.alive()) show(toC(rv._t())); requestAnimationFrame(follow); };
     requestAnimationFrame(follow);
