@@ -289,7 +289,9 @@ function startTurn(p, k, text, send) {
   const meta = chatMeta(p, k);
   const studio = join(PROJECTS, p);
   const reelsBefore = new Set(existsSync(join(studio, 'reels')) ? readdirSync(join(studio, 'reels')) : []);
-  const args = ['-p', `${preamble(p, k)}\n\n${text}`, '--output-format', 'stream-json', '--verbose',
+  // Messages go in on stdin as stream-json (as in bot/agents.mjs): what the owner writes while
+  // the turn runs joins it between tool calls; each one is echoed back once Claude took it in.
+  const args = ['-p', '--input-format', 'stream-json', '--replay-user-messages', '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions', '--disallowedTools', DENIED.join(','),
     '--setting-sources', 'project,local', '--strict-mcp-config', '--mcp-config', emptyMcp,
     // A project may be a link to a folder outside the studio (My Gudauri → Рилсы/студия): Claude
@@ -305,9 +307,13 @@ function startTurn(p, k, text, send) {
   const child = spawn(process.env.AGENT_BIN || 'claude', args, {
     cwd: BOT,
     env: {...process.env, REELS_BOT: '1', REELS_DATA: DATA, REELS_CHANNEL: channel, REELS_PROJECTS: PROJECTS, REELS_STUDIO: studio},
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
     detached: true,
   });
+  const encode = (t) => `${JSON.stringify({type: 'user', message: {role: 'user', content: t}})}\n`;
+  child.stdin.on('error', () => {});
+  let open = true, sent = 1, taken = 0, replies = 0;
+  child.stdin.write(encode(`${preamble(p, k)}\n\n${text}`));
   // A new-reel chat becomes that reel's chat as soon as its folder appears.
   const rebind = () => {
     if (!key.startsWith('new-') || !existsSync(join(studio, 'reels'))) return;
@@ -336,6 +342,17 @@ function startTurn(p, k, text, send) {
   };
   const timer = setInterval(poll, 700);
   let buf = '', result = null, err = '';
+  // One reply per result: with messages added on the way there can be several in one turn.
+  const reply = (ev) => {
+    let out = (ev.result ?? '').trim();
+    if (ev.is_error) { const msg = {from: 'bot', kind: 'error', text: out || 'агент завершился с ошибкой'}; record(p, key, msg); send({msg}); replies++; return; }
+    if (!out || out === 'NO_REPLY') return;
+    // «⌨️ A | B | C» on the last line is the keyboard, as in the bot.
+    let keys = [];
+    out = out.replace(/\n?\s*⌨️\s*(.+)\s*$/u, (_, k2) => { keys = k2.split('|').map((x) => x.trim()).filter(Boolean); return ''; }).trim();
+    const msg = {from: 'bot', kind: 'text', text: out.replace(/\s*NO_REPLY\s*$/, ''), keys, buttons: []};
+    record(p, key, msg); send({msg}); replies++;
+  };
   child.stdout.on('data', (d) => {
     buf += d;
     let i;
@@ -345,22 +362,24 @@ function startTurn(p, k, text, send) {
       let ev;
       try { ev = JSON.parse(line); } catch { continue; }
       if (ev.type === 'system' && ev.subtype === 'init') setChatMeta(p, key, {session: ev.session_id});
-      if (ev.type === 'result') result = ev;
+      if (ev.type === 'user' && ev.isReplay) taken++;
+      if (ev.type === 'result') {
+        result = ev;
+        poll();
+        reply(ev);
+        answered = live.length;
+        // All that was written is taken in: let Claude exit. Otherwise it goes on with the rest.
+        if (open && taken >= sent) { open = false; child.stdin.end(); }
+      }
     }
   });
   child.stderr.on('data', (d) => { err += d; });
   child.on('close', (code) => {
     clearInterval(timer);
     poll();
-    let reply = (result?.result ?? '').trim();
-    if (result?.is_error || (code && !result)) {
-      const msg = {from: 'bot', kind: 'error', text: reply || err.trim().split('\n').pop() || `агент завершился с кодом ${code}`};
-      record(p, key, msg); send({msg});
-    } else if (reply && reply !== 'NO_REPLY') {
-      // «⌨️ A | B | C» on the last line is the keyboard, as in the bot.
-      let keys = [];
-      reply = reply.replace(/\n?\s*⌨️\s*(.+)\s*$/u, (_, k2) => { keys = k2.split('|').map((x) => x.trim()).filter(Boolean); return ''; }).trim();
-      const msg = {from: 'bot', kind: 'text', text: reply.replace(/\s*NO_REPLY\s*$/, ''), keys, buttons: []};
+    open = false;
+    if (code && !result && !job.stopped) {
+      const msg = {from: 'bot', kind: 'error', text: err.trim().split('\n').pop() || `агент завершился с кодом ${code}`};
       record(p, key, msg); send({msg});
     }
     setChatMeta(p, key, {status: '', updated: Date.now()});
@@ -371,8 +390,17 @@ function startTurn(p, k, text, send) {
     send({done: true, ms: result?.duration_ms});
     jobs.delete(job);
     rmSync(channel, {recursive: true, force: true});
+    // Added on the way but not answered when it stopped (or never taken in): those go next.
+    const unanswered = job.stopped ? live.length - answered : Math.min(live.length, sent - taken);
+    if (unanswered > 0) job.queue.unshift(...live.slice(-unanswered));
+    // Messages written while this turn ran (or after «Стоп») go next, in the same session.
+    if (job.queue.length) startTurn(p, key, `(Written while you were working on the previous message: a correction or addition to it. Take it into account and carry on.)\n\n${job.queue.join('\n\n')}`, () => {});
   });
-  const job = {child, p, get key() { return key; }};
+  // A message written while the turn runs: straight in while Claude still listens, else next turn.
+  const live = [];
+  let answered = 0;
+  const add = (t) => { if (open && !job.stopped) { sent++; live.push(t); child.stdin.write(encode(t)); return 'live'; } job.queue.push(t); return 'next'; };
+  const job = {child, p, queue: [], add, stopped: false, get key() { return key; }};
   jobs.add(job);
   return job;
 }
@@ -1151,6 +1179,19 @@ createServer(async (req, res) => {
     writeJson(f, pub);
     return json(200, {seen: pub.seen});
   }
+  // Голосовой ввод in a chat box (browsers without live dictation): the recording becomes text and goes.
+  if (req.method === 'POST' && url.pathname === '/api/voice') {
+    if (!can('editor')) return json(403, {});
+    const chunks = [];
+    let size = 0;
+    for await (const c of req) { size += c.length; if (size > 25 * 1024 * 1024) return json(413, {}); chunks.push(c); }
+    mkdirSync(join(DATA, 'voice'), {recursive: true});
+    const f = join(DATA, 'voice', `${Date.now()}-${randomBytes(3).toString('hex')}.${/mp4|aac/.test(req.headers['content-type'] || '') ? 'm4a' : 'webm'}`);
+    writeFileSync(f, Buffer.concat(chunks));
+    const text = await transcribe(f, 'ru').catch(() => null);
+    rmSync(f, {force: true});
+    return json(200, {text: text || ''});
+  }
   // A spoken note: saved next to the reel's materials and turned into text by the bot's local Whisper.
   if (req.method === 'POST' && url.pathname === '/api/reel/voice') {
     if (!can('editor')) return json(403, {});
@@ -1283,7 +1324,14 @@ createServer(async (req, res) => {
     if (!can('editor')) return json(403, {});
     const {key: k, text, shown} = await body(req);
     if (!chatKey(k) || !text?.trim()) return json(400, {});
-    if (jobOf(p, k)) return json(409, {});
+    // Claude is still on this chat: the message waits and goes as the next turn (startTurn).
+    const running = jobOf(p, k);
+    if (running) {
+      const how = running.add(`(from ${me.name}, written while you were working: a correction or addition — take it into account now)\n${text}`);
+      record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name, queued: true});
+      log(me.name, `дописал в чат «${k}», пока Claude работал: ${(shown || text).slice(0, 80)}`);
+      return json(202, {queued: how});
+    }
     if (full()) return json(429, {max: MAX_JOBS});
     record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name});
     log(me.name, `написал в чат «${k}»: ${(shown || text).slice(0, 80)}`);
@@ -1298,7 +1346,7 @@ createServer(async (req, res) => {
     if (!can('editor')) return json(403, {});
     const {key: k} = await body(req).catch(() => ({}));
     // A key stops that chat's turn; without one (older pages) every turn in the project stops.
-    for (const j of jobs) if (j.p === p && (!k || j.key === k)) try { process.kill(-j.child.pid, 'SIGTERM'); } catch {}
+    for (const j of jobs) if (j.p === p && (!k || j.key === k)) { j.stopped = true; try { process.kill(-j.child.pid, 'SIGTERM'); } catch {} }
     log(me.name, `остановил задачу${k ? ` в «${k}»` : ''}`);
     return json(200, {});
   }

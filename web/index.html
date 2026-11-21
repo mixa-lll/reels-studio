@@ -103,6 +103,14 @@
   form.send textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); max-height: 160px; min-height: 44px; }
   .icon { width: 44px; height: 44px; border: 1px solid var(--line); background: var(--card); border-radius: 12px; display: grid; place-items: center; flex: none; }
   .icon.go { background: var(--ink); border-color: var(--ink); color: #fff; border-radius: 50%; }
+  .icon.cmic { color: var(--ink2); cursor: pointer; }
+  .icon.cmic.rec { background: #DC2626; border-color: #DC2626; color: #fff; animation: micpulse 1.2s ease-in-out infinite; }
+  .icon.cmic.wait { opacity: .6; cursor: progress; }
+  @keyframes micpulse { 50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, .18); } }
+  @media (prefers-reduced-motion: reduce) { .icon.cmic.rec { animation: none; } }
+  .msg .later { display: block; font-size: 11px; opacity: .7; margin-top: 4px; }
+  .acc-ic { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+  .acc-ic.g { opacity: .55; }
   .hint { color: var(--muted); text-align: center; margin: 12vh auto 0; max-width: 420px; }
   aside.vers { width: 360px; flex: none; border-left: 1px solid var(--line); background: var(--card); padding: 16px; display: flex; flex-direction: column; gap: 14px; height: 100vh; overflow-y: auto; }
   .ver { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -806,6 +814,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
       <input type="file" multiple hidden>
       <label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)" for="ta-${esc(key)}">Сообщение</label>
       <textarea id="ta-${esc(key)}" rows="1" placeholder="Сообщение или правка…"></textarea>
+      <button type="button" class="icon cmic" aria-label="Голосом" aria-pressed="false" title="Голосом: нажмите, говорите, нажмите ещё раз">${svg('mic', 18)}</button>
       <button class="icon go" aria-label="Отправить"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
     </div></form>` : '<p class="small muted" style="text-align: center; padding: 12px">У тебя доступ только на просмотр.</p>'}`;
   const log = $('.log .in', el), keysEl = $('.keys', el), st = $('.status', el), ta = $('textarea', el);
@@ -813,7 +822,8 @@ function chatBox(key, {onDone, onRebind} = {}) {
   const setBusy = (on, text) => {
     busy = on; st.classList.toggle('on', on);
     if (text) { $('.stext', st).textContent = text; $('.shint', st).textContent = /рендер/i.test(text) ? 'Это нормально: монтаж идёт на сервере. Страницу можно закрыть — версия появится сама.' : ''; }
-    el.querySelectorAll('.btns button, .keys button, .go').forEach((b) => (b.disabled = on));
+    el.querySelectorAll('.btns button, .keys button').forEach((b) => (b.disabled = on));
+    if (ta) ta.placeholder = on ? 'Дописать или поправить — Claude возьмёт это следующим шагом' : 'Сообщение или правка…';
   };
   $('button', st).onclick = () => post('/api/stop', {key});
   const buttons = (list, under) => {
@@ -855,7 +865,8 @@ function chatBox(key, {onDone, onRebind} = {}) {
       // Attachments travel as «📎 name» lines of the shown text; they come back as chips.
       const lines = String(m.text || '').split('\n'), files = lines.filter((l) => l.startsWith('📎 ')), text = lines.filter((l) => !l.startsWith('📎 ')).join('\n').trim();
       d.innerHTML = (m.by && m.by !== ME.name ? `<span class="by">${esc(m.by)}</span>` : '') + (text ? `<div>${esc(text)}</div>` : '')
-        + files.map((l) => `<div class="fchip">${svg('clip', 14)}<span>${esc(l.slice(3))}</span></div>`).join('');
+        + files.map((l) => `<div class="fchip">${svg('clip', 14)}<span>${esc(l.slice(3))}</span></div>`).join('')
+        + (m.queued ? '<span class="later">дописано по ходу</span>' : '');
     }
     else if (m.kind === 'error') { d.className = 'msg err'; d.textContent = '⚠️ ' + m.text; }
     else {
@@ -877,7 +888,19 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (m.from === 'bot' && canEdit()) showKeys(m.keys || []);
   };
   async function say(text, shown) {
-    if (busy || !text.trim()) return;
+    if (!text.trim()) return;
+    if (busy) {
+      // Claude is still working: the server keeps it and runs it right after (or after «Стоп»).
+      const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown})}).catch(() => null);
+      const q = r?.status === 202 ? (await r.json().catch(() => ({}))).queued : null;
+      if (q) {
+        render({from: 'me', text: shown || text, queued: true});
+        if (q === 'next') followUp = true;
+        toast(q === 'live' ? 'Claude прочтёт это между шагами и учтёт' : 'Claude возьмёт это сразу после текущего ответа');
+      }
+      else toast('Не отправилось — попробуйте ещё раз');
+      return;
+    }
     showKeys([]);
     render({from: 'me', text: shown || text});
     setBusy(true, 'Думаю…');
@@ -903,9 +926,12 @@ function chatBox(key, {onDone, onRebind} = {}) {
       }
     } catch (err) { render({from: 'bot', kind: 'error', text: err.message}); }
     setBusy(false);
+    // What was written meanwhile runs as the next turn on the server: follow it like a reload does.
+    if (followUp) { followUp = false; await load(); }
     onDone?.(key);
     ta?.focus();
   }
+  let followUp = false;
   async function load() {
     const h = await api('/api/chat?key=' + encodeURIComponent(key));
     log.innerHTML = '';
@@ -914,7 +940,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (h.busy) {
       setBusy(true, h.status || 'Работаю… обновлю, когда закончу');
       setTimeout(() => location.hash.includes(key) && load().then(() => sidebar()), 4000);
-    } else if (busy) setBusy(false);
+    } else if (busy) { setBusy(false); onDone?.(key); }
   }
   if (ta) {
     const form = $('form', el), file = $('input[type=file]', el), clip = $('.clip', el), chips = $('.files', el);
@@ -935,28 +961,78 @@ function chatBox(key, {onDone, onRebind} = {}) {
     el.addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; el.classList.add('over'); });
     el.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
     el.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; el.classList.remove('over'); } });
-    el.addEventListener('drop', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth = 0; el.classList.remove('over'); if (!busy) add([...e.dataTransfer.files]); });
+    el.addEventListener('drop', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth = 0; el.classList.remove('over'); add([...e.dataTransfer.files]); });
+    // Голосовой ввод: the words land in the field (not sent), so they can be read and fixed first.
+    // Chrome and Safari write live as you speak; elsewhere the recording goes to the server's Whisper.
+    const mic = $('.cmic', el), SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let live = null, rec = null, on = false, base = '';
+    const micState = (s) => { mic.classList.toggle('rec', s === 'rec'); mic.classList.toggle('wait', s === 'wait'); mic.setAttribute('aria-pressed', String(s === 'rec')); mic.setAttribute('aria-label', s === 'rec' ? 'Остановить запись' : 'Голосом'); };
+    const put = (t) => { ta.value = (base && t ? base.replace(/\s*$/, ' ') : base) + t; ta.dispatchEvent(new Event('input')); };
+    const record = async () => {
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); } catch { on = false; micState(''); return toast('Нет доступа к микрофону — разрешите его в настройках браузера'); }
+      const chunks = [];
+      rec = new MediaRecorder(stream);
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = async () => {
+        stream.getTracks().forEach((x) => x.stop());
+        const type = rec.mimeType || 'audio/webm'; rec = null;
+        micState('wait'); ta.placeholder = 'Распознаю…';
+        const r = await fetch(`/api/voice?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': type}, body: new Blob(chunks, {type})}).then((x) => x.json()).catch(() => ({}));
+        micState(''); setBusy(busy);
+        if (r.text) { put(r.text); ta.focus(); } else toast('Не расслышал — скажите ещё раз или напишите');
+      };
+      rec.start(); micState('rec');
+    };
+    const startVoice = () => {
+      on = true; base = ta.value; micState('rec');
+      if (!SR) return record();
+      live = new SR(); live.lang = 'ru-RU'; live.continuous = true; live.interimResults = true;
+      let done = '';
+      live.onresult = (e) => {
+        let tmp = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) done += t; else tmp += t; }
+        put((done + tmp).trim());
+      };
+      live.onerror = (e) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed' && !navigator.mediaDevices) { on = false; live = null; micState(''); return toast('Нет доступа к микрофону — разрешите его в настройках браузера'); }
+        // The browser's own dictation is off or offline: record and let the server write it out.
+        if (e.error === 'network' || e.error === 'service-not-allowed' || e.error === 'language-not-supported') { live.onend = null; live = null; record(); }
+      };
+      // Dictation stops by itself after a pause; keep listening until the button is pressed again.
+      live.onend = () => { if (on && live) { base = ta.value; done = ''; try { live.start(); } catch { stopVoice(); } } else micState(''); };
+      try { live.start(); } catch { live = null; record(); }
+    };
+    const stopVoice = () => {
+      if (!on) return;
+      on = false;
+      if (live) { const l = live; live = null; l.stop(); micState(''); ta.focus(); }
+      if (rec) rec.stop();
+    };
+    mic.onclick = () => (on ? stopVoice() : startVoice());
     form.onsubmit = async (e) => {
       e.preventDefault();
       const files = [...picked], text = ta.value.trim();
-      if ((!text && !files.length) || busy) return;
-      const parts = [], shown = [];
+      if (!text && !files.length) return;
+      stopVoice();
+      const parts = [], shown = [], was = busy;
+      const loading = (t) => (was ? toast(t) : setBusy(true, t));
       try {
         for (const f of files) {
-          setBusy(true, `Загружаю ${f.name}…`);
+          loading(`Загружаю ${f.name}…`);
           const toReel = !key.startsWith('_') && !key.startsWith('new-') ? `&reel=${encodeURIComponent(key)}` : '';
-          const u = await uploadFile(f, toReel, (i, n) => n > 1 && setBusy(true, `Загружаю ${f.name}… ${Math.round(i / n * 100)}%`));
+          const u = await uploadFile(f, toReel, (i, n) => n > 1 && !was && setBusy(true, `Загружаю ${f.name}… ${Math.round(i / n * 100)}%`));
           parts.push(`(attached file → ${u.path})`);
           if (u.digest) parts.push(`(Telegram export «${u.digest.name}», ${u.digest.count} messages unpacked → ${u.digest.path}; ${u.digest.photos} photos it links are in photos/ beside it — open them to see the design)`);
           shown.push('📎 ' + f.name + (u.digest ? ` · выгрузка Telegram: ${u.digest.count} сообщ., ${u.digest.photos} фото` : ''));
         }
       } catch (err) {
         // Nothing is sent: the text and the files stay in the box to try again.
-        setBusy(false);
+        if (!was) setBusy(false);
         toast(err.message === 'Failed to fetch' ? 'Файл не загрузился: связь оборвалась. Текст и вложения остались — попробуйте ещё раз' : err.message);
         return;
       }
-      setBusy(false);
+      if (!was) setBusy(false);
       ta.value = ''; ta.style.height = 'auto';
       picked = []; showPicked();
       say([text, ...parts].filter(Boolean).join('\n'), [text, ...shown].filter(Boolean).join('\n'));
@@ -1148,12 +1224,14 @@ const itemPlats = (x, plats = PLATS || []) => {
   const g = guessPlat(x, plats);
   return g ? [{p: g, guessed: true}] : [];
 };
-const accChips = (x) => (PLATS || []).length < 2 ? '' : itemPlats(x).map(({p, guessed}) => `<span class="acc-chip${guessed ? ' g' : ''}" title="${esc(p.name)}${p.account ? ' · ' + esc(p.account) : ''}${guessed ? ' — угадано по языку и формату' : ''}">${esc(p.name)}</span>`).join('');
+const platIcon = (p) => (/телеграм|telegram|\btg\b/i.test(`${p.name} ${p.id}`) ? 'tg' : /insta|\big\b/i.test(`${p.name} ${p.id}`) ? 'ig' : null);
+// Each account as its network's icon with the language (Instagram RU → [ig]RU, Телеграм → [tg]).
+const accIcon = (p, guessed) => { const ic = platIcon(p), tag = platTag(p); return `<span class="acc-ic${guessed ? ' g' : ''}" title="${esc(p.name)}${p.account ? ' · ' + esc(p.account) : ''}${guessed ? ' — угадано по языку и формату' : ''}">${ic ? svg(ic, 13) : ''}${ic === 'tg' ? '' : esc(tag)}</span>`; };
+const accChips = (x) => (PLATS || []).length < 2 ? '' : itemPlats(x).map(({p, guessed}) => accIcon(p, guessed)).join('');
 const whenText = (at) => at ? new Date(at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short'}) : 'без даты';
 function itemCard(x) {
   if (x.ig) return `<a class="icard" href="${esc(x.url)}" target="_blank" rel="noopener" data-ig="${esc(x.account)}|${esc(x.code)}" title="Вышло в Instagram, в студии выпуска нет">
-    <span class="ich"><span style="display: inline-flex; color: #C13584">${svg('ig', 13)}</span>@${esc(x.account)}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
-    ${accChips(x) ? `<span class="accs">${accChips(x)}</span>` : ''}
+    <span class="ich"><span style="display: inline-flex; color: #C13584">${svg('ig', 13)}</span>@${esc(x.account)}<span class="muted" style="margin-left: auto; display: inline-flex; gap: 8px; align-items: center">${accChips(x)}<span style="display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span></span>
     ${x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy" style="width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; background: #F2F2F2">` : ''}
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)} · в студии выпуска нет${x.offer ? ` · похоже на «${esc(x.offer.title)}»` : ''}</span></a>`;
@@ -1162,8 +1240,7 @@ function itemCard(x) {
   const extra = x.stage === 'material' && need.length ? ` · снято ${need.filter((n) => n.done).length} из ${need.length}` : '';
   const sib = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id).length : 0;
   return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}" data-peek="${x.id}">
-    <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
-    ${accChips(x) ? `<span class="accs">${accChips(x)}</span>` : ''}
+    <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex; gap: 8px; align-items: center">${accChips(x)}<span style="display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span></span>
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)}${itemTouched(x) ? ` · обновлён ${ago(itemTouched(x))}` : ''}${extra}${sib ? ` · ещё ${sib} из того же материала` : ''}${x.missing ? ' · папка пропала' : ''}</span></a>`;
 }
