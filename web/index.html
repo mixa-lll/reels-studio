@@ -103,6 +103,27 @@
   form.send textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); max-height: 160px; min-height: 44px; }
   .icon { width: 44px; height: 44px; border: 1px solid var(--line); background: var(--card); border-radius: 12px; display: grid; place-items: center; flex: none; }
   .icon.go { background: var(--ink); border-color: var(--ink); color: #fff; border-radius: 50%; }
+  .dock { position: fixed; right: 16px; bottom: 84px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100vw - 32px); font-size: 13px; }
+  .dock-pill { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+  .dock-pill.busy { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .dock-pill.idle { font-weight: 500; color: var(--muted); box-shadow: none; height: 30px; padding: 0 12px; }
+  .dock-pill.done { border-color: #16A34A; }
+  .dock-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #A3A3A3; flex: none; }
+  .dock-pill.busy .dot { background: #4ADE80; animation: dockpulse 1.4s ease-in-out infinite; }
+  .dock-pill.done .dot { background: #16A34A; }
+  @keyframes dockpulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .dock-pill.busy .dot { animation: none; } }
+  .dock-panel { width: 360px; max-width: 100%; max-height: min(70vh, 560px); overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.14); padding: 6px; display: flex; flex-direction: column; }
+  .dock-h { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .dock-row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 10px; text-decoration: none; color: var(--ink); cursor: pointer; }
+  .dock-row:hover, .dock-row:focus-visible { background: #F6F6F6; }
+  .dock-row .ic { flex: none; width: 18px; height: 18px; display: grid; place-items: center; margin-top: 1px; }
+  .dock-row .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .dock-row .tx b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dock-row .tx span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .dock-row .stop { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 8px; font: inherit; font-size: 12px; padding: 3px 8px; cursor: pointer; color: var(--ink2); }
+  .dock-row.new { background: #F0FDF4; }
+  @media (max-width: 640px) { .dock { right: 10px; bottom: 76px; } .dock-panel { width: calc(100vw - 20px); } }
   .icon.cmic { color: var(--ink2); cursor: pointer; }
   .icon.cmic.rec { background: #DC2626; border-color: #DC2626; color: #fff; animation: micpulse 1.2s ease-in-out infinite; }
   .icon.cmic.wait { opacity: .6; cursor: progress; }
@@ -904,6 +925,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
     showKeys([]);
     render({from: 'me', text: shown || text});
     setBusy(true, 'Думаю…');
+    setTimeout(dockTick, 700);
     try {
       const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown})});
       if (r.status === 409) throw new Error('Claude ещё отвечает в этом чате — дождись ответа');
@@ -4176,9 +4198,64 @@ document.addEventListener('click', async (e) => {
 window.addEventListener('hashchange', route);
 // «Открыть сбоку» goes back in history; a page restored from the back-forward cache runs no route.
 window.addEventListener('pageshow', (e) => { if (e.persisted && sessionStorage.getItem('peekNext')) route(); });
+// «Сейчас работает» (handbook/DECISIONS.md, 2026-11-22): a corner pill on every screen with what
+// Claude is doing in every chat and project right now and what it finished in the last hour; it
+// opens into a list, a row leads to its chat. Polls /api/running: often while something runs.
+const DOCK = {open: false, prev: new Set(), first: true};
+const dockSeen = () => { try { return Number(localStorage.getItem('dockSeen') || 0); } catch { return 0; } };
+const dockHref = (k) => k === '_project' ? '#/' : k === '_ds' ? '#/memory/ds' : k === '_ideas' ? '#/ideas' : k.startsWith('new-') ? '#/new' : k.startsWith('post-') ? '#/post/' + k.slice(5) : k.startsWith('idea-') ? '#/item/' + k.slice(5) : '#/reel/' + k;
+const dockAgo = (t) => { const m = Math.max(0, Math.round((Date.now() - t) / 6e4)); return m < 1 ? 'только что' : m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; };
+async function dockGo(project, key) {
+  if (project !== P) { P = project; localStorage.setItem('project', P); OV = null; ITEMS_AT = 0; await loadMe(); }
+  location.hash = dockHref(key);
+  route();
+}
+async function dockTick() {
+  clearTimeout(DOCK.t);
+  if (!canEdit()) return;
+  let d = null;
+  if (!document.hidden) d = await api('/api/running').catch(() => null);
+  if (d) dockDraw(d);
+  DOCK.t = setTimeout(dockTick, d?.running.length || DOCK.open ? 4000 : 15000);
+}
+function dockDraw(d) {
+  let el = $('#dock');
+  if (!el) { el = document.createElement('div'); el.id = 'dock'; el.className = 'dock'; el.setAttribute('aria-live', 'polite'); document.body.append(el); }
+  const seen = dockSeen(), fresh = d.recent.filter((r) => r.at > seen);
+  // A turn that was running and is gone now: say so, unless its chat is the open screen.
+  const now = new Set(d.running.map((r) => r.project + '|' + r.key));
+  if (!DOCK.first) for (const r of d.recent) if (DOCK.prev.has(r.project + '|' + r.key) && !now.has(r.project + '|' + r.key) && !(r.project === P && location.hash === dockHref(r.key))) toast(`${r.stopped ? 'Остановлено' : r.ok ? 'Готово' : 'Не получилось'}: «${r.title}»`);
+  DOCK.prev = now; DOCK.first = false;
+  const busy = d.running.length + (d.bot ? 1 : 0);
+  const label = busy ? `Claude работает${busy > 1 ? ' · ' + busy : ''}` : fresh.length ? `Готово · ${fresh.length}` : 'Claude свободен';
+  const pill = `<button type="button" class="dock-pill ${busy ? 'busy' : fresh.length ? 'done' : 'idle'}" aria-expanded="${DOCK.open}" aria-controls="dockPanel"><i class="dot"></i>${esc(label)}${busy && !DOCK.open ? `<span style="font-weight: 400; opacity: .7; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(d.running[0]?.title || 'Телеграм-бот')}</span>` : ''}</button>`;
+  const other = (r) => (r.project !== P ? ` · ${esc(r.projectName)}` : '');
+  const rows = [
+    ...d.running.map((r) => `<div class="dock-row" role="link" tabindex="0" data-go="${esc(r.project)}|${esc(r.key)}"><span class="ic"><i class="spin" style="width: 12px; height: 12px"></i></span><span class="tx"><b>${esc(r.title)}</b><span>${esc(r.status || 'Думаю…')}</span><span>${dockAgo(r.started)}${r.by ? ' · ' + esc(r.by) : ''}${other(r)}</span></span><button type="button" class="stop" data-stop="${esc(r.project)}|${esc(r.key)}">Стоп</button></div>`),
+    ...(d.bot ? [`<div class="dock-row" style="cursor: default"><span class="ic">${svg('tg', 15)}</span><span class="tx"><b>Телеграм-бот</b><span>работает для: ${esc(d.bot.for)}${d.bot.queue ? ` · в очереди ${d.bot.queue}` : ''}</span></span></div>`] : []),
+  ];
+  const done = d.recent.slice(0, 8).map((r) => `<div class="dock-row ${r.at > seen ? 'new' : ''}" role="link" tabindex="0" data-go="${esc(r.project)}|${esc(r.key)}"><span class="ic" style="color: ${r.ok ? '#16A34A' : '#DC2626'}">${r.stopped ? '■' : r.ok ? '✓' : '!'}</span><span class="tx"><b>${esc(r.title)}</b>${r.text ? `<span>${esc(r.text)}</span>` : ''}<span>${r.stopped ? 'остановлено' : r.ok ? 'готово' : 'ошибка'} ${dockAgo(r.at)}${dockAgo(r.at) === 'только что' ? '' : ' назад'}${other(r)}</span></span></div>`).join('');
+  el.innerHTML = (DOCK.open ? `<div class="dock-panel" id="dockPanel" role="region" aria-label="Задачи Claude">
+      <div class="dock-h">Сейчас работает<span style="margin-left: auto; font-weight: 400">до ${d.max} задач сразу</span></div>
+      ${rows.join('') || '<p class="small muted" style="padding: 4px 10px 8px; margin: 0">Ничего не идёт. Задачи можно ставить в любом чате — рилса, поста, проекта — они идут параллельно.</p>'}
+      ${done ? `<div class="dock-h" style="border-top: 1px solid var(--line); margin-top: 4px; padding-top: 10px">За последний час${fresh.length ? '<button type="button" id="dockClear" style="all: unset; margin-left: auto; cursor: pointer; font-weight: 400">отметить прочитанным</button>' : ''}</div>${done}` : ''}
+    </div>` : '') + pill;
+  el.querySelector('.dock-pill').onclick = () => { DOCK.open = !DOCK.open; dockDraw(d); if (DOCK.open) dockTick(); };
+  el.querySelectorAll('[data-go]').forEach((r) => {
+    const go = () => { const [pr, k] = r.dataset.go.split('|'); DOCK.open = false; try { localStorage.setItem('dockSeen', String(Date.now())); } catch {} dockGo(pr, k); dockTick(); };
+    r.onclick = (e) => { if (!e.target.closest('[data-stop]')) go(); };
+    r.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  });
+  el.querySelectorAll('[data-stop]').forEach((b) => (b.onclick = async () => { const [pr, k] = b.dataset.stop.split('|'); b.disabled = true; await fetch(`/api/stop?project=${encodeURIComponent(pr)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key: k})}).catch(() => {}); setTimeout(dockTick, 800); }));
+  $('#dockClear')?.addEventListener('click', () => { try { localStorage.setItem('dockSeen', String(Date.now())); } catch {} dockDraw(d); });
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && DOCK.open) { DOCK.open = false; dockTick(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) dockTick(); });
+
 (async () => {
   await loadMe();
   route();
+  dockTick();
 })();
 
 </script>

@@ -281,6 +281,8 @@ function preamble(p, k) {
 }
 
 const jobs = new Set();
+// Finished turns for the «Сейчас работает» dock (web/index.html): newest first, kept in memory.
+const RECENT = [];
 const jobOf = (p, k) => [...jobs].find((j) => j.p === p && j.key === k);
 const full = () => jobs.size >= MAX_JOBS;
 let channelSeq = 0;
@@ -351,8 +353,9 @@ function startTurn(p, k, text, send) {
     let keys = [];
     out = out.replace(/\n?\s*⌨️\s*(.+)\s*$/u, (_, k2) => { keys = k2.split('|').map((x) => x.trim()).filter(Boolean); return ''; }).trim();
     const msg = {from: 'bot', kind: 'text', text: out.replace(/\s*NO_REPLY\s*$/, ''), keys, buttons: []};
-    record(p, key, msg); send({msg}); replies++;
+    record(p, key, msg); send({msg}); replies++; lastText = out;
   };
+  let lastText = '';
   child.stdout.on('data', (d) => {
     buf += d;
     let i;
@@ -389,6 +392,8 @@ function startTurn(p, k, text, send) {
     }
     send({done: true, ms: result?.duration_ms});
     jobs.delete(job);
+    RECENT.unshift({p, key, by: job.by, started: job.started, at: Date.now(), ok: !(code && !result) || job.stopped, stopped: job.stopped, text: String(lastText || '').replace(/\s+/g, ' ').slice(0, 160)});
+    RECENT.splice(40);
     rmSync(channel, {recursive: true, force: true});
     // Added on the way but not answered when it stopped (or never taken in): those go next.
     const unanswered = job.stopped ? live.length - answered : Math.min(live.length, sent - taken);
@@ -400,7 +405,7 @@ function startTurn(p, k, text, send) {
   const live = [];
   let answered = 0;
   const add = (t) => { if (open && !job.stopped) { sent++; live.push(t); child.stdin.write(encode(t)); return 'live'; } job.queue.push(t); return 'next'; };
-  const job = {child, p, queue: [], add, stopped: false, get key() { return key; }};
+  const job = {child, p, queue: [], add, stopped: false, started: Date.now(), by: /^\(from ([^,)\n]+)/.exec(text)?.[1] || '', get key() { return key; }};
   jobs.add(job);
   return job;
 }
@@ -834,6 +839,35 @@ createServer(async (req, res) => {
     return json(200, {item});
   }
 
+  // «Сейчас работает»: every turn Claude runs in the projects this person sees, the Telegram
+  // bot's, and the ones that ended in the last hour, each with where it is.
+  if (req.method === 'GET' && url.pathname === '/api/running') {
+    const mine = projects().filter((x) => me.isOwner || (me.project ? x.slug === me.project : !x.test));
+    const name = new Map(mine.map((x) => [x.slug, x.name]));
+    const titles = new Map();
+    const titleOf = (pp, k) => {
+      if (k === '_project') return 'Чат проекта';
+      if (k === '_ds') return 'Дизайн-система';
+      if (k === '_ideas') return 'Идеи';
+      if (k.startsWith('new-')) return 'Новый рилс';
+      if (!titles.has(pp)) {
+        const m = new Map();
+        try { for (const r of reels(pp)) m.set(r.id, r.title); } catch {}
+        try { for (const x of listPosts(join(PROJECTS, pp), () => null)) m.set('post-' + x.id, x.title); } catch {}
+        for (const x of readJson(join(PROJECTS, pp, 'items.json'), {}).items || []) m.set('idea-' + x.id, x.title);
+        titles.set(pp, m);
+      }
+      return titles.get(pp).get(k) || k;
+    };
+    const one = (j) => ({project: j.p, projectName: name.get(j.p) || j.p, key: j.key, title: titleOf(j.p, j.key), by: j.by || '', started: j.started});
+    const bot = readJson(join(BOT, 'data', 'state.json'), {});
+    return json(200, {
+      running: [...jobs].filter((j) => name.has(j.p)).map((j) => ({...one(j), status: chatMeta(j.p, j.key).status || ''})),
+      recent: RECENT.filter((r) => name.has(r.p) && Date.now() - r.at < 3600e3).map((r) => ({...one(r), at: r.at, ok: r.ok, stopped: !!r.stopped, text: r.text})),
+      bot: bot.pending ? {for: bot.holder || bot.ownerName || 'владельца', queue: (bot.queue || []).length} : null,
+      max: MAX_JOBS,
+    });
+  }
   if (req.method === 'GET' && url.pathname === '/api/overview') {
     const list = reels(p);
     const ideas = parseIdeas(p).filter((x) => /Owner's ideas|My ideas/.test(x.section));
