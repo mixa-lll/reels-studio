@@ -337,6 +337,19 @@
   .mob { display: none !important; }
 .testbar{display:block;margin:0 0 10px;padding:7px 10px;border-radius:9px;background:#2F6FEB;color:#fff;font-size:13px;font-weight:600;text-decoration:none}
   /* Основа: выпуски по этапам (handbook/LEAN.md, кусок 3) */
+  .acc-chip { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: #F1F1F1; color: var(--ink2); white-space: nowrap; line-height: 17px; }
+  .acc-chip.g { background: none; border: 1px dashed #D4D4D4; color: var(--muted); line-height: 15px; }
+  .accs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .ltab-wrap { overflow-x: auto; }
+  .ltab { min-width: 900px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .ltab .tr { display: grid; grid-template-columns: minmax(220px, 2.4fr) minmax(130px, 1.3fr) 110px minmax(170px, 1.5fr) 90px 110px; gap: 14px; align-items: center; padding: 10px 14px; border-top: 1px solid #F0F0F0; text-decoration: none; color: var(--ink); font-size: 13px; }
+  .ltab .tr:hover { background: #FAFAFA; }
+  .ltab .thd { border-top: 0; color: var(--muted); font-size: 12px; border-radius: 12px 12px 0 0; }
+  .ltab .thd button { all: unset; cursor: pointer; } .ltab .thd button.on { color: var(--ink); font-weight: 600; }
+  .ctxm { position: fixed; z-index: 60; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px; min-width: 180px; display: flex; flex-direction: column; }
+  .ctxm button { all: unset; padding: 8px 12px; border-radius: 7px; font-size: 13px; cursor: pointer; }
+  .ctxm button:hover, .ctxm button:focus-visible { background: #F4F4F4; }
+  .ctxm button.danger { color: #DC2626; }
   .lboard { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 10px; align-items: start; overflow-x: auto; }
   .lcol { background: var(--side); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
   .lcolh { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; font-size: 13px; }
@@ -1125,10 +1138,22 @@ const itemHref = (x) => x.ref?.kind === 'reel' ? '#/reel/' + x.ref.id : x.ref?.k
 const sdot = (s) => `<span class="sdot" style="color: ${LIFE_COLOR[s]}"><i style="${s === 'idea' ? 'border: 1.5px dashed ' + LIFE_COLOR[s] : 'background: ' + LIFE_COLOR[s]}"></i>${LIFE.find(([k]) => k === s)?.[1] || ''}</span>`;
 // When an item was last worked on: its own changes or a new version of its reel or post.
 const itemTouched = (x) => Math.max(x.updated || 0, x.stageAt || 0, x.created || 0, (x.ref?.kind === 'reel' ? OV?.reels.find((r) => r.id === x.ref.id)?.updated : 0) || 0, (x.ref?.kind === 'post' ? OV?.posts?.find((r) => r.id === x.ref.id)?.updated : 0) || 0);
+// The project's accounts (strategy.json → platforms), for the account marks on every card.
+let PLATS = null;
+const loadPlats = () => PLATS ? Promise.resolve(PLATS) : api('/api/plan').then((d) => (PLATS = (d.strategy?.platforms || []).filter((p) => p.id))).catch(() => (PLATS = []));
+// Where an item goes: its accounts in the Plan (`out`), the ones set by hand, else a guess.
+const itemPlats = (x, plats = PLATS || []) => {
+  const own = [...new Set([...(x.out || []).map((o) => o.platform), ...(x.platforms || [])])].map((id) => plats.find((p) => p.id === id)).filter(Boolean);
+  if (own.length) return own.map((p) => ({p}));
+  const g = guessPlat(x, plats);
+  return g ? [{p: g, guessed: true}] : [];
+};
+const accChips = (x) => (PLATS || []).length < 2 ? '' : itemPlats(x).map(({p, guessed}) => `<span class="acc-chip${guessed ? ' g' : ''}" title="${esc(p.name)}${p.account ? ' · ' + esc(p.account) : ''}${guessed ? ' — угадано по языку и формату' : ''}">${esc(p.name)}</span>`).join('');
 const whenText = (at) => at ? new Date(at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short'}) : 'без даты';
 function itemCard(x) {
-  if (x.ig) return `<a class="icard" href="${esc(x.url)}" target="_blank" rel="noopener" title="Вышло в Instagram, в студии выпуска нет">
+  if (x.ig) return `<a class="icard" href="${esc(x.url)}" target="_blank" rel="noopener" data-ig="${esc(x.account)}|${esc(x.code)}" title="Вышло в Instagram, в студии выпуска нет">
     <span class="ich"><span style="display: inline-flex; color: #C13584">${svg('ig', 13)}</span>@${esc(x.account)}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
+    ${accChips(x) ? `<span class="accs">${accChips(x)}</span>` : ''}
     ${x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy" style="width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; background: #F2F2F2">` : ''}
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)} · в студии выпуска нет${x.offer ? ` · похоже на «${esc(x.offer.title)}»` : ''}</span></a>`;
@@ -1138,15 +1163,53 @@ function itemCard(x) {
   const sib = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id).length : 0;
   return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}" data-peek="${x.id}">
     <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
+    ${accChips(x) ? `<span class="accs">${accChips(x)}</span>` : ''}
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)}${itemTouched(x) ? ` · обновлён ${ago(itemTouched(x))}` : ''}${extra}${sib ? ` · ещё ${sib} из того же материала` : ''}${x.missing ? ' · папка пропала' : ''}</span></a>`;
 }
+// Right click on a release anywhere (Выпуски, Plan): open it or delete it. Deleting asks first;
+// a reel or post folder goes to the project's bin for 30 days.
+document.addEventListener('contextmenu', (e) => {
+  const el = e.target.closest?.('#view [data-peek], #view [data-ig]');
+  if (!el || !canEdit()) return;
+  const x = el.dataset.peek ? ITEMS?.items.find((y) => y.id === el.dataset.peek) : null;
+  if (!x && !el.dataset.ig) return;
+  e.preventDefault();
+  document.querySelector('.ctxm')?.remove();
+  const m = document.createElement('div');
+  m.className = 'ctxm'; m.setAttribute('role', 'menu');
+  m.innerHTML = `<button type="button" role="menuitem" data-a="open">Открыть</button>${x ? '<button type="button" role="menuitem" class="danger" data-a="del">Удалить…</button>' : '<button type="button" role="menuitem" class="danger" data-a="hide">Убрать — не из студии</button>'}`;
+  document.body.append(m);
+  m.style.left = Math.min(e.clientX, innerWidth - m.offsetWidth - 8) + 'px';
+  m.style.top = Math.min(e.clientY, innerHeight - m.offsetHeight - 8) + 'px';
+  m.querySelector('button').focus();
+  const close = () => { m.remove(); removeEventListener('pointerdown', away, true); removeEventListener('keydown', esc_, true); };
+  const away = (ev) => { if (!m.contains(ev.target)) close(); };
+  const esc_ = (ev) => { if (ev.key === 'Escape') close(); };
+  addEventListener('pointerdown', away, true); addEventListener('keydown', esc_, true);
+  m.onclick = async (ev) => {
+    const a = ev.target.dataset?.a;
+    if (!a) return;
+    close();
+    if (a === 'open') { if (el.target === '_blank') open(el.href, '_blank', 'noopener'); else location.hash = el.getAttribute('href'); return; }
+    if (a === 'hide') { const [account, code] = el.dataset.ig.split('|'); await post('/api/instagram/link', {account, code, hide: true}); await loadIg(); toast('Убрано'); route(); return; }
+    const folder = x.ref?.kind === 'reel' || x.ref?.kind === 'post';
+    if (!confirm(`Удалить «${x.title}»?${folder ? '\n\nПапка ' + (x.ref.kind === 'reel' ? 'рилса' : 'поста') + ' со всеми версиями уйдёт в корзину проекта: 30 дней её можно вернуть, потом она удалится насовсем.' : ''}${x.published?.length ? '\n\nВыпуск уже вышел в Instagram — пост там останется.' : ''}`)) return;
+    const r = await post('/api/items/delete', {id: x.id}).catch(() => null);
+    if (!r) return toast('Не удалилось');
+    toast(r.trash ? 'Удалено — папка в корзине проекта' : 'Удалено');
+    route();
+  };
+});
 // Выпуски (LeanAll): five columns by stage; format and rubric are filters, Claude's pitches a separate list.
 async function vAll(fmt = 'all') {
   title('Выпуски');
   fmt = {reels: 'reel', posts: 'post'}[fmt] || fmt;
-  await Promise.all([loadItems(), loadIg()]);
+  await Promise.all([loadItems(), loadIg(), loadPlats()]);
   const mine = ITEMS.items.filter((x) => !x.proposed);
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch { return ''; } };
+  let acc = sessionStorage.getItem('allAcc') || '', q = '', asList = store('allView') === 'list';
+  let [sortBy, sortDir] = (store('allSort') || 'created:desc').split(':');
   const pitches = ITEMS.items.filter((x) => x.proposed);
   let rub = sessionStorage.getItem('allRubric') || '';
   const fmts = [['all', 'Все форматы'], ...['reel', 'post', 'carousel', 'telegram'].map((k) => [k, FMT_NAME[k]])];
@@ -1156,10 +1219,13 @@ async function vAll(fmt = 'all') {
     <div class="row" style="gap: 8px; flex-wrap: wrap">${fmts.map(([k, t]) => `<a class="ln-pill ${k === fmt ? 'on' : ''}" href="#/all${k === 'all' ? '' : '/' + k}">${k === 'all' ? '' : svg(FMT_ICON[k], 14)}${t} · ${n(k)}</a>`).join('')}
       <span style="width: 1px; height: 22px; background: var(--line); margin: 0 6px"></span>
       <select class="ln-pill" id="rubSel" aria-label="Рубрика"><option value="">Рубрика: все</option>${ITEMS.rubrics.map((r) => `<option value="${esc(r.id)}" ${r.id === rub ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+      ${PLATS.length > 1 ? `<select class="ln-pill" id="accSel" aria-label="Аккаунт"><option value="">Аккаунт: все</option>${PLATS.map((p) => `<option value="${esc(p.id)}" ${p.id === acc ? 'selected' : ''}>${esc(p.name)}${p.account ? ' · ' + esc(p.account) : ''}</option>`).join('')}</select>` : ''}
+      <input class="ln-pill" id="allQ" type="search" placeholder="Найти по названию" aria-label="Найти по названию" style="min-width: 180px">
+      ${fmt === 'proposed' ? '' : `<span class="ln-seg"><button type="button" data-view="board" class="${asList ? '' : 'on'}">Доска</button><button type="button" data-view="list" class="${asList ? 'on' : ''}">Список</button></span>`}
       <a class="ln-pill ${fmt === 'proposed' ? 'on' : ''}" href="#/all/proposed" style="margin-left: auto">${svg('idea', 14)}Предложения Claude · ${pitches.length}</a></div>
     <div id="allBody"></div></div>`;
   const draw = () => {
-    const pass = (x) => (!rub || x.rubric === rub || itemRubric(x)?.id === rub);
+    const pass = (x) => (!rub || x.rubric === rub || itemRubric(x)?.id === rub) && (!acc || itemPlats(x).some(({p}) => p.id === acc)) && (!q || String(x.title || '').toLowerCase().includes(q));
     if (fmt === 'proposed') {
       const list = pitches.filter(pass);
       $('#allBody').innerHTML = `<p class="small muted" style="margin: 0 0 8px">Идеи из ideas.md, которые ещё никто не взял. Взятая идея встаёт в колонку «Идея», дату можно поставить в Плане.</p>` + (list.map((x) => `<div class="ln-li"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><a href="#/item/${x.id}" style="flex: 1; min-width: 0; text-decoration: none; color: var(--ink)"><b style="font-weight: 600">${esc(x.title)}</b><br><span class="small muted">${esc(x.idea?.hook || x.idea?.about || '').slice(0, 140)}</span></a>${x.at ? `<span class="small muted">${whenText(x.at)}</span>` : ''}<span class="small muted">${x.by === 'owner' ? 'твоя' : 'Claude'}</span>${canEdit() ? `<button type="button" class="ln-btn s" data-take="${x.id}">Взять</button>` : ''}</div>`).join('') || '<p class="small muted">Пусто.</p>');
@@ -1169,9 +1235,40 @@ async function vAll(fmt = 'all') {
     const list = [...mine, ...(rub ? [] : igLooseItems())].filter((x) => (fmt === 'all' || x.format === fmt) && pass(x));
     // «Вышло» goes by the date it came out, newest first; the rest by the last change.
     const order = (a, b) => a.stage === 'published' ? String(b.at || '').localeCompare(String(a.at || '')) : itemTouched(b) - itemTouched(a);
+    if (asList) return drawList(list);
     $('#allBody').innerHTML = `<div class="lboard">${LIFE.map(([k, t]) => { const col = list.filter((x) => x.stage === k).sort(order); return `<section class="lcol" aria-label="${t}"><div class="lcolh">${sdot(k)}<span class="muted" style="margin-left: auto">${col.length}</span></div>${col.map(itemCard).join('') || '<p class="small muted" style="padding: 4px">Пусто.</p>'}</section>`; }).join('')}</div>`;
   };
+  // Список: one row per release with its accounts, when it goes out on each, when it was made.
+  const firstOut = (x) => (x.out?.length ? x.out.map((o) => o.at).sort()[0] : x.at) || '';
+  const KEYS = {title: (x) => String(x.title || '').toLowerCase(), stage: (x) => LIFE.findIndex(([k]) => k === x.stage), at: firstOut, created: (x) => x.created || 0, touched: (x) => (x.ig ? 0 : itemTouched(x))};
+  const fmtAt = (t) => new Date(t).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+  const fmtDay = (t) => new Date(t).toLocaleDateString('ru', {day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric'});
+  const outsText = (x) => {
+    const outs = x.out?.length ? x.out : x.at ? [{platform: null, at: x.at}] : [];
+    if (!outs.length) return '<span class="muted">без даты</span>';
+    return outs.slice().sort((a, b) => a.at.localeCompare(b.at)).map((o) => { const p = (PLATS || []).find((y) => y.id === o.platform); return `<span style="white-space: nowrap">${p && x.out?.length > 1 ? `<span class="acc-chip" style="margin-right: 5px" title="${esc(p.name)}">${esc(platTag(p))}</span>` : ''}${fmtAt(o.at)}</span>`; }).join('<br>');
+  };
+  function drawList(list) {
+    const k = KEYS[sortBy] || KEYS.created, dir = sortDir === 'asc' ? 1 : -1;
+    // Rows without the sorted value (no date) go last either way.
+    const rows = list.slice().sort((a, b) => { const va = k(a), vb = k(b); if (!va && vb) return 1; if (va && !vb) return -1; return (va > vb ? 1 : va < vb ? -1 : 0) * dir; });
+    const th = (key, t) => `<button type="button" data-sort="${key}" class="${sortBy === key ? 'on' : ''}">${t}${sortBy === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</button>`;
+    $('#allBody').innerHTML = `<div class="ltab-wrap"><div class="ltab" role="table">
+      <div class="tr thd" role="row">${th('title', 'Выпуск')}<span>Аккаунт</span>${th('stage', 'Этап')}${th('at', 'Выкладка')}${th('created', 'Создан')}${th('touched', 'Обновлён')}</div>
+      ${rows.map((x) => { const r = x.ig ? null : itemRubric(x); return `<a class="tr" role="row" href="${x.ig ? esc(x.url) : itemHref(x)}" ${x.ig ? `target="_blank" rel="noopener" data-ig="${esc(x.account)}|${esc(x.code)}"` : `data-peek="${x.id}"`}>
+        <span style="display: flex; gap: 8px; align-items: center; min-width: 0"><span class="muted" style="display: inline-flex; flex: none" title="${FMT_NAME[x.format] || ''}">${svg(x.ig ? 'ig' : FMT_ICON[x.format] || 'reel', 15)}</span><span style="min-width: 0"><b style="font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</b><span class="small muted">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}; margin-right: 5px"></span>${esc(r.name)}` : x.ig ? '@' + esc(x.account) + ' · в студии выпуска нет' : 'без рубрики'}</span></span></span>
+        <span class="accs">${accChips(x) || '<span class="muted">—</span>'}</span>
+        <span>${sdot(x.stage)}</span>
+        <span class="small">${outsText(x)}</span>
+        <span class="small muted">${x.created ? fmtDay(x.created) : '—'}</span>
+        <span class="small muted">${x.ig ? '—' : itemTouched(x) ? ago(itemTouched(x)) : '—'}</span></a>`; }).join('') || '<p class="small muted" style="padding: 14px">Ничего не нашлось.</p>'}
+    </div></div>`;
+    $('#allBody').querySelectorAll('[data-sort]').forEach((b) => (b.onclick = () => { if (sortBy === b.dataset.sort) sortDir = sortDir === 'asc' ? 'desc' : 'asc'; else { sortBy = b.dataset.sort; sortDir = sortBy === 'title' || sortBy === 'stage' ? 'asc' : 'desc'; } store('allSort', sortBy + ':' + sortDir); draw(); }));
+  }
   $('#rubSel').onchange = (e) => { rub = e.target.value; sessionStorage.setItem('allRubric', rub); draw(); };
+  $('#accSel')?.addEventListener('change', (e) => { acc = e.target.value; sessionStorage.setItem('allAcc', acc); draw(); });
+  $('#allQ').oninput = (e) => { q = e.target.value.trim().toLowerCase(); draw(); };
+  view.querySelectorAll('[data-view]').forEach((b) => (b.onclick = () => { asList = b.dataset.view === 'list'; store('allView', asList ? 'list' : 'board'); view.querySelectorAll('[data-view]').forEach((y) => y.classList.toggle('on', y === b)); draw(); }));
   draw();
 }
 
@@ -2580,6 +2677,8 @@ const platTag = (p) => { const s = `${p.name || ''} ${p.id || ''}`; return /\b(e
 const platTakes = (p, x) => !(p.formats || []).length || p.formats.some((f) => f.kind === FMT_KIND[x.format]);
 const accKey = (a) => String(a || '').replace(/^@/, '').toLowerCase();
 function guessPlat(x, plats) {
+  const own = (x.platforms || []).map((id) => plats.find((p) => p.id === id)).find(Boolean);
+  if (own) return own;
   const acc = x.ig ? x.account : (x.published || [])[0]?.account;
   const byAcc = acc && plats.find((p) => accKey(p.account) === accKey(acc));
   if (byAcc) return byAcc;
@@ -2618,6 +2717,7 @@ async function vPlan(offset = 0, month = true) {
   // off and draws them together («Слитно»: one chip per release, account tags) or apart («По аккаунтам»:
   // a lane per account in a week, a chip per account in a month). Kept per project in this browser.
   const plats = (st.platforms || []).filter((p) => p.id), multi = plats.length > 1;
+  PLATS = plats;
   const pref = (() => { try { return JSON.parse(localStorage.getItem('planAcc:' + P) || '{}'); } catch { return {}; } })();
   const offPl = new Set((pref.off || []).filter((id) => plats.some((p) => p.id === id)));
   if (offPl.size >= plats.length) offPl.clear();

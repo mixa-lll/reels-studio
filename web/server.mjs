@@ -13,7 +13,7 @@ import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
-import {changeItem, createItems, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
+import {changeItem, createItems, deleteItem, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
 import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {readKit} from './dskit.mjs';
@@ -997,6 +997,14 @@ createServer(async (req, res) => {
     if (!item) return json(404, {});
     log(me.name, `выпуск «${item.title}»: ${Object.keys(b).filter((k) => k !== 'id').join(', ')}`);
     return json(200, {item});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/items/delete') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const r = deleteItem(studio, String(b.id || ''), {by: me.name});
+    if (!r) return json(404, {});
+    log(me.name, `удалил выпуск «${r.title}»${r.trash ? ' (папка в корзине проекта на 30 дней)' : ''}`);
+    return json(200, r);
   }
   if (req.method === 'POST' && url.pathname === '/api/items/new') {
     if (!can('editor')) return json(403, {});
