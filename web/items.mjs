@@ -3,7 +3,7 @@
 // in projects/<p>/items.json and points at the reel and post folders, which stay as they are:
 // the bot and the agent keep using them, ideas.md and plan.json. syncItems() reads those
 // sources, adds what is new and moves each item's stage forward when the files say so.
-import {existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, utimesSync, writeFileSync} from 'node:fs';
 import {randomBytes} from 'node:crypto';
 import {join} from 'node:path';
 import {listPosts} from './posts.mjs';
@@ -334,6 +334,43 @@ export function dropIdea(studio, id, reason, {by, now = Date.now()} = {}) {
   saveItems(studio, data);
   logEvent(studio, {type: 'drop', item: id, reason, by}, now);
   return {title: item.ref.id, batch: item.batch || null};
+}
+
+/**
+ * «Удалить» (right click in Выпуски and the Plan): the item goes, its reel or post folder moves to
+ * the project's bin (.trash, emptied after 30 days — bot/storage.mjs), a pitch goes to Cancelled.
+ * Returns {title, trash} or null.
+ */
+export function deleteItem(studio, id, {by, now = Date.now()} = {}) {
+  const data = loadItems(studio);
+  const item = data.items.find((x) => x.id === id);
+  if (!item) return null;
+  let trash = null;
+  if (item.ref?.kind === 'reel' || item.ref?.kind === 'post') {
+    const dir = join(studio, item.ref.kind + 's', item.ref.id);
+    if (existsSync(dir)) {
+      const bin = join(studio, '.trash');
+      mkdirSync(bin, {recursive: true});
+      const label = `удалён ${item.ref.kind === 'reel' ? 'рилс' : 'пост'} ${item.ref.id} ${new Date(now).toISOString().slice(0, 10)}`;
+      let to = join(bin, label);
+      for (let i = 2; existsSync(to); i++) to = join(bin, `${label} ${i}`);
+      renameSync(dir, to);
+      utimesSync(to, new Date(now), new Date(now));
+      trash = label;
+    }
+    const f = join(studio, 'plan.json');
+    if (existsSync(f)) {
+      const plan = readJson(f, {}), key = planKey(item);
+      for (const k of ['at', 'rubric', 'out']) if (plan[k]) delete plan[k][key];
+      writeJson(f, plan);
+    }
+  } else if (item.ref?.kind === 'idea') moveIdea(studio, item.ref.id, {from: /.*/, to: 'Cancelled', reason: 'удалено'});
+  const twin = item.twin;
+  data.items = data.items.filter((x) => x !== item);
+  if (twin) { const left = data.items.filter((x) => x.twin === twin); if (left.length === 1) delete left[0].twin; }
+  saveItems(studio, data);
+  logEvent(studio, {type: 'delete', item: id, title: item.title, trash, by}, now);
+  return {title: item.title, trash};
 }
 
 /** «Вернуть»: the pitch goes back to My ideas; the next sync makes it a proposal again. */
