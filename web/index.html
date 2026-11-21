@@ -393,6 +393,12 @@
   .ln-grid.mo .ln-chip .t .rsq { margin-top: 4px; }
   .ln-grid.mo .ln-chip .t span:last-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
   .ln-chip.igc { background: #fff; border: 1px solid #EDEDED; color: var(--muted); }
+  .ln-chip .m { flex-wrap: wrap; row-gap: 2px; }
+  .ln-acc { flex: none; font-size: 10px; font-weight: 700; letter-spacing: .02em; color: var(--ink2); background: #fff; border: 1px solid #E5E5E5; border-radius: 4px; padding: 0 4px; line-height: 15px; }
+  .ln-miss { flex: none; font-size: 10.5px; color: #B45309; white-space: nowrap; }
+  .ln-accb { font: inherit; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; border: 1px solid #E5E5E5; background: #fff; color: #A3A3A3; cursor: pointer; }
+  .ln-accb.on { color: var(--ink); border-color: #171717; }
+  .ln-lane { border-right: 1px solid #F0F0F0; border-bottom: 1px solid #F0F0F0; padding: 10px 8px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; min-width: 0; }
   .ln-chip.igc .t { color: var(--ink); font-weight: 500; }
   .ln-chip.igc .t svg { flex: none; color: #C13584; }
   .ln-ig { margin-top: auto; align-self: flex-start; display: inline-flex; gap: 3px; align-items: center; font-size: 11px; color: var(--muted); }
@@ -2567,6 +2573,24 @@ async function vKnowledge(tab = 'overview', sel) {
   $('#tplSel')?.addEventListener('change', async (e) => { await post('/api/strategy/template', {rubric: e.target.dataset.rubric, template: e.target.value || null}); route(); });
 }
 
+// Выходы по аккаунтам (STRATEGY.md): where an item goes. Its own `out` [{platform, at}] when someone
+// set it, else one account guessed from where it came out, its format and its language.
+const FMT_KIND = {reel: 'reel', post: 'photo', carousel: 'carousel', telegram: 'text', story: 'story'};
+const platTag = (p) => { const s = `${p.name || ''} ${p.id || ''}`; return /\b(en|eng)\b|англ/i.test(s) ? 'EN' : /\bru\b|рус/i.test(s) ? 'RU' : /телеграм|telegram|\btg\b/i.test(s) ? 'ТГ' : String(p.name || p.id || '?').slice(0, 3); };
+const platTakes = (p, x) => !(p.formats || []).length || p.formats.some((f) => f.kind === FMT_KIND[x.format]);
+const accKey = (a) => String(a || '').replace(/^@/, '').toLowerCase();
+function guessPlat(x, plats) {
+  const acc = x.ig ? x.account : (x.published || [])[0]?.account;
+  const byAcc = acc && plats.find((p) => accKey(p.account) === accKey(acc));
+  if (byAcc) return byAcc;
+  const can = plats.filter((p) => platTakes(p, x)), pool = can.length ? can : plats;
+  const letters = (x.title || '').match(/\p{L}/gu) || [];
+  const ru = x.lang ? x.lang === 'RU' : letters.length ? letters.filter((c) => /[а-яё]/i.test(c)).length / letters.length > 0.5 : true;
+  const en = /(^|-)en(-|$)/.test(x.ref?.id || '') || !ru;
+  return pool.find((p) => platTag(p) === (en ? 'EN' : 'RU')) || pool[0] || null;
+}
+const planOuts = (x, plats) => x.out?.length ? x.out.filter((o) => o.at) : x.at ? [{platform: guessPlat(x, plats)?.id || null, at: x.at, guessed: true}] : [];
+
 // Календарь (CleanPlan): a week of reels and posts from plan.json, empty rhythm slots, events; drag to a day.
 // План (LeanPlan): ideas on dates first. A hairline month (or week) grid, each item with its rubric,
 // format and stage; ideas dashed, Claude's proposals marked. Rubrics on the right.
@@ -2590,50 +2614,101 @@ async function vPlan(offset = 0, month = true) {
   // Posts found in Instagram without an item (offers first): a muted line in their day and a list aside.
   const found = (IG || []).flatMap((a) => [...(a.offers || []).map((o) => ({a, m: a.media.find((m) => m.code === o.code), offer: o})), ...(a.loose || []).map((c) => ({a, m: a.media.find((m) => m.code === c)}))]).filter((x) => x.m);
   const igAll = igLooseItems();
-  const onDay = (d) => [...all, ...igAll].filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
+  // Аккаунты: each item stands on a day once per account it goes to. The bar turns accounts on and
+  // off and draws them together («Слитно»: one chip per release, account tags) or apart («По аккаунтам»:
+  // a lane per account in a week, a chip per account in a month). Kept per project in this browser.
+  const plats = (st.platforms || []).filter((p) => p.id), multi = plats.length > 1;
+  const pref = (() => { try { return JSON.parse(localStorage.getItem('planAcc:' + P) || '{}'); } catch { return {}; } })();
+  const offPl = new Set((pref.off || []).filter((id) => plats.some((p) => p.id === id)));
+  if (offPl.size >= plats.length) offPl.clear();
+  const lanes = multi && pref.by === 'acc', onPl = plats.filter((p) => !offPl.has(p.id));
+  const savePref = (v) => { try { localStorage.setItem('planAcc:' + P, JSON.stringify({...pref, off: [...offPl], ...v})); } catch {} };
+  const placed = [...all, ...igAll].flatMap((x) => planOuts(x, plats).filter((o) => !o.platform || !offPl.has(o.platform)).map((o) => ({x, o})));
+  const relKey = (x) => (x.ig ? x.id : x.twin || x.id);
+  // Every account a release goes to (twins together), to say which one it is missing.
+  const relPl = new Map();
+  for (const x of all) for (const o of planOuts(x, plats)) { const k = relKey(x); if (!relPl.has(k)) relPl.set(k, new Set()); relPl.get(k).add(o.platform); }
+  const tagOf = (id) => esc(platTag(plats.find((p) => p.id === id) || {id}));
+  const tagH = (pls) => multi && pls.length && (lanes ? month : onPl.length > 1) ? pls.map((id) => `<span class="ln-acc">${tagOf(id)}</span>`).join('') : '';
+  const missH = (x) => {
+    if (!multi || lanes || onPl.length < 2 || !x.at || x.ig || x.proposed || x.stage === 'published') return '';
+    const has = relPl.get(relKey(x)) || new Set(), miss = onPl.filter((p) => platTakes(p, x) && !has.has(p.id));
+    return miss.length ? `<span class="ln-miss" title="Этот выпуск пока не стоит на ${miss.map((p) => esc(p.name)).join(', ')}">нет ${miss.map((p) => esc(platTag(p))).join(', ')}</span>` : '';
+  };
+  const onDay = (d, pl) => {
+    const list = placed.filter(({o}) => o.at.slice(0, 10) === ymd(d) && (pl === undefined || o.platform === pl)).sort((p, q) => p.o.at.localeCompare(q.o.at));
+    if (lanes) return list.map(({x, o}) => ({x, pls: [o.platform], pl: o.platform, at: o.at}));
+    const by = new Map();
+    for (const {x, o} of list) { const k = relKey(x); if (!by.has(k)) by.set(k, {x, pls: [], pl: '', at: o.at}); by.get(k).pls.push(o.platform); }
+    return [...by.values()];
+  };
+  const perWeek = (p) => p.perWeek ?? (p.formats || []).reduce((m, f) => m + (f.perWeek || 0), 0);
+  const inRange = (o) => o.at.slice(0, 10) >= ymd(days[0]) && o.at.slice(0, 10) <= ymd(days.at(-1));
+  const platCount = (p) => [...all, ...igAll].flatMap((x) => planOuts(x, plats)).filter((o) => o.platform === p.id && inRange(o)).length;
   // A post that is only in Instagram: its caption, the account; a click opens it there.
-  const chipIg = (x) => `<a class="ln-chip igc" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(x.title)} — вышло в @${esc(x.account)}, в студии выпуска нет">
+  const chipIg = (x, c = {pls: []}) => `<a class="ln-chip igc" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(x.title)} — вышло в @${esc(x.account)}, в студии выпуска нет">
       <span class="t">${svg('ig', 11)}<span>${esc(x.title)}</span></span>
-      <span class="m"><span class="mt">${month ? (x.lang ? x.lang + ' · ' : '') : '@' + esc(x.account) + ' · '}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}</span></span></a>`;
+      <span class="m">${tagH(c.pls)}<span class="mt">${multi ? '' : month ? (x.lang ? x.lang + ' · ' : '') : '@' + esc(x.account) + ' · '}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}</span></span></a>`;
   // Month: two quiet lines per item — title, then stage dot + format (+ take/other for Claude's proposals).
   const stageName = (k) => (LIFE.find(([s]) => s === k)?.[1] || '').toLowerCase();
-  const chipM = (x) => `<a class="ln-chip ${x.stage === 'idea' || x.proposed ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
+  const chipM = (x, c = {pls: []}) => `<a class="ln-chip ${x.stage === 'idea' || x.proposed ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" data-pl="${esc(c.pl || '')}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
       <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
-      <span class="m">${x.proposed && canEdit() ? '' : `<span class="mt">${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex; vertical-align: -2px; margin-right: 4px">${svg('ig', 11)}</span>` : ''}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${x.proposed ? '' : `<i class="sd" style="background: ${LIFE_COLOR[x.stage] || '#A3A3A3'}"></i>${esc(stageName(x.stage))}`}</span>`}${x.proposed && canEdit() ? `<span class="acts"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</span></a>`;
-  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
+      <span class="m">${tagH(c.pls)}${x.proposed && canEdit() ? '' : `<span class="mt">${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex; vertical-align: -2px; margin-right: 4px">${svg('ig', 11)}</span>` : ''}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${x.proposed ? '' : `<i class="sd" style="background: ${LIFE_COLOR[x.stage] || '#A3A3A3'}"></i>${esc(stageName(x.stage))}`}</span>`}${x.proposed && canEdit() ? `<span class="acts"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}${missH(x)}</span></a>`;
+  const chip = (x, c = {pls: []}) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" data-pl="${esc(c.pl || '')}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
       <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
-      <span class="m">${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex">${svg('ig', 12)}</span>` : ''}${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}</span>
+      <span class="m">${tagH(c.pls)}${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex">${svg('ig', 12)}</span>` : ''}${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((c.at || x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}${missH(x)}</span>
       ${x.proposed && canEdit() ? `<span class="m" style="gap: 8px"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</a>`;
-  const cells = days.map((d) => {
+  const cell = (d, pl, {top = true, ev: showEv = true, h = 420} = {}) => {
     const isToday = ymd(d) === ymd(today), out = month && d.getMonth() !== first.getMonth();
-    const ev = (plan.events || []).concat(st.events || []).filter((e) => e.date === ymd(d));
-    return `<div class="ln-cell${isToday ? ' today' : ''}${out ? ' out' : ''}" data-day="${ymd(d)}" style="${month ? '' : 'min-height: 420px'}"><span class="dn">${d.getDate()}</span>
-      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d).map((x) => x.ig ? chipIg(x) : (month ? chipM : chip)(x)).join('')}</div>`;
-  }).join('');
+    const ev = showEv ? (plan.events || []).concat(st.events || []).filter((e) => e.date === ymd(d)) : [];
+    return `<div class="ln-cell${isToday ? ' today' : ''}${out ? ' out' : ''}" data-day="${ymd(d)}"${pl ? ` data-pl="${esc(pl)}"` : ''} style="${month ? '' : 'min-height: ' + h + 'px'}">${top ? `<span class="dn">${d.getDate()}</span>` : ''}
+      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d, pl).map((c) => c.x.ig ? chipIg(c.x, c) : (month ? chipM : chip)(c.x, c)).join('')}</div>`;
+  };
+  // A week «По аккаунтам»: a lane per account, its count against the plan's «в неделю».
+  const laneWeek = lanes && !month;
+  const cells = laneWeek ? onPl.map((p, i) => `<div class="ln-lane"><b>${esc(platTag(p))}</b><span class="small muted" style="overflow-wrap: anywhere">${esc(p.account || p.name)}</span><span class="small ${perWeek(p) && platCount(p) < perWeek(p) ? '' : 'muted'}">${platCount(p)}${perWeek(p) ? ' из ' + perWeek(p) : ''}</span></div>${days.map((d) => cell(d, p.id, {top: false, ev: i === 0, h: Math.max(140, Math.round(420 / onPl.length))})).join('')}`).join('')
+    : days.map((d) => cell(d)).join('');
   const shown = all.filter((x) => !x.proposed && x.at && x.at.slice(0, 10) >= ymd(days[0]) && x.at.slice(0, 10) <= ymd(days.at(-1)));
   const undated = all.filter((x) => !x.at && !x.proposed && x.stage !== 'published');
   const mname = first.toLocaleDateString('ru', {month: 'long'});
   const gen = (m) => m.replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я');
   const range = month ? mname : `${days[0].getDate()} ${gen(days[0].toLocaleDateString('ru', {month: 'long'}))} – ${days[6].getDate()} ${gen(days[6].toLocaleDateString('ru', {month: 'long'}))}`;
   const base = month ? '#/plan/m/' : '#/plan/w/';
+  // Версии на двух языках: two items (own folders) that are one release; the Plan draws them as one.
+  const twinBox = () => {
+    const pick = all.filter((x) => !x.proposed && x.stage !== 'idea' && !x.missing).slice(-60).reverse();
+    const opt = (x) => `<option value="${esc(x.id)}">${esc((planOuts(x, plats)[0] ? platTag(plats.find((p) => p.id === planOuts(x, plats)[0].platform) || {}) + ' · ' : '') + x.title)}</option>`;
+    const pairs = [...new Set(all.filter((x) => x.twin && x.at && planOuts(x, plats).some(inRange)).map((x) => x.twin))].map((t) => all.filter((x) => x.twin === t));
+    return `<details style="margin-top: 8px"><summary class="small" style="cursor: pointer; color: var(--ink2)">Один выпуск на разных языках${pairs.length ? ` · ${pairs.length}` : ''}</summary>
+      <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 8px"><span class="small muted" style="line-height: 1.45">Если EN- и RU-версии лежат отдельными выпусками, свяжите их — в «Слитно» они станут одной карточкой.</span>
+        ${pairs.map((g) => `<div class="small" style="display: flex; gap: 8px; align-items: baseline"><span style="flex: 1; min-width: 0">${g.map((x) => esc(x.title)).join(' = ')}</span><button type="button" class="ln-act" data-untwin="${esc(g[0].id)}" style="color: var(--muted)">развязать</button></div>`).join('')}
+        <select class="ln-act" id="twinA" aria-label="Первая версия" style="max-width: 100%"><option value="">первая версия…</option>${pick.map(opt).join('')}</select>
+        <select class="ln-act" id="twinB" aria-label="Вторая версия" style="max-width: 100%"><option value="">вторая версия…</option>${pick.map(opt).join('')}</select>
+        <span class="row" style="gap: 12px"><button type="button" class="ln-act" id="twinGo">связать</button><button type="button" class="ln-act" id="twinAsk" style="color: var(--muted)">найти пары с Claude</button></span></div></details>`;
+  };
   const rubs = ITEMS.rubrics.map((r) => `<a href="#/rubric/${esc(r.id)}" style="display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-bottom: 1px solid #F0F0F0; text-decoration: none; color: var(--ink)"><span style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600"><span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}<span class="muted" style="margin-left: auto; font-weight: 400; font-size: 12px">${shown.filter((x) => itemRubric(x)?.id === r.id).length}</span></span>${r.about ? `<span class="muted" style="font-size: 12px; padding-left: 16px">${esc(r.about)}</span>` : ''}</a>`).join('');
   view.innerHTML = `<div style="display: flex; flex-direction: column; height: 100vh; min-width: 0">
     <div class="ln-top"><b>План</b><span>·</span><span>${range}</span>
       <span class="ln-seg" style="margin-left: 12px"><a href="#/plan/w" class="${month ? '' : 'on'}">Неделя</a><a href="#/plan" class="${month ? 'on' : ''}">Месяц</a></span>
+      ${multi ? `<span class="ln-seg" style="margin-left: 6px"><button type="button" data-by="all" class="${lanes ? '' : 'on'}" title="Каждый выпуск один раз, с метками аккаунтов">Слитно</button><button type="button" data-by="acc" class="${lanes ? 'on' : ''}" title="Каждый аккаунт отдельно">По аккаунтам</button></span>
+      <span style="display: inline-flex; gap: 4px">${plats.map((p) => `<button type="button" class="ln-accb ${offPl.has(p.id) ? '' : 'on'}" data-acc="${esc(p.id)}" aria-pressed="${!offPl.has(p.id)}" title="${esc(p.name)}${p.account ? ' · ' + esc(p.account) : ''}">${esc(platTag(p))}</button>`).join('')}</span>` : ''}
       <span style="display: inline-flex; gap: 2px; margin-left: 6px"><a class="ln-btn g s" href="${base}${offset - 1}" aria-label="Назад">‹</a><a class="ln-btn g s" href="${base.slice(0, -1)}">Сейчас</a><a class="ln-btn g s" href="${base}${offset + 1}" aria-label="Вперёд">›</a></span>
       <span style="display: inline-flex; gap: 12px; margin-left: 8px">${LIFE.slice(0, 4).map(([k]) => `${sdot(k)}<span class="muted">${shown.filter((x) => x.stage === k).length}</span>`).join('')}</span>
       <span style="flex: 1"></span>${canEdit() ? `<button type="button" class="ln-btn p" id="lay">${svg('idea', 14)}Собрать контент-план</button>` : ''}</div>
     <div style="flex: 1; display: flex; min-height: 0">
       <div style="flex: 1; display: flex; flex-direction: column; padding: 16px 20px 20px; min-width: 0; overflow-y: auto">
-        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 12px; color: var(--muted); padding: 0 0 8px">${DAYS.map((d, i) => `<span style="padding-left: 8px">${month ? d.toLowerCase() : d.toLowerCase() + ' ' + days[i].getDate()}</span>`).join('')}</div>
-        <div class="ln-grid${month ? ' mo' : ''}">${cells}</div>
-        <p class="small muted" style="margin: 12px 2px 0">Пунктир — пока только идея: дату и рубрику уже видно, снимать ещё нечего. Перетащи выпуск на другой день или в «Без даты».</p>
+        <div style="display: grid; grid-template-columns: ${laneWeek ? '110px ' : ''}repeat(7, minmax(0, 1fr)); font-size: 12px; color: var(--muted); padding: 0 0 8px">${laneWeek ? '<span></span>' : ''}${DAYS.map((d, i) => `<span style="padding-left: 8px">${month ? d.toLowerCase() : d.toLowerCase() + ' ' + days[i].getDate()}</span>`).join('')}</div>
+        <div class="ln-grid${month ? ' mo' : ''}"${laneWeek ? ' style="grid-template-columns: 110px repeat(7, minmax(0, 1fr))"' : ''}>${cells}</div>
+        <p class="small muted" style="margin: 12px 2px 0">${laneWeek ? 'Перетащи выпуск на другую дорожку — он переедет на тот аккаунт; с ⌥ Option — встанет туда ещё раз, а здесь останется.' : 'Пунктир — пока только идея: дату и рубрику уже видно, снимать ещё нечего. Перетащи выпуск на другой день или в «Без даты».'}</p>
       </div>
       <aside class="ln-aside">
+        ${multi ? `<div style="display: flex; flex-direction: column"><div style="display: flex; align-items: center"><b style="font-weight: 600">Аккаунты</b><span class="muted" style="margin-left: auto; font-size: 12px">${month ? 'в этом месяце' : 'на этой неделе'}</span></div>
+          ${plats.map((p) => `<div style="display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid #F0F0F0; font-size: 13px; ${offPl.has(p.id) ? 'opacity: .45' : ''}"><span class="ln-acc">${esc(platTag(p))}</span><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(p.name)} <span class="muted">${esc(p.account || '')}</span></span><span class="muted" style="font-size: 12px">${platCount(p)}${!month && perWeek(p) ? ' из ' + perWeek(p) : ''}</span></div>`).join('')}
+          ${canEdit() ? twinBox() : ''}</div>` : ''}
         <div style="display: flex; align-items: center"><b style="font-weight: 600">Рубрики</b><span class="muted" style="margin-left: auto; font-size: 12px">${month ? 'в этом месяце' : 'на этой неделе'}</span></div>
         <div>${rubs || '<span class="small muted">Рубрик пока нет.</span>'}</div>
         ${canEdit() ? '<button type="button" id="addRub" style="align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; color: #2F6FEB; font-weight: 600; cursor: pointer">+ Рубрика</button>' : ''}
-        <div class="ln-drop" data-day="" style="display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 2px"><div style="display: flex; align-items: center; margin-top: 8px"><b style="font-weight: 600">Без даты</b><span class="muted" style="margin-left: auto; font-size: 12px">${undated.length}</span></div>${undated.slice(0, 6).map(chip).join('')}${undated.length > 6 ? `<a class="small muted" href="#/all">ещё ${undated.length - 6} — в Выпусках</a>` : ''}</div>
+        <div class="ln-drop" data-day="" style="display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 2px"><div style="display: flex; align-items: center; margin-top: 8px"><b style="font-weight: 600">Без даты</b><span class="muted" style="margin-left: auto; font-size: 12px">${undated.length}</span></div>${undated.slice(0, 6).map((x) => chip(x)).join('')}${undated.length > 6 ? `<a class="small muted" href="#/all">ещё ${undated.length - 6} — в Выпусках</a>` : ''}</div>
         ${igStale().length ? `<div class="rback" style="margin-top: 10px; align-items: flex-start">${svg('ig', 15)}<span style="flex: 1; font-size: 12.5px; line-height: 1.45">Instagram не подключён: в Плане только то, что было видно на снимке ${igStale().map((a) => `@${esc(a.account)} — ${a.media.length} из ${a.posts ?? '?'} на ${new Date(a.fetchedAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}`).join(', ')}. ${canEdit() ? '<a href="#/settings/connect">Подключить</a>' : ''}</span></div>` : ''}
         ${found.length ? `<div style="display: flex; flex-direction: column; gap: 2px; margin-top: 8px"><b style="font-weight: 600">Найдено в Instagram</b><span class="small muted" style="line-height: 1.5; padding-bottom: 4px">${found.length} без выпуска в студии. Привяжите свои — остальные можно убрать.</span>
           ${found.slice(0, 5).map(({a, m, offer}) => `<div style="display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F0F0F0"><a href="${esc(m.permalink)}" target="_blank" rel="noopener" style="flex: none"><img src="${esc(m.thumb || '')}" alt="" style="width: 40px; height: 54px; object-fit: cover; border-radius: 6px; display: block"></a>
@@ -2653,17 +2728,36 @@ async function vPlan(offset = 0, month = true) {
   $('#addRub')?.addEventListener('click', async () => { const name = prompt('Название рубрики'); if (!name?.trim()) return; const {rubric} = await post('/api/strategy/edit', {rubric: {name}}); location.hash = '#/rubric/' + rubric.id; });
   view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); redraw(); }));
   view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const x = all.find((y) => y.id === b.dataset.other); sessionStorage.setItem('planAsk', JSON.stringify({text: `Замени идею «${x.title}» на ${(x.at || '').slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric:.`, shown: `Другую вместо «${x.title}»`})); location.hash = '#/plan/draft'; }));
+  view.querySelectorAll('[data-by]').forEach((b) => (b.onclick = () => { savePref({by: b.dataset.by}); redraw(); }));
+  view.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => { const id = b.dataset.acc; if (offPl.has(id)) offPl.delete(id); else if (offPl.size < plats.length - 1) offPl.add(id); savePref({}); redraw(); }));
+  $('#twinGo')?.addEventListener('click', async () => { const a = $('#twinA').value, b = $('#twinB').value; if (!a || !b || a === b) return toast('Выберите две разные версии'); await post('/api/items/set', {id: a, twin: b}); toast('Связано: один выпуск'); redraw(); });
+  view.querySelectorAll('[data-untwin]').forEach((b) => (b.onclick = async () => { await post('/api/items/set', {id: b.dataset.untwin, twin: null}); toast('Развязано'); redraw(); }));
+  $('#twinAsk')?.addEventListener('click', () => { sessionStorage.setItem('planAsk', JSON.stringify({text: `Найди в items.json выпуски, которые — одна тема на разных языках для разных аккаунтов (${plats.map((p) => p.name + ' ' + (p.account || '')).join(', ')}), например EN- и RU-версия одного рилса. Свяжи каждую пару одинаковым полем "twin": "t-<8 hex>" у обоих (STRATEGY.md «Выходы по аккаунтам»). Разные темы не связывай, уже связанные не трогай. Перечисли, что связал.`, shown: 'Найди пары версий на разных языках'})); location.hash = '#/plan/draft'; });
   let drag = null;
-  view.querySelectorAll('.ln-chip').forEach((c) => { c.ondragstart = () => { drag = c.dataset.id; }; });
+  view.querySelectorAll('.ln-chip[data-id]').forEach((c) => { c.ondragstart = () => { drag = {id: c.dataset.id, pl: c.dataset.pl || ''}; }; });
   view.querySelectorAll('.ln-cell, .ln-drop').forEach((d) => {
     d.ondragover = (e) => { e.preventDefault(); d.classList.add('over'); };
     d.ondragleave = () => d.classList.remove('over');
     d.ondrop = async (e) => {
       e.preventDefault(); d.classList.remove('over');
       if (!drag || !canEdit()) return;
-      const it = all.find((x) => x.id === drag);
-      const time = it?.at?.slice(11, 16) || (st.rhythm?.slots || []).find((s) => s.rubric === it?.rubric)?.time || '19:00';
-      await post('/api/items/set', {id: drag, at: d.dataset.day ? `${d.dataset.day}T${time}` : null});
+      const it = all.find((x) => x.id === drag.id);
+      if (!it) return;
+      const day = d.dataset.day, time = it.at?.slice(11, 16) || (st.rhythm?.slots || []).find((s) => s.rubric === it.rubric)?.time || '19:00';
+      if (!day) await post('/api/items/set', {id: it.id, at: null});
+      else if (lanes && drag.pl) {
+        // One account's date (and, across lanes, its account); ⌥ keeps the old one as well.
+        const cur = planOuts(it, plats).filter((o) => o.platform).map(({platform, at}) => ({platform, at}));
+        const from = cur.find((o) => o.platform === drag.pl), to = d.dataset.pl || drag.pl;
+        const next = cur.filter((o) => o.platform !== to && (e.altKey || o.platform !== drag.pl));
+        next.push({platform: to, at: `${day}T${from?.at.slice(11, 16) || time}`});
+        await post('/api/items/set', {id: it.id, out: next});
+      } else if (!it.at) await post('/api/items/set', {id: it.id, at: `${day}T${time}`});
+      else {
+        // The whole release moves: its twins by the same number of days (the server moves every account's date).
+        const shift = Date.parse(day) - Date.parse(it.at.slice(0, 10));
+        for (const x of it.twin ? all.filter((y) => y.twin === it.twin && y.at) : [it]) await post('/api/items/set', {id: x.id, at: new Date(Date.parse(x.at.slice(0, 10)) + shift).toISOString().slice(0, 10) + x.at.slice(10)});
+      }
       redraw();
     };
   });
