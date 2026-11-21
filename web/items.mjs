@@ -200,7 +200,34 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
   if (typeof b.title === 'string' && b.title.trim()) item.title = b.title.trim().slice(0, 140);
   if (b.format !== undefined && FORMATS.includes(b.format) && !item.ref?.kind?.match(/reel|post/)) item.format = b.format;
   if (b.rubric !== undefined) item.rubric = b.rubric ? String(b.rubric).slice(0, 60) : null;
-  if (b.at !== undefined) item.at = b.at ? String(b.at).slice(0, 25) : null;
+  // Выходы (STRATEGY.md «Выходы по аккаунтам»): the item on each account, [{platform, at}].
+  // item.at stays the first of them, so everything that reads one date keeps working.
+  if (Array.isArray(b.out)) {
+    const seen = new Set();
+    item.out = b.out.map((o) => ({platform: String(o?.platform || '').slice(0, 40), at: o?.at ? String(o.at).slice(0, 16) : null}))
+      .filter((o) => o.platform && /^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(o.at || '') && !seen.has(o.platform) && seen.add(o.platform)).slice(0, 10);
+    if (!item.out.length) delete item.out;
+    item.at = item.out ? item.out.map((o) => o.at).sort()[0] : null;
+  } else if (b.at !== undefined) {
+    const next = b.at ? String(b.at).slice(0, 25) : null;
+    // A new date for the whole item moves every account's date by the same number of days.
+    if (!next) delete item.out;
+    else if (item.out?.length && item.at) {
+      const shift = Date.parse(next.slice(0, 10)) - Date.parse(item.at.slice(0, 10));
+      item.out = item.out.map((o) => ({...o, at: new Date(Date.parse(o.at.slice(0, 10)) + shift).toISOString().slice(0, 10) + o.at.slice(10)}));
+    }
+    item.at = next;
+  }
+  // Twins: the same release in another language, with its own folder; the Plan draws them as one.
+  // `twin` is the other item's id (both get one shared id) or null to unlink this one.
+  if (b.twin !== undefined) {
+    const old = item.twin;
+    const other = b.twin ? data.items.find((x) => x.id === String(b.twin) && x !== item) : null;
+    if (other) { const t = other.twin || item.twin || newId('t'); other.twin = t; item.twin = t; }
+    else if (!b.twin) delete item.twin;
+    // A twin left alone is no twin.
+    if (old && old !== item.twin) { const left = data.items.filter((x) => x.twin === old); if (left.length === 1) delete left[0].twin; }
+  }
   if (b.group !== undefined) item.group = b.group ? String(b.group).slice(0, 40) : undefined;
   if (Array.isArray(b.platforms)) item.platforms = b.platforms.map(String).slice(0, 10);
   if (b.idea && typeof b.idea === 'object') item.idea = {...item.idea, ...ideaFields(b.idea, item.idea || {})};
@@ -346,6 +373,7 @@ export function mirrorPlan(studio, item) {
   const plan = readJson(f, {});
   plan.at ||= {}; plan.rubric ||= {};
   if (item.at) plan.at[key] = item.at; else delete plan.at[key];
+  if (item.out?.length) (plan.out ||= {})[key] = item.out; else if (plan.out) delete plan.out[key];
   if (item.rubric) plan.rubric[key] = item.rubric; else delete plan.rubric[key];
   writeJson(f, plan);
 }
