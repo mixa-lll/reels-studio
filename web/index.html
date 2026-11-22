@@ -4119,7 +4119,8 @@ async function vIdeas(tab = '', sel = '') {
   const draw = ++IDEAS_DRAW;
   const [, bankRes, refsRes] = await Promise.all([loadItems(), api('/api/ideas/bank').catch(() => ({bank: []})), tab === 'refs' ? api('/api/refs').catch(() => ({list: []})) : Promise.resolve(null)]);
   if (draw !== IDEAS_DRAW || !location.hash.startsWith('#/ideas')) return;
-  const bank = bankRes.bank || [];
+  // The bank holds ideas only: entries that already became reels (In work… Published) live in their reels.
+  const bank = (bankRes.bank || []).filter((b) => /ideas$/.test(b.section));
   const rubs = ITEMS.rubrics;
   const refsCount = refsRes ? refsRes.list.length : null;
   const tabs = `<nav class="tabs" aria-label="Вкладки идей">${[['', 'Накидать'], ['bank', `Банк идей · ${bank.length}`], ['refs', 'Референсы' + (refsCount != null ? ' · ' + refsCount : '')]].map(([k, t]) => `<a href="#/ideas${k ? '/' + k : ''}" class="${k === tab ? 'on' : ''}" ${k === tab ? 'aria-current="page"' : ''}>${t}</a>`).join('')}</nav>`;
