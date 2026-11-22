@@ -13,6 +13,7 @@ import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
+import {changeScript, readScript, snapshot as scriptSnapshot} from './script.mjs';
 import {changeItem, createItems, deleteItem, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
 import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
@@ -275,6 +276,13 @@ function preamble(p, k) {
     'The page shows the reel in four stages (Сценарий, Материалы, Монтаж, Выкладка) from two optional files in the reel folder; keep them current when the script, materials or captions change. ' +
     '`scenes.json`: [{"t":"0:00","name":"Хук","screen":"what is on screen","text":"text on screen","sound":"…","need":"what material it needs","have":"what file covers it","status":"готово|нужно|переснять"}]. ' +
     '`publish.json`: {"captions":[{"platform":"Instagram RU","account":"@…","text":"caption"}],"checks":[{"ok":true,"text":"…"}]}. ' +
+    'The text of the reel is written by meaning blocks in `script.json` (format at the top of web/script.mjs), stage «Сценарий», two steps: «1 · Текст» and «2 · Вид». ' +
+    'A block is one thought of 1–3 spoken sentences (hook, each point, the turn, the call): it becomes one take in the prompter, one clip of cut.json and the words graphics hang on. Roles are short Russian nouns (Хук, Карта, Цены, Призыв). ' +
+    'For a new reel whose idea is taken, or when the owner asks to lay out the text, write script.json first (the README «Сценарий» section stays a short summary). ' +
+    'Messages starting with «(about blocks …)» or «(about the words «…» of block …)» are about exactly those blocks: change only them, keep the ids, never touch other blocks. A block with "ok": true is approved — leave it unless the message is about it. ' +
+    'When asked for variants, put 2–3 in that block\'s "alts" ([{"label":"боль","text":"…"}]) and keep "text" as it is; the page shows them under the block with «Взять». Reordering is moving blocks in the array. Say in 1–2 lines what changed, never «было → стало» walls: the page shows the text itself. ' +
+    'Step «2 · Вид» (only after "text":{"ok":true}): for every block fill "look" — what is on screen while it is said: frame (who and how), broll (a cutaway to film: name it so it can go to the shot list), gfx (graphics), text (text on screen), sound; "at" = the exact words of the block it starts on, "tpl" = the template of the project style it uses, "have" = style (exists in the style), ready (the file is there), shoot (still to film), new (not in the style yet). Take looks from the project design system first. ' +
+    'Later, in «Монтаж» and «Графика», build from it: one clip per block in its order, graphics on the "at" words; if the text changes after «Вид» is approved, update that block\'s look too. ' +
     'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version. ' +
     'Comments for the next version live in `edits.json` (format in web/edits.mjs): [{"id","stage":"script|scenes|video","t":seconds,"text","quote"?,"scene"?,"shape"?:{"kind":"rect|brush|point|frame",…fractions of the frame},"hint"?:"blur|replace|trim|remove","state":"open|sent|done|note","forV":"v4","by"}]; they come from the page and from the mini app\'s editor. When you have built that version, set each sent comment to "done" and add "result": what you changed, in a few words — the page shows it as «что поменялось». Your own pre-build findings (faces, subtitles, consents) go there as "state":"note" with "by":"Claude".');
   return lines.join('\n');
@@ -1145,7 +1153,7 @@ createServer(async (req, res) => {
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
-      ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
+      ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), script: readScript(dir), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10),
       storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}, basedOn: readJson(join(dir, 'based-on.json'), null)});
   }
@@ -1191,6 +1199,17 @@ createServer(async (req, res) => {
     writeJson(join(dir, 'ready.json'), {v: b.v, by: me.name, at: Date.now()});
     log(me.name, `${b.v} ролика ${b.reel} идёт в «Готово»`);
     return json(200, {ready: b.v});
+  }
+  // «Сценарий» by meaning blocks (web/script.mjs): order, approve, take a variant, approve a step, undo.
+  if (req.method === 'POST' && url.pathname === '/api/reel/script') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir) return json(404, {});
+    const s = changeScript(dir, b, me.name);
+    if (!s) return json(400, {});
+    log(me.name, `сценарий ${b.reel}: ${b.op}${b.step ? ' ' + b.step : ''}`);
+    return json(200, {script: s});
   }
   if (req.method === 'POST' && url.pathname === '/api/reel/edits') {
     if (!can('editor')) return json(403, {});
@@ -1367,6 +1386,9 @@ createServer(async (req, res) => {
       return json(202, {queued: how});
     }
     if (full()) return json(429, {max: MAX_JOBS});
+    // «↩ Вернуть как было» on the script stage returns what the text was before this turn.
+    const rdir = !k.startsWith('_') && !k.startsWith('new-') && !k.startsWith('post-') && reelDir(p, k);
+    if (rdir) scriptSnapshot(rdir);
     record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name});
     log(me.name, `написал в чат «${k}»: ${(shown || text).slice(0, 80)}`);
     res.writeHead(200, {'content-type': 'text/event-stream', 'cache-control': 'no-store'});

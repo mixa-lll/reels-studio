@@ -91,6 +91,13 @@
   form.send .in { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
   form.send .files { max-width: 760px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   form.send .files:empty { display: none; }
+  form.send .pinrow { max-width: 760px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  form.send .pinrow[hidden] { display: none; }
+  .pinchip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; background: var(--ink); color: #fff; border-radius: 7px; padding: 4px 6px 4px 9px; max-width: 100%; }
+  .pinchip button { border: 0; background: none; color: #fff; padding: 0 2px; font-size: 15px; line-height: 1; cursor: pointer; }
+  .pinact { font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+  .pinact:hover { border-color: var(--ink); }
+  .msg .about { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 3px; white-space: normal; }
   .fchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 6px 6px 6px 10px; font-size: 13px; }
   .fchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fchip small { color: var(--muted); }
@@ -159,6 +166,91 @@
   .vph { background: var(--soft); color: var(--muted); display: grid; place-items: center; text-align: center; padding: 24px; font-size: 13px; }
   .rinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
   .blk { display: flex; flex-direction: column; gap: 6px; }
+
+  /* «Сценарий» by meaning blocks (canvas «Текст и вид рилса»): the chat lives inside the stage, to the right. */
+  .sx { display: flex; flex-direction: column; min-height: 100%; }
+  .sx-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 16px 28px 10px; }
+  .sx-bar .seg button { cursor: pointer; }
+  .sx-steps { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .sx-steps button { border: 0; background: none; border-radius: 7px; padding: 6px 12px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  .sx-steps button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .sx-steps button:disabled { cursor: not-allowed; opacity: .55; }
+  .sx-steps i { font-style: normal; color: #A3A3A3; font-size: 12px; }
+  .sx-work { flex: 1; display: flex; gap: 24px; padding: 6px 28px 28px; align-items: flex-start; }
+  .sx-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .sx-chat { flex: none; position: sticky; top: 12px; align-self: flex-start; height: 70vh; display: flex; }
+  aside.chatcol.inl { height: 100%; width: 360px; border: 0; border-radius: 14px; background: #F7F7F4; overflow: hidden; }
+  aside.chatcol.inl .ctx { display: none; }
+  aside.chatcol.inl .chead { border-bottom: 1px solid #ECECE8; }
+  aside.chatcol.inl form.send { border-top: 0; }
+  aside.chatcol.inl .msg.bot { background: #fff; }
+  body.chat-mini aside.chatcol.inl { width: 48px; }
+  .sx-b { display: flex; gap: 12px; border: 1.5px solid var(--line); border-radius: 14px; padding: 14px 18px 14px 10px; background: #fff; cursor: pointer; }
+  .sx-b:hover { border-color: #D4D4D4; }
+  .sx-b.on { border-color: var(--ink); box-shadow: 0 0 0 1.5px var(--ink); background: #FCFCFB; }
+  .sx-b.drag { opacity: .55; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .sx-g { flex: 0 0 22px; display: flex; justify-content: center; padding-top: 3px; color: #C4C4C4; cursor: grab; touch-action: none; }
+  .sx-g:hover { color: var(--ink2); }
+  .sx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .sx-top { display: flex; align-items: center; gap: 10px; }
+  .sx-role { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+  .sx-t { font-size: 12px; color: #8C8B86; font-variant-numeric: tabular-nums; }
+  .sx-ok { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--green); }
+  .sx-in { margin-left: auto; font-size: 11px; font-weight: 700; color: #fff; background: var(--ink); border-radius: 6px; padding: 2px 8px; white-space: nowrap; letter-spacing: 0; text-transform: none; vertical-align: middle; }
+  .sx-txt { font-size: 22px; line-height: 1.4; font-weight: 500; color: #2A2926; }
+  .sx-txt.was { color: #8C8B86; }
+  .sx-sel { background: #DCE7FB; color: inherit; border-radius: 4px; box-shadow: 0 0 0 3px #DCE7FB; }
+  .sx-alts { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .sx-alt { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; cursor: default; }
+  .sx-alt b { width: 16px; flex: none; font-size: 13px; color: var(--muted); }
+  .sx-alt span { flex: 1; font-size: 18px; line-height: 1.4; font-weight: 500; }
+  .sx-alt small { font-size: 12px; color: #8C8B86; white-space: nowrap; }
+  .sx-paper { border: 1px solid var(--line); border-radius: 18px; padding: 32px 40px; display: flex; flex-direction: column; gap: 6px; background: #fff; }
+  .sx-r { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 28px; align-items: baseline; padding: 10px 0 12px 16px; border-left: 3px solid var(--line); }
+  .sx-r.ok { border-left-color: var(--green); } .sx-r.on { border-left-color: var(--ink); }
+  .sx-mk { cursor: pointer; } .sx-mk b { display: block; font-size: 13px; font-weight: 700; color: var(--ink2); line-height: 18px; } .sx-mk span { display: block; font-size: 12px; color: #8C8B86; line-height: 16px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .sx-r.ok .sx-mk span { color: var(--green); } .sx-mk:hover b { color: var(--ink); }
+  .sx-p { margin: 0; font-size: 28px; line-height: 1.42; font-weight: 500; color: #2A2926; letter-spacing: -.01em; }
+  .sx-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink2); padding: 0 2px 4px; }
+  .sx-legend span { display: inline-flex; align-items: center; gap: 6px; } .sx-legend i { width: 10px; height: 10px; border-radius: 3px; }
+  .sx-av { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #fff; }
+  .sx-avr { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; padding: 16px 18px; border-top: 1px solid #EFEEEA; cursor: pointer; }
+  .sx-avr:first-child { border-top: 0; }
+  .sx-avr.on { background: #FCFCFB; box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .sx-avn { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; } .sx-avn b { font-size: 13px; font-weight: 700; } .sx-avn span:not(.sx-in) { font-size: 12px; color: #8C8B86; }
+  .sx-avn .sx-in { margin: 4px 0 0; }
+  .sx-say { font-size: 18px; line-height: 1.5; font-weight: 500; color: #2A2926; }
+  .sx-at { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 4px; }
+  .sx-els { display: flex; flex-direction: column; gap: 6px; }
+  .sx-el { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 10px; align-items: start; font-size: 13px; line-height: 1.4; padding: 7px 10px; border-radius: 9px; background: #F7F7F4; }
+  .sx-k { font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 6px; padding-top: 1px; } .sx-k i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .sx-w small { display: block; color: var(--muted); font-size: 12px; }
+  .sx-have { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+  .sx-have.y { background: #E6F2EA; color: #1F6B3B; } .sx-have.s { background: #E4ECFA; color: #1D4C9E; } .sx-have.n { background: #FBE7E5; color: #A2322A; }
+  .sx-shoot { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 14px; }
+  .sx-empty { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; max-width: 560px; border: 1px dashed #D4D4D4; border-radius: 16px; padding: 24px; }
+  @media (max-width: 1100px) { .sx-work { flex-wrap: wrap; } .sx-chat { position: static; width: 100%; height: 70vh; } aside.chatcol.inl { width: 100%; } .sx-avr { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+  @media (max-width: 720px) { .sx-bar, .sx-work { padding-left: 16px; padding-right: 16px; } .sx-r { grid-template-columns: minmax(0, 1fr); gap: 4px; } .sx-p { font-size: 22px; } .sx-paper { padding: 20px; } .sx-txt { font-size: 19px; } }
+  /* Суфлёр: dark, the text up by the camera; the overlap with the neighbours in yellow. */
+  .pr { position: fixed; inset: 0; z-index: 90; background: #0E0E0D; color: #F2F2EF; display: flex; flex-direction: column; }
+  .pr-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 24px; border-bottom: 1px solid #262624; font-size: 14px; color: #B9B8B3; }
+  .pr-top b { color: #F2F2EF; }
+  .pr-b { height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid #3A3936; background: none; color: #F2F2EF; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .pr-b.on { background: #F2F2EF; color: #0E0E0D; border-color: #F2F2EF; }
+  .pr-segs { display: inline-flex; gap: 4px; } .pr-segs i { width: 26px; height: 5px; border-radius: 3px; background: #3A3936; } .pr-segs i.d { background: #2E8A4F; } .pr-segs i.n { background: #F2F2EF; }
+  .pr-stage { flex: 1; overflow-y: auto; display: flex; justify-content: center; padding: 40px 24px; }
+  .pr-txt { width: min(1040px, 100%); display: flex; flex-direction: column; gap: calc(22px * var(--k)); }
+  .pr-cur { margin: 0; font-size: calc(clamp(34px, 4.2vw, 60px) * var(--k)); line-height: 1.28; font-weight: 700; letter-spacing: -.015em; }
+  .pr-side { margin: 0; font-size: calc(clamp(20px, 2.1vw, 30px) * var(--k)); line-height: 1.4; font-weight: 600; color: #6B6A66; }
+  .pr-lap { color: #F7D774; background: rgba(247,215,116,.14); border-radius: 6px; padding: 1px 6px; box-shadow: inset 0 -2px 0 rgba(247,215,116,.55); }
+  .pr-hint { font-size: 13px; color: #8C8B86; }
+  .pr-flow { margin: 0 0 .6em; font-size: calc(clamp(28px, 3.2vw, 46px) * var(--k)); line-height: 1.3; font-weight: 700; color: #55544F; cursor: pointer; }
+  .pr-flow.now { color: #F2F2EF; }
+  .pr-bot { display: flex; align-items: center; gap: 14px; padding: 14px 24px calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid #262624; }
+  .pr-rb { width: 54px; height: 54px; border-radius: 50%; border: 1px solid #3A3936; background: none; color: #F2F2EF; font-size: 26px; line-height: 1; cursor: pointer; }
+  .pr-rb:disabled { opacity: .3; cursor: default; }
+  .pr-keys { font-size: 12px; color: #6B6A66; margin-left: auto; }
+  @media (max-width: 720px) { .pr-top { padding: 10px 14px; } .pr-segs, .pr-keys { display: none; } .pr-stage { padding: 20px 18px; } .pr-bot { justify-content: space-between; } }
 
   /* «Как увидят» (NX0–NX7): the release inside each platform's interface, before publishing */
   .nx-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
@@ -830,7 +922,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
   el.innerHTML = `<div class="log"><div class="in"></div></div>
     <div class="status"><i class="spin"></i><span style="display: flex; flex-direction: column; min-width: 0"><span class="stext">Думаю…</span><span class="shint small"></span></span><button class="btn" type="button" style="margin-left: auto; min-height: 32px">Стоп</button></div>
     <div class="keys"></div>
-    ${canEdit() ? `<form class="send"><div class="files" aria-live="polite"></div><div class="in">
+    ${canEdit() ? `<form class="send"><div class="pinrow" hidden></div><div class="files" aria-live="polite"></div><div class="in">
       <button type="button" class="icon clip" aria-label="Прикрепить файл"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"></path></svg></button>
       <input type="file" multiple hidden>
       <label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)" for="ta-${esc(key)}">Сообщение</label>
@@ -844,7 +936,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
     busy = on; st.classList.toggle('on', on);
     if (text) { $('.stext', st).textContent = text; $('.shint', st).textContent = /рендер/i.test(text) ? 'Это нормально: монтаж идёт на сервере. Страницу можно закрыть — версия появится сама.' : ''; }
     el.querySelectorAll('.btns button, .keys button').forEach((b) => (b.disabled = on));
-    if (ta) ta.placeholder = on ? 'Дописать или поправить — Claude возьмёт это следующим шагом' : 'Сообщение или правка…';
+    if (ta) ta.placeholder = on ? 'Дописать или поправить — Claude возьмёт это следующим шагом' : pinned ? 'Что поменять…' : 'Сообщение или правка…';
   };
   $('button', st).onclick = () => post('/api/stop', {key});
   const buttons = (list, under) => {
@@ -884,8 +976,8 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (m.from === 'me') {
       d.className = 'msg me';
       // Attachments travel as «📎 name» lines of the shown text; they come back as chips.
-      const lines = String(m.text || '').split('\n'), files = lines.filter((l) => l.startsWith('📎 ')), text = lines.filter((l) => !l.startsWith('📎 ')).join('\n').trim();
-      d.innerHTML = (m.by && m.by !== ME.name ? `<span class="by">${esc(m.by)}</span>` : '') + (text ? `<div>${esc(text)}</div>` : '')
+      const lines = String(m.text || '').split('\n'), files = lines.filter((l) => l.startsWith('📎 ')), about = lines.filter((l) => l.startsWith('◎ ')).map((l) => l.slice(2)), text = lines.filter((l) => !l.startsWith('📎 ') && !l.startsWith('◎ ')).join('\n').trim();
+      d.innerHTML = (m.by && m.by !== ME.name ? `<span class="by">${esc(m.by)}</span>` : '') + about.map((x) => `<span class="about">${esc(x)}</span>`).join('') + (text ? `<div>${esc(text)}</div>` : '')
         + files.map((l) => `<div class="fchip">${svg('clip', 14)}<span>${esc(l.slice(3))}</span></div>`).join('')
         + (m.queued ? '<span class="later">дописано по ходу</span>' : '');
     }
@@ -1057,9 +1149,27 @@ function chatBox(key, {onDone, onRebind} = {}) {
       if (!was) setBusy(false);
       ta.value = ''; ta.style.height = 'auto';
       picked = []; showPicked();
-      say([text, ...parts].filter(Boolean).join('\n'), [text, ...shown].filter(Boolean).join('\n'));
+      say([pinned?.note, text, ...parts].filter(Boolean).join('\n'), [pinned && '◎ ' + pinned.label, text, ...shown].filter(Boolean).join('\n'));
     };
   }
+  // What the next messages are about (a block of the script, a phrase…): a chip over the field, sent as a
+  // note before the text. {label, note, acts: [{label, text} | {label, run}], onClear} or null.
+  let pinned = null;
+  el.pin = (x) => {
+    pinned = x || null;
+    const row = $('.pinrow', el);
+    if (!row || !ta) return;
+    row.hidden = !pinned;
+    ta.placeholder = pinned ? 'Что поменять…' : busy ? 'Дописать или поправить — Claude возьмёт это следующим шагом' : 'Сообщение или правка…';
+    if (!pinned) return (row.innerHTML = '');
+    row.innerHTML = `<span class="pinchip">${esc(pinned.label)}<button type="button" aria-label="Убрать из чата">×</button></span>${(pinned.acts || []).map((a, i) => `<button type="button" class="pinact" data-pa="${i}">${esc(a.label)}</button>`).join('')}`;
+    $('.pinchip button', row).onclick = () => { const f = pinned?.onClear; el.pin(null); f?.(); };
+    row.querySelectorAll('[data-pa]').forEach((b) => (b.onclick = () => {
+      const a = pinned.acts[+b.dataset.pa];
+      if (a.run) return a.run();
+      say(`${pinned.note}\n${a.text}`, `◎ ${pinned.label}\n${a.label}`);
+    }));
+  };
   el.say = say;
   el.ready = load();
   return el;
@@ -1761,6 +1871,7 @@ const tc = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2
 
 async function drawStage(id, tab, data) {
   data ||= await getReel(id);
+  if (tab !== 'script') dockChat(null);
   if (tab === 'script') return stageScript(id, data);
   if (tab === 'materials') return reelFiles(id, data);
   if (tab === 'compare') return stageCompare(id, data);
@@ -1769,8 +1880,242 @@ async function drawStage(id, tab, data) {
   return renderVersions(id, data);
 }
 
-// Сценарий (CleanText): scenes on the left, each scene as a card; clicking a scene drafts a note about it.
+// «Сценарий» by meaning blocks (script.json, web/script.mjs; canvas «Текст и вид рилса» Т1–Т5, В1–В2):
+// step «1 · Текст» — blocks as cards or as one text, «2 · Вид» — what is on screen on each block.
+// The chat column moves inside the stage; a picked block or phrase is pinned in it, and every message is about it.
+const SX = {};
+const sxState = (id) => (SX[id] ||= {sel: [], view: 'blocks', step: null, phrase: null});
+const sxPlural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const SX_KIND = {frame: ['Кадр', '#737373'], broll: ['Перебивка', '#737373'], gfx: ['Графика', '#2F6FEB'], text: ['Текст', '#C2620A'], sound: ['Звук', '#0F7F78']};
+const SX_HAVE = {style: ['в стиле', 'y'], ready: ['есть', 'y'], shoot: ['снять', 's'], new: ['нет в стиле', 'n']};
+// The chat column of the reel: inside the stage on «Сценарий», back on the right everywhere else.
+function dockChat(slot) {
+  const a = $('aside.chatcol'), work = $('#view .work');
+  if (!a || !work) return;
+  if (slot) { slot.append(a); a.classList.add('inl'); }
+  else if (a.parentElement !== work) { work.append(a); a.classList.remove('inl'); }
+}
 function stageScript(id, data) {
+  dockChat(null);
+  if (!data.script) return stageScenes(id, data);
+  const s = data.script, st = sxState(id), host = $('#reelHost');
+  const ids = new Set(s.blocks.map((b) => b.id));
+  st.sel = st.sel.filter((x) => ids.has(x));
+  if (st.phrase && !ids.has(st.phrase.id)) st.phrase = null;
+  if (!st.step) st.step = s.text?.ok ? 'look' : 'text';
+  const look = st.step === 'look', okN = s.blocks.filter((b) => b.ok).length;
+  const steps = `<div class="sx-steps" role="group" aria-label="Шаг сценария"><button type="button" data-sxstep="text" aria-pressed="${!look}"><b>1 · Текст${s.text?.ok ? ' ✓' : ''}</b></button><i aria-hidden="true">→</i><button type="button" data-sxstep="look" aria-pressed="${look}" ${s.text?.ok ? '' : 'disabled title="Сначала утвердите текст"'}><b>2 · Вид</b></button></div>`;
+  const undo = canEdit() && s.canUndo ? '<button type="button" class="btn" id="sxUndo" title="Вернуть сценарий, каким он был до последней правки">↩ Вернуть как было</button>' : '';
+  const prompt = `<button type="button" class="btn" id="sxPrompt" title="Суфлёр на весь экран">${'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"></path></svg>'}Суфлёр</button>`;
+  let bar;
+  if (!look) {
+    bar = `${steps}<nav class="seg" aria-label="Как показать"><button type="button" class="${st.view === 'blocks' ? 'on' : ''}" data-sxview="blocks">Блоками</button><button type="button" class="${st.view === 'read' ? 'on' : ''}" data-sxview="read">Сплошным</button></nav>
+      <span class="small muted">${s.blocks.length} ${sxPlural(s.blocks.length, 'блок', 'блока', 'блоков')} · ≈ ${mmss(s.total)}${s.text?.ok ? ' · текст утверждён' : ` · утверждено ${okN}`}</span><span style="flex: 1"></span>${undo}${prompt}
+      ${canEdit() ? (s.text?.ok ? '<button type="button" class="btn" id="sxReopen" title="Текст снова можно править; вид останется">Открыть текст</button>' : '<button type="button" class="btn primary" id="sxOk">Утвердить текст</button>') : ''}`;
+  } else {
+    const all = s.blocks.flatMap((b) => b.look || []), cnt = (k) => all.filter((x) => x.kind === k).length, shoot = all.filter((x) => x.have === 'shoot').length;
+    bar = `${steps}<span class="small muted">${all.length ? `${cnt('gfx')} графики · ${cnt('text')} текста на экране${shoot ? ` · снять ${shoot}` : ''}` : 'вид ещё не разложен'}</span><span style="flex: 1"></span>${undo}${prompt}
+      ${canEdit() && all.length ? (s.look?.ok ? '<a class="btn" href="#/reel/' + esc(id) + '/materials">Вид утверждён → Материалы</a>' : '<button type="button" class="btn primary" id="sxLookOk">Утвердить вид</button>') : ''}`;
+  }
+  host.innerHTML = `<div class="sx"><div class="sx-bar">${bar}</div><div class="sx-work"><div class="sx-main" id="sxMain"></div><div class="sx-chat" id="sxChat"></div></div></div>`;
+  dockChat($('#sxChat'));
+  // The chat column fits the visible part of the stage, under the bar, and stays there while the blocks scroll.
+  const fit = () => { const c = $('#sxChat'), bar = host.querySelector('.sx-bar'); if (c && bar && innerWidth > 1100) c.style.height = Math.max(420, host.clientHeight - bar.offsetHeight - 30) + 'px'; else if (c) c.style.height = ''; };
+  fit(); window.onresize = fit;
+  const main = $('#sxMain');
+  if (look) sxLook(main, id, s, st);
+  else if (st.view === 'read') sxRead(main, id, s, st);
+  else sxBlocks(main, id, s, st);
+  sxPin(id, s);
+  host.querySelectorAll('[data-sxstep]').forEach((b) => (b.onclick = () => { st.step = b.dataset.sxstep; st.sel = []; st.phrase = null; stageScript(id, data); }));
+  host.querySelectorAll('[data-sxview]').forEach((b) => (b.onclick = () => { st.view = b.dataset.sxview; st.phrase = null; stageScript(id, data); }));
+  const act = async (b, msg) => { const r = await post('/api/reel/script', {reel: id, ...b}).catch(() => null); if (!r?.script) return toast('Не получилось — попробуйте ещё раз'); data.script = r.script; if (msg) toast(msg); stageScript(id, data); };
+  SX[id].act = act;
+  $('#sxUndo')?.addEventListener('click', () => act({op: 'undo'}, 'Вернул как было'));
+  $('#sxOk')?.addEventListener('click', () => act({op: 'step', step: 'text'}, 'Текст утверждён — дальше «2 · Вид»').then(() => { st.step = 'look'; st.sel = []; st.phrase = null; stageScript(id, data); }));
+  $('#sxReopen')?.addEventListener('click', () => act({op: 'step', step: 'text', on: false}));
+  $('#sxLookOk')?.addEventListener('click', () => act({op: 'step', step: 'look'}, 'Вид утверждён'));
+  $('#sxPrompt')?.addEventListener('click', () => prompter(s, st.sel[0] || st.phrase?.id));
+}
+// The chip in the chat: the picked blocks or the picked words, with quick asks for them.
+function sxPin(id, s) {
+  const box = chatOf(), st = SX[id];
+  if (!box?.pin) return;
+  const num = (bid) => s.blocks.findIndex((b) => b.id === bid) + 1, blk = (bid) => s.blocks.find((b) => b.id === bid);
+  const clear = () => { st.sel = []; st.phrase = null; $('#reelHost .sx') && stageScript(id, {...REEL_CACHE.get(id)?.data, script: s}); };
+  if (st.phrase) {
+    const b = blk(st.phrase.id);
+    return box.pin({label: `«${short(st.phrase.words, 40)}» · блок ${num(b.id)}`, note: `(about the words «${st.phrase.words}» of block #${num(b.id)} «${b.role}» id=${b.id} in script.json${st.step === 'look' ? ', step «Вид»: what is on screen on these words' : ''})`, onClear: clear,
+      acts: st.step === 'look' ? [{label: 'Графика на этих словах', text: 'Поставь на эти слова графику из стиля проекта'}, {label: 'Перебивка', text: 'Здесь перебивка — что снять?'}] : [{label: 'Переписать', text: 'Перепиши эти слова'}, {label: 'Новый блок отсюда', text: 'Начни с этих слов новый блок'}]});
+  }
+  if (!st.sel.length) return box.pin(null);
+  const list = st.sel.map(blk);
+  const label = list.length === 1 ? `Блок ${num(list[0].id)} · ${list[0].role || 'без названия'}` : `Блоки ${list.map((b) => num(b.id)).sort((a, b) => a - b).join(', ')}`;
+  const note = `(about blocks of script.json${st.step === 'look' ? ', step «Вид»' : ''}: ${list.map((b) => `#${num(b.id)} «${b.role}» id=${b.id}`).join(', ')})`;
+  const okAll = list.every((b) => b.ok);
+  const acts = st.step === 'look'
+    ? [{label: 'Другой кадр', text: 'Предложи другой кадр'}, {label: 'Меньше графики', text: 'Меньше графики, проще'}, {label: 'Из стиля', text: 'Возьми элементы из стиля проекта'}]
+    : [{label: 'Варианты', text: 'Дай 2–3 варианта'}, {label: 'Короче', text: 'Короче, смысл тот же'}, {label: 'Проще', text: 'Проще, разговорнее'},
+      ...(list.length === 1 ? [{label: 'Разбить на два', text: 'Разбей этот блок на два'}] : []),
+      ...(canEdit() && !s.text?.ok ? [{label: okAll ? 'Снять утверждение' : 'Утвердить', run: () => { st.sel = []; SX[id].act({op: 'ok', ids: list.map((b) => b.id), on: !okAll}); }}] : [])];
+  box.pin({label, note, acts, onClear: clear});
+}
+const sxHead = (b, i, st, extra = '') => `<div class="sx-top"><span class="sx-role">${i + 1} · ${esc(b.role || 'Блок')}</span><span class="sx-t">${mmss(b.from)} · ${b.sec} с</span>${st.sel.includes(b.id) || st.phrase?.id === b.id ? '<span class="sx-in">в чате</span>' : b.ok ? '<span class="sx-ok">✓ утверждён</span>' : ''}${extra}</div>`;
+// Clicking a card picks it (shift: several); the dots drag it to another place.
+function sxPick(main, id, s, st, selector) {
+  main.querySelectorAll(selector).forEach((el) => el.addEventListener('click', (e) => {
+    if (e.target.closest('button, a') || String(getSelection()).trim()) return;
+    const bid = el.dataset.id;
+    st.phrase = null;
+    if (e.shiftKey) st.sel = st.sel.includes(bid) ? st.sel.filter((x) => x !== bid) : [...st.sel, bid];
+    else st.sel = st.sel.length === 1 && st.sel[0] === bid ? [] : [bid];
+    stageScript(id, {...REEL_CACHE.get(id)?.data, script: s});
+    chatOf()?.querySelector('textarea')?.focus();
+  }));
+}
+// Picking words inside a block's text pins those words (the phrase), not the whole block.
+function sxWords(main, id, s, st, selector) {
+  main.addEventListener('mouseup', () => {
+    const sel = getSelection(), words = String(sel).trim().replace(/\s+/g, ' ');
+    if (!words || words.length < 2) return;
+    const a = sel.anchorNode?.parentElement?.closest(selector), b = sel.focusNode?.parentElement?.closest(selector);
+    if (!a || a !== b) return;
+    st.phrase = {id: a.closest('[data-id]').dataset.id, words}; st.sel = [];
+    sel.removeAllRanges();
+    stageScript(id, {...REEL_CACHE.get(id)?.data, script: s});
+  });
+}
+const sxMark = (text, st, bid) => {
+  const t = esc(text), w = st.phrase?.id === bid ? esc(st.phrase.words) : '';
+  const i = w ? t.indexOf(w) : -1;
+  return i < 0 ? t : `${t.slice(0, i)}<mark class="sx-sel">${w}</mark>${t.slice(i + w.length)}`;
+};
+function sxBlocks(main, id, s, st) {
+  const grip = '<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" aria-hidden="true"><circle cx="3" cy="3" r="1.6"></circle><circle cx="9" cy="3" r="1.6"></circle><circle cx="3" cy="9" r="1.6"></circle><circle cx="9" cy="9" r="1.6"></circle><circle cx="3" cy="15" r="1.6"></circle><circle cx="9" cy="15" r="1.6"></circle></svg>';
+  main.innerHTML = s.blocks.map((b, i) => `<article class="sx-b${st.sel.includes(b.id) ? ' on' : ''}" data-id="${esc(b.id)}">
+      <span class="sx-g" ${canEdit() ? `title="Перетащить" data-grip="1"` : ''}>${canEdit() ? grip : ''}</span>
+      <div class="sx-body">${sxHead(b, i, st)}
+        <div class="sx-txt${b.alts ? ' was' : ''}">${sxMark(b.text, st, b.id)}</div>
+        ${b.alts ? `<div class="sx-alts">${b.alts.map((a, j) => `<div class="sx-alt"><b>${'АБВГДЕ'[j]}</b><span>${esc(a.text)}</span><small>${a.label ? esc(a.label) + ' · ' : ''}${secondsOf(a.text)} с</small>${canEdit() ? `<button type="button" class="btn${j ? '' : ' primary'}" data-take="${j}">Взять</button>` : ''}</div>`).join('')}</div>` : ''}
+      </div></article>`).join('')
+    + `<p class="small muted" style="margin: 4px 2px 0">Клик по блоку — он уходит в чат, пишите, что поменять. Shift + клик — несколько. Выделите слова — в чат уйдут только они.${canEdit() ? ' Тяните за точки, чтобы переставить.' : ''}</p>`;
+  main.querySelectorAll('[data-take]').forEach((b) => (b.onclick = () => SX[id].act({op: 'take', id: b.closest('[data-id]').dataset.id, alt: +b.dataset.take})));
+  sxPick(main, id, s, st, '.sx-b');
+  sxWords(main, id, s, st, '.sx-txt');
+  if (!canEdit()) return;
+  // Drag by the dots: the card follows the pointer between the others; dropping saves the order.
+  let drag = null;
+  main.querySelectorAll('[data-grip]').forEach((g) => g.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const card = g.closest('.sx-b');
+    drag = card; card.classList.add('drag');
+    const move = (ev) => {
+      const cards = [...main.querySelectorAll('.sx-b:not(.drag)')];
+      const after = cards.find((c) => { const r = c.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+      if (after) main.insertBefore(drag, after); else main.insertBefore(drag, main.querySelector('p'));
+    };
+    const up = () => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      drag.classList.remove('drag');
+      const order = [...main.querySelectorAll('.sx-b')].map((c) => c.dataset.id);
+      drag = null;
+      if (order.join() !== s.blocks.map((b) => b.id).join()) SX[id].act({op: 'order', ids: order});
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
+  }));
+}
+const secondsOf = (t) => Math.max(1, Math.round(String(t || '').split(/\s+/).filter(Boolean).length / 2.5));
+function sxRead(main, id, s, st) {
+  main.innerHTML = `<div class="sx-paper">${s.blocks.map((b, i) => `<div class="sx-r${b.ok ? ' ok' : ''}${st.sel.includes(b.id) || st.phrase?.id === b.id ? ' on' : ''}" data-id="${esc(b.id)}">
+      <div class="sx-mk"><b>${i + 1} · ${esc(b.role || 'Блок')}</b><span>${mmss(b.from)}${b.ok ? ' · утверждён' : ''}</span></div>
+      <p class="sx-p">${sxMark(b.text, st, b.id)}${st.sel.includes(b.id) || st.phrase?.id === b.id ? ' <span class="sx-in">в чате</span>' : ''}</p></div>`).join('')}</div>
+    <p class="small muted" style="margin: 0 2px">Так, как прозвучит. Выделите слова — они уйдут в чат; клик по подписи слева — весь блок.</p>`;
+  main.querySelectorAll('.sx-mk').forEach((m) => m.addEventListener('click', () => { const bid = m.parentElement.dataset.id; st.phrase = null; st.sel = st.sel[0] === bid ? [] : [bid]; stageScript(id, {...REEL_CACHE.get(id)?.data, script: s}); }));
+  sxWords(main, id, s, st, '.sx-p');
+}
+// «2 · Вид»: what is said on the left, what is on screen on the right; the words graphics start on are underlined.
+function sxLook(main, id, s, st) {
+  const any = s.blocks.some((b) => b.look?.length);
+  if (!any) {
+    main.innerHTML = `<div class="sx-empty"><b>Вид ещё не разложен</b><span class="muted">Claude пройдёт по утверждённому тексту и для каждого блока напишет, что на экране: кадр, графика из стиля проекта, текст на экране, звук — и на каких словах это появляется.</span>${canEdit() ? '<button type="button" class="btn primary" id="sxLookMake">Разложить вид по блокам</button>' : ''}</div>`;
+    $('#sxLookMake')?.addEventListener('click', () => chatOf().say('(step «2 · Вид» of script.json) Разложи вид по всем блокам: что на экране на каждом, на каких словах, из какого шаблона стиля, что нужно доснять.', 'Разложить вид по блокам'));
+    return;
+  }
+  const under = (b) => {
+    let t = sxMark(b.text, st, b.id);
+    for (const x of b.look || []) {
+      if (!x.at) continue;
+      const w = esc(x.at), i = t.indexOf(w);
+      if (i >= 0 && !/<[^>]*$/.test(t.slice(0, i))) t = `${t.slice(0, i)}<span class="sx-at" style="text-decoration-color: ${SX_KIND[x.kind]?.[1] || '#2F6FEB'}">${w}</span>${t.slice(i + w.length)}`;
+    }
+    return t;
+  };
+  const shoot = s.blocks.flatMap((b, i) => (b.look || []).filter((x) => x.have === 'shoot').map((x) => `${i + 1} · ${x.what}`));
+  main.innerHTML = `<div class="sx-legend">${Object.entries(SX_KIND).filter(([k]) => k !== 'broll').map(([, [n, c]]) => `<span><i style="background: ${c}"></i>${n}</span>`).join('')}<span class="muted">подчёркнуто — на этих словах появляется</span></div>
+    <div class="sx-av">${s.blocks.map((b, i) => `<div class="sx-avr${st.sel.includes(b.id) ? ' on' : ''}" data-id="${esc(b.id)}">
+      <div class="sx-avn"><b>${i + 1} · ${esc(b.role || 'Блок')}</b><span>${mmss(b.from)} · ${b.sec} с</span>${st.sel.includes(b.id) || st.phrase?.id === b.id ? '<span class="sx-in">в чате</span>' : ''}</div>
+      <div class="sx-say">${under(b)}</div>
+      <div class="sx-els">${(b.look || []).map((x) => { const [n, c] = SX_KIND[x.kind] || SX_KIND.gfx, h = SX_HAVE[x.have]; return `<div class="sx-el"><span class="sx-k" style="color: ${c}"><i style="background: ${c}"></i>${n}</span><span class="sx-w">${esc(x.what)}${x.at || x.tpl ? `<small>${x.at ? `на «${esc(x.at)}»` : 'весь блок'}${x.tpl ? ` · шаблон «${esc(x.tpl)}»` : ''}</small>` : ''}</span>${h ? `<span class="sx-have ${h[1]}">${h[0]}</span>` : ''}</div>`; }).join('') || '<span class="small muted">пока ничего</span>'}</div>
+    </div>`).join('')}</div>
+    ${shoot.length ? `<div class="sx-shoot"><b>Доснять · ${shoot.length}</b>${shoot.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}`;
+  sxPick(main, id, s, st, '.sx-avr');
+  sxWords(main, id, s, st, '.sx-say');
+}
+// Суфлёр (Т4/Т5): the text on the whole screen, one block per take, the end of the previous phrase and the
+// start of the next one in yellow — say them too, the cut then joins in the middle of the overlap.
+function prompter(s, startId) {
+  let i = Math.max(0, s.blocks.findIndex((b) => b.id === startId)), size = Number(UI.get('prompt.size')) || 1, lap = UI.get('prompt.lap') !== 'off', mirror = false, flow = false;
+  const ov = document.createElement('div');
+  ov.className = 'pr'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Суфлёр');
+  const words = (t) => String(t || '').split(/\s+/).filter(Boolean);
+  const tail = (t) => { const w = words(t); return w.slice(Math.max(0, w.length - Math.min(3, Math.ceil(w.length / 2)))).join(' '); };
+  const head = (t) => { const w = words(t); return w.slice(0, Math.min(3, Math.ceil(w.length / 2))).join(' '); };
+  const draw = () => {
+    const b = s.blocks[i], prev = s.blocks[i - 1], next = s.blocks[i + 1];
+    ov.innerHTML = `<div class="pr-top"><button type="button" class="pr-b" data-x="close">✕ Выйти · Esc</button><b>Блок ${i + 1} из ${s.blocks.length}</b><span>${esc(b.role || '')}</span>
+        <span class="pr-segs" aria-hidden="true">${s.blocks.map((_, j) => `<i class="${j < i ? 'd' : j === i ? 'n' : ''}"></i>`).join('')}</span><span style="flex: 1"></span>
+        <button type="button" class="pr-b${flow ? '' : ' on'}" data-x="blocks">По блокам</button><button type="button" class="pr-b${flow ? ' on' : ''}" data-x="flow">Подряд</button>
+        <button type="button" class="pr-b${lap ? ' on' : ''}" data-x="lap" aria-pressed="${lap}">Нахлёст</button><button type="button" class="pr-b${mirror ? ' on' : ''}" data-x="mirror" aria-pressed="${mirror}">Зеркально</button>
+        <button type="button" class="pr-b" data-x="minus" aria-label="Мельче">A−</button><button type="button" class="pr-b" data-x="plus" aria-label="Крупнее">A+</button></div>
+      <div class="pr-stage" style="--k: ${size}${mirror ? '; transform: scaleX(-1)' : ''}"><div class="pr-txt">${flow
+        ? s.blocks.map((x, j) => `<p class="pr-flow${j === i ? ' now' : ''}" data-j="${j}">${esc(x.text)}</p>`).join('')
+        : `${lap && prev ? `<p class="pr-side">…<span class="pr-lap">${esc(tail(prev.text))}</span></p>` : ''}<p class="pr-cur">${esc(b.text)}</p>${lap && next ? `<p class="pr-side"><span class="pr-lap">${esc(head(next.text))}</span> ${esc(words(next.text).slice(words(head(next.text)).length).join(' '))}</p>` : ''}
+        ${lap && (prev || next) ? '<span class="pr-hint">Жёлтое — нахлёст: скажите конец прошлой фразы и начало следующей, монтаж склеит по середине</span>' : ''}`}</div></div>
+      <div class="pr-bot"><button type="button" class="pr-rb" data-x="prev" aria-label="Прошлый блок" ${i ? '' : 'disabled'}>‹</button><button type="button" class="pr-rb" data-x="next" aria-label="Следующий блок" ${i < s.blocks.length - 1 ? '' : 'disabled'}>›</button>
+        <span class="pr-keys">← → блоки · A− A+ размер · Esc выйти</span></div>`;
+    ov.querySelector(flow ? '.pr-flow.now' : '.pr-cur')?.scrollIntoView({block: 'start'});
+  };
+  const go = (d) => { i = Math.min(s.blocks.length - 1, Math.max(0, i + d)); draw(); };
+  const close = () => { document.removeEventListener('keydown', keys); ov.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
+  ov.addEventListener('click', (e) => {
+    const x = e.target.closest('[data-x]')?.dataset.x, j = e.target.closest('[data-j]')?.dataset.j;
+    if (j !== undefined) { i = +j; return draw(); }
+    if (!x) return;
+    if (x === 'close') return close();
+    if (x === 'prev') return go(-1);
+    if (x === 'next') return go(1);
+    if (x === 'blocks' || x === 'flow') flow = x === 'flow';
+    if (x === 'lap') { lap = !lap; UI.set('prompt.lap', lap ? 'on' : 'off'); }
+    if (x === 'mirror') mirror = !mirror;
+    if (x === 'minus' || x === 'plus') { size = Math.min(2, Math.max(0.6, Math.round((size + (x === 'plus' ? 0.1 : -0.1)) * 10) / 10)); UI.set('prompt.size', String(size)); }
+    draw();
+  });
+  const keys = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); go(1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); go(-1); }
+  };
+  document.addEventListener('keydown', keys);
+  // Esc in full screen leaves full screen first: that closes the prompter too.
+  document.addEventListener('fullscreenchange', function off() { if (!document.fullscreenElement) { document.removeEventListener('fullscreenchange', off); if (ov.isConnected) close(); } });
+  document.body.append(ov);
+  draw();
+  ov.requestFullscreen?.().catch(() => {});
+}
+
+// Before script.json (older reels): scenes on the left, each scene as a card; clicking a scene drafts a note about it.
+function stageScenes(id, data) {
   const sc = Array.isArray(data.scenes) ? data.scenes : null;
   const host = $('#reelHost');
   const script = section(data.readme, 'Сценарий'), look = section(data.readme, 'Вид');
@@ -1783,10 +2128,11 @@ function stageScript(id, data) {
           ${field('На экране', x.screen)}${field('Текст на экране', x.text)}${field('Звук', x.sound)}</section>`).join('')
         : `<div class="md" style="max-width: 820px">${md(script) || '<p class="muted">Сценария пока нет. Опиши идею в чате справа — Claude напишет сценарий.</p>'}</div>
            ${look.trim() ? `<div class="blk"><span class="lbl">Как выглядит</span><div class="md" style="font-size: 14px">${md(look)}</div></div>` : ''}
-           ${canEdit() && script.trim() ? '<div><button type="button" class="btn" id="toScenes">Разложить по сценам</button> <span class="small muted">Claude разобьёт сценарий на сцены с таймкодами — их можно править по одной</span></div>' : ''}`}
+           ${canEdit() ? '<div class="row" style="gap: 10px; flex-wrap: wrap"><button type="button" class="btn primary" id="toBlocks">Разложить на смысловые блоки</button>' + (script.trim() ? '<button type="button" class="btn" id="toScenes">Разложить по сценам</button>' : '') + '<span class="small muted">Блоки можно править по одному, менять местами и утверждать; потом по ним — вид, суфлёр и монтаж</span></div>' : ''}`}
     </div></div>`;
   host.querySelectorAll('[data-sc]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); $('#sc' + a.dataset.sc).scrollIntoView({behavior: 'smooth', block: 'start'}); }));
   host.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => { const x = sc[b.dataset.edit]; draft(`Сцена ${Number(b.dataset.edit) + 1} «${x.name}» (${x.t}) —`); }));
+  $('#toBlocks')?.addEventListener('click', () => chatOf().say('Разложи текст этого рилса на смысловые блоки в script.json (шаг «1 · Текст»): хук, каждая мысль, призыв — по 1–3 фразы, как это прозвучит. Идея и сценарий — из README.', 'Разложить на смысловые блоки'));
   $('#toScenes')?.addEventListener('click', () => chatOf().say('Разложи сценарий этого рилса по сценам в scenes.json: таймкод, название, что на экране, текст на экране, звук, какой материал нужен и есть ли он.', 'Разложить сценарий по сценам'));
 }
 
