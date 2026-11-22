@@ -1202,7 +1202,9 @@ createServer(async (req, res) => {
     const name = basename(src).replace(/\.[^.]+$/, '').replace(/-synced$/, ''), rel = `sources/${name}-synced.wav`;
     (async () => {
       const r = await micSync(join(dir, cut.source), src, join(dir, rel), {nudge: Number(b.nudge) || 0});
-      if (r.score < 0.25) throw new Error(`не похоже на звук этой записи (совпадение ${Math.round(r.score * 100)} %) — тот ли файл?`);
+      // A lavalier at the mouth and a camera across the room sound different: one window may match weakly
+      // (reel 22: 23 %) while the windows along the recording agree on the same offset. Those are the proof.
+      if (r.score < 0.25 && (r.windows || 0) < 3) throw new Error(`не похоже на звук этой записи (совпадение ${Math.round(r.score * 100)} %) — тот ли файл?`);
       const now = readJson(join(dir, 'cut.json'), cut);
       writeJson(join(dir, 'cut.json'), {...now, voice: rel, mic: {from: `sources/${basename(src)}`, offset: r.offset, drift: r.drift, score: r.score, nudge: Number(b.nudge) || 0}, rev: (Number(now.rev) || 0) + 1, editedBy: me.name, editedAt: new Date().toISOString()});
       Object.assign(job, {state: 'done', step: 'готово', ...r});
