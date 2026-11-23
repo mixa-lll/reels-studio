@@ -39,3 +39,16 @@ and the Calendar from them. Change only what the request is about and keep other
 ```
 
 Keys are `reel:<folder>` or `post:<folder>`. The page writes here when someone drags an item to a day; the agent writes here when it plans the week. When asked to fill an empty slot, suggest an idea from `ideas.md` or a reel/post in work that fits the slot's rubric and format.
+
+## Выходы по аккаунтам — one release on several accounts
+
+A release (an item in `items.json`) can go to several accounts of `strategy.json → platforms`,
+each on its own day: `"out": [{"platform": "ig-en", "at": "2026-11-24T19:00"}, {"platform": "ig-ru", "at": "2026-11-25T19:00"}]`.
+`at` stays the first of them; the page mirrors `out` into `plan.json → out` for items with a folder.
+Without `out` the Plan guesses one account from where the item came out in Instagram, its format
+(a platform takes the item if one of its `formats` has that kind) and the language of its title.
+
+When the same release is made twice, once per language (two folders, e.g. `10-gudauri-prices-en`
+and `02-ceny-chast-2`), give both items the same `"twin": "t-<8 hex>"`: the Plan's «Слитно» view
+draws them as one release with both account tags and says which account is still missing.
+Link only the same topic; when planning a week across accounts, write `out` (or twins), not copies.

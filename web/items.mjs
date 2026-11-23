@@ -3,7 +3,7 @@
 // in projects/<p>/items.json and points at the reel and post folders, which stay as they are:
 // the bot and the agent keep using them, ideas.md and plan.json. syncItems() reads those
 // sources, adds what is new and moves each item's stage forward when the files say so.
-import {existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, utimesSync, writeFileSync} from 'node:fs';
 import {randomBytes} from 'node:crypto';
 import {join} from 'node:path';
 import {listPosts} from './posts.mjs';
@@ -59,7 +59,9 @@ export function readSources(studio) {
     const versions = existsSync(vd) ? readdirSync(vd).filter((v) => /^v\d+$/.test(v)).length : 0;
     const title = (/^#\s*(.+)/m.exec(read(join(dir, 'README.md')))?.[1] || r).replace(/^\d+[\s—–-]*/, '').replace(/[«»]/g, '').replace(/\s*\(.*\)\s*$/, '').trim();
     const scenes = readJson(join(dir, 'scenes.json'), []);
-    return {id: r, title, status: status[reelNumber(r)] || 'none', versions, need: Array.isArray(scenes) ? scenes : []};
+    // script.json without an approved «Вид»: the reel is still on «Идея» (text and look are its steps).
+    const script = readJson(join(dir, 'script.json'), null);
+    return {id: r, title, status: status[reelNumber(r)] || 'none', versions, need: Array.isArray(scenes) ? scenes : [], writing: !!script && !script.look?.ok};
   });
   const posts = listPosts(studio, () => null).map((x) => {
     const post = readJson(join(studio, 'posts', x.id, 'post.json'), {});
@@ -78,7 +80,7 @@ export function derivedStage(item, src) {
     if (!r) return null;
     if (r.status === 'published') return 'published';
     if (r.status === 'done') return 'ready';
-    return r.versions ? 'build' : 'material';
+    return r.versions ? 'build' : r.writing ? null : 'material';
   }
   if (ref?.kind === 'post') {
     const x = src.posts.find((y) => y.id === ref.id);
@@ -200,7 +202,34 @@ export function changeItem(studio, id, b, {by, now = Date.now()} = {}) {
   if (typeof b.title === 'string' && b.title.trim()) item.title = b.title.trim().slice(0, 140);
   if (b.format !== undefined && FORMATS.includes(b.format) && !item.ref?.kind?.match(/reel|post/)) item.format = b.format;
   if (b.rubric !== undefined) item.rubric = b.rubric ? String(b.rubric).slice(0, 60) : null;
-  if (b.at !== undefined) item.at = b.at ? String(b.at).slice(0, 25) : null;
+  // Выходы (STRATEGY.md «Выходы по аккаунтам»): the item on each account, [{platform, at}].
+  // item.at stays the first of them, so everything that reads one date keeps working.
+  if (Array.isArray(b.out)) {
+    const seen = new Set();
+    item.out = b.out.map((o) => ({platform: String(o?.platform || '').slice(0, 40), at: o?.at ? String(o.at).slice(0, 16) : null}))
+      .filter((o) => o.platform && /^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(o.at || '') && !seen.has(o.platform) && seen.add(o.platform)).slice(0, 10);
+    if (!item.out.length) delete item.out;
+    item.at = item.out ? item.out.map((o) => o.at).sort()[0] : null;
+  } else if (b.at !== undefined) {
+    const next = b.at ? String(b.at).slice(0, 25) : null;
+    // A new date for the whole item moves every account's date by the same number of days.
+    if (!next) delete item.out;
+    else if (item.out?.length && item.at) {
+      const shift = Date.parse(next.slice(0, 10)) - Date.parse(item.at.slice(0, 10));
+      item.out = item.out.map((o) => ({...o, at: new Date(Date.parse(o.at.slice(0, 10)) + shift).toISOString().slice(0, 10) + o.at.slice(10)}));
+    }
+    item.at = next;
+  }
+  // Twins: the same release in another language, with its own folder; the Plan draws them as one.
+  // `twin` is the other item's id (both get one shared id) or null to unlink this one.
+  if (b.twin !== undefined) {
+    const old = item.twin;
+    const other = b.twin ? data.items.find((x) => x.id === String(b.twin) && x !== item) : null;
+    if (other) { const t = other.twin || item.twin || newId('t'); other.twin = t; item.twin = t; }
+    else if (!b.twin) delete item.twin;
+    // A twin left alone is no twin.
+    if (old && old !== item.twin) { const left = data.items.filter((x) => x.twin === old); if (left.length === 1) delete left[0].twin; }
+  }
   if (b.group !== undefined) item.group = b.group ? String(b.group).slice(0, 40) : undefined;
   if (Array.isArray(b.platforms)) item.platforms = b.platforms.map(String).slice(0, 10);
   if (b.idea && typeof b.idea === 'object') item.idea = {...item.idea, ...ideaFields(b.idea, item.idea || {})};
@@ -309,6 +338,43 @@ export function dropIdea(studio, id, reason, {by, now = Date.now()} = {}) {
   return {title: item.ref.id, batch: item.batch || null};
 }
 
+/**
+ * «Удалить» (right click in Выпуски and the Plan): the item goes, its reel or post folder moves to
+ * the project's bin (.trash, emptied after 30 days — bot/storage.mjs), a pitch goes to Cancelled.
+ * Returns {title, trash} or null.
+ */
+export function deleteItem(studio, id, {by, now = Date.now()} = {}) {
+  const data = loadItems(studio);
+  const item = data.items.find((x) => x.id === id);
+  if (!item) return null;
+  let trash = null;
+  if (item.ref?.kind === 'reel' || item.ref?.kind === 'post') {
+    const dir = join(studio, item.ref.kind + 's', item.ref.id);
+    if (existsSync(dir)) {
+      const bin = join(studio, '.trash');
+      mkdirSync(bin, {recursive: true});
+      const label = `удалён ${item.ref.kind === 'reel' ? 'рилс' : 'пост'} ${item.ref.id} ${new Date(now).toISOString().slice(0, 10)}`;
+      let to = join(bin, label);
+      for (let i = 2; existsSync(to); i++) to = join(bin, `${label} ${i}`);
+      renameSync(dir, to);
+      utimesSync(to, new Date(now), new Date(now));
+      trash = label;
+    }
+    const f = join(studio, 'plan.json');
+    if (existsSync(f)) {
+      const plan = readJson(f, {}), key = planKey(item);
+      for (const k of ['at', 'rubric', 'out']) if (plan[k]) delete plan[k][key];
+      writeJson(f, plan);
+    }
+  } else if (item.ref?.kind === 'idea') moveIdea(studio, item.ref.id, {from: /.*/, to: 'Cancelled', reason: 'удалено'});
+  const twin = item.twin;
+  data.items = data.items.filter((x) => x !== item);
+  if (twin) { const left = data.items.filter((x) => x.twin === twin); if (left.length === 1) delete left[0].twin; }
+  saveItems(studio, data);
+  logEvent(studio, {type: 'delete', item: id, title: item.title, trash, by}, now);
+  return {title: item.title, trash};
+}
+
 /** «Вернуть»: the pitch goes back to My ideas; the next sync makes it a proposal again. */
 export function undropIdea(studio, title) {
   return moveIdea(studio, title, {from: /^Cancelled$/, to: 'My ideas'});
@@ -346,6 +412,7 @@ export function mirrorPlan(studio, item) {
   const plan = readJson(f, {});
   plan.at ||= {}; plan.rubric ||= {};
   if (item.at) plan.at[key] = item.at; else delete plan.at[key];
+  if (item.out?.length) (plan.out ||= {})[key] = item.out; else if (plan.out) delete plan.out[key];
   if (item.rubric) plan.rubric[key] = item.rubric; else delete plan.rubric[key];
   writeJson(f, plan);
 }

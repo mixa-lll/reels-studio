@@ -8,12 +8,13 @@
 // (Whisper, masks, Python, downloads). Only editors reach the chats. DENIED keeps it away
 // from this server's own files (sessions, passwords, invites).
 import {createServer} from 'node:http';
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
-import {changeItem, createItems, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
+import {changeScript, readScript, snapshot as scriptSnapshot} from './script.mjs';
+import {changeItem, createItems, deleteItem, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
 import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {readKit} from './dskit.mjs';
@@ -320,6 +321,14 @@ function preamble(p, k) {
     'The page shows the reel in four stages (Сценарий, Материалы, Монтаж, Выкладка) from two optional files in the reel folder; keep them current when the script, materials or captions change. ' +
     '`scenes.json`: [{"t":"0:00","name":"Хук","screen":"what is on screen","text":"text on screen","sound":"…","need":"what material it needs","have":"what file covers it","status":"готово|нужно|переснять"}]. ' +
     '`publish.json`: {"captions":[{"platform":"Instagram RU","account":"@…","text":"caption"}],"checks":[{"ok":true,"text":"…"}]}. ' +
+    'The text of the reel is written by meaning blocks in `script.json` (format at the top of web/script.mjs), stage «Идея», its steps «2 · Текст» and «3 · Вид» (step 1 is the idea itself). ' +
+    'A block is one thought of 1–3 spoken sentences (hook, each point, the turn, the call): it becomes one take in the prompter, one clip of cut.json and the words graphics hang on. Roles are short Russian nouns (Хук, Карта, Цены, Призыв). ' +
+    'For a new reel whose idea is taken, or when the owner asks to lay out the text, write script.json first (the README «Сценарий» section stays a short summary). ' +
+    'A block may carry "takes" (files in sources/ the owner filmed in the studio prompter, one block per take; "good": true is the one they picked): cut from them, the good one first; never remove "takes". ' +
+    'Messages starting with «(about blocks …)» or «(about the words «…» of block …)» are about exactly those blocks: change only them, keep the ids, never touch other blocks. A block with "ok": true is approved — leave it unless the message is about it. ' +
+    'When asked for variants, put 2–3 in that block\'s "alts" ([{"label":"боль","text":"…"}]) and keep "text" as it is; the page shows them under the block with «Взять». Reordering is moving blocks in the array. Say in 1–2 lines what changed, never «было → стало» walls: the page shows the text itself. ' +
+    'Step «3 · Вид» (only after "text":{"ok":true}): for every block fill "look" — what is on screen while it is said: frame (who and how), broll (a cutaway to film: name it so it can go to the shot list), gfx (graphics), text (text on screen), sound; "at" = the exact words of the block it starts on, "tpl" = the template of the project style it uses, "have" = style (exists in the style), ready (the file is there), shoot (still to film), new (not in the style yet). Take looks from the project design system first. ' +
+    'Later, in «Монтаж» and «Графика», build from it: one clip per block in its order, graphics on the "at" words; if the text changes after «Вид» is approved, update that block\'s look too. ' +
     'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version. ' +
     'Comments for the next version live in `edits.json` (format in web/edits.mjs): [{"id","stage":"script|scenes|video","t":seconds,"text","quote"?,"scene"?,"shape"?:{"kind":"rect|brush|point|frame",…fractions of the frame},"hint"?:"blur|replace|trim|remove","state":"open|sent|done|note","forV":"v4","by"}]; they come from the page and from the mini app\'s editor. When you have built that version, set each sent comment to "done" and add "result": what you changed, in a few words — the page shows it as «что поменялось». Your own pre-build findings (faces, subtitles, consents) go there as "state":"note" with "by":"Claude".');
   return lines.join('\n');
@@ -329,6 +338,8 @@ const jobs = new Set();
 const MONTAGE = new Map();
 const AUTOCUT = new Map();
 const MICSYNC = new Map();
+// Finished turns for the «Сейчас работает» dock (web/index.html): newest first, kept in memory.
+const RECENT = [];
 const jobOf = (p, k) => [...jobs].find((j) => j.p === p && j.key === k);
 const full = () => jobs.size >= MAX_JOBS;
 let channelSeq = 0;
@@ -337,7 +348,9 @@ function startTurn(p, k, text, send) {
   const meta = chatMeta(p, k);
   const studio = join(PROJECTS, p);
   const reelsBefore = new Set(existsSync(join(studio, 'reels')) ? readdirSync(join(studio, 'reels')) : []);
-  const args = ['-p', `${preamble(p, k)}\n\n${text}`, '--output-format', 'stream-json', '--verbose',
+  // Messages go in on stdin as stream-json (as in bot/agents.mjs): what the owner writes while
+  // the turn runs joins it between tool calls; each one is echoed back once Claude took it in.
+  const args = ['-p', '--input-format', 'stream-json', '--replay-user-messages', '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions', '--disallowedTools', DENIED.join(','),
     '--setting-sources', 'project,local', '--strict-mcp-config', '--mcp-config', emptyMcp,
     // A project may be a link to a folder outside the studio (My Gudauri → Рилсы/студия): Claude
@@ -353,9 +366,13 @@ function startTurn(p, k, text, send) {
   const child = spawn(process.env.AGENT_BIN || 'claude', args, {
     cwd: BOT,
     env: {...process.env, REELS_BOT: '1', REELS_DATA: DATA, REELS_CHANNEL: channel, REELS_PROJECTS: PROJECTS, REELS_STUDIO: studio},
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
     detached: true,
   });
+  const encode = (t) => `${JSON.stringify({type: 'user', message: {role: 'user', content: t}})}\n`;
+  child.stdin.on('error', () => {});
+  let open = true, sent = 1, taken = 0, replies = 0;
+  child.stdin.write(encode(`${preamble(p, k)}\n\n${text}`));
   // A new-reel chat becomes that reel's chat as soon as its folder appears.
   const rebind = () => {
     if (!key.startsWith('new-') || !existsSync(join(studio, 'reels'))) return;
@@ -384,6 +401,18 @@ function startTurn(p, k, text, send) {
   };
   const timer = setInterval(poll, 700);
   let buf = '', result = null, err = '';
+  // One reply per result: with messages added on the way there can be several in one turn.
+  const reply = (ev) => {
+    let out = (ev.result ?? '').trim();
+    if (ev.is_error) { const msg = {from: 'bot', kind: 'error', text: out || 'агент завершился с ошибкой'}; record(p, key, msg); send({msg}); replies++; return; }
+    if (!out || out === 'NO_REPLY') return;
+    // «⌨️ A | B | C» on the last line is the keyboard, as in the bot.
+    let keys = [];
+    out = out.replace(/\n?\s*⌨️\s*(.+)\s*$/u, (_, k2) => { keys = k2.split('|').map((x) => x.trim()).filter(Boolean); return ''; }).trim();
+    const msg = {from: 'bot', kind: 'text', text: out.replace(/\s*NO_REPLY\s*$/, ''), keys, buttons: []};
+    record(p, key, msg); send({msg}); replies++; lastText = out;
+  };
+  let lastText = '';
   child.stdout.on('data', (d) => {
     buf += d;
     let i;
@@ -393,22 +422,24 @@ function startTurn(p, k, text, send) {
       let ev;
       try { ev = JSON.parse(line); } catch { continue; }
       if (ev.type === 'system' && ev.subtype === 'init') setChatMeta(p, key, {session: ev.session_id});
-      if (ev.type === 'result') result = ev;
+      if (ev.type === 'user' && ev.isReplay) taken++;
+      if (ev.type === 'result') {
+        result = ev;
+        poll();
+        reply(ev);
+        answered = live.length;
+        // All that was written is taken in: let Claude exit. Otherwise it goes on with the rest.
+        if (open && taken >= sent) { open = false; child.stdin.end(); }
+      }
     }
   });
   child.stderr.on('data', (d) => { err += d; });
   child.on('close', (code) => {
     clearInterval(timer);
     poll();
-    let reply = (result?.result ?? '').trim();
-    if (result?.is_error || (code && !result)) {
-      const msg = {from: 'bot', kind: 'error', text: reply || err.trim().split('\n').pop() || `агент завершился с кодом ${code}`};
-      record(p, key, msg); send({msg});
-    } else if (reply && reply !== 'NO_REPLY') {
-      // «⌨️ A | B | C» on the last line is the keyboard, as in the bot.
-      let keys = [];
-      reply = reply.replace(/\n?\s*⌨️\s*(.+)\s*$/u, (_, k2) => { keys = k2.split('|').map((x) => x.trim()).filter(Boolean); return ''; }).trim();
-      const msg = {from: 'bot', kind: 'text', text: reply.replace(/\s*NO_REPLY\s*$/, ''), keys, buttons: []};
+    open = false;
+    if (code && !result && !job.stopped) {
+      const msg = {from: 'bot', kind: 'error', text: err.trim().split('\n').pop() || `агент завершился с кодом ${code}`};
       record(p, key, msg); send({msg});
     }
     setChatMeta(p, key, {status: '', updated: Date.now()});
@@ -418,9 +449,20 @@ function startTurn(p, k, text, send) {
     }
     send({done: true, ms: result?.duration_ms});
     jobs.delete(job);
+    RECENT.unshift({p, key, by: job.by, started: job.started, at: Date.now(), ok: !(code && !result) || job.stopped, stopped: job.stopped, text: String(lastText || '').replace(/\s+/g, ' ').slice(0, 160)});
+    RECENT.splice(40);
     rmSync(channel, {recursive: true, force: true});
+    // Added on the way but not answered when it stopped (or never taken in): those go next.
+    const unanswered = job.stopped ? live.length - answered : Math.min(live.length, sent - taken);
+    if (unanswered > 0) job.queue.unshift(...live.slice(-unanswered));
+    // Messages written while this turn ran (or after «Стоп») go next, in the same session.
+    if (job.queue.length) startTurn(p, key, `(Written while you were working on the previous message: a correction or addition to it. Take it into account and carry on.)\n\n${job.queue.join('\n\n')}`, () => {});
   });
-  const job = {child, p, get key() { return key; }};
+  // A message written while the turn runs: straight in while Claude still listens, else next turn.
+  const live = [];
+  let answered = 0;
+  const add = (t) => { if (open && !job.stopped) { sent++; live.push(t); child.stdin.write(encode(t)); return 'live'; } job.queue.push(t); return 'next'; };
+  const job = {child, p, queue: [], add, stopped: false, started: Date.now(), by: /^\(from ([^,)\n]+)/.exec(text)?.[1] || '', get key() { return key; }};
   jobs.add(job);
   return job;
 }
@@ -854,6 +896,35 @@ createServer(async (req, res) => {
     return json(200, {item});
   }
 
+  // «Сейчас работает»: every turn Claude runs in the projects this person sees, the Telegram
+  // bot's, and the ones that ended in the last hour, each with where it is.
+  if (req.method === 'GET' && url.pathname === '/api/running') {
+    const mine = projects().filter((x) => me.isOwner || (me.project ? x.slug === me.project : !x.test));
+    const name = new Map(mine.map((x) => [x.slug, x.name]));
+    const titles = new Map();
+    const titleOf = (pp, k) => {
+      if (k === '_project') return 'Чат проекта';
+      if (k === '_ds') return 'Дизайн-система';
+      if (k === '_ideas') return 'Идеи';
+      if (k.startsWith('new-')) return 'Новый рилс';
+      if (!titles.has(pp)) {
+        const m = new Map();
+        try { for (const r of reels(pp)) m.set(r.id, r.title); } catch {}
+        try { for (const x of listPosts(join(PROJECTS, pp), () => null)) m.set('post-' + x.id, x.title); } catch {}
+        for (const x of readJson(join(PROJECTS, pp, 'items.json'), {}).items || []) m.set('idea-' + x.id, x.title);
+        titles.set(pp, m);
+      }
+      return titles.get(pp).get(k) || k;
+    };
+    const one = (j) => ({project: j.p, projectName: name.get(j.p) || j.p, key: j.key, title: titleOf(j.p, j.key), by: j.by || '', started: j.started});
+    const bot = readJson(join(BOT, 'data', 'state.json'), {});
+    return json(200, {
+      running: [...jobs].filter((j) => name.has(j.p)).map((j) => ({...one(j), status: chatMeta(j.p, j.key).status || ''})),
+      recent: RECENT.filter((r) => name.has(r.p) && Date.now() - r.at < 3600e3).map((r) => ({...one(r), at: r.at, ok: r.ok, stopped: !!r.stopped, text: r.text})),
+      bot: bot.pending ? {for: bot.holder || bot.ownerName || 'владельца', queue: (bot.queue || []).length} : null,
+      max: MAX_JOBS,
+    });
+  }
   if (req.method === 'GET' && url.pathname === '/api/overview') {
     const list = reels(p);
     const ideas = parseIdeas(p).filter((x) => /Owner's ideas|My ideas/.test(x.section));
@@ -1046,6 +1117,14 @@ createServer(async (req, res) => {
     log(me.name, `выпуск «${item.title}»: ${Object.keys(b).filter((k) => k !== 'id').join(', ')}`);
     return json(200, {item});
   }
+  if (req.method === 'POST' && url.pathname === '/api/items/delete') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const r = deleteItem(studio, String(b.id || ''), {by: me.name});
+    if (!r) return json(404, {});
+    log(me.name, `удалил выпуск «${r.title}»${r.trash ? ' (папка в корзине проекта на 30 дней)' : ''}`);
+    return json(200, r);
+  }
   if (req.method === 'POST' && url.pathname === '/api/items/new') {
     if (!can('editor')) return json(403, {});
     const b = await body(req);
@@ -1123,7 +1202,7 @@ createServer(async (req, res) => {
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
-      ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
+      ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), script: readScript(dir), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10),
       storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}, basedOn: readJson(join(dir, 'based-on.json'), null), cut: cutView(dir)});
   }
@@ -1313,6 +1392,40 @@ createServer(async (req, res) => {
     log(me.name, `${b.v} ролика ${b.reel} идёт в «Готово»`);
     return json(200, {ready: b.v});
   }
+  // «Написать текст» on an idea: the studio makes the reel folder itself (no agent turn for that), writes the idea
+  // into its README and links the item, so the page opens «Сценарий» at once and Claude only writes the text.
+  if (req.method === 'POST' && url.pathname === '/api/reel/start') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const item = loadItems(studio).items.find((x) => x.id === String(b.item || ''));
+    if (!item || item.format !== 'reel') return json(404, {});
+    if (item.ref?.kind === 'reel' && reelDir(p, item.ref.id)) return json(200, {id: item.ref.id, existed: true});
+    const RU = {а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya'};
+    const slug = [...item.title.toLowerCase()].map((c) => RU[c] ?? c).join('').replace(/[^a-z0-9]+/g, '-').split('-').filter(Boolean).slice(0, 4).join('-').slice(0, 40) || 'reel';
+    changeItem(studio, item.id, {take: true, starting: true}, {by: me.name});
+    const run = spawnSync(process.execPath, [join(BOT, 'scripts', 'new-reel.mjs'), slug], {cwd: BOT, env: {...process.env, REELS_STUDIO: studio}, encoding: 'utf8'});
+    const dir = String(run.stdout || '').trim().split('\n').pop();
+    if (run.status !== 0 || !dir || !existsSync(dir)) return json(500, {error: 'Папка рилса не создалась'});
+    const id = basename(dir), idea = item.idea || {};
+    writeFileSync(join(dir, 'README.md'), [`# ${id.slice(0, 2)} «${item.title}»`, '', 'Status: in work', '', '## Идея', idea.about || item.title,
+      ...(idea.hook ? ['', `Крючок: ${idea.hook}`] : []), ...((idea.flow || []).length ? ['', 'Ход:', ...idea.flow.map((l, i) => `${i + 1}. ${l}`)] : []), ''].join('\n'));
+    // The empty script keeps the release on «Идея» until its text and look are approved (items.mjs).
+    writeFileSync(join(dir, 'script.json'), JSON.stringify({blocks: []}));
+    syncItems(studio);
+    log(me.name, `завёл рилс ${id} из идеи «${item.title}»`);
+    return json(200, {id});
+  }
+  // «Сценарий» by meaning blocks (web/script.mjs): order, approve, take a variant, approve a step, undo.
+  if (req.method === 'POST' && url.pathname === '/api/reel/script') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir) return json(404, {});
+    const s = changeScript(dir, b, me.name);
+    if (!s) return json(400, {});
+    log(me.name, `сценарий ${b.reel}: ${b.op}${b.step ? ' ' + b.step : ''}`);
+    return json(200, {script: s});
+  }
   if (req.method === 'POST' && url.pathname === '/api/reel/edits') {
     if (!can('editor')) return json(403, {});
     const b = await body(req);
@@ -1333,6 +1446,19 @@ createServer(async (req, res) => {
     pub.seen = {...pub.seen, [b.key.slice(0, 80)]: {by: me.name, at: Date.now()}};
     writeJson(f, pub);
     return json(200, {seen: pub.seen});
+  }
+  // Голосовой ввод in a chat box (browsers without live dictation): the recording becomes text and goes.
+  if (req.method === 'POST' && url.pathname === '/api/voice') {
+    if (!can('editor')) return json(403, {});
+    const chunks = [];
+    let size = 0;
+    for await (const c of req) { size += c.length; if (size > 25 * 1024 * 1024) return json(413, {}); chunks.push(c); }
+    mkdirSync(join(DATA, 'voice'), {recursive: true});
+    const f = join(DATA, 'voice', `${Date.now()}-${randomBytes(3).toString('hex')}.${/mp4|aac/.test(req.headers['content-type'] || '') ? 'm4a' : 'webm'}`);
+    writeFileSync(f, Buffer.concat(chunks));
+    const text = await transcribe(f, 'ru').catch(() => null);
+    rmSync(f, {force: true});
+    return json(200, {text: text || ''});
   }
   // A spoken note: saved next to the reel's materials and turned into text by the bot's local Whisper.
   if (req.method === 'POST' && url.pathname === '/api/reel/voice') {
@@ -1466,8 +1592,18 @@ createServer(async (req, res) => {
     if (!can('editor')) return json(403, {});
     const {key: k, text, shown} = await body(req);
     if (!chatKey(k) || !text?.trim()) return json(400, {});
-    if (jobOf(p, k)) return json(409, {});
+    // Claude is still on this chat: the message waits and goes as the next turn (startTurn).
+    const running = jobOf(p, k);
+    if (running) {
+      const how = running.add(`(from ${me.name}, written while you were working: a correction or addition — take it into account now)\n${text}`);
+      record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name, queued: true});
+      log(me.name, `дописал в чат «${k}», пока Claude работал: ${(shown || text).slice(0, 80)}`);
+      return json(202, {queued: how});
+    }
     if (full()) return json(429, {max: MAX_JOBS});
+    // «↩ Вернуть как было» on the script stage returns what the text was before this turn.
+    const rdir = !k.startsWith('_') && !k.startsWith('new-') && !k.startsWith('post-') && reelDir(p, k);
+    if (rdir) scriptSnapshot(rdir);
     record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name});
     log(me.name, `написал в чат «${k}»: ${(shown || text).slice(0, 80)}`);
     res.writeHead(200, {'content-type': 'text/event-stream', 'cache-control': 'no-store'});
@@ -1481,7 +1617,7 @@ createServer(async (req, res) => {
     if (!can('editor')) return json(403, {});
     const {key: k} = await body(req).catch(() => ({}));
     // A key stops that chat's turn; without one (older pages) every turn in the project stops.
-    for (const j of jobs) if (j.p === p && (!k || j.key === k)) try { process.kill(-j.child.pid, 'SIGTERM'); } catch {}
+    for (const j of jobs) if (j.p === p && (!k || j.key === k)) { j.stopped = true; try { process.kill(-j.child.pid, 'SIGTERM'); } catch {} }
     log(me.name, `остановил задачу${k ? ` в «${k}»` : ''}`);
     return json(200, {});
   }
@@ -1531,7 +1667,7 @@ createServer(async (req, res) => {
     mkdirSync(join(studio, 'inbox'), {recursive: true});
     appendFileSync(join(studio, 'inbox', 'history.md'), `- ${new Date().toISOString()} (web, ${me.name}${rdir ? `, reel ${reel}` : ''}) ${path}\n`);
     log(me.name, `загрузил ${basename(path)}${rdir ? ` в рилс ${reel}` : ''}`);
-    return json(200, {path, url: mediaUrl(path), digest});
+    return json(200, {path, name: basename(path), url: mediaUrl(path), digest});
   }
   // Inbox → variants (Д2): an author's material becomes a post whose chat writes 2–3 variants.
   if (req.method === 'POST' && url.pathname === '/api/authors/variants') {

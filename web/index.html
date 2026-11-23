@@ -93,6 +93,13 @@
   form.send .in { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
   form.send .files { max-width: 760px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   form.send .files:empty { display: none; }
+  form.send .pinrow { max-width: 760px; margin: 0 auto 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  form.send .pinrow[hidden] { display: none; }
+  .pinchip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; background: var(--ink); color: #fff; border-radius: 7px; padding: 4px 6px 4px 9px; max-width: 100%; }
+  .pinchip button { border: 0; background: none; color: #fff; padding: 0 2px; font-size: 15px; line-height: 1; cursor: pointer; }
+  .pinact { font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+  .pinact:hover { border-color: var(--ink); }
+  .msg .about { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 3px; white-space: normal; }
   .fchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 6px 6px 6px 10px; font-size: 13px; }
   .fchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fchip small { color: var(--muted); }
@@ -105,6 +112,35 @@
   form.send textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); max-height: 160px; min-height: 44px; }
   .icon { width: 44px; height: 44px; border: 1px solid var(--line); background: var(--card); border-radius: 12px; display: grid; place-items: center; flex: none; }
   .icon.go { background: var(--ink); border-color: var(--ink); color: #fff; border-radius: 50%; }
+  .dock { position: fixed; right: 16px; bottom: 84px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: calc(100vw - 32px); font-size: 13px; }
+  .dock-pill { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+  .dock-pill.busy { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .dock-pill.idle { font-weight: 500; color: var(--muted); box-shadow: none; height: 30px; padding: 0 12px; }
+  .dock-pill.done { border-color: #16A34A; }
+  .dock-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #A3A3A3; flex: none; }
+  .dock-pill.busy .dot { background: #4ADE80; animation: dockpulse 1.4s ease-in-out infinite; }
+  .dock-pill.done .dot { background: #16A34A; }
+  @keyframes dockpulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .dock-pill.busy .dot { animation: none; } }
+  .dock-panel { width: 360px; max-width: 100%; max-height: min(70vh, 560px); overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.14); padding: 6px; display: flex; flex-direction: column; }
+  .dock-h { display: flex; align-items: center; gap: 8px; padding: 8px 10px 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .dock-row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 10px; text-decoration: none; color: var(--ink); cursor: pointer; }
+  .dock-row:hover, .dock-row:focus-visible { background: #F6F6F6; }
+  .dock-row .ic { flex: none; width: 18px; height: 18px; display: grid; place-items: center; margin-top: 1px; }
+  .dock-row .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .dock-row .tx b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dock-row .tx span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .dock-row .stop { flex: none; border: 1px solid var(--line); background: #fff; border-radius: 8px; font: inherit; font-size: 12px; padding: 3px 8px; cursor: pointer; color: var(--ink2); }
+  .dock-row.new { background: #F0FDF4; }
+  @media (max-width: 640px) { .dock { right: 10px; bottom: 76px; } .dock-panel { width: calc(100vw - 20px); } }
+  .icon.cmic { color: var(--ink2); cursor: pointer; }
+  .icon.cmic.rec { background: #DC2626; border-color: #DC2626; color: #fff; animation: micpulse 1.2s ease-in-out infinite; }
+  .icon.cmic.wait { opacity: .6; cursor: progress; }
+  @keyframes micpulse { 50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, .18); } }
+  @media (prefers-reduced-motion: reduce) { .icon.cmic.rec { animation: none; } }
+  .msg .later { display: block; font-size: 11px; opacity: .7; margin-top: 4px; }
+  .acc-ic { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+  .acc-ic.g { opacity: .55; }
   .hint { color: var(--muted); text-align: center; margin: 12vh auto 0; max-width: 420px; }
   aside.vers { width: 360px; flex: none; border-left: 1px solid var(--line); background: var(--card); padding: 16px; display: flex; flex-direction: column; gap: 14px; height: 100vh; overflow-y: auto; }
   .ver { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -132,6 +168,147 @@
   .vph { background: var(--soft); color: var(--muted); display: grid; place-items: center; text-align: center; padding: 24px; font-size: 13px; }
   .rinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
   .blk { display: flex; flex-direction: column; gap: 6px; }
+
+  /* «Сценарий» by meaning blocks (canvas «Текст и вид рилса»): the chat lives inside the stage, to the right. */
+  .sx { display: flex; flex-direction: column; min-height: 100%; }
+  .sx-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 28px 10px; position: sticky; top: 0; z-index: 5; background: var(--bg); }
+  .sx-bar .seg button { cursor: pointer; }
+  .sx-steps { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .sx-steps button { border: 0; background: none; border-radius: 7px; padding: 6px 12px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  .sx-steps button[aria-pressed="true"], .sx-steps a.on { background: var(--ink); color: #fff; }
+  .sx-steps a { border-radius: 7px; padding: 6px 12px; font-size: 13px; color: var(--muted); text-decoration: none; }
+  .sx-steps button:disabled { cursor: not-allowed; opacity: .55; }
+  .sx-steps i { font-style: normal; color: #A3A3A3; font-size: 12px; }
+  .sx-work { flex: 1; display: flex; gap: 24px; padding: 6px 28px 28px; align-items: flex-start; }
+  .sx-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .rrow { flex: 1; min-height: 0; display: flex; }
+  .rfoot { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 60px; padding: 8px 24px; border-top: 1px solid var(--line); box-sizing: border-box; }
+  .rfoot[hidden] { display: none; } .rfoot .btn { min-height: 38px; display: inline-flex; align-items: center; text-decoration: none; }
+  @media (max-width: 860px) { .rfoot { position: sticky; bottom: 0; background: var(--bg); padding: 8px 16px; z-index: 6; } .rfoot > .small { flex-basis: 100%; } }
+  aside.chatcol.inl { height: auto; width: 360px; margin: 12px 12px 12px 0; border: 0; border-radius: 14px; background: #F7F7F4; overflow: hidden; }
+  @media (max-width: 860px) { .rrow { flex-direction: column; } aside.chatcol.inl { width: auto; height: 80vh; margin: 12px; border-top: 0; } }
+  aside.chatcol.inl .ctx { display: none; }
+  aside.chatcol.inl .chead { border-bottom: 1px solid #ECECE8; }
+  aside.chatcol.inl form.send { border-top: 0; }
+  aside.chatcol.inl .msg.bot { background: #fff; }
+  body.chat-mini aside.chatcol.inl { width: 48px; }
+  .sx-b { display: flex; gap: 12px; border: 1.5px solid var(--line); border-radius: 14px; padding: 14px 18px 14px 10px; background: #fff; cursor: pointer; }
+  .sx-b:hover { border-color: #D4D4D4; }
+  .sx-b.on { border-color: var(--ink); box-shadow: 0 0 0 1.5px var(--ink); background: #FCFCFB; }
+  .sx-b.drag { opacity: .55; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .sx-g { flex: 0 0 22px; display: flex; justify-content: center; padding-top: 3px; color: #C4C4C4; cursor: grab; touch-action: none; }
+  .sx-g:hover { color: var(--ink2); }
+  .sx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .sx-top { display: flex; align-items: center; gap: 10px; }
+  .sx-role { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink2); }
+  .sx-t { font-size: 12px; color: #8C8B86; font-variant-numeric: tabular-nums; }
+  .sx-ok { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--green); }
+  .sx-in { margin-left: auto; font-size: 11px; font-weight: 700; color: #fff; background: var(--ink); border-radius: 6px; padding: 2px 8px; white-space: nowrap; letter-spacing: 0; text-transform: none; vertical-align: middle; }
+  .sx-txt { font-size: 22px; line-height: 1.4; font-weight: 500; color: #2A2926; }
+  .sx-txt.was { color: #8C8B86; }
+  .sx-sel { background: #DCE7FB; color: inherit; border-radius: 4px; box-shadow: 0 0 0 3px #DCE7FB; }
+  .sx-alts { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .sx-alt { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; cursor: default; }
+  .sx-alt b { width: 16px; flex: none; font-size: 13px; color: var(--muted); }
+  .sx-alt span { flex: 1; font-size: 18px; line-height: 1.4; font-weight: 500; }
+  .sx-alt small { font-size: 12px; color: #8C8B86; white-space: nowrap; }
+  .sx-paper { border: 1px solid var(--line); border-radius: 18px; padding: 32px 40px; display: flex; flex-direction: column; gap: 6px; background: #fff; }
+  .sx-r { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 28px; align-items: baseline; padding: 10px 0 12px 16px; border-left: 3px solid var(--line); }
+  .sx-r.ok { border-left-color: var(--green); } .sx-r.on { border-left-color: var(--ink); }
+  .sx-mk { cursor: pointer; } .sx-mk b { display: block; font-size: 13px; font-weight: 700; color: var(--ink2); line-height: 18px; } .sx-mk span { display: block; font-size: 12px; color: #8C8B86; line-height: 16px; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .sx-r.ok .sx-mk span { color: var(--green); } .sx-mk:hover b { color: var(--ink); }
+  .sx-p { margin: 0; font-size: 28px; line-height: 1.42; font-weight: 500; color: #2A2926; letter-spacing: -.01em; }
+  .sx-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink2); padding: 0 2px 4px; }
+  .sx-legend span { display: inline-flex; align-items: center; gap: 6px; } .sx-legend i { width: 10px; height: 10px; border-radius: 3px; }
+  .sx-av { border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #fff; }
+  .sx-avr { display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1.15fr); gap: 20px; padding: 16px 18px; border-top: 1px solid #EFEEEA; cursor: pointer; }
+  .sx-avr:first-child { border-top: 0; }
+  .sx-avr.on { background: #FCFCFB; box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .sx-avn { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; } .sx-avn b { font-size: 13px; font-weight: 700; } .sx-avn span:not(.sx-in) { font-size: 12px; color: #8C8B86; }
+  .sx-avn .sx-in { margin: 4px 0 0; }
+  .sx-say { font-size: 18px; line-height: 1.5; font-weight: 500; color: #2A2926; }
+  .sx-at { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 4px; }
+  .sx-els { display: flex; flex-direction: column; gap: 6px; }
+  .sx-el { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; gap: 10px; align-items: start; font-size: 13px; line-height: 1.4; padding: 7px 10px; border-radius: 9px; background: #F7F7F4; }
+  .sx-k { font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 6px; padding-top: 1px; } .sx-k i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .sx-w small { display: block; color: var(--muted); font-size: 12px; }
+  .sx-have { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+  .sx-have.y { background: #E6F2EA; color: #1F6B3B; } .sx-have.s { background: #E4ECFA; color: #1D4C9E; } .sx-have.n { background: #FBE7E5; color: #A2322A; }
+  .sx-shoot { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 14px; }
+  .sx-empty { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; max-width: 560px; border: 1px dashed #D4D4D4; border-radius: 16px; padding: 24px; }
+  .ipath { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); } .ipath b { color: var(--ink); font-weight: 700; } .ipath i { font-style: normal; color: #C4C4C4; }
+  /* The idea fits one screen: the main button and the properties in a strip on top, the fields under it. */
+  .ibody { flex-direction: column; gap: 14px !important; } .ibody > div:first-child { flex: none !important; max-width: 920px; width: 100%; }
+  .iside { order: -1; flex: none !important; width: 100%; max-width: 920px; flex-direction: row !important; flex-wrap: wrap; align-items: center; gap: 10px 14px !important; }
+  .iside #iGo { flex: none; padding: 0 22px; } .iside > .small { flex: 1 1 220px; } .iside > .ipath { flex: none; } .iside > details { flex: 1 1 100%; }
+  .iside > div { flex: 1 1 100%; flex-direction: row !important; flex-wrap: wrap; border: 0 !important; padding: 0 !important; gap: 4px 20px !important; }
+  .iside > div > div { flex: none; gap: 4px !important; } .iside > div > div > span:first-child { flex: none !important; }
+  .ibody textarea.f { padding: 8px 12px !important; min-height: 0; line-height: 1.45 !important; } details.ifold.isec { padding: 10px 14px; align-self: start; }
+  .ibody > div:first-child { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px !important; } .ibody > div:first-child > * { grid-column: 1 / -1; } .ibody > div:first-child > details.ifold { grid-column: auto; }
+  .iside > div { flex: 1 1 auto !important; } .iside > .ipath { margin-right: 6px; }
+  @media (max-width: 700px) { .ibody > div:first-child > details.ifold { grid-column: 1 / -1; } }
+  @media (max-width: 860px) { .ibody { padding: 16px !important; } }
+  .igrid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; } @media (max-width: 900px) { .igrid2 { grid-template-columns: minmax(0, 1fr); } }
+  details.ifold > summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; } details.ifold > summary::-webkit-details-marker { display: none; }
+  details.ifold > summary::before { content: '›'; color: var(--muted); font-size: 16px; line-height: 1; transition: transform .12s; } details.ifold[open] > summary::before { transform: rotate(90deg); }
+  details.ifold:not([open]) { gap: 0; } details.ifold[open] > summary { margin-bottom: 4px; }
+  .sx-wait { display: flex; gap: 12px; align-items: center; border: 1.5px solid var(--line); border-radius: 14px; padding: 16px 18px; } .sx-wait div { display: flex; flex-direction: column; gap: 2px; }
+  .sx-sk { cursor: default; opacity: .6; } .sx-sk .sx-body i { display: block; height: 16px; border-radius: 6px; background: var(--soft); } .sx-sk .sx-body i:last-child { width: 62%; }
+  .sx-go { display: none; }
+  @media (max-width: 860px) { .sx-go { display: flex; position: fixed; left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40; align-items: center; gap: 10px; background: #fff; border: 1.5px solid var(--ink); border-radius: 14px; padding: 8px 8px 8px 14px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.14); } .sx-go span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sx-work { flex-wrap: wrap; } .sx-avr { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+  @media (max-width: 720px) { .sx-bar, .sx-work { padding-left: 16px; padding-right: 16px; } .sx-r { grid-template-columns: minmax(0, 1fr); gap: 4px; } .sx-p { font-size: 22px; } .sx-paper { padding: 20px; } .sx-txt { font-size: 19px; } }
+  .sx-ed { cursor: default; } .sx-ed .sx-body { gap: 8px; } .sx-ed textarea.f { font-size: 19px; line-height: 1.4; min-height: 96px; }
+  .sx-player { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sx-track { flex: 1; min-width: 120px; display: flex; gap: 3px; } .sx-track i { height: 6px; border-radius: 3px; background: #DAD9D4; } .sx-track i.d { background: var(--ink); } .sx-track i.n { background: #2F6FEB; }
+  .sx-r.said .sx-p { color: #A3A3A3; } .sx-r.say { border-left-color: #2F6FEB; } .sx-r.say .sx-p { color: var(--ink); }
+  .sx-sb { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; }
+  .sx-fr { flex: none; width: 76px; display: flex; flex-direction: column; gap: 5px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
+  .sx-fr > span:last-child { font-size: 11px; font-weight: 700; color: var(--ink2); line-height: 1.2; } .sx-fr small { display: block; font-weight: 500; color: #8C8B86; }
+  .sx-fr.on .sx-scr { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .sx-scr { display: block; position: relative; width: 76px; aspect-ratio: 9 / 16; border-radius: 8px; background: #D9D6CE; overflow: hidden; }
+  .sx-scr.br { background: #A9A59A; }
+  .sx-scr i { position: absolute; display: block; font-style: normal; }
+  .sx-scr .p { left: 26%; right: 26%; bottom: 0; height: 52%; border-radius: 999px 999px 0 0; background: #8C8B86; }
+  .sx-scr .g { inset: 0 0 46% 0; background: #B8C9E6; }
+  .sx-scr .t { left: 10%; right: 10%; top: 12%; height: 12%; border-radius: 4px; background: #C2620A; }
+  .sx-scr.big { width: 104px; border-radius: 10px; margin-top: 8px; }
+  .sx-scr.big i { font-size: 9px; line-height: 1.25; font-weight: 700; padding: 4px 5px; overflow: hidden; }
+  .sx-scr.big .g { color: #1D4C9E; } .sx-scr.big .t { height: auto; min-height: 12%; color: #fff; }
+  .sx-scr.big .b { inset: auto 0 0 0; color: #fff; background: rgba(0,0,0,.35); }
+  .sx-scr.big .g2 { left: 8%; right: 30%; bottom: 8%; border-radius: 5px; background: #fff; color: #1D4C9E; }
+  .rshoot { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .rshoot:first-of-type { border-top: 0; }
+  @media (max-width: 720px) { .rshoot { grid-template-columns: minmax(0, 1fr) auto; } .rshoot > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; } }
+  /* Суфлёр: dark, the text up by the camera; the overlap with the neighbours in yellow. */
+  .pr { position: fixed; inset: 0; z-index: 90; background: #0E0E0D; color: #F2F2EF; display: flex; flex-direction: column; }
+  .pr-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 24px; border-bottom: 1px solid #262624; font-size: 14px; color: #B9B8B3; }
+  .pr-top b { color: #F2F2EF; }
+  .pr-b { height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid #3A3936; background: none; color: #F2F2EF; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .pr-b.on { background: #F2F2EF; color: #0E0E0D; border-color: #F2F2EF; }
+  .pr-segs { display: inline-flex; gap: 4px; } .pr-segs i { width: 26px; height: 5px; border-radius: 3px; background: #3A3936; } .pr-segs i.d { background: #2E8A4F; } .pr-segs i.n { background: #F2F2EF; }
+  .pr-stage { flex: 1; overflow-y: auto; display: flex; justify-content: center; padding: 40px 24px; }
+  .pr-txt { width: min(1040px, 100%); display: flex; flex-direction: column; gap: calc(22px * var(--k)); }
+  .pr-cur { margin: 0; font-size: calc(clamp(34px, 4.2vw, 60px) * var(--k)); line-height: 1.28; font-weight: 700; letter-spacing: -.015em; }
+  .pr-side { margin: 0; font-size: calc(clamp(20px, 2.1vw, 30px) * var(--k)); line-height: 1.4; font-weight: 600; color: #6B6A66; }
+  .pr-lap { color: #F7D774; background: rgba(247,215,116,.14); border-radius: 6px; padding: 1px 6px; box-shadow: inset 0 -2px 0 rgba(247,215,116,.55); }
+  .pr-hint { font-size: 13px; color: #8C8B86; }
+  .pr-flow { margin: 0 0 .6em; font-size: calc(clamp(28px, 3.2vw, 46px) * var(--k)); line-height: 1.3; font-weight: 700; color: #55544F; cursor: pointer; }
+  .pr-flow.now { color: #F2F2EF; }
+  .pr-bot { display: flex; align-items: center; gap: 14px; padding: 14px 24px calc(18px + env(safe-area-inset-bottom)); border-top: 1px solid #262624; }
+  .pr-rb { width: 54px; height: 54px; border-radius: 50%; border: 1px solid #3A3936; background: none; color: #F2F2EF; font-size: 26px; line-height: 1; cursor: pointer; }
+  .pr-rb:disabled { opacity: .3; cursor: default; }
+  .pr-keys { font-size: 12px; color: #6B6A66; margin-left: auto; }
+  .pr-ui { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .pr-bot { flex-wrap: wrap; }
+  .pr-rec { height: 54px; padding: 0 24px; border-radius: 27px; border: 0; background: #F2F2EF; color: #0E0E0D; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+  .pr-rec i { width: 14px; height: 14px; border-radius: 50%; background: #E5484D; } .pr-rec.on i { border-radius: 3px; } .pr-rec:disabled { opacity: .6; }
+  .pr-tk { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 999px; border: 0; background: #262624; color: #B9B8B3; cursor: pointer; } .pr-tk.ok { background: #1E3A2A; color: #8FD4A8; }
+  .pr-segs i.h { background: #8C8B86; } .pr-segs i.cur { box-shadow: 0 0 0 2px #0E0E0D, 0 0 0 3px #F2F2EF; }
+  .pr-cam { position: absolute; right: 24px; top: 76px; width: 132px; aspect-ratio: 9 / 16; border-radius: 12px; overflow: hidden; background: #262624; }
+  .pr-cam[hidden] { display: none; } .pr-cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  .pr-cam span { position: absolute; left: 8px; bottom: 6px; font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+  @media (max-width: 720px) { .pr-cam { width: 84px; right: 12px; top: auto; bottom: 110px; } }
+  @media (max-width: 720px) { .pr-top { padding: 10px 14px; } .pr-segs, .pr-keys { display: none; } .pr-stage { padding: 20px 18px; } .pr-bot { justify-content: space-between; } }
 
   /* «Как увидят» (NX0–NX7): the release inside each platform's interface, before publishing */
   .nx-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
@@ -339,6 +516,19 @@
   .mob { display: none !important; }
 .testbar{display:block;margin:0 0 10px;padding:7px 10px;border-radius:9px;background:#2F6FEB;color:#fff;font-size:13px;font-weight:600;text-decoration:none}
   /* Основа: выпуски по этапам (handbook/LEAN.md, кусок 3) */
+  .acc-chip { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: #F1F1F1; color: var(--ink2); white-space: nowrap; line-height: 17px; }
+  .acc-chip.g { background: none; border: 1px dashed #D4D4D4; color: var(--muted); line-height: 15px; }
+  .accs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .ltab-wrap { overflow-x: auto; }
+  .ltab { min-width: 900px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .ltab .tr { display: grid; grid-template-columns: minmax(220px, 2.4fr) minmax(130px, 1.3fr) 110px minmax(170px, 1.5fr) 90px 110px; gap: 14px; align-items: center; padding: 10px 14px; border-top: 1px solid #F0F0F0; text-decoration: none; color: var(--ink); font-size: 13px; }
+  .ltab .tr:hover { background: #FAFAFA; }
+  .ltab .thd { border-top: 0; color: var(--muted); font-size: 12px; border-radius: 12px 12px 0 0; }
+  .ltab .thd button { all: unset; cursor: pointer; } .ltab .thd button.on { color: var(--ink); font-weight: 600; }
+  .ctxm { position: fixed; z-index: 60; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px; min-width: 180px; display: flex; flex-direction: column; }
+  .ctxm button { all: unset; padding: 8px 12px; border-radius: 7px; font-size: 13px; cursor: pointer; }
+  .ctxm button:hover, .ctxm button:focus-visible { background: #F4F4F4; }
+  .ctxm button.danger { color: #DC2626; }
   .lboard { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 10px; align-items: start; overflow-x: auto; }
   .lcol { background: var(--side); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
   .lcolh { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; font-size: 13px; }
@@ -395,6 +585,12 @@
   .ln-grid.mo .ln-chip .t .rsq { margin-top: 4px; }
   .ln-grid.mo .ln-chip .t span:last-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
   .ln-chip.igc { background: #fff; border: 1px solid #EDEDED; color: var(--muted); }
+  .ln-chip .m { flex-wrap: wrap; row-gap: 2px; }
+  .ln-acc { flex: none; font-size: 10px; font-weight: 700; letter-spacing: .02em; color: var(--ink2); background: #fff; border: 1px solid #E5E5E5; border-radius: 4px; padding: 0 4px; line-height: 15px; }
+  .ln-miss { flex: none; font-size: 10.5px; color: #B45309; white-space: nowrap; }
+  .ln-accb { font: inherit; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; border: 1px solid #E5E5E5; background: #fff; color: #A3A3A3; cursor: pointer; }
+  .ln-accb.on { color: var(--ink); border-color: #171717; }
+  .ln-lane { border-right: 1px solid #F0F0F0; border-bottom: 1px solid #F0F0F0; padding: 10px 8px; display: flex; flex-direction: column; gap: 3px; font-size: 13px; min-width: 0; }
   .ln-chip.igc .t { color: var(--ink); font-weight: 500; }
   .ln-chip.igc .t svg { flex: none; color: #C13584; }
   .ln-ig { margin-top: auto; align-self: flex-start; display: inline-flex; gap: 3px; align-items: center; font-size: 11px; color: var(--muted); }
@@ -1152,11 +1348,12 @@ function chatBox(key, {onDone, onRebind} = {}) {
   el.innerHTML = `<div class="log"><div class="in"></div></div>
     <div class="status"><i class="spin"></i><span style="display: flex; flex-direction: column; min-width: 0"><span class="stext">Думаю…</span><span class="shint small"></span></span><button class="btn" type="button" style="margin-left: auto; min-height: 32px">Стоп</button></div>
     <div class="keys"></div>
-    ${canEdit() ? `<form class="send"><div class="files" aria-live="polite"></div><div class="in">
+    ${canEdit() ? `<form class="send"><div class="pinrow" hidden></div><div class="files" aria-live="polite"></div><div class="in">
       <button type="button" class="icon clip" aria-label="Прикрепить файл"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L15 7"></path></svg></button>
       <input type="file" multiple hidden>
       <label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)" for="ta-${esc(key)}">Сообщение</label>
       <textarea id="ta-${esc(key)}" rows="1" placeholder="Сообщение или правка…"></textarea>
+      <button type="button" class="icon cmic" aria-label="Голосом" aria-pressed="false" title="Голосом: нажмите, говорите, нажмите ещё раз">${svg('mic', 18)}</button>
       <button class="icon go" aria-label="Отправить"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
     </div></form>` : '<p class="small muted" style="text-align: center; padding: 12px">У тебя доступ только на просмотр.</p>'}`;
   const log = $('.log .in', el), keysEl = $('.keys', el), st = $('.status', el), ta = $('textarea', el);
@@ -1164,7 +1361,8 @@ function chatBox(key, {onDone, onRebind} = {}) {
   const setBusy = (on, text) => {
     busy = on; st.classList.toggle('on', on);
     if (text) { $('.stext', st).textContent = text; $('.shint', st).textContent = /рендер/i.test(text) ? 'Это нормально: монтаж идёт на сервере. Страницу можно закрыть — версия появится сама.' : ''; }
-    el.querySelectorAll('.btns button, .keys button, .go').forEach((b) => (b.disabled = on));
+    el.querySelectorAll('.btns button, .keys button').forEach((b) => (b.disabled = on));
+    if (ta) ta.placeholder = on ? 'Дописать или поправить — Claude возьмёт это следующим шагом' : pinned ? 'Что поменять…' : 'Сообщение или правка…';
   };
   $('button', st).onclick = () => post('/api/stop', {key});
   const buttons = (list, under) => {
@@ -1204,9 +1402,10 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (m.from === 'me') {
       d.className = 'msg me';
       // Attachments travel as «📎 name» lines of the shown text; they come back as chips.
-      const lines = String(m.text || '').split('\n'), files = lines.filter((l) => l.startsWith('📎 ')), text = lines.filter((l) => !l.startsWith('📎 ')).join('\n').trim();
-      d.innerHTML = (m.by && m.by !== ME.name ? `<span class="by">${esc(m.by)}</span>` : '') + (text ? `<div>${esc(text)}</div>` : '')
-        + files.map((l) => `<div class="fchip">${svg('clip', 14)}<span>${esc(l.slice(3))}</span></div>`).join('');
+      const lines = String(m.text || '').split('\n'), files = lines.filter((l) => l.startsWith('📎 ')), about = lines.filter((l) => l.startsWith('◎ ')).map((l) => l.slice(2)), text = lines.filter((l) => !l.startsWith('📎 ') && !l.startsWith('◎ ')).join('\n').trim();
+      d.innerHTML = (m.by && m.by !== ME.name ? `<span class="by">${esc(m.by)}</span>` : '') + about.map((x) => `<span class="about">${esc(x)}</span>`).join('') + (text ? `<div>${esc(text)}</div>` : '')
+        + files.map((l) => `<div class="fchip">${svg('clip', 14)}<span>${esc(l.slice(3))}</span></div>`).join('')
+        + (m.queued ? '<span class="later">дописано по ходу</span>' : '');
     }
     else if (m.kind === 'error') { d.className = 'msg err'; d.textContent = '⚠️ ' + m.text; }
     else {
@@ -1228,10 +1427,23 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (m.from === 'bot' && canEdit()) showKeys(m.keys || []);
   };
   async function say(text, shown) {
-    if (busy || !text.trim()) return;
+    if (!text.trim()) return;
+    if (busy) {
+      // Claude is still working: the server keeps it and runs it right after (or after «Стоп»).
+      const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown})}).catch(() => null);
+      const q = r?.status === 202 ? (await r.json().catch(() => ({}))).queued : null;
+      if (q) {
+        render({from: 'me', text: shown || text, queued: true});
+        if (q === 'next') followUp = true;
+        toast(q === 'live' ? 'Claude прочтёт это между шагами и учтёт' : 'Claude возьмёт это сразу после текущего ответа');
+      }
+      else toast('Не отправилось — попробуйте ещё раз');
+      return;
+    }
     showKeys([]);
     render({from: 'me', text: shown || text});
     setBusy(true, 'Думаю…');
+    setTimeout(dockTick, 700);
     try {
       const r = await fetch(`/api/chat?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key, text, shown})});
       if (r.status === 409) throw new Error('Claude ещё отвечает в этом чате — дождись ответа');
@@ -1254,9 +1466,12 @@ function chatBox(key, {onDone, onRebind} = {}) {
       }
     } catch (err) { render({from: 'bot', kind: 'error', text: err.message}); }
     setBusy(false);
+    // What was written meanwhile runs as the next turn on the server: follow it like a reload does.
+    if (followUp) { followUp = false; await load(); }
     onDone?.(key);
     ta?.focus();
   }
+  let followUp = false;
   async function load() {
     const h = await api('/api/chat?key=' + encodeURIComponent(key));
     log.innerHTML = '';
@@ -1265,7 +1480,7 @@ function chatBox(key, {onDone, onRebind} = {}) {
     if (h.busy) {
       setBusy(true, h.status || 'Работаю… обновлю, когда закончу');
       setTimeout(() => location.hash.includes(key) && load().then(() => sidebar()), 4000);
-    } else if (busy) setBusy(false);
+    } else if (busy) { setBusy(false); onDone?.(key); }
   }
   if (ta) {
     const form = $('form', el), file = $('input[type=file]', el), clip = $('.clip', el), chips = $('.files', el);
@@ -1286,33 +1501,101 @@ function chatBox(key, {onDone, onRebind} = {}) {
     el.addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; el.classList.add('over'); });
     el.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
     el.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; el.classList.remove('over'); } });
-    el.addEventListener('drop', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth = 0; el.classList.remove('over'); if (!busy) add([...e.dataTransfer.files]); });
+    el.addEventListener('drop', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth = 0; el.classList.remove('over'); add([...e.dataTransfer.files]); });
+    // Голосовой ввод: the words land in the field (not sent), so they can be read and fixed first.
+    // Chrome and Safari write live as you speak; elsewhere the recording goes to the server's Whisper.
+    const mic = $('.cmic', el), SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let live = null, rec = null, on = false, base = '';
+    const micState = (s) => { mic.classList.toggle('rec', s === 'rec'); mic.classList.toggle('wait', s === 'wait'); mic.setAttribute('aria-pressed', String(s === 'rec')); mic.setAttribute('aria-label', s === 'rec' ? 'Остановить запись' : 'Голосом'); };
+    const put = (t) => { ta.value = (base && t ? base.replace(/\s*$/, ' ') : base) + t; ta.dispatchEvent(new Event('input')); };
+    const record = async () => {
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); } catch { on = false; micState(''); return toast('Нет доступа к микрофону — разрешите его в настройках браузера'); }
+      const chunks = [];
+      rec = new MediaRecorder(stream);
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = async () => {
+        stream.getTracks().forEach((x) => x.stop());
+        const type = rec.mimeType || 'audio/webm'; rec = null;
+        micState('wait'); ta.placeholder = 'Распознаю…';
+        const r = await fetch(`/api/voice?project=${encodeURIComponent(P)}`, {method: 'POST', headers: {'content-type': type}, body: new Blob(chunks, {type})}).then((x) => x.json()).catch(() => ({}));
+        micState(''); setBusy(busy);
+        if (r.text) { put(r.text); ta.focus(); } else toast('Не расслышал — скажите ещё раз или напишите');
+      };
+      rec.start(); micState('rec');
+    };
+    const startVoice = () => {
+      on = true; base = ta.value; micState('rec');
+      if (!SR) return record();
+      live = new SR(); live.lang = 'ru-RU'; live.continuous = true; live.interimResults = true;
+      let done = '';
+      live.onresult = (e) => {
+        let tmp = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) done += t; else tmp += t; }
+        put((done + tmp).trim());
+      };
+      live.onerror = (e) => {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed' && !navigator.mediaDevices) { on = false; live = null; micState(''); return toast('Нет доступа к микрофону — разрешите его в настройках браузера'); }
+        // The browser's own dictation is off or offline: record and let the server write it out.
+        if (e.error === 'network' || e.error === 'service-not-allowed' || e.error === 'language-not-supported') { live.onend = null; live = null; record(); }
+      };
+      // Dictation stops by itself after a pause; keep listening until the button is pressed again.
+      live.onend = () => { if (on && live) { base = ta.value; done = ''; try { live.start(); } catch { stopVoice(); } } else micState(''); };
+      try { live.start(); } catch { live = null; record(); }
+    };
+    const stopVoice = () => {
+      if (!on) return;
+      on = false;
+      if (live) { const l = live; live = null; l.stop(); micState(''); ta.focus(); }
+      if (rec) rec.stop();
+    };
+    mic.onclick = () => (on ? stopVoice() : startVoice());
     form.onsubmit = async (e) => {
       e.preventDefault();
       const files = [...picked], text = ta.value.trim();
-      if ((!text && !files.length) || busy) return;
-      const parts = [], shown = [];
+      if (!text && !files.length) return;
+      stopVoice();
+      const parts = [], shown = [], was = busy;
+      const loading = (t) => (was ? toast(t) : setBusy(true, t));
       try {
         for (const f of files) {
-          setBusy(true, `Загружаю ${f.name}…`);
+          loading(`Загружаю ${f.name}…`);
           const toReel = !key.startsWith('_') && !key.startsWith('new-') ? `&reel=${encodeURIComponent(key)}` : '';
-          const u = await uploadFile(f, toReel, (i, n) => n > 1 && setBusy(true, `Загружаю ${f.name}… ${Math.round(i / n * 100)}%`));
+          const u = await uploadFile(f, toReel, (i, n) => n > 1 && !was && setBusy(true, `Загружаю ${f.name}… ${Math.round(i / n * 100)}%`));
           parts.push(`(attached file → ${u.path})`);
           if (u.digest) parts.push(`(Telegram export «${u.digest.name}», ${u.digest.count} messages unpacked → ${u.digest.path}; ${u.digest.photos} photos it links are in photos/ beside it — open them to see the design)`);
           shown.push('📎 ' + f.name + (u.digest ? ` · выгрузка Telegram: ${u.digest.count} сообщ., ${u.digest.photos} фото` : ''));
         }
       } catch (err) {
         // Nothing is sent: the text and the files stay in the box to try again.
-        setBusy(false);
+        if (!was) setBusy(false);
         toast(err.message === 'Failed to fetch' ? 'Файл не загрузился: связь оборвалась. Текст и вложения остались — попробуйте ещё раз' : err.message);
         return;
       }
-      setBusy(false);
+      if (!was) setBusy(false);
       ta.value = ''; ta.style.height = 'auto';
       picked = []; showPicked();
-      say([text, ...parts].filter(Boolean).join('\n'), [text, ...shown].filter(Boolean).join('\n'));
+      say([pinned?.note, text, ...parts].filter(Boolean).join('\n'), [pinned && '◎ ' + pinned.label, text, ...shown].filter(Boolean).join('\n'));
     };
   }
+  // What the next messages are about (a block of the script, a phrase…): a chip over the field, sent as a
+  // note before the text. {label, note, acts: [{label, text} | {label, run}], onClear} or null.
+  let pinned = null;
+  el.pin = (x) => {
+    pinned = x || null;
+    const row = $('.pinrow', el);
+    if (!row || !ta) return;
+    row.hidden = !pinned;
+    ta.placeholder = pinned ? 'Что поменять…' : busy ? 'Дописать или поправить — Claude возьмёт это следующим шагом' : 'Сообщение или правка…';
+    if (!pinned) return (row.innerHTML = '');
+    row.innerHTML = `<span class="pinchip">${esc(pinned.label)}<button type="button" aria-label="Убрать из чата">×</button></span>${(pinned.acts || []).map((a, i) => `<button type="button" class="pinact" data-pa="${i}">${esc(a.label)}</button>`).join('')}`;
+    $('.pinchip button', row).onclick = () => { const f = pinned?.onClear; el.pin(null); f?.(); };
+    row.querySelectorAll('[data-pa]').forEach((b) => (b.onclick = () => {
+      const a = pinned.acts[+b.dataset.pa];
+      if (a.run) return a.run();
+      say(`${pinned.note}\n${a.text}`, `◎ ${pinned.label}\n${a.label}`);
+    }));
+  };
   el.say = say;
   el.ready = load();
   return el;
@@ -1489,10 +1772,24 @@ const itemHref = (x) => x.ref?.kind === 'reel' ? '#/reel/' + x.ref.id : x.ref?.k
 const sdot = (s) => `<span class="sdot" style="color: ${LIFE_COLOR[s]}"><i style="${s === 'idea' ? 'border: 1.5px dashed ' + LIFE_COLOR[s] : 'background: ' + LIFE_COLOR[s]}"></i>${LIFE.find(([k]) => k === s)?.[1] || ''}</span>`;
 // When an item was last worked on: its own changes or a new version of its reel or post.
 const itemTouched = (x) => Math.max(x.updated || 0, x.stageAt || 0, x.created || 0, (x.ref?.kind === 'reel' ? OV?.reels.find((r) => r.id === x.ref.id)?.updated : 0) || 0, (x.ref?.kind === 'post' ? OV?.posts?.find((r) => r.id === x.ref.id)?.updated : 0) || 0);
+// The project's accounts (strategy.json → platforms), for the account marks on every card.
+let PLATS = null;
+const loadPlats = () => PLATS ? Promise.resolve(PLATS) : api('/api/plan').then((d) => (PLATS = (d.strategy?.platforms || []).filter((p) => p.id))).catch(() => (PLATS = []));
+// Where an item goes: its accounts in the Plan (`out`), the ones set by hand, else a guess.
+const itemPlats = (x, plats = PLATS || []) => {
+  const own = [...new Set([...(x.out || []).map((o) => o.platform), ...(x.platforms || [])])].map((id) => plats.find((p) => p.id === id)).filter(Boolean);
+  if (own.length) return own.map((p) => ({p}));
+  const g = guessPlat(x, plats);
+  return g ? [{p: g, guessed: true}] : [];
+};
+const platIcon = (p) => (/телеграм|telegram|\btg\b/i.test(`${p.name} ${p.id}`) ? 'tg' : /insta|\big\b/i.test(`${p.name} ${p.id}`) ? 'ig' : null);
+// Each account as its network's icon with the language (Instagram RU → [ig]RU, Телеграм → [tg]).
+const accIcon = (p, guessed) => { const ic = platIcon(p), tag = platTag(p); return `<span class="acc-ic${guessed ? ' g' : ''}" title="${esc(p.name)}${p.account ? ' · ' + esc(p.account) : ''}${guessed ? ' — угадано по языку и формату' : ''}">${ic ? svg(ic, 13) : ''}${ic === 'tg' ? '' : esc(tag)}</span>`; };
+const accChips = (x) => (PLATS || []).length < 2 ? '' : itemPlats(x).map(({p, guessed}) => accIcon(p, guessed)).join('');
 const whenText = (at) => at ? new Date(at).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short'}) : 'без даты';
 function itemCard(x) {
-  if (x.ig) return `<a class="icard" href="${esc(x.url)}" target="_blank" rel="noopener" title="Вышло в Instagram, в студии выпуска нет">
-    <span class="ich"><span style="display: inline-flex; color: #C13584">${svg('ig', 13)}</span>@${esc(x.account)}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
+  if (x.ig) return `<a class="icard" href="${esc(x.url)}" target="_blank" rel="noopener" data-ig="${esc(x.account)}|${esc(x.code)}" title="Вышло в Instagram, в студии выпуска нет">
+    <span class="ich"><span style="display: inline-flex; color: #C13584">${svg('ig', 13)}</span>@${esc(x.account)}<span class="muted" style="margin-left: auto; display: inline-flex; gap: 8px; align-items: center">${accChips(x)}<span style="display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span></span>
     ${x.thumb ? `<img src="${esc(x.thumb)}" alt="" loading="lazy" style="width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; background: #F2F2F2">` : ''}
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)} · в студии выпуска нет${x.offer ? ` · похоже на «${esc(x.offer.title)}»` : ''}</span></a>`;
@@ -1501,16 +1798,53 @@ function itemCard(x) {
   const extra = x.stage === 'material' && need.length ? ` · снято ${need.filter((n) => n.done).length} из ${need.length}` : '';
   const sib = x.group ? ITEMS.items.filter((y) => y.group === x.group && y.id !== x.id).length : 0;
   return `<a class="icard ${x.stage === 'idea' ? 'idea' : ''}" href="${itemHref(x)}" data-peek="${x.id}">
-    <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span>
+    <span class="ich">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}` : '<span class="muted">без рубрики</span>'}<span class="muted" style="margin-left: auto; display: inline-flex; gap: 8px; align-items: center">${accChips(x)}<span style="display: inline-flex" title="${FMT_NAME[x.format]}">${svg(FMT_ICON[x.format] || 'reel', 14)}</span></span></span>
     <b>${esc(x.title)}</b>
     <span class="small muted">${whenText(x.at)}${itemTouched(x) ? ` · обновлён ${ago(itemTouched(x))}` : ''}${extra}${sib ? ` · ещё ${sib} из того же материала` : ''}${x.missing ? ' · папка пропала' : ''}</span></a>`;
 }
+// Right click on a release anywhere (Выпуски, Plan): open it or delete it. Deleting asks first;
+// a reel or post folder goes to the project's bin for 30 days.
+document.addEventListener('contextmenu', (e) => {
+  const el = e.target.closest?.('#view [data-peek], #view [data-ig]');
+  if (!el || !canEdit()) return;
+  const x = el.dataset.peek ? ITEMS?.items.find((y) => y.id === el.dataset.peek) : null;
+  if (!x && !el.dataset.ig) return;
+  e.preventDefault();
+  document.querySelector('.ctxm')?.remove();
+  const m = document.createElement('div');
+  m.className = 'ctxm'; m.setAttribute('role', 'menu');
+  m.innerHTML = `<button type="button" role="menuitem" data-a="open">Открыть</button>${x ? '<button type="button" role="menuitem" class="danger" data-a="del">Удалить…</button>' : '<button type="button" role="menuitem" class="danger" data-a="hide">Убрать — не из студии</button>'}`;
+  document.body.append(m);
+  m.style.left = Math.min(e.clientX, innerWidth - m.offsetWidth - 8) + 'px';
+  m.style.top = Math.min(e.clientY, innerHeight - m.offsetHeight - 8) + 'px';
+  m.querySelector('button').focus();
+  const close = () => { m.remove(); removeEventListener('pointerdown', away, true); removeEventListener('keydown', esc_, true); };
+  const away = (ev) => { if (!m.contains(ev.target)) close(); };
+  const esc_ = (ev) => { if (ev.key === 'Escape') close(); };
+  addEventListener('pointerdown', away, true); addEventListener('keydown', esc_, true);
+  m.onclick = async (ev) => {
+    const a = ev.target.dataset?.a;
+    if (!a) return;
+    close();
+    if (a === 'open') { if (el.target === '_blank') open(el.href, '_blank', 'noopener'); else location.hash = el.getAttribute('href'); return; }
+    if (a === 'hide') { const [account, code] = el.dataset.ig.split('|'); await post('/api/instagram/link', {account, code, hide: true}); await loadIg(); toast('Убрано'); route(); return; }
+    const folder = x.ref?.kind === 'reel' || x.ref?.kind === 'post';
+    if (!confirm(`Удалить «${x.title}»?${folder ? '\n\nПапка ' + (x.ref.kind === 'reel' ? 'рилса' : 'поста') + ' со всеми версиями уйдёт в корзину проекта: 30 дней её можно вернуть, потом она удалится насовсем.' : ''}${x.published?.length ? '\n\nВыпуск уже вышел в Instagram — пост там останется.' : ''}`)) return;
+    const r = await post('/api/items/delete', {id: x.id}).catch(() => null);
+    if (!r) return toast('Не удалилось');
+    toast(r.trash ? 'Удалено — папка в корзине проекта' : 'Удалено');
+    route();
+  };
+});
 // Выпуски (LeanAll): five columns by stage; format and rubric are filters, Claude's pitches a separate list.
 async function vAll(fmt = 'all') {
   title('Выпуски');
   fmt = {reels: 'reel', posts: 'post'}[fmt] || fmt;
-  await Promise.all([loadItems(), loadIg()]);
+  await Promise.all([loadItems(), loadIg(), loadPlats()]);
   const mine = ITEMS.items.filter((x) => !x.proposed);
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k) || ''; localStorage.setItem(k, v); } catch { return ''; } };
+  let acc = sessionStorage.getItem('allAcc') || '', q = '', asList = store('allView') === 'list';
+  let [sortBy, sortDir] = (store('allSort') || 'created:desc').split(':');
   const pitches = ITEMS.items.filter((x) => x.proposed);
   let rub = sessionStorage.getItem('allRubric') || '';
   const fmts = [['all', 'Все форматы'], ...['reel', 'post', 'carousel', 'telegram'].map((k) => [k, FMT_NAME[k]])];
@@ -1520,10 +1854,13 @@ async function vAll(fmt = 'all') {
     <div class="row" style="gap: 8px; flex-wrap: wrap">${fmts.map(([k, t]) => `<a class="ln-pill ${k === fmt ? 'on' : ''}" href="#/all${k === 'all' ? '' : '/' + k}">${k === 'all' ? '' : svg(FMT_ICON[k], 14)}${t} · ${n(k)}</a>`).join('')}
       <span style="width: 1px; height: 22px; background: var(--line); margin: 0 6px"></span>
       <select class="ln-pill" id="rubSel" aria-label="Рубрика"><option value="">Рубрика: все</option>${ITEMS.rubrics.map((r) => `<option value="${esc(r.id)}" ${r.id === rub ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+      ${PLATS.length > 1 ? `<select class="ln-pill" id="accSel" aria-label="Аккаунт"><option value="">Аккаунт: все</option>${PLATS.map((p) => `<option value="${esc(p.id)}" ${p.id === acc ? 'selected' : ''}>${esc(p.name)}${p.account ? ' · ' + esc(p.account) : ''}</option>`).join('')}</select>` : ''}
+      <input class="ln-pill" id="allQ" type="search" placeholder="Найти по названию" aria-label="Найти по названию" style="min-width: 180px">
+      ${fmt === 'proposed' ? '' : `<span class="ln-seg"><button type="button" data-view="board" class="${asList ? '' : 'on'}">Доска</button><button type="button" data-view="list" class="${asList ? 'on' : ''}">Список</button></span>`}
       <a class="ln-pill ${fmt === 'proposed' ? 'on' : ''}" href="#/all/proposed" style="margin-left: auto">${svg('idea', 14)}Предложения Claude · ${pitches.length}</a></div>
     <div id="allBody"></div></div>`;
   const draw = () => {
-    const pass = (x) => (!rub || x.rubric === rub || itemRubric(x)?.id === rub);
+    const pass = (x) => (!rub || x.rubric === rub || itemRubric(x)?.id === rub) && (!acc || itemPlats(x).some(({p}) => p.id === acc)) && (!q || String(x.title || '').toLowerCase().includes(q));
     if (fmt === 'proposed') {
       const list = pitches.filter(pass);
       $('#allBody').innerHTML = `<p class="small muted" style="margin: 0 0 8px">Идеи из ideas.md, которые ещё никто не взял. Взятая идея встаёт в колонку «Идея», дату можно поставить в Плане.</p>` + (list.map((x) => `<div class="ln-li"><span class="muted" style="display: inline-flex">${svg(FMT_ICON[x.format], 15)}</span><a href="#/item/${x.id}" style="flex: 1; min-width: 0; text-decoration: none; color: var(--ink)"><b style="font-weight: 600">${esc(x.title)}</b><br><span class="small muted">${esc(x.idea?.hook || x.idea?.about || '').slice(0, 140)}</span></a>${x.at ? `<span class="small muted">${whenText(x.at)}</span>` : ''}<span class="small muted">${x.by === 'owner' ? 'твоя' : 'Claude'}</span>${canEdit() ? `<button type="button" class="ln-btn s" data-take="${x.id}">Взять</button>` : ''}</div>`).join('') || '<p class="small muted">Пусто.</p>');
@@ -1533,9 +1870,40 @@ async function vAll(fmt = 'all') {
     const list = [...mine, ...(rub ? [] : igLooseItems())].filter((x) => (fmt === 'all' || x.format === fmt) && pass(x));
     // «Вышло» goes by the date it came out, newest first; the rest by the last change.
     const order = (a, b) => a.stage === 'published' ? String(b.at || '').localeCompare(String(a.at || '')) : itemTouched(b) - itemTouched(a);
+    if (asList) return drawList(list);
     $('#allBody').innerHTML = `<div class="lboard">${LIFE.map(([k, t]) => { const col = list.filter((x) => x.stage === k).sort(order); return `<section class="lcol" aria-label="${t}"><div class="lcolh">${sdot(k)}<span class="muted" style="margin-left: auto">${col.length}</span></div>${col.map(itemCard).join('') || '<p class="small muted" style="padding: 4px">Пусто.</p>'}</section>`; }).join('')}</div>`;
   };
+  // Список: one row per release with its accounts, when it goes out on each, when it was made.
+  const firstOut = (x) => (x.out?.length ? x.out.map((o) => o.at).sort()[0] : x.at) || '';
+  const KEYS = {title: (x) => String(x.title || '').toLowerCase(), stage: (x) => LIFE.findIndex(([k]) => k === x.stage), at: firstOut, created: (x) => x.created || 0, touched: (x) => (x.ig ? 0 : itemTouched(x))};
+  const fmtAt = (t) => new Date(t).toLocaleString('ru', {weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'});
+  const fmtDay = (t) => new Date(t).toLocaleDateString('ru', {day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric'});
+  const outsText = (x) => {
+    const outs = x.out?.length ? x.out : x.at ? [{platform: null, at: x.at}] : [];
+    if (!outs.length) return '<span class="muted">без даты</span>';
+    return outs.slice().sort((a, b) => a.at.localeCompare(b.at)).map((o) => { const p = (PLATS || []).find((y) => y.id === o.platform); return `<span style="white-space: nowrap">${p && x.out?.length > 1 ? `<span class="acc-chip" style="margin-right: 5px" title="${esc(p.name)}">${esc(platTag(p))}</span>` : ''}${fmtAt(o.at)}</span>`; }).join('<br>');
+  };
+  function drawList(list) {
+    const k = KEYS[sortBy] || KEYS.created, dir = sortDir === 'asc' ? 1 : -1;
+    // Rows without the sorted value (no date) go last either way.
+    const rows = list.slice().sort((a, b) => { const va = k(a), vb = k(b); if (!va && vb) return 1; if (va && !vb) return -1; return (va > vb ? 1 : va < vb ? -1 : 0) * dir; });
+    const th = (key, t) => `<button type="button" data-sort="${key}" class="${sortBy === key ? 'on' : ''}">${t}${sortBy === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</button>`;
+    $('#allBody').innerHTML = `<div class="ltab-wrap"><div class="ltab" role="table">
+      <div class="tr thd" role="row">${th('title', 'Выпуск')}<span>Аккаунт</span>${th('stage', 'Этап')}${th('at', 'Выкладка')}${th('created', 'Создан')}${th('touched', 'Обновлён')}</div>
+      ${rows.map((x) => { const r = x.ig ? null : itemRubric(x); return `<a class="tr" role="row" href="${x.ig ? esc(x.url) : itemHref(x)}" ${x.ig ? `target="_blank" rel="noopener" data-ig="${esc(x.account)}|${esc(x.code)}"` : `data-peek="${x.id}"`}>
+        <span style="display: flex; gap: 8px; align-items: center; min-width: 0"><span class="muted" style="display: inline-flex; flex: none" title="${FMT_NAME[x.format] || ''}">${svg(x.ig ? 'ig' : FMT_ICON[x.format] || 'reel', 15)}</span><span style="min-width: 0"><b style="font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(x.title)}</b><span class="small muted">${r ? `<span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}; margin-right: 5px"></span>${esc(r.name)}` : x.ig ? '@' + esc(x.account) + ' · в студии выпуска нет' : 'без рубрики'}</span></span></span>
+        <span class="accs">${accChips(x) || '<span class="muted">—</span>'}</span>
+        <span>${sdot(x.stage)}</span>
+        <span class="small">${outsText(x)}</span>
+        <span class="small muted">${x.created ? fmtDay(x.created) : '—'}</span>
+        <span class="small muted">${x.ig ? '—' : itemTouched(x) ? ago(itemTouched(x)) : '—'}</span></a>`; }).join('') || '<p class="small muted" style="padding: 14px">Ничего не нашлось.</p>'}
+    </div></div>`;
+    $('#allBody').querySelectorAll('[data-sort]').forEach((b) => (b.onclick = () => { if (sortBy === b.dataset.sort) sortDir = sortDir === 'asc' ? 'desc' : 'asc'; else { sortBy = b.dataset.sort; sortDir = sortBy === 'title' || sortBy === 'stage' ? 'asc' : 'desc'; } store('allSort', sortBy + ':' + sortDir); draw(); }));
+  }
   $('#rubSel').onchange = (e) => { rub = e.target.value; sessionStorage.setItem('allRubric', rub); draw(); };
+  $('#accSel')?.addEventListener('change', (e) => { acc = e.target.value; sessionStorage.setItem('allAcc', acc); draw(); });
+  $('#allQ').oninput = (e) => { q = e.target.value.trim().toLowerCase(); draw(); };
+  view.querySelectorAll('[data-view]').forEach((b) => (b.onclick = () => { asList = b.dataset.view === 'list'; store('allView', asList ? 'list' : 'board'); view.querySelectorAll('[data-view]').forEach((y) => y.classList.toggle('on', y === b)); draw(); }));
   draw();
 }
 
@@ -1548,15 +1916,18 @@ async function lifeBar(kind, id) {
 }
 // One navigation for a reel or post (LeanRelease): the five stages are the tabs; a stage with
 // more than one screen (Материал: сценарий и материалы) shows them underneath.
-const REEL_STEPS = {idea: ['idea'], material: ['script', 'materials'], build: ['edit'], ready: ['publish'], published: ['publish']};
+// Text and look are steps of «Идея» (canvas «Рилс — концепт», page «★ Все этапы»): 1 · Замысел → 2 · Текст → 3 · Вид.
+const REEL_STEPS = {idea: ['idea', 'script', 'look'], material: ['materials'], build: ['edit'], ready: ['publish'], published: ['publish']};
 const POST_STEPS = (k) => ({idea: ['idea'], material: ['text'], build: k === 'carousel' ? ['struct', 'slides'] : ['text'], ready: ['publish'], published: ['publish']});
-const STEP_NAME = {idea: 'Идея', script: 'Сценарий', materials: 'Материалы', edit: 'Монтаж', publish: 'Выкладка', text: 'Текст и фото', struct: 'Структура', slides: 'Слайды'};
+const STEP_NAME = {idea: 'Замысел', script: 'Текст', look: 'Вид', materials: 'Материалы', edit: 'Монтаж', publish: 'Выкладка', text: 'Текст и фото', struct: 'Структура', slides: 'Слайды'};
+// The steps inside a stage («1 · Замысел → 2 · Текст → 3 · Вид»): one control for every stage that has several.
+const stepsNav = (list, tab, base) => list.length > 1 ? `<div class="lsub"><nav class="sx-steps" aria-label="Шаги этапа">${list.map((t, i) => `${i ? '<i aria-hidden="true">→</i>' : ''}<a href="${base}${t}" ${t === tab ? 'aria-current="step" class="on"' : ''}><b>${i + 1} · ${STEP_NAME[t]}</b></a>`).join('')}</nav></div>` : '';
 async function lifeNav(kind, id, steps, tab, base) {
   await loadItems().catch(() => null);
   const x = ITEMS?.items.find((y) => y.ref?.kind === kind && y.ref.id === id);
   if (!x) return '';
   const viewing = LIFE.map(([s]) => s).find((s) => steps[s].includes(tab) && (s === x.stage || !LIFE.some(([o]) => o === x.stage && steps[o].includes(tab)))) || x.stage;
-  const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
+  const subs = stepsNav(steps[viewing], tab, base);
   return lifeBarFor(x, {href: (s) => base + steps[s][0], viewing}) + subs;
 }
 // The «Идея» screen of a reel or post that already has its folder: the concept, editable.
@@ -1569,7 +1940,7 @@ function drawIdea(host, kind, id) {
     ${area('about', 'О чём', x.idea?.about, 3, 'Одна-две фразы: о чём выпуск')}
     ${area('hook', 'Крючок — первые 2 секунды', x.idea?.hook, 2, 'Фраза или кадр, на котором остаются')}
     ${area('flow', 'Ход — по строке на шаг', (x.idea?.flow || []).join('\n'), 4, '1 · …\n2 · …')}
-    <p class="small muted" style="margin: 0">Идея — первый этап. Сценарий и что снять — на этапе «Материал»; правки сохраняются сами.</p></div>`;
+    <p class="small muted" style="margin: 0">${kind === 'reel' ? `Идея — первый этап. Дальше — <a href="#/reel/${esc(id)}/script">текст по смысловым блокам</a> на этапе «Материал», потом вид и что снять; правки сохраняются сами.` : 'Идея — первый этап. Сценарий и что снять — на этапе «Материал»; правки сохраняются сами.'}</p></div>`;
   host.querySelectorAll('[data-i]').forEach((el) => (el.onchange = () => { const v = (k) => host.querySelector(`[data-i="${k}"]`).value; post('/api/items/set', {id: x.id, idea: {about: v('about'), hook: v('hook'), flow: v('flow').split('\n').map((l) => l.trim()).filter(Boolean)}}).then(() => toast('Сохранено')); }));
 }
 function lifeBarFor(x, {controls = true, href = null, viewing = null} = {}) {
@@ -1600,7 +1971,7 @@ function stageNote(x, s, i, k) {
   const need = x.need || [], got = need.filter((n) => n.done).length;
   const reel = x.ref?.kind === 'reel' ? OV?.reels.find((y) => y.id === x.ref.id) : null;
   if (i < k) return {idea: x.created ? new Date(x.created).toLocaleDateString('ru', {day: 'numeric', month: 'short'}) : 'есть', material: need.length ? `кадров: ${need.length}` : 'собран', build: reel?.version || 'собран', ready: 'одобрен'}[s] || '';
-  if (i === k) return {idea: x.proposed ? 'предложение Claude' : 'ждёт «что снять»', material: need.length ? `снято ${got} из ${need.length}` : 'собираем', build: reel?.version ? `${reel.version} ждёт вас` : 'собирается', ready: 'проверка перед выходом', published: 'вышло'}[s] || '';
+  if (i === k) return {idea: x.proposed ? 'предложение Claude' : x.format === 'reel' ? 'ждёт текста' : 'ждёт «что снять»', material: need.length ? `снято ${got} из ${need.length}` : 'собираем', build: reel?.version ? `${reel.version} ждёт вас` : 'собирается', ready: 'проверка перед выходом', published: 'вышло'}[s] || '';
   return {material: 'что снять', build: 'соберёт Claude', ready: 'проверка', published: x.at ? whenText(x.at) : 'без даты'}[s] || '';
 }
 // The five stages across (LR0): passed — black line and a tick, now — the stage's colour and how far
@@ -1646,7 +2017,7 @@ async function relHead(kind, id, steps, tab, base, title) {
   // «Готово» and «Вышло» share a page, so that page offers both.
   const later = (steps.ready.includes(tab) ? ['ready', 'published'] : [viewing]).filter((st) => LIFE.findIndex(([o]) => o === st) > k);
   const ahead = ed && later.length ? `<div class="rback">${svg('eye', 15)}<span style="flex: 1">Выпуск сейчас на этапе «${LIFE[k][1]}».${later.includes('published') ? ' Уже готов или вышел — отметьте вручную.' : ''}</span>${later.map((st) => `<button type="button" class="ln-btn ${st === later.at(-1) ? 'p' : ''} s" data-setstage="${st}" data-item="${x.id}">${st === 'published' ? 'Отметить «Вышло»' : `Перевести на «${LIFE.find(([o]) => o === st)[1]}»`}</button>`).join('')}</div>` : '';
-  const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
+  const subs = stepsNav(steps[viewing], tab, base);
   return `<div class="rhead" data-item="${x.id}">
     <a href="#/all" class="rcrumb" title="Все выпуски">‹<span class="rlbl2"> Выпуски</span></a><span class="slash rlbl2">/</span>
     <span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b class="rtitle" title="${esc(title)}">${esc(title)}</b>
@@ -1768,10 +2139,14 @@ window.addEventListener('hashchange', () => { if (!$('#peek')) return; $('#peek'
 async function startItem(y, {open = true} = {}) {
   const brief = [`«${y.title}»`, y.idea?.about && `О чём: ${y.idea.about}`, y.idea?.hook && `Крючок: ${y.idea.hook}`, (y.idea?.flow || []).length && `Ход: ${y.idea.flow.join(' / ')}`].filter(Boolean).join('\n');
   if (y.format === 'reel') {
-    await post('/api/items/set', {id: y.id, take: true, starting: true});
-    const key = 'new-' + Date.now();
-    sessionStorage.setItem('firstMsg:' + key, JSON.stringify({text: `Новый рилс по идее из плана:\n${brief}\nСначала сценарий и список того, что снять (scenes.json: need/status), — материал я пришлю.`, shown: `${y.title}\nИдея готова — что снять?`}));
-    return '#/reel/' + key;
+    // The studio makes the reel folder itself, so «Сценарий» opens at once and Claude only writes the text.
+    const r = await post('/api/reel/start', {item: y.id}).catch(() => null);
+    if (!r?.id) { toast('Не получилось завести рилс — попробуйте ещё раз'); return '#/item/' + y.id; }
+    if (r.existed) return `#/reel/${r.id}/script`;
+    const bare = !y.idea?.about && !y.idea?.hook && !(y.idea?.flow || []).length;
+    sessionStorage.setItem('sxWriting:' + r.id, '1');
+    sessionStorage.setItem('firstMsg:' + r.id, JSON.stringify({text: `Рилс заведён из идеи плана (item id=${y.id} в items.json проекта):\n${brief}\n${bare ? 'У идеи есть только название: сначала сам заполни её в items.json этого item — idea.about (одна-две фразы), idea.hook (крючок на первые 2 секунды), idea.flow (3–5 шагов строками) — из брифа, фактов и рубрики, ничего не выдумывая про цены и цифры. Потом сразу' : 'Сразу'} напиши текст по смысловым блокам в script.json (шаг «1 · Текст»): крючок — первым блоком, дальше по ходу, в конце призыв; так, как это прозвучит вслух. Работай быстро: папка уже есть, читай только бриф, PLAYBOOK и факты; вид, scenes.json и список «что снять» не трогай — они после того, как я утвержу текст. В ответе — одна-две строки: сколько блоков и секунд и что стоит уточнить.`, shown: `${y.title}\nНаписать текст`}));
+    return `#/reel/${r.id}/script`;
   }
   const kind = {post: 'photo', carousel: 'carousel', telegram: 'text'}[y.format] || 'text';
   const r = await post('/api/post/new', {kind, title: y.title});
@@ -1801,39 +2176,41 @@ async function vItem(id) {
   const idea = x.idea || {};
   const hooks = [...(idea.hooks || [])];
   if (idea.hook && !hooks.some((h) => h.text === idea.hook)) hooks.unshift({text: idea.hook, why: 'сейчас'});
-  const sec = (h, inner, act = '') => `<section class="isec"><div class="row" style="gap: 8px"><h2 style="flex: 1">${h}</h2>${act}</div>${inner}</section>`;
+  // Folded by default, so the idea fits one screen; the count says whether there is something inside.
+  const sec = (h, inner, act = '', n = 0) => `<details class="isec ifold"><summary><h2 style="flex: 1">${h}${n ? ` · ${n}` : ''}</h2>${act}</summary>${inner}</details>`;
+  const bare = !x.idea?.about && !x.idea?.hook && !(x.idea?.flow || []).length;
   const askBtn = (t, label) => ed ? `<button type="button" class="ln-btn s" data-ask="${esc(t)}">${label || t}</button>` : '';
   view.innerHTML = `<div class="work"><div class="rmain">
     <div class="ln-top">${x.batch ? `<a href="#/ideas/${esc(x.batch)}" style="color: var(--muted); text-decoration: none">Пачка ${esc(batchName(x.batch))}</a><span>›</span><span>${at + 1} из ${mates.length}</span>
       <a class="ln-btn s" ${prev ? `href="#/item/${esc(prev.id)}"` : 'aria-disabled="true" style="opacity: .4; pointer-events: none"'} aria-label="Предыдущая идея">‹</a><a class="ln-btn s" ${next ? `href="#/item/${esc(next.id)}"` : 'aria-disabled="true" style="opacity: .4; pointer-events: none"'} aria-label="Следующая идея">›</a><span>·</span>` : ''}<span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b>${esc(x.title)}</b><span>· ${r ? esc(r.name) + ' · ' : ''}${FMT_NAME[x.format].toLowerCase()} · ${whenText(x.at)}</span><span style="flex: 1"></span>${x.proposed ? '<span class="small muted">предложение</span>' : ''}</div>
     ${x.proposed ? '' : lifeBarFor(x, {controls: false}).replace('class="lbar"', 'class="lbar" style="padding: 10px 24px"')}
-    <div style="flex: 1; overflow-y: auto; padding: 28px 40px; display: flex; gap: 32px; min-height: 0">
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+    <div class="rrow"><div class="ibody" style="flex: 1; min-width: 0; overflow-y: auto; padding: 14px 40px; display: flex; gap: 32px; min-height: 0">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px">
         <span class="small muted">${x.by === 'Claude' ? 'Предложил Claude' : x.by === 'owner' ? 'Твоя идея' : x.by ? 'Добавил ' + esc(x.by) : 'Идея'}${x.takenBy ? ' · взял ' + esc(x.takenBy) : ''}</span>
         <label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Название</span><input class="f" data-i="title" value="${esc(x.title)}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 15px"></label>
-        ${field('about', 'О чём', x.idea?.about, 3, 'Одна-две фразы: о чём выпуск')}
-        ${field('hook', 'Крючок — первые 2 секунды', x.idea?.hook, 2, 'Фраза или кадр, на котором остаются')}
-        ${field('flow', 'Ход — по строке на шаг', (x.idea?.flow || []).join('\n'), 4, '1 · …\n2 · …\n3 · …')}
-        ${ed ? `<div class="row" style="gap: 8px; flex-wrap: wrap">${['Короче, 15 секунд', 'Распиши ход', 'Сделать каруселью'].map((t) => `<button type="button" class="ln-pill" data-ask="${t}">${t}</button>`).join('')}</div>` : ''}
-        ${sec('Варианты крючка', hooks.length ? hooks.map((h, i) => `<button type="button" class="ihook ${h.text === idea.hook ? 'on' : ''}" ${ed ? `data-hook="${i}"` : 'disabled'} aria-pressed="${h.text === idea.hook}"><i></i><span style="display: flex; flex-direction: column; gap: 2px"><span>«${esc(h.text)}»</span>${h.why ? `<span class="small muted">${esc(h.why)}</span>` : ''}</span></button>`).join('') : '<span class="small muted">Пока один крючок — попросите варианты.</span>', askBtn('Предложи 3 новых варианта крючка: запиши их в hooks с короткими why, hook не меняй', 'Ещё 3 варианта'))}
-        ${sec('Что снять', `${(idea.shoot || []).map((s, i) => `<label class="row" style="gap: 8px; align-items: flex-start"><input type="checkbox" data-shoot="${i}" ${s.done ? 'checked' : ''} ${ed ? '' : 'disabled'} style="margin-top: 3px">${esc(s.text)}</label>`).join('') || '<span class="small muted">Список кадров ещё не составлен.</span>'}
-          ${ed ? '<form class="row" id="shootAdd" style="gap: 8px"><input class="f" id="shootIn" placeholder="Добавить кадр…" aria-label="Добавить кадр" style="flex: 1; min-height: 34px"><button class="ln-btn s">Добавить</button></form>' : ''}`, askBtn('Составь список «что снять» в shoot: каждый кадр одной строкой, что уже есть в материалах проекта — отметь done', idea.shoot?.length ? 'Пересобрать' : 'Составить'))}
+        ${field('about', 'О чём', x.idea?.about, 2, 'Одна-две фразы: о чём выпуск — можно не заполнять')}
+        <div class="igrid2">${field('hook', 'Крючок — первые 2 секунды', x.idea?.hook, 3, 'Фраза или кадр, на котором остаются')}${field('flow', 'Ход — по строке на шаг', (x.idea?.flow || []).join('\n'), 3, '1 · …\n2 · …\n3 · …')}</div>
+        ${ed ? `<div class="row" style="gap: 8px; flex-wrap: wrap"><button type="button" class="ln-pill" data-ask="Заполни идею за меня: about, hook и flow из названия, брифа и фактов; что не знаешь наверняка — не выдумывай" style="border-color: var(--ink); font-weight: 600">${bare ? 'Заполнить за меня' : 'Дозаполнить за меня'}</button>${['Короче, 15 секунд', 'Распиши ход', 'Сделать каруселью'].map((t) => `<button type="button" class="ln-pill" data-ask="${t}">${t}</button>`).join('')}</div>` : ''}
+        ${sec('Варианты крючка', hooks.length ? hooks.map((h, i) => `<button type="button" class="ihook ${h.text === idea.hook ? 'on' : ''}" ${ed ? `data-hook="${i}"` : 'disabled'} aria-pressed="${h.text === idea.hook}"><i></i><span style="display: flex; flex-direction: column; gap: 2px"><span>«${esc(h.text)}»</span>${h.why ? `<span class="small muted">${esc(h.why)}</span>` : ''}</span></button>`).join('') : '<span class="small muted">Пока один крючок — попросите варианты.</span>', askBtn('Предложи 3 новых варианта крючка: запиши их в hooks с короткими why, hook не меняй', 'Ещё 3 варианта'), hooks.length)}
+        ${sec('Что снять', `${(idea.shoot || []).map((s, i) => `<label class="row" style="gap: 8px; align-items: flex-start"><input type="checkbox" data-shoot="${i}" ${s.done ? 'checked' : ''} ${ed ? '' : 'disabled'} style="margin-top: 3px">${esc(s.text)}</label>`).join('') || `<span class="small muted">${x.format === 'reel' ? 'Список соберётся из текста и вида — после «Идея готова — написать текст». Можно набросать и сейчас.' : 'Список кадров ещё не составлен.'}</span>`}
+          ${ed ? '<form class="row" id="shootAdd" style="gap: 8px"><input class="f" id="shootIn" placeholder="Добавить кадр…" aria-label="Добавить кадр" style="flex: 1; min-height: 34px"><button class="ln-btn s">Добавить</button></form>' : ''}`, askBtn('Составь список «что снять» в shoot: каждый кадр одной строкой, что уже есть в материалах проекта — отметь done', idea.shoot?.length ? 'Пересобрать' : 'Составить'), (idea.shoot || []).length)}
         ${idea.facts?.length ? sec('Факты — проверить до съёмки', idea.facts.map((f) => `<div class="row small" style="gap: 8px; align-items: flex-start"><span class="istat" style="background: ${f.ok ? '#F3FBF5' : '#FFF7E6'}; color: ${f.ok ? '#166534' : '#7A4A00'}">${f.ok ? 'есть' : 'проверить'}</span><span>${esc(f.text)}</span></div>`).join('')) : ''}
         ${idea.src || idea.why || idea.similar ? sec('Откуда и зачем', `${idea.src ? `<span class="small"><span class="muted">Откуда:</span> ${esc(idea.src)}</span>` : ''}${idea.why ? `<span class="small"><span class="muted">Почему сработает:</span> ${esc(idea.why)}</span>` : ''}${idea.similar ? `<span class="small" style="padding: 6px 9px; border-radius: 8px; background: #FFF7E6; color: #7A4A00">Похоже на ${esc(idea.similar)}</span>` : ''}`) : ''}
       </div>
-      <div style="flex: 0 0 280px; display: flex; flex-direction: column; gap: 14px">
+      <div class="iside" style="flex: 0 0 280px; display: flex; flex-direction: column; gap: 12px">
+        ${ed ? `<button type="button" class="ln-btn p" id="iGo" style="height: 44px; justify-content: center">${x.format === 'reel' ? 'Написать текст →' : 'Идея готова — что снять?'}</button>` : ''}
+        ${x.format === 'reel' ? `<span class="small muted" style="line-height: 1.5">${bare ? 'Хватит названия: пустые поля Claude заполнит сам и сразу напишет текст по блокам.' : 'Claude напишет текст по блокам из того, что здесь есть.'}</span><span class="ipath" aria-label="Что дальше"><b>Идея</b><i>→</i>Текст<i>→</i>Вид<i>→</i>Съёмка</span>`
+          : '<span class="small muted" style="line-height: 1.5">Claude составит список кадров, выпуск перейдёт на этап «Материал». Правки сохраняются сами.</span>'}
+        ${ed && x.proposed ? '<button type="button" class="ln-btn" id="iTake" style="height: 40px; justify-content: center">Взять</button>' : ''}
+        ${ed && x.proposed && x.ref?.kind === 'idea' ? `<details><summary class="small" style="cursor: pointer; color: var(--muted)">Не берём…</summary><div class="row" style="gap: 6px; flex-wrap: wrap; padding-top: 8px">${IDEA_REASONS.map((t) => `<button type="button" class="ipill" style="min-height: 30px; font-size: 12px" data-idrop="${esc(t)}">${t}</button>`).join('')}</div></details>` : ''}
         <div style="border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
           ${prop('Рубрика', sel('rubric', [['', 'без рубрики'], ...ITEMS.rubrics.map((y) => [y.id, y.name])], r?.id || ''))}
           ${prop('Формат', sel('format', Object.entries(FMT_NAME).filter(([k]) => k !== 'story'), x.format))}
           ${prop('Дата', `<input class="f" data-i="at" type="datetime-local" value="${esc((x.at || '').slice(0, 16))}" ${ed ? '' : 'readonly'} style="width: auto; min-height: 30px; font-size: 13px; border-color: transparent">`)}
         </div>
-        ${ed && x.proposed ? '<button type="button" class="ln-btn" id="iTake" style="height: 40px; justify-content: center">Взять</button>' : ''}
-        ${ed && x.proposed && x.ref?.kind === 'idea' ? `<details><summary class="small" style="cursor: pointer; color: var(--muted)">Не берём…</summary><div class="row" style="gap: 6px; flex-wrap: wrap; padding-top: 8px">${IDEA_REASONS.map((t) => `<button type="button" class="ipill" style="min-height: 30px; font-size: 12px" data-idrop="${esc(t)}">${t}</button>`).join('')}</div></details>` : ''}
-        ${ed ? '<button type="button" class="ln-btn p" id="iGo" style="height: 44px; justify-content: center">Идея готова — что снять?</button>' : ''}
-        <span class="small muted" style="line-height: 1.5">Claude составит список кадров, выпуск перейдёт на этап «Материал». Правки сохраняются сами.</span>
       </div>
-    </div></div>
-    <aside class="chatcol" aria-label="Чат идеи"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат идеи</b><span class="small muted">Claude правит только эту идею</span></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+    </div>
+    <aside class="chatcol inl" aria-label="Чат идеи"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат идеи</b><span class="small muted">Claude правит только эту идею</span></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div></div></div>`;
   wireLifeBar(view, () => vItem(id));
   // Each idea has its own chat (server preamble «idea-<id>»): it edits only this item.
   const box = chatBox('idea-' + x.id, {onDone: () => { ITEMS_AT = 0; sidebar(); if (location.hash === '#/item/' + id) vItem(id); }});
@@ -1882,34 +2259,34 @@ async function vReel(id, tab) {
   const [data] = warm ? [cached.data] : await Promise.all([req, loadItems().catch(() => null)]);
   if (warm) req.then((d) => { if (d && JSON.stringify(d) !== JSON.stringify(cached.data) && location.hash.startsWith('#/reel/' + id) && $('#reelHost')) drawStage(id, reelTab() || tab, d); });
   const r = data?.reel;
-  if (r && (!tab || tab === 'files')) tab = tab === 'files' ? 'materials' : stageAt(r);
+  // No tab in the address: the release opens where it is — the text while it is an idea, the files on «Материал».
+  if (r && (!tab || tab === 'files')) { const it = ITEMS?.items.find((y) => y.ref?.kind === 'reel' && y.ref.id === id); tab = tab === 'files' || !r.version && it?.stage === 'material' ? 'materials' : stageAt(r); }
   const nav = r ? await relHead('reel', id, REEL_STEPS, tab, `#/reel/${id}/`, `${r.num} · ${r.title}`) : '';
   title(r ? `${r.num} ${r.title}` : 'Новый выпуск');
   const head = nav || `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Выпуски</a> › рилс</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
       ${stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>`;
   const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
-  const chatName = {script: 'Чат сценария', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', cut: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
+  const chatName = {idea: 'Чат замысла', script: 'Чат текста', look: 'Чат вида', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', cut: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
   // A reel that exists: its stage in the middle, its chat as a column on the right (CleanReel, CleanText…).
   const keep = !isNew && REEL_CHAT?.id === id && view.contains(REEL_CHAT.box) ? REEL_CHAT.box : null;
   view.innerHTML = isNew || !r
     ? `<div class="work"><div class="chat">${head}${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`
-    : `<div class="work"><div class="rmain">${head}<div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
-      <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+    : `<div class="work"><div class="rmain">${head}<div class="rrow"><div id="reelHost" style="flex: 1; min-width: 0; overflow-y: auto"></div>
+      <aside class="chatcol inl" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div><div class="rfoot" id="reelFoot" hidden></div></div></div>`;
   const box = keep || chatBox(id, {
     onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
     onDone: (k) => {
       REEL_CACHE.delete(k); sidebar();
       if (k.startsWith('new-')) return;
       const t = reelTab() || tab;
-      if (isNew) vReel(k); else if (['edit', 'script', 'publish'].includes(t) && location.hash.startsWith('#/reel/' + k)) drawStage(k, t);
+      if (isNew) vReel(k); else if (['edit', 'script', 'look', 'idea', 'publish'].includes(t) && location.hash.startsWith('#/reel/' + k)) drawStage(k, t);
     },
   });
   REEL_CHAT = isNew ? null : {id, box};
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id, tab); } });
   wireRelHead(view, () => vReel(id, tab));
-  if (r && tab === 'idea') drawIdea($('#reelHost'), 'reel', id);
-  else if (r) drawStage(id, tab, data);
+  if (r) drawStage(id, tab, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
   if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
@@ -1928,6 +2305,18 @@ async function uploadFile(f, query, onPart) {
   return r.json();
 }
 const chatOf = () => $('#chatHost > div');
+// The bottom bar of a stage: a hint on the left; «вернуть», «назад» and ONE black button forward on the right.
+// {note, undo: fn, back: {label, href}, next: {label, href | run, off: why}} — null hides the bar.
+function setFoot(f) {
+  const el = $('#reelFoot');
+  if (!el) return;
+  el.hidden = !f;
+  if (!f) return (el.innerHTML = '');
+  const n = f.next;
+  el.innerHTML = `<span class="small muted" style="flex: 1; min-width: 0">${esc(f.note || '')}</span>${f.undo ? '<button type="button" class="btn" data-ft="undo" style="border-color: transparent">↩ Вернуть как было</button>' : ''}${f.back ? `<a class="btn" href="${f.back.href}">${esc(f.back.label)}</a>` : ''}${n ? (n.href && !n.off ? `<a class="btn primary" href="${n.href}">${esc(n.label)}</a>` : `<button type="button" class="btn primary" data-ft="next" ${n.off ? `disabled title="${esc(n.off)}"` : ''}>${esc(n.label)}</button>`) : ''}`;
+  el.querySelector('[data-ft="undo"]')?.addEventListener('click', f.undo);
+  if (n?.run && !n.off) el.querySelector('[data-ft="next"]').onclick = (e) => { e.target.disabled = true; n.run(); };
+}
 // Puts text into the reel chat's input (a timecode, a scene) without sending it.
 function draft(text) {
   const ta = $('#chatHost textarea');
@@ -1941,7 +2330,15 @@ const tc = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2
 
 async function drawStage(id, tab, data) {
   data ||= await getReel(id);
-  if (tab === 'script') return stageScript(id, data);
+  if (tab === 'idea') {
+    setFoot(null); chatOf()?.pin?.(null);
+    drawIdea($('#reelHost'), 'reel', id);
+    return setFoot(data.script ? {note: 'Замысел можно править и потом — текст от этого сам не поменяется.', next: {label: 'К тексту →', href: `#/reel/${id}/script`}}
+      : {note: 'Хватит названия: пустые поля Claude заполнит сам.', next: canEdit() ? {label: 'Написать текст →', run: () => { sessionStorage.setItem('sxWriting:' + id, '1'); location.hash = `#/reel/${id}/script`; setTimeout(() => chatOf()?.say('Напиши текст этого рилса по смысловым блокам в script.json (шаг «2 · Текст»): крючок — первым блоком, дальше по ходу, в конце призыв. Замысел — в README и в items.json.', 'Написать текст'), 300); }} : null});
+  }
+  if (tab !== 'script' && tab !== 'look') chatOf()?.pin?.(null);
+  setFoot(null);
+  if (tab === 'script' || tab === 'look') return stageScript(id, data, tab);
   if (tab === 'materials') return reelFiles(id, data);
   if (tab === 'compare') return stageCompare(id, data);
   if (tab === 'cut') return stageCut(id, data);
@@ -1950,8 +2347,354 @@ async function drawStage(id, tab, data) {
   return renderVersions(id, data);
 }
 
-// Сценарий (CleanText): scenes on the left, each scene as a card; clicking a scene drafts a note about it.
-function stageScript(id, data) {
+// «Сценарий» by meaning blocks (script.json, web/script.mjs; canvas «Текст и вид рилса» Т1–Т5, В1–В2):
+// step «1 · Текст» — blocks as cards or as one text, «2 · Вид» — what is on screen on each block.
+// The chat column moves inside the stage; a picked block or phrase is pinned in it, and every message is about it.
+const SX = {};
+const sxState = (id) => (SX[id] ||= {sel: [], view: 'blocks', step: null, phrase: null, edit: null});
+const sxPlural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const secondsOf = (t) => Math.max(1, Math.round(String(t || '').split(/\s+/).filter(Boolean).length / 2.5));
+const SX_KIND = {frame: ['Кадр', '#737373'], broll: ['Перебивка', '#737373'], gfx: ['Графика', '#2F6FEB'], text: ['Текст', '#C2620A'], sound: ['Звук', '#0F7F78']};
+const SX_HAVE = {style: ['в стиле', 'y'], ready: ['есть', 'y'], shoot: ['снять', 's'], new: ['нет в стиле', 'n']};
+// The chat column of the reel: inside the stage on «Сценарий», back on the right everywhere else.
+// The chat of a release is a panel inside the stage on every tab (.rrow); nothing to move.
+function dockChat() {}
+const sxRedraw = (id, s) => stageScript(id, {...REEL_CACHE.get(id)?.data, script: s});
+function stageScript(id, data, tab = reelTab() === 'look' ? 'look' : 'script') {
+  try { speechSynthesis.cancel(); } catch {}
+  if (!data.script) return stageScenes(id, data);
+  sessionStorage.removeItem('sxWriting:' + id);
+  const s = data.script, st = sxState(id), host = $('#reelHost');
+  const ids = new Set(s.blocks.map((b) => b.id));
+  st.sel = st.sel.filter((x) => ids.has(x));
+  if (st.phrase && !ids.has(st.phrase.id)) st.phrase = null;
+  if (st.step !== (tab === 'look' ? 'look' : 'text')) { st.sel = []; st.phrase = null; st.edit = null; }
+  st.step = tab === 'look' ? 'look' : 'text';
+  const look = st.step === 'look', okN = s.blocks.filter((b) => b.ok).length;
+  const prompt = `<button type="button" class="btn" id="sxPrompt" title="Суфлёр на весь экран: текст по блокам, запись дублей">${'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"></path></svg>'}Суфлёр</button>`;
+  let bar;
+  if (!look) {
+    bar = `<nav class="seg" aria-label="Как показать"><button type="button" class="${st.view === 'blocks' ? 'on' : ''}" data-sxview="blocks">Блоками</button><button type="button" class="${st.view === 'read' ? 'on' : ''}" data-sxview="read">Сплошным</button></nav>
+      <span class="small muted">${s.blocks.length} ${sxPlural(s.blocks.length, 'блок', 'блока', 'блоков')} · ≈ ${mmss(s.total)}${s.text?.ok ? ' · текст утверждён' : ` · утверждено ${okN}`}</span><span style="flex: 1"></span>${prompt}
+      ${canEdit() && !s.text?.ok && st.view === 'blocks' ? '<button type="button" class="btn" id="sxAdd">+ Блок</button>' : ''}
+      ${canEdit() && s.text?.ok ? '<button type="button" class="btn" id="sxReopen" title="Текст снова можно править; вид останется">Открыть текст</button>' : ''}`;
+  } else {
+    const all = s.blocks.flatMap((b) => b.look || []), cnt = (k) => all.filter((x) => x.kind === k).length, shoot = all.filter((x) => x.have === 'shoot').length;
+    bar = `<span class="small muted">${!s.text?.ok ? 'вид раскладывается по утверждённому тексту' : all.length ? `${cnt('gfx')} графики · ${cnt('text')} текста на экране${shoot ? ` · снять ${shoot}` : ''}${s.look?.ok ? ' · вид утверждён' : ''}` : 'вид ещё не разложен'}</span><span style="flex: 1"></span>${prompt}`;
+  }
+  host.innerHTML = `<div class="sx"><div class="sx-bar">${bar}</div><div class="sx-work"><div class="sx-main" id="sxMain"></div></div></div>`;
+  // On a phone the chat sits under the blocks and its history scrolls the page down to itself: open on the text.
+  if (innerWidth <= 860 && !st.seen) { st.seen = true; const top = () => host.querySelector('.sx')?.scrollIntoView({block: 'start'}); top(); chatOf()?.ready?.then(() => setTimeout(top, 60)); }
+  const act = async (b, msg) => { const r = await post('/api/reel/script', {reel: id, ...b}).catch(() => null); if (!r?.script) return toast('Не получилось — попробуйте ещё раз'); data.script = r.script; if (msg) toast(msg); stageScript(id, data); };
+  SX[id].act = act;
+  const main = $('#sxMain');
+  if (look) sxLook(main, id, s, st);
+  else if (st.view === 'read') sxRead(main, id, s, st);
+  else sxBlocks(main, id, s, st);
+  sxPin(id, s);
+  // Phone: the chat is under the blocks, so what is picked gets a bar at the bottom that leads to it.
+  if (st.sel.length || st.phrase) {
+    host.querySelector('.sx').insertAdjacentHTML('beforeend', `<div class="sx-go"><span>${esc($('.pinchip')?.firstChild?.textContent || 'Выбрано')} — в чате</span><button type="button" class="btn primary" id="sxGo">Написать ↓</button></div>`);
+    $('#sxGo').onclick = () => { $('aside.chatcol').scrollIntoView({block: 'end'}); chatOf()?.querySelector('textarea')?.focus(); };
+  }
+  host.querySelectorAll('[data-sxview]').forEach((b) => (b.onclick = () => { st.view = b.dataset.sxview; st.phrase = null; st.edit = null; stageScript(id, data); }));
+  $('#sxReopen')?.addEventListener('click', () => act({op: 'step', step: 'text', on: false}));
+  const undo = canEdit() && s.canUndo ? () => act({op: 'undo'}, 'Вернул как было') : null;
+  const base = `#/reel/${id}/`, hasLook = s.blocks.some((b) => b.look?.length);
+  if (!look) setFoot({note: s.text?.ok ? 'Текст утверждён. Чтобы править блоки, нажмите «Открыть текст».' : 'Клик по блоку — он в чате. Утверждённые блоки Claude не трогает.', undo, back: {label: '← К замыслу', href: base + 'idea'},
+    next: s.text?.ok ? {label: 'К виду →', href: base + 'look'} : canEdit() ? {label: 'Текст готов → Вид', run: async () => { await act({op: 'step', step: 'text'}, 'Текст утверждён'); location.hash = base + 'look'; }} : null});
+  else setFoot({note: 'Вид держится за слова текста: поменяется текст блока — поправьте и его вид.', undo, back: {label: '← К тексту', href: base + 'script'},
+    next: s.look?.ok ? {label: 'К материалу →', href: base + 'materials'} : canEdit() ? {label: 'Вид готов → Материал', off: !s.text?.ok ? 'Сначала утвердите текст' : !hasLook ? 'Сначала разложите вид по блокам' : '', run: async () => { await act({op: 'step', step: 'look'}, 'Вид утверждён'); location.hash = base + 'materials'; }} : null});
+  $('#sxAdd')?.addEventListener('click', () => { st.edit = {id: null, after: st.sel[0] || s.blocks.at(-1)?.id}; stageScript(id, data); });
+  $('#sxPrompt')?.addEventListener('click', () => prompter(s, st.sel[0] || st.phrase?.id, id));
+}
+// The chip in the chat: the picked blocks or the picked words, with quick asks for them.
+function sxPin(id, s) {
+  const box = chatOf(), st = SX[id];
+  if (!box?.pin) return;
+  const num = (bid) => s.blocks.findIndex((b) => b.id === bid) + 1, blk = (bid) => s.blocks.find((b) => b.id === bid);
+  const clear = () => { st.sel = []; st.phrase = null; $('#reelHost .sx') && sxRedraw(id, s); };
+  if (st.phrase) {
+    const b = blk(st.phrase.id);
+    return box.pin({label: `«${short(st.phrase.words).slice(0, 40)}» · блок ${num(b.id)}`, note: `(about the words «${st.phrase.words}» of block #${num(b.id)} «${b.role}» id=${b.id} in script.json${st.step === 'look' ? ', step «Вид»: what is on screen on these words' : ''})`, onClear: clear,
+      acts: st.step === 'look' ? [{label: 'Графика из стиля', text: 'Поставь на эти слова графику из стиля проекта'}, {label: 'Цифра крупно', text: 'На этих словах — цифра крупно'}, {label: 'Плашка с текстом', text: 'На этих словах — плашка с текстом'}, {label: 'Перебивка', text: 'На этих словах перебивка — что снять?'}] : [{label: 'Переписать', text: 'Перепиши эти слова'}, {label: 'Новый блок отсюда', text: 'Начни с этих слов новый блок'}]});
+  }
+  if (!st.sel.length) return box.pin(null);
+  const list = st.sel.map(blk);
+  const label = list.length === 1 ? `Блок ${num(list[0].id)} · ${list[0].role || 'без названия'}` : `Блоки ${list.map((b) => num(b.id)).sort((a, b) => a - b).join(', ')}`;
+  const note = `(about blocks of script.json${st.step === 'look' ? ', step «Вид»' : ''}: ${list.map((b) => `#${num(b.id)} «${b.role}» id=${b.id}`).join(', ')})`;
+  const okAll = list.every((b) => b.ok), open = canEdit() && !s.text?.ok;
+  const acts = st.step === 'look'
+    ? [{label: 'Другой кадр', text: 'Предложи другой кадр'}, {label: 'Меньше графики', text: 'Меньше графики, проще'}, {label: 'Из стиля', text: 'Возьми элементы из стиля проекта'}]
+    : [{label: 'Варианты', text: 'Дай 2–3 варианта'}, {label: 'Короче', text: 'Короче, смысл тот же'}, {label: 'Проще', text: 'Проще, разговорнее'},
+      ...(list.length === 1 ? [{label: 'Разбить на два', text: 'Разбей этот блок на два'}] : []),
+      ...(open && list.length === 1 ? [{label: 'Править руками', run: () => { st.edit = {id: list[0].id}; sxRedraw(id, s); }}] : []),
+      ...(open ? [{label: okAll ? 'Снять утверждение' : 'Утвердить', run: () => { st.sel = []; SX[id].act({op: 'ok', ids: list.map((b) => b.id), on: !okAll}); }}] : [])];
+  box.pin({label, note, acts, onClear: clear});
+}
+const sxHead = (b, i, st) => `<div class="sx-top"><span class="sx-role">${i + 1} · ${esc(b.role || 'Блок')}</span><span class="sx-t">${mmss(b.from)} · ${b.sec} с</span>${b.takes ? `<span class="sx-t">· ${b.takes.length} ${sxPlural(b.takes.length, 'дубль', 'дубля', 'дублей')}</span>` : ''}${st.sel.includes(b.id) || st.phrase?.id === b.id ? '<span class="sx-in">в чате</span>' : b.ok ? '<span class="sx-ok">✓ утверждён</span>' : ''}</div>`;
+// Clicking a card picks it (shift: several).
+function sxPick(main, id, s, st, selector) {
+  main.querySelectorAll(selector).forEach((el) => el.addEventListener('click', (e) => {
+    if (e.target.closest('button, a, textarea, input') || String(getSelection()).trim()) return;
+    const bid = el.dataset.id;
+    st.phrase = null;
+    if (e.shiftKey) st.sel = st.sel.includes(bid) ? st.sel.filter((x) => x !== bid) : [...st.sel, bid];
+    else st.sel = st.sel.length === 1 && st.sel[0] === bid ? [] : [bid];
+    sxRedraw(id, s);
+    if (innerWidth > 860) chatOf()?.querySelector('textarea')?.focus();
+  }));
+}
+// Picking words inside a block's text pins those words (the phrase), not the whole block.
+function sxWords(main, id, s, st, selector) {
+  main.addEventListener('mouseup', () => {
+    const sel = getSelection(), words = String(sel).trim().replace(/\s+/g, ' ');
+    if (!words || words.length < 2) return;
+    const a = sel.anchorNode?.parentElement?.closest(selector), b = sel.focusNode?.parentElement?.closest(selector);
+    if (!a || a !== b) return;
+    st.phrase = {id: a.closest('[data-id]').dataset.id, words}; st.sel = [];
+    sel.removeAllRanges();
+    sxRedraw(id, s);
+  });
+}
+const sxMark = (text, st, bid) => {
+  const t = esc(text), w = st.phrase?.id === bid ? esc(st.phrase.words) : '';
+  const i = w ? t.indexOf(w) : -1;
+  return i < 0 ? t : `${t.slice(0, i)}<mark class="sx-sel">${w}</mark>${t.slice(i + w.length)}`;
+};
+function sxBlocks(main, id, s, st) {
+  const grip = '<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" aria-hidden="true"><circle cx="3" cy="3" r="1.6"></circle><circle cx="9" cy="3" r="1.6"></circle><circle cx="3" cy="9" r="1.6"></circle><circle cx="9" cy="9" r="1.6"></circle><circle cx="3" cy="15" r="1.6"></circle><circle cx="9" cy="15" r="1.6"></circle></svg>';
+  // «+ Блок» and «Править руками»: the block's name and text in fields, saved by the page itself.
+  const editor = (b) => `<article class="sx-b on sx-ed" data-ed="${esc(b?.id || '')}"><span class="sx-g"></span><div class="sx-body">
+      <label class="lbl" for="sxRole">Название блока</label><input class="f" id="sxRole" value="${esc(b?.role || '')}" placeholder="Хук, Цены, Призыв…" maxlength="40">
+      <label class="lbl" for="sxText">Что звучит</label><textarea class="f" id="sxText" rows="3" placeholder="1–3 фразы так, как их скажут">${esc(b?.text || '')}</textarea>
+      <div class="row" style="gap: 8px"><button type="button" class="btn primary" id="sxSave">${b ? 'Сохранить' : 'Добавить блок'}</button><button type="button" class="btn" id="sxCancel">Отмена</button><span style="flex: 1"></span>${b && s.blocks.length > 1 ? '<button type="button" class="btn" id="sxDel" style="color: #B4231A">Удалить блок</button>' : ''}</div></div></article>`;
+  const card = (b, i) => st.edit?.id === b.id ? editor(b) : `<article class="sx-b${st.sel.includes(b.id) ? ' on' : ''}" data-id="${esc(b.id)}">
+      <span class="sx-g" ${canEdit() ? `title="Перетащить" data-grip="1"` : ''}>${canEdit() ? grip : ''}</span>
+      <div class="sx-body">${sxHead(b, i, st)}
+        <div class="sx-txt${b.alts ? ' was' : ''}">${sxMark(b.text, st, b.id)}</div>
+        ${b.alts ? `<div class="sx-alts">${b.alts.map((a, j) => `<div class="sx-alt"><b>${'АБВГДЕ'[j]}</b><span>${esc(a.text)}</span><small>${a.label ? esc(a.label) + ' · ' : ''}${secondsOf(a.text)} с</small>${canEdit() ? `<button type="button" class="btn${j ? '' : ' primary'}" data-take="${j}">Взять</button>` : ''}</div>`).join('')}</div>` : ''}
+      </div></article>${st.edit && !st.edit.id && st.edit.after === b.id ? editor(null) : ''}`;
+  main.innerHTML = s.blocks.map(card).join('')
+    + `<p class="small muted" style="margin: 4px 2px 0">Клик по блоку — он уходит в чат, пишите, что поменять. Shift + клик — несколько. Выделите слова — в чат уйдут только они.${canEdit() ? ' Тяните за точки, чтобы переставить; двойной клик — править руками.' : ''}</p>`;
+  main.querySelectorAll('[data-take]').forEach((b) => (b.onclick = () => SX[id].act({op: 'take', id: b.closest('[data-id]').dataset.id, alt: +b.dataset.take})));
+  sxPick(main, id, s, st, '.sx-b[data-id]');
+  sxWords(main, id, s, st, '.sx-txt');
+  if (st.edit) {
+    const ta = $('#sxText'); ta?.focus(); ta?.scrollIntoView({block: 'nearest'});
+    const done = () => { const e = st.edit; st.edit = null; return e; };
+    $('#sxCancel').onclick = () => { done(); sxRedraw(id, s); };
+    $('#sxSave').onclick = () => { const text = ta.value.trim(), role = $('#sxRole').value.trim(); if (!text) return ta.focus(); const e = done(); SX[id].act(e.id ? {op: 'edit', id: e.id, text, role} : {op: 'add', text, role, after: e.after}); };
+    $('#sxDel')?.addEventListener('click', () => { if (!confirm('Удалить этот блок? Вернуть можно кнопкой «Вернуть как было».')) return; const e = done(); st.sel = []; SX[id].act({op: 'remove', id: e.id}); });
+    ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('#sxSave').click(); if (e.key === 'Escape') $('#sxCancel').click(); });
+  }
+  if (!canEdit()) return;
+  if (!s.text?.ok) main.querySelectorAll('.sx-txt').forEach((t) => t.addEventListener('dblclick', () => { getSelection().removeAllRanges(); st.edit = {id: t.closest('[data-id]').dataset.id}; st.phrase = null; sxRedraw(id, s); }));
+  // Drag by the dots: the card follows the pointer between the others; dropping saves the order.
+  let drag = null;
+  main.querySelectorAll('[data-grip]').forEach((g) => g.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    drag = g.closest('.sx-b'); drag.classList.add('drag');
+    const move = (ev) => {
+      const cards = [...main.querySelectorAll('.sx-b:not(.drag)')];
+      const after = cards.find((c) => { const r = c.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
+      main.insertBefore(drag, after || main.querySelector('p'));
+    };
+    const up = () => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      drag.classList.remove('drag');
+      const order = [...main.querySelectorAll('.sx-b[data-id]')].map((c) => c.dataset.id);
+      drag = null;
+      if (order.join() !== s.blocks.map((b) => b.id).join()) SX[id].act({op: 'order', ids: order});
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
+  }));
+}
+// «Сплошным»: the whole text as it will sound; the browser's voice reads it block by block.
+function sxRead(main, id, s, st) {
+  const can = 'speechSynthesis' in window;
+  main.innerHTML = `${can ? `<div class="sx-player"><button type="button" class="btn" id="sxSay">▶ Прочитать вслух</button><div class="sx-track" aria-hidden="true">${s.blocks.map((b) => `<i style="flex: ${b.sec}" data-seg="${esc(b.id)}"></i>`).join('')}</div><span class="small muted" id="sxSayT" style="font-variant-numeric: tabular-nums">${mmss(0)} / ${mmss(s.total)}</span>
+      <select class="f" id="sxRate" aria-label="Темп чтения" style="width: auto; min-height: 36px; padding: 4px 8px"><option value="0.85">медленно</option><option value="1" selected>обычно</option><option value="1.2">быстро</option></select></div>` : ''}
+    <div class="sx-paper">${s.blocks.map((b, i) => `<div class="sx-r${b.ok ? ' ok' : ''}${st.sel.includes(b.id) || st.phrase?.id === b.id ? ' on' : ''}" data-id="${esc(b.id)}">
+      <div class="sx-mk"><b>${i + 1} · ${esc(b.role || 'Блок')}</b><span>${mmss(b.from)}${b.ok ? ' · утверждён' : ''}</span></div>
+      <p class="sx-p">${sxMark(b.text, st, b.id)}${st.sel.includes(b.id) || st.phrase?.id === b.id ? ' <span class="sx-in">в чате</span>' : ''}</p></div>`).join('')}</div>
+    <p class="small muted" style="margin: 0 2px">Так, как прозвучит. Выделите слова — они уйдут в чат; клик по подписи слева — весь блок.</p>`;
+  main.querySelectorAll('.sx-mk').forEach((m) => m.addEventListener('click', () => { const bid = m.parentElement.dataset.id; st.phrase = null; st.sel = st.sel[0] === bid ? [] : [bid]; sxRedraw(id, s); }));
+  sxWords(main, id, s, st, '.sx-p');
+  const btn = $('#sxSay');
+  if (!btn) return;
+  let on = false;
+  const mark = (i) => {
+    main.querySelectorAll('.sx-r').forEach((r, j) => { r.classList.toggle('say', j === i); r.classList.toggle('said', i >= 0 && j < i); });
+    main.querySelectorAll('[data-seg]').forEach((x, j) => { x.className = i < 0 ? '' : j < i ? 'd' : j === i ? 'n' : ''; });
+    $('#sxSayT').textContent = `${mmss(i < 0 ? 0 : s.blocks[i].from)} / ${mmss(s.total)}`;
+    if (i >= 0) main.querySelectorAll('.sx-r')[i]?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  };
+  const stop = () => { on = false; speechSynthesis.cancel(); btn.textContent = '▶ Прочитать вслух'; mark(-1); };
+  const say = (i) => {
+    if (!on || !btn.isConnected) return;
+    if (i >= s.blocks.length) return stop();
+    mark(i);
+    const u = new SpeechSynthesisUtterance(s.blocks[i].text);
+    u.lang = /[а-яё]/i.test(s.blocks[i].text) ? 'ru-RU' : 'en-US';
+    u.rate = Number($('#sxRate')?.value) || 1;
+    u.onend = () => say(i + 1);
+    u.onerror = () => on && stop();
+    speechSynthesis.speak(u);
+  };
+  btn.onclick = () => { if (on) return stop(); on = true; btn.textContent = '■ Стоп'; say(Math.max(0, s.blocks.findIndex((b) => b.id === (st.sel[0] || st.phrase?.id)))); };
+}
+// A schematic frame of a block from its look: who is in the frame, where graphics and text sit.
+function sxFrame(b, big) {
+  const L = b.look || [], has = (k) => L.find((x) => x.kind === k);
+  const broll = has('broll') && !has('frame'), gfx = L.filter((x) => x.kind === 'gfx'), txt = L.filter((x) => x.kind === 'text');
+  return `<span class="sx-scr${big ? ' big' : ''}${broll ? ' br' : ''}" ${big ? 'role="img" aria-label="Набросок кадра"' : 'aria-hidden="true"'}>
+    ${gfx.length ? `<i class="g">${big ? esc(short(gfx[0].what).slice(0, 46)) : ''}</i>` : ''}${broll ? (big ? `<i class="b">${esc(short(has('broll').what).slice(0, 50))}</i>` : '') : '<i class="p"></i>'}
+    ${txt.length ? `<i class="t">${big ? esc(short(txt[0].what).slice(0, 40)) : ''}</i>` : ''}${big && gfx[1] ? `<i class="g2">${esc(short(gfx[1].what).slice(0, 40))}</i>` : ''}</span>`;
+}
+// «2 · Вид»: what is said on the left, what is on screen on the right; the words graphics start on are underlined.
+function sxLook(main, id, s, st) {
+  const any = s.blocks.some((b) => b.look?.length);
+  if (!s.text?.ok && !any) { main.innerHTML = `<div class="sx-empty"><b>Сначала текст</b><span class="muted">Вид раскладывается по утверждённому тексту: что на экране на каждом блоке и на каких словах.</span><a class="btn" href="#/reel/${esc(id)}/script">← К тексту</a></div>`; return; }
+  if (!any) {
+    main.innerHTML = `<div class="sx-empty"><b>Вид ещё не разложен</b><span class="muted">Claude пройдёт по утверждённому тексту и для каждого блока напишет, что на экране: кадр, графика из стиля проекта, текст на экране, звук — и на каких словах это появляется.</span>${canEdit() ? '<button type="button" class="btn primary" id="sxLookMake">Разложить вид по блокам</button>' : ''}</div>`;
+    $('#sxLookMake')?.addEventListener('click', () => chatOf().say('(step «3 · Вид» of script.json) Разложи вид по всем блокам: что на экране на каждом, на каких словах, из какого шаблона стиля, что нужно доснять.', 'Разложить вид по блокам'));
+    return;
+  }
+  const under = (b) => {
+    let t = sxMark(b.text, st, b.id);
+    for (const x of b.look || []) {
+      if (!x.at) continue;
+      const w = esc(x.at), i = t.indexOf(w);
+      if (i >= 0 && !/<[^>]*$/.test(t.slice(0, i))) t = `${t.slice(0, i)}<span class="sx-at" style="text-decoration-color: ${SX_KIND[x.kind]?.[1] || '#2F6FEB'}">${w}</span>${t.slice(i + w.length)}`;
+    }
+    return t;
+  };
+  const shoot = s.blocks.flatMap((b, i) => (b.look || []).filter((x) => x.have === 'shoot').map((x) => `${i + 1} · ${x.what}`));
+  const on = (b) => st.sel.includes(b.id) || st.phrase?.id === b.id;
+  main.innerHTML = `<div class="sx-sb" aria-label="Раскадровка">${s.blocks.map((b, i) => `<button type="button" class="sx-fr${on(b) ? ' on' : ''}" data-fr="${esc(b.id)}" title="${esc(b.role || '')}">${sxFrame(b)}<span>${i + 1} ${esc(short(b.role || 'Блок').slice(0, 12))}<small>${b.sec} с</small></span></button>`).join('')}</div>
+    <div class="sx-legend">${Object.entries(SX_KIND).filter(([k]) => k !== 'broll').map(([, [n, c]]) => `<span><i style="background: ${c}"></i>${n}</span>`).join('')}<span class="muted">подчёркнуто — на этих словах появляется</span></div>
+    <div class="sx-av">${s.blocks.map((b, i) => `<div class="sx-avr${st.sel.includes(b.id) ? ' on' : ''}" data-id="${esc(b.id)}">
+      <div class="sx-avn"><b>${i + 1} · ${esc(b.role || 'Блок')}</b><span>${mmss(b.from)} · ${b.sec} с</span>${on(b) ? '<span class="sx-in">в чате</span>' : ''}${on(b) && b.look?.length ? sxFrame(b, true) : ''}</div>
+      <div class="sx-say">${under(b)}</div>
+      <div class="sx-els">${(b.look || []).map((x) => { const [n, c] = SX_KIND[x.kind] || SX_KIND.gfx, h = SX_HAVE[x.have]; return `<div class="sx-el"><span class="sx-k" style="color: ${c}"><i style="background: ${c}"></i>${n}</span><span class="sx-w">${esc(x.what)}${x.at || x.tpl ? `<small>${x.at ? `на «${esc(x.at)}»` : 'весь блок'}${x.tpl ? ` · шаблон «${esc(x.tpl)}»` : ''}</small>` : ''}</span>${h ? `<span class="sx-have ${h[1]}">${h[0]}</span>` : ''}</div>`; }).join('') || '<span class="small muted">пока ничего</span>'}</div>
+    </div>`).join('')}</div>
+    ${shoot.length ? `<div class="sx-shoot"><b>Доснять · ${shoot.length}</b>${shoot.map((x) => `<span>${esc(x)}</span>`).join('')}<a href="#/reel/${esc(id)}/materials" class="small">Весь список — на этапе «Материал»</a></div>` : ''}`;
+  main.querySelectorAll('[data-fr]').forEach((f) => (f.onclick = () => { st.phrase = null; st.sel = st.sel[0] === f.dataset.fr ? [] : [f.dataset.fr]; sxRedraw(id, s); main.querySelector(`.sx-avr[data-id="${f.dataset.fr}"]`)?.scrollIntoView({block: 'nearest'}); }));
+  sxPick(main, id, s, st, '.sx-avr');
+  sxWords(main, id, s, st, '.sx-say');
+}
+// Суфлёр (Т4/Т5): the text on the whole screen, one block per take, the end of the previous phrase and the
+// start of the next one in yellow — say them too, the cut then joins in the middle of the overlap.
+// With a reel (id) it also films: the camera in the corner, each take goes to the reel's sources/ under its block.
+function prompter(s, startId, id) {
+  let i = Math.max(0, s.blocks.findIndex((b) => b.id === startId)), size = Number(UI.get('prompt.size')) || 1, lap = UI.get('prompt.lap') !== 'off', mirror = false, flow = false;
+  let stream = null, rec = null, t0 = 0, tick = 0, busy = '';
+  const film = !!id && canEdit() && !!navigator.mediaDevices?.getUserMedia && 'MediaRecorder' in window;
+  const ov = document.createElement('div');
+  ov.className = 'pr'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Суфлёр');
+  ov.innerHTML = '<div class="pr-ui"></div><div class="pr-cam" hidden><video muted playsinline autoplay></video><span></span></div>';
+  const ui = ov.firstChild, camBox = ov.lastChild, camV = camBox.firstChild, camT = camBox.lastChild;
+  const words = (t) => String(t || '').split(/\s+/).filter(Boolean);
+  const tail = (t) => { const w = words(t); return w.slice(Math.max(0, w.length - Math.min(3, Math.ceil(w.length / 2)))).join(' '); };
+  const head = (t) => { const w = words(t); return w.slice(0, Math.min(3, Math.ceil(w.length / 2))).join(' '); };
+  const draw = () => {
+    const b = s.blocks[i], prev = s.blocks[i - 1], next = s.blocks[i + 1], takes = b.takes || [];
+    ui.innerHTML = `<div class="pr-top"><button type="button" class="pr-b" data-x="close">✕ Выйти · Esc</button><b>Блок ${i + 1} из ${s.blocks.length}</b><span>${esc(b.role || '')}</span>
+        <span class="pr-segs" aria-hidden="true">${s.blocks.map((x, j) => `<i class="${x.takes?.some((t) => t.good) ? 'd' : j === i ? 'n' : x.takes ? 'h' : ''}${j === i ? ' cur' : ''}"></i>`).join('')}</span><span style="flex: 1"></span>
+        <button type="button" class="pr-b${flow ? '' : ' on'}" data-x="blocks">По блокам</button><button type="button" class="pr-b${flow ? ' on' : ''}" data-x="flow">Подряд</button>
+        <button type="button" class="pr-b${lap ? ' on' : ''}" data-x="lap" aria-pressed="${lap}">Нахлёст</button><button type="button" class="pr-b${mirror ? ' on' : ''}" data-x="mirror" aria-pressed="${mirror}">Зеркально</button>
+        <button type="button" class="pr-b" data-x="minus" aria-label="Мельче">A−</button><button type="button" class="pr-b" data-x="plus" aria-label="Крупнее">A+</button></div>
+      <div class="pr-stage" style="--k: ${size}${mirror ? '; transform: scaleX(-1)' : ''}"><div class="pr-txt">${flow
+        ? s.blocks.map((x, j) => `<p class="pr-flow${j === i ? ' now' : ''}" data-j="${j}">${esc(x.text)}</p>`).join('')
+        : `${lap && prev ? `<p class="pr-side">…<span class="pr-lap">${esc(tail(prev.text))}</span></p>` : ''}<p class="pr-cur">${esc(b.text)}</p>${lap && next ? `<p class="pr-side"><span class="pr-lap">${esc(head(next.text))}</span> ${esc(words(next.text).slice(words(head(next.text)).length).join(' '))}</p>` : ''}
+        ${lap && (prev || next) ? '<span class="pr-hint">Жёлтое — нахлёст: скажите конец прошлой фразы и начало следующей, монтаж склеит по середине</span>' : ''}`}</div></div>
+      <div class="pr-bot"><button type="button" class="pr-rb" data-x="prev" aria-label="Прошлый блок" ${i && !rec ? '' : 'disabled'}>‹</button>
+        ${film && !flow ? `<button type="button" class="pr-rec${rec ? ' on' : ''}" data-x="rec" ${busy ? 'disabled' : ''}><i></i>${busy || (rec ? 'Стоп · дубль готов' : stream ? `Записать дубль ${takes.length + 1}` : 'Включить камеру и записать')}</button>` : ''}
+        <button type="button" class="pr-rb" data-x="next" aria-label="Следующий блок" ${i < s.blocks.length - 1 && !rec ? '' : 'disabled'}>›</button>
+        ${!flow ? takes.map((t, j) => `<button type="button" class="pr-tk${t.good ? ' ok' : ''}" data-good="${esc(t.file)}" title="Отметить лучшим дублем">Дубль ${j + 1}${t.sec ? ' · ' + mmss(t.sec) : ''}${t.good ? ' · ✓ лучший' : ''}</button>`).join('') : ''}
+        <span class="pr-keys">${film ? 'Пробел — запись и стоп · ' : ''}← → блоки · Esc выйти</span></div>`;
+    ui.querySelector(flow ? '.pr-flow.now' : '.pr-cur')?.scrollIntoView({block: 'start'});
+  };
+  const go = (d) => { if (rec) return; i = Math.min(s.blocks.length - 1, Math.max(0, i + d)); draw(); };
+  const sync = (r) => { if (r?.script) { s.blocks.forEach((b) => { const n = r.script.blocks.find((x) => x.id === b.id); if (n?.takes) b.takes = n.takes; }); } };
+  async function record() {
+    if (busy) return;
+    if (rec) return rec.stop();
+    if (!stream) {
+      try { stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'user', width: {ideal: 1920}, height: {ideal: 1080}}, audio: true}); }
+      catch { return toast('Нет доступа к камере или микрофону — разрешите их в настройках браузера'); }
+      camV.srcObject = stream; camBox.hidden = false;
+    }
+    const b = s.blocks[i], chunks = [];
+    const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t)) || '';
+    rec = new MediaRecorder(stream, type ? {mimeType: type, videoBitsPerSecond: 12e6} : undefined);
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = async () => {
+      const sec = (Date.now() - t0) / 1000, mime = rec.mimeType || 'video/webm';
+      rec = null; clearInterval(tick); camT.textContent = '';
+      busy = 'Сохраняю дубль…'; draw();
+      try {
+        const name = `take-${String(i + 1).padStart(2, '0')}-${(b.takes?.length || 0) + 1}.${/mp4/.test(mime) ? 'mp4' : 'webm'}`;
+        const u = await uploadFile(new File(chunks, name, {type: mime}), `&reel=${encodeURIComponent(id)}`);
+        sync(await post('/api/reel/script', {reel: id, op: 'shot', id: b.id, file: u.name, sec}));
+      } catch (err) { toast(err.message || 'Дубль не сохранился'); }
+      busy = ''; draw();
+    };
+    t0 = Date.now(); rec.start();
+    tick = setInterval(() => { camT.textContent = `● ${mmss((Date.now() - t0) / 1000)}`; }, 250);
+    draw();
+  }
+  const close = () => {
+    if (rec) { rec.onstop = null; try { rec.stop(); } catch {} }
+    clearInterval(tick); stream?.getTracks().forEach((x) => x.stop());
+    document.removeEventListener('keydown', keys); ov.remove();
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    if (id && location.hash.startsWith('#/reel/' + id)) drawStage(id, reelTab() || 'script');
+  };
+  ov.addEventListener('click', async (e) => {
+    const x = e.target.closest('[data-x]')?.dataset.x, j = e.target.closest('[data-j]')?.dataset.j, good = e.target.closest('[data-good]')?.dataset.good;
+    if (good) { sync(await post('/api/reel/script', {reel: id, op: 'good', id: s.blocks[i].id, file: good}).catch(() => null)); return draw(); }
+    if (j !== undefined && !rec) { i = +j; return draw(); }
+    if (!x) return;
+    if (x === 'close') return close();
+    if (x === 'rec') return record();
+    if (x === 'prev') return go(-1);
+    if (x === 'next') return go(1);
+    if (x === 'blocks' || x === 'flow') flow = x === 'flow';
+    if (x === 'lap') { lap = !lap; UI.set('prompt.lap', lap ? 'on' : 'off'); }
+    if (x === 'mirror') mirror = !mirror;
+    if (x === 'minus' || x === 'plus') { size = Math.min(2, Math.max(0.6, Math.round((size + (x === 'plus' ? 0.1 : -0.1)) * 10) / 10)); UI.set('prompt.size', String(size)); }
+    draw();
+  });
+  const keys = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === ' ') { e.preventDefault(); if (film && !flow) record(); else go(1); }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); go(1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); go(-1); }
+  };
+  document.addEventListener('keydown', keys);
+  // Esc in full screen leaves full screen first: that closes the prompter too.
+  document.addEventListener('fullscreenchange', function off() { if (!document.fullscreenElement) { document.removeEventListener('fullscreenchange', off); if (ov.isConnected) close(); } });
+  document.body.append(ov);
+  draw();
+  ov.requestFullscreen?.().catch(() => {});
+}
+
+// Before script.json (older reels): scenes on the left, each scene as a card; clicking a scene drafts a note about it.
+function stageScenes(id, data) {
+  if (sessionStorage.getItem('sxWriting:' + id) && !Array.isArray(data.scenes)) {
+    $('#reelHost').innerHTML = `<div class="sx"><div class="sx-work"><div class="sx-main"><div class="sx-wait"><i class="spin"></i><div><b>Claude пишет текст по смысловым блокам</b><span class="muted">Обычно около минуты. Блоки появятся здесь сами — их можно будет править по одному, менять местами и утверждать.</span></div></div>${'<div class="sx-b sx-sk"><span class="sx-g"></span><div class="sx-body"><i></i><i></i></div></div>'.repeat(4)}</div></div></div>`;
+    setFoot({note: 'Claude пишет текст — можно пока дописать в чат, что важно сказать.', back: {label: '← К замыслу', href: `#/reel/${id}/idea`}});
+    // The blocks show as soon as the file is written, without waiting for the end of Claude's turn.
+    const poll = setInterval(async () => {
+      if (!$('.sx-wait') || !location.hash.startsWith('#/reel/' + id)) return clearInterval(poll);
+      const d = await getReel(id).catch(() => null);
+      if (d?.script && $('.sx-wait')) { clearInterval(poll); drawStage(id, 'script', d); }
+    }, 2500);
+    return;
+  }
   const sc = Array.isArray(data.scenes) ? data.scenes : null;
   const host = $('#reelHost');
   const script = section(data.readme, 'Сценарий'), look = section(data.readme, 'Вид');
@@ -1964,10 +2707,11 @@ function stageScript(id, data) {
           ${field('На экране', x.screen)}${field('Текст на экране', x.text)}${field('Звук', x.sound)}</section>`).join('')
         : `<div class="md" style="max-width: 820px">${md(script) || '<p class="muted">Сценария пока нет. Опиши идею в чате справа — Claude напишет сценарий.</p>'}</div>
            ${look.trim() ? `<div class="blk"><span class="lbl">Как выглядит</span><div class="md" style="font-size: 14px">${md(look)}</div></div>` : ''}
-           ${canEdit() && script.trim() ? '<div><button type="button" class="btn" id="toScenes">Разложить по сценам</button> <span class="small muted">Claude разобьёт сценарий на сцены с таймкодами — их можно править по одной</span></div>' : ''}`}
+           ${canEdit() ? '<div class="row" style="gap: 10px; flex-wrap: wrap"><button type="button" class="btn primary" id="toBlocks">Разложить на смысловые блоки</button>' + (script.trim() ? '<button type="button" class="btn" id="toScenes">Разложить по сценам</button>' : '') + '<span class="small muted">Блоки можно править по одному, менять местами и утверждать; потом по ним — вид, суфлёр и монтаж</span></div>' : ''}`}
     </div></div>`;
   host.querySelectorAll('[data-sc]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); $('#sc' + a.dataset.sc).scrollIntoView({behavior: 'smooth', block: 'start'}); }));
   host.querySelectorAll('[data-edit]').forEach((b) => (b.onclick = () => { const x = sc[b.dataset.edit]; draft(`Сцена ${Number(b.dataset.edit) + 1} «${x.name}» (${x.t}) —`); }));
+  $('#toBlocks')?.addEventListener('click', () => chatOf().say('Разложи текст этого рилса на смысловые блоки в script.json (шаг «1 · Текст»): хук, каждая мысль, призыв — по 1–3 фразы, как это прозвучит. Идея и сценарий — из README.', 'Разложить на смысловые блоки'));
   $('#toScenes')?.addEventListener('click', () => chatOf().say('Разложи сценарий этого рилса по сценам в scenes.json: таймкод, название, что на экране, текст на экране, звук, какой материал нужен и есть ли он.', 'Разложить сценарий по сценам'));
 }
 
@@ -2199,10 +2943,10 @@ async function vPost(id, stage) {
     ${nav || `    <div class="chead"><div style="flex: 1; min-width: 220px"><div class="small muted"><a href="#/all">Выпуски</a> › ${esc((KIND[p.kind] || 'пост').toLowerCase())}</div><h1 style="font-size: 20px; display: flex; align-items: center; gap: 10px">${esc(p.title || 'Пост')} ${kindBadge(p.kind)}</h1></div>
       ${nav ? '' : `<nav class="stg" aria-label="Этапы">${stages.map(([k, t], i) => `<a href="#/post/${esc(id)}/${k}" class="${k === stage ? 'on' : i < atI ? 'done' : ''}">${t}</a>`).join('')}</nav>`}
       ${canEdit() ? `<select class="f" id="kindSel" aria-label="Тип поста" style="width: auto; min-height: 36px">${[['text', 'Текст'], ['photo', 'С фото'], ['carousel', 'Карусель']].map(([k, t]) => `<option value="${k}" ${k === p.kind ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}</div>`}
-    <div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
-    <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
+    <div class="rrow"><div id="reelHost" style="flex: 1; min-width: 0; overflow-y: auto"></div>
+    <aside class="chatcol inl" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
       <div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span><span class="chip">этот пост</span></div>
-      <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+      <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div></div></div>`;
   wireRelHead(view, () => vPost(id, stage));
   const box = chatBox('post-' + id, {onDone: () => { sidebar(); if (stage !== 'idea') drawPost(id, stage); }});
   $('#chatHost').append(box);
@@ -2357,8 +3101,16 @@ async function reelFiles(id, data) {
   const sc = Array.isArray(data?.scenes) ? data.scenes : null;
   const stColor = (t) => /готов/i.test(t || '') ? 'var(--green)' : /пересн/i.test(t || '') ? 'var(--amber)' : 'var(--blue)';
   const bo = data?.basedOn && !(data.versions || []).length ? data.basedOn : null;
+  // From script.json: one take per block (filmed in the prompter) and every cutaway its «Вид» asks to film.
+  const sx = data?.script?.blocks?.length ? data.script : null;
+  const sxNeed = sx ? sx.blocks.flatMap((b, i) => [
+    {name: `${i + 1} · ${b.role || 'Блок'}`, what: b.text, done: !!b.takes?.length, state: b.takes?.length ? `${b.takes.length} ${sxPlural(b.takes.length, 'дубль', 'дубля', 'дублей')}${b.takes.some((t) => t.good) ? ' · выбран' : ''}` : 'снять'},
+    ...(b.look || []).filter((x) => x.kind === 'broll' || x.have === 'shoot' && x.kind !== 'frame').map((x) => ({name: `↳ ${SX_KIND[x.kind]?.[0] || 'Кадр'}`, what: x.what + (x.at ? ` — на «${x.at}»` : ''), done: x.have === 'ready', state: x.have === 'ready' ? 'есть' : 'снять'})),
+  ]) : [];
   host.innerHTML = `<div class="page" style="max-width: 1000px">
     ${bo ? `<div class="rback" style="margin-bottom: 14px">${svg('idea', 15)}<span style="flex: 1">Сделан по образцу <a href="#/reel/${esc(bo.from)}">${esc(bo.from.slice(0, 2))}</a>. ${bo.mode === 'material' ? 'Загрузите новый материал — сцены ниже подскажут, что где нужно. Claude соберёт v1 в том же ритме и оформлении.' : bo.mode === 'theme' ? 'Напишите в чате, о чём рилс, и загрузите материал.' : 'Материал уже на месте: Claude переведёт и соберёт.'}</span>${canEdit() ? `<button type="button" class="ln-btn p s" id="buildCopy">Собрать по образцу</button>` : ''}</div>` : ''}
+    ${sx ? `<section><div class="row" style="justify-content: space-between; margin-bottom: 6px; gap: 8px; flex-wrap: wrap"><h2>Что снять · ${sxNeed.filter((x) => x.done).length} из ${sxNeed.length}</h2><span class="row" style="gap: 8px">${canEdit() ? '<button type="button" class="btn" id="sxTask" title="Задание со всем текстом по блокам — человеку в мини-приложение «Съёмка»">Отдать на съёмку</button>' : ''}<button type="button" class="btn primary" id="sxShoot">Суфлёр · снять дубли</button></span></div>
+      ${sxNeed.map((x) => `<div class="rshoot"><b style="font-weight: 600">${esc(x.name)}</b><span class="muted">${esc(x.what)}</span><span class="st" style="color: ${x.done ? 'var(--green)' : 'var(--blue)'}">${esc(x.state)}</span></div>`).join('')}</section>` : ''}
     ${sc ? `<section><div class="row" style="justify-content: space-between; margin-bottom: 6px"><h2>Готовность · ${sc.filter((x) => /готов/i.test(x.status || '')).length} из ${sc.length}</h2>${canEdit() ? '<button type="button" class="btn" id="shotList">Шот-лист в Телеграм</button>' : ''}</div>
       <div class="grid4 lbl" style="border-top: 0"><span>Сцена</span><span>Что нужно</span><span>Что есть</span><span>Статус</span></div>
       ${sc.map((x, i) => `<div class="grid4"><b style="font-weight: 600">${i + 1} · ${esc(x.name || '')}</b><span class="muted">${esc(x.need || x.screen || '')}</span><span class="small muted">${esc(x.have || '—')}</span><span class="st" style="color: ${stColor(x.status)}">${esc(x.status || 'нужно')}</span></div>`).join('')}</section>`
@@ -2390,6 +3142,15 @@ async function reelFiles(id, data) {
     load();
   }
   $('#buildCopy')?.addEventListener('click', () => chatOf().say(bo.prompt, `Собери v1 по образцу ${bo.from.slice(0, 2)}`));
+  const it = ITEMS?.items.find((y) => y.ref?.kind === 'reel' && y.ref.id === id);
+  setFoot({note: sx ? `Снято ${sxNeed.filter((x) => x.done).length} из ${sxNeed.length}. В «Сборку» можно идти и так — недостающее доснимается потом.` : 'Загрузите исходники — или сразу к сборке.', back: sx ? {label: '← К виду', href: `#/reel/${id}/look`} : null,
+    next: canEdit() ? {label: 'Материал собран → Сборка', run: async () => { if (it && ['idea', 'material'].includes(it.stage)) await post('/api/items/set', {id: it.id, stage: 'build'}); location.hash = `#/reel/${id}/edit`; }} : null});
+  $('#sxShoot')?.addEventListener('click', () => prompter(sx, null, id));
+  $('#sxTask')?.addEventListener('click', async () => {
+    const r = data.reel, text = sx.blocks.map((b) => b.text.replace(/\s+/g, ' ')).join('\n');
+    const ok = await post('/api/tasks', {action: 'add', title: `${r.num} · ${r.title}`.slice(0, 120), text, seconds: sx.total, lang: /[а-яё]/i.test(text) ? 'ru' : 'en'}).catch(() => null);
+    toast(ok ? 'Задание в «Съёмке»: текст по блокам, каждый блок — отдельная фраза' : 'Не получилось создать задание');
+  });
   $('#shotList')?.addEventListener('click', () => chatOf().say('Составь шот-лист по сценам: что снять, как держать телефон, сколько секунд; отметь, что уже есть в материалах. Обнови scenes.json и пришли шот-лист сюда.', 'Шот-лист'));
   const drop = $('#drop');
   if (drop) {
@@ -4402,6 +5163,26 @@ async function vKnowledge(tab = 'overview', sel) {
   $('#tplSel')?.addEventListener('change', async (e) => { await post('/api/strategy/template', {rubric: e.target.dataset.rubric, template: e.target.value || null}); route(); });
 }
 
+// Выходы по аккаунтам (STRATEGY.md): where an item goes. Its own `out` [{platform, at}] when someone
+// set it, else one account guessed from where it came out, its format and its language.
+const FMT_KIND = {reel: 'reel', post: 'photo', carousel: 'carousel', telegram: 'text', story: 'story'};
+const platTag = (p) => { const s = `${p.name || ''} ${p.id || ''}`; return /\b(en|eng)\b|англ/i.test(s) ? 'EN' : /\bru\b|рус/i.test(s) ? 'RU' : /телеграм|telegram|\btg\b/i.test(s) ? 'ТГ' : String(p.name || p.id || '?').slice(0, 3); };
+const platTakes = (p, x) => !(p.formats || []).length || p.formats.some((f) => f.kind === FMT_KIND[x.format]);
+const accKey = (a) => String(a || '').replace(/^@/, '').toLowerCase();
+function guessPlat(x, plats) {
+  const own = (x.platforms || []).map((id) => plats.find((p) => p.id === id)).find(Boolean);
+  if (own) return own;
+  const acc = x.ig ? x.account : (x.published || [])[0]?.account;
+  const byAcc = acc && plats.find((p) => accKey(p.account) === accKey(acc));
+  if (byAcc) return byAcc;
+  const can = plats.filter((p) => platTakes(p, x)), pool = can.length ? can : plats;
+  const letters = (x.title || '').match(/\p{L}/gu) || [];
+  const ru = x.lang ? x.lang === 'RU' : letters.length ? letters.filter((c) => /[а-яё]/i.test(c)).length / letters.length > 0.5 : true;
+  const en = /(^|-)en(-|$)/.test(x.ref?.id || '') || !ru;
+  return pool.find((p) => platTag(p) === (en ? 'EN' : 'RU')) || pool[0] || null;
+}
+const planOuts = (x, plats) => x.out?.length ? x.out.filter((o) => o.at) : x.at ? [{platform: guessPlat(x, plats)?.id || null, at: x.at, guessed: true}] : [];
+
 // Календарь (CleanPlan): a week of reels and posts from plan.json, empty rhythm slots, events; drag to a day.
 // План (LeanPlan): ideas on dates first. A hairline month (or week) grid, each item with its rubric,
 // format and stage; ideas dashed, Claude's proposals marked. Rubrics on the right.
@@ -4425,50 +5206,102 @@ async function vPlan(offset = 0, month = true) {
   // Posts found in Instagram without an item (offers first): a muted line in their day and a list aside.
   const found = (IG || []).flatMap((a) => [...(a.offers || []).map((o) => ({a, m: a.media.find((m) => m.code === o.code), offer: o})), ...(a.loose || []).map((c) => ({a, m: a.media.find((m) => m.code === c)}))]).filter((x) => x.m);
   const igAll = igLooseItems();
-  const onDay = (d) => [...all, ...igAll].filter((x) => x.at && x.at.slice(0, 10) === ymd(d)).sort((p, q) => p.at.localeCompare(q.at));
+  // Аккаунты: each item stands on a day once per account it goes to. The bar turns accounts on and
+  // off and draws them together («Слитно»: one chip per release, account tags) or apart («По аккаунтам»:
+  // a lane per account in a week, a chip per account in a month). Kept per project in this browser.
+  const plats = (st.platforms || []).filter((p) => p.id), multi = plats.length > 1;
+  PLATS = plats;
+  const pref = (() => { try { return JSON.parse(localStorage.getItem('planAcc:' + P) || '{}'); } catch { return {}; } })();
+  const offPl = new Set((pref.off || []).filter((id) => plats.some((p) => p.id === id)));
+  if (offPl.size >= plats.length) offPl.clear();
+  const lanes = multi && pref.by === 'acc', onPl = plats.filter((p) => !offPl.has(p.id));
+  const savePref = (v) => { try { localStorage.setItem('planAcc:' + P, JSON.stringify({...pref, off: [...offPl], ...v})); } catch {} };
+  const placed = [...all, ...igAll].flatMap((x) => planOuts(x, plats).filter((o) => !o.platform || !offPl.has(o.platform)).map((o) => ({x, o})));
+  const relKey = (x) => (x.ig ? x.id : x.twin || x.id);
+  // Every account a release goes to (twins together), to say which one it is missing.
+  const relPl = new Map();
+  for (const x of all) for (const o of planOuts(x, plats)) { const k = relKey(x); if (!relPl.has(k)) relPl.set(k, new Set()); relPl.get(k).add(o.platform); }
+  const tagOf = (id) => esc(platTag(plats.find((p) => p.id === id) || {id}));
+  const tagH = (pls) => multi && pls.length && (lanes ? month : onPl.length > 1) ? pls.map((id) => `<span class="ln-acc">${tagOf(id)}</span>`).join('') : '';
+  const missH = (x) => {
+    if (!multi || lanes || onPl.length < 2 || !x.at || x.ig || x.proposed || x.stage === 'published') return '';
+    const has = relPl.get(relKey(x)) || new Set(), miss = onPl.filter((p) => platTakes(p, x) && !has.has(p.id));
+    return miss.length ? `<span class="ln-miss" title="Этот выпуск пока не стоит на ${miss.map((p) => esc(p.name)).join(', ')}">нет ${miss.map((p) => esc(platTag(p))).join(', ')}</span>` : '';
+  };
+  const onDay = (d, pl) => {
+    const list = placed.filter(({o}) => o.at.slice(0, 10) === ymd(d) && (pl === undefined || o.platform === pl)).sort((p, q) => p.o.at.localeCompare(q.o.at));
+    if (lanes) return list.map(({x, o}) => ({x, pls: [o.platform], pl: o.platform, at: o.at}));
+    const by = new Map();
+    for (const {x, o} of list) { const k = relKey(x); if (!by.has(k)) by.set(k, {x, pls: [], pl: '', at: o.at}); by.get(k).pls.push(o.platform); }
+    return [...by.values()];
+  };
+  const perWeek = (p) => p.perWeek ?? (p.formats || []).reduce((m, f) => m + (f.perWeek || 0), 0);
+  const inRange = (o) => o.at.slice(0, 10) >= ymd(days[0]) && o.at.slice(0, 10) <= ymd(days.at(-1));
+  const platCount = (p) => [...all, ...igAll].flatMap((x) => planOuts(x, plats)).filter((o) => o.platform === p.id && inRange(o)).length;
   // A post that is only in Instagram: its caption, the account; a click opens it there.
-  const chipIg = (x) => `<a class="ln-chip igc" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(x.title)} — вышло в @${esc(x.account)}, в студии выпуска нет">
+  const chipIg = (x, c = {pls: []}) => `<a class="ln-chip igc" href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(x.title)} — вышло в @${esc(x.account)}, в студии выпуска нет">
       <span class="t">${svg('ig', 11)}<span>${esc(x.title)}</span></span>
-      <span class="m"><span class="mt">${month ? (x.lang ? x.lang + ' · ' : '') : '@' + esc(x.account) + ' · '}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}</span></span></a>`;
+      <span class="m">${tagH(c.pls)}<span class="mt">${multi ? '' : month ? (x.lang ? x.lang + ' · ' : '') : '@' + esc(x.account) + ' · '}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}</span></span></a>`;
   // Month: two quiet lines per item — title, then stage dot + format (+ take/other for Claude's proposals).
   const stageName = (k) => (LIFE.find(([s]) => s === k)?.[1] || '').toLowerCase();
-  const chipM = (x) => `<a class="ln-chip ${x.stage === 'idea' || x.proposed ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
+  const chipM = (x, c = {pls: []}) => `<a class="ln-chip ${x.stage === 'idea' || x.proposed ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" data-pl="${esc(c.pl || '')}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
       <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
-      <span class="m">${x.proposed && canEdit() ? '' : `<span class="mt">${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex; vertical-align: -2px; margin-right: 4px">${svg('ig', 11)}</span>` : ''}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${x.proposed ? '' : `<i class="sd" style="background: ${LIFE_COLOR[x.stage] || '#A3A3A3'}"></i>${esc(stageName(x.stage))}`}</span>`}${x.proposed && canEdit() ? `<span class="acts"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</span></a>`;
-  const chip = (x) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
+      <span class="m">${tagH(c.pls)}${x.proposed && canEdit() ? '' : `<span class="mt">${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex; vertical-align: -2px; margin-right: 4px">${svg('ig', 11)}</span>` : ''}${esc(FMT_NAME[x.format]?.toLowerCase() || '')}${x.proposed ? '' : `<i class="sd" style="background: ${LIFE_COLOR[x.stage] || '#A3A3A3'}"></i>${esc(stageName(x.stage))}`}</span>`}${x.proposed && canEdit() ? `<span class="acts"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}${missH(x)}</span></a>`;
+  const chip = (x, c = {pls: []}) => `<a class="ln-chip ${x.stage === 'idea' ? 'idea' : ''}" draggable="${canEdit()}" data-id="${x.id}" data-pl="${esc(c.pl || '')}" href="${itemHref(x)}" data-peek="${x.id}" title="${esc(x.title)}">
       <span class="t"><span class="rsq" style="background: ${esc(itemRubric(x)?.color || '#A3A3A3')}"></span><span>${esc(x.title)}</span></span>
-      <span class="m">${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex">${svg('ig', 12)}</span>` : ''}${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}</span>
+      <span class="m">${tagH(c.pls)}${x.published?.length ? `<span title="Вышло в Instagram" style="display: inline-flex">${svg('ig', 12)}</span>` : ''}${FMT_NAME[x.format]?.toLowerCase() || ''}${x.proposed ? ' · предложение' : ''}${month ? '' : ' · ' + esc((c.at || x.at || '').slice(11, 16))}${x.proposed ? '' : sdot(x.stage)}${missH(x)}</span>
       ${x.proposed && canEdit() ? `<span class="m" style="gap: 8px"><button type="button" class="ln-act" data-take="${x.id}">взять</button><button type="button" class="ln-act" data-other="${x.id}" style="color: var(--muted)">другую</button></span>` : ''}</a>`;
-  const cells = days.map((d) => {
+  const cell = (d, pl, {top = true, ev: showEv = true, h = 420} = {}) => {
     const isToday = ymd(d) === ymd(today), out = month && d.getMonth() !== first.getMonth();
-    const ev = (plan.events || []).concat(st.events || []).filter((e) => e.date === ymd(d));
-    return `<div class="ln-cell${isToday ? ' today' : ''}${out ? ' out' : ''}" data-day="${ymd(d)}" style="${month ? '' : 'min-height: 420px'}"><span class="dn">${d.getDate()}</span>
-      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d).map((x) => x.ig ? chipIg(x) : (month ? chipM : chip)(x)).join('')}</div>`;
-  }).join('');
+    const ev = showEv ? (plan.events || []).concat(st.events || []).filter((e) => e.date === ymd(d)) : [];
+    return `<div class="ln-cell${isToday ? ' today' : ''}${out ? ' out' : ''}" data-day="${ymd(d)}"${pl ? ` data-pl="${esc(pl)}"` : ''} style="${month ? '' : 'min-height: ' + h + 'px'}">${top ? `<span class="dn">${d.getDate()}</span>` : ''}
+      ${ev.map((e) => `<span style="font-size: 11px; background: var(--blueBg); color: var(--blue); border-radius: 6px; padding: 3px 6px; font-weight: 600">${esc(e.title)}</span>`).join('')}${onDay(d, pl).map((c) => c.x.ig ? chipIg(c.x, c) : (month ? chipM : chip)(c.x, c)).join('')}</div>`;
+  };
+  // A week «По аккаунтам»: a lane per account, its count against the plan's «в неделю».
+  const laneWeek = lanes && !month;
+  const cells = laneWeek ? onPl.map((p, i) => `<div class="ln-lane"><b>${esc(platTag(p))}</b><span class="small muted" style="overflow-wrap: anywhere">${esc(p.account || p.name)}</span><span class="small ${perWeek(p) && platCount(p) < perWeek(p) ? '' : 'muted'}">${platCount(p)}${perWeek(p) ? ' из ' + perWeek(p) : ''}</span></div>${days.map((d) => cell(d, p.id, {top: false, ev: i === 0, h: Math.max(140, Math.round(420 / onPl.length))})).join('')}`).join('')
+    : days.map((d) => cell(d)).join('');
   const shown = all.filter((x) => !x.proposed && x.at && x.at.slice(0, 10) >= ymd(days[0]) && x.at.slice(0, 10) <= ymd(days.at(-1)));
   const undated = all.filter((x) => !x.at && !x.proposed && x.stage !== 'published');
   const mname = first.toLocaleDateString('ru', {month: 'long'});
   const gen = (m) => m.replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я');
   const range = month ? mname : `${days[0].getDate()} ${gen(days[0].toLocaleDateString('ru', {month: 'long'}))} – ${days[6].getDate()} ${gen(days[6].toLocaleDateString('ru', {month: 'long'}))}`;
   const base = month ? '#/plan/m/' : '#/plan/w/';
+  // Версии на двух языках: two items (own folders) that are one release; the Plan draws them as one.
+  const twinBox = () => {
+    const pick = all.filter((x) => !x.proposed && x.stage !== 'idea' && !x.missing).slice(-60).reverse();
+    const opt = (x) => `<option value="${esc(x.id)}">${esc((planOuts(x, plats)[0] ? platTag(plats.find((p) => p.id === planOuts(x, plats)[0].platform) || {}) + ' · ' : '') + x.title)}</option>`;
+    const pairs = [...new Set(all.filter((x) => x.twin && x.at && planOuts(x, plats).some(inRange)).map((x) => x.twin))].map((t) => all.filter((x) => x.twin === t));
+    return `<details style="margin-top: 8px"><summary class="small" style="cursor: pointer; color: var(--ink2)">Один выпуск на разных языках${pairs.length ? ` · ${pairs.length}` : ''}</summary>
+      <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 8px"><span class="small muted" style="line-height: 1.45">Если EN- и RU-версии лежат отдельными выпусками, свяжите их — в «Слитно» они станут одной карточкой.</span>
+        ${pairs.map((g) => `<div class="small" style="display: flex; gap: 8px; align-items: baseline"><span style="flex: 1; min-width: 0">${g.map((x) => esc(x.title)).join(' = ')}</span><button type="button" class="ln-act" data-untwin="${esc(g[0].id)}" style="color: var(--muted)">развязать</button></div>`).join('')}
+        <select class="ln-act" id="twinA" aria-label="Первая версия" style="max-width: 100%"><option value="">первая версия…</option>${pick.map(opt).join('')}</select>
+        <select class="ln-act" id="twinB" aria-label="Вторая версия" style="max-width: 100%"><option value="">вторая версия…</option>${pick.map(opt).join('')}</select>
+        <span class="row" style="gap: 12px"><button type="button" class="ln-act" id="twinGo">связать</button><button type="button" class="ln-act" id="twinAsk" style="color: var(--muted)">найти пары с Claude</button></span></div></details>`;
+  };
   const rubs = ITEMS.rubrics.map((r) => `<a href="#/rubric/${esc(r.id)}" style="display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-bottom: 1px solid #F0F0F0; text-decoration: none; color: var(--ink)"><span style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600"><span class="rsq" style="background: ${esc(r.color || '#A3A3A3')}"></span>${esc(r.name)}<span class="muted" style="margin-left: auto; font-weight: 400; font-size: 12px">${shown.filter((x) => itemRubric(x)?.id === r.id).length}</span></span>${r.about ? `<span class="muted" style="font-size: 12px; padding-left: 16px">${esc(r.about)}</span>` : ''}</a>`).join('');
   view.innerHTML = `<div style="display: flex; flex-direction: column; height: 100vh; min-width: 0">
     <div class="ln-top"><b>План</b><span>·</span><span>${range}</span>
       <span class="ln-seg" style="margin-left: 12px"><a href="#/plan/w" class="${month ? '' : 'on'}">Неделя</a><a href="#/plan" class="${month ? 'on' : ''}">Месяц</a></span>
+      ${multi ? `<span class="ln-seg" style="margin-left: 6px"><button type="button" data-by="all" class="${lanes ? '' : 'on'}" title="Каждый выпуск один раз, с метками аккаунтов">Слитно</button><button type="button" data-by="acc" class="${lanes ? 'on' : ''}" title="Каждый аккаунт отдельно">По аккаунтам</button></span>
+      <span style="display: inline-flex; gap: 4px">${plats.map((p) => `<button type="button" class="ln-accb ${offPl.has(p.id) ? '' : 'on'}" data-acc="${esc(p.id)}" aria-pressed="${!offPl.has(p.id)}" title="${esc(p.name)}${p.account ? ' · ' + esc(p.account) : ''}">${esc(platTag(p))}</button>`).join('')}</span>` : ''}
       <span style="display: inline-flex; gap: 2px; margin-left: 6px"><a class="ln-btn g s" href="${base}${offset - 1}" aria-label="Назад">‹</a><a class="ln-btn g s" href="${base.slice(0, -1)}">Сейчас</a><a class="ln-btn g s" href="${base}${offset + 1}" aria-label="Вперёд">›</a></span>
       <span style="display: inline-flex; gap: 12px; margin-left: 8px">${LIFE.slice(0, 4).map(([k]) => `${sdot(k)}<span class="muted">${shown.filter((x) => x.stage === k).length}</span>`).join('')}</span>
       <span style="flex: 1"></span>${canEdit() ? `<button type="button" class="ln-btn p" id="lay">${svg('idea', 14)}Собрать контент-план</button>` : ''}</div>
     <div style="flex: 1; display: flex; min-height: 0">
       <div style="flex: 1; display: flex; flex-direction: column; padding: 16px 20px 20px; min-width: 0; overflow-y: auto">
-        <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); font-size: 12px; color: var(--muted); padding: 0 0 8px">${DAYS.map((d, i) => `<span style="padding-left: 8px">${month ? d.toLowerCase() : d.toLowerCase() + ' ' + days[i].getDate()}</span>`).join('')}</div>
-        <div class="ln-grid${month ? ' mo' : ''}">${cells}</div>
-        <p class="small muted" style="margin: 12px 2px 0">Пунктир — пока только идея: дату и рубрику уже видно, снимать ещё нечего. Перетащи выпуск на другой день или в «Без даты».</p>
+        <div style="display: grid; grid-template-columns: ${laneWeek ? '110px ' : ''}repeat(7, minmax(0, 1fr)); font-size: 12px; color: var(--muted); padding: 0 0 8px">${laneWeek ? '<span></span>' : ''}${DAYS.map((d, i) => `<span style="padding-left: 8px">${month ? d.toLowerCase() : d.toLowerCase() + ' ' + days[i].getDate()}</span>`).join('')}</div>
+        <div class="ln-grid${month ? ' mo' : ''}"${laneWeek ? ' style="grid-template-columns: 110px repeat(7, minmax(0, 1fr))"' : ''}>${cells}</div>
+        <p class="small muted" style="margin: 12px 2px 0">${laneWeek ? 'Перетащи выпуск на другую дорожку — он переедет на тот аккаунт; с ⌥ Option — встанет туда ещё раз, а здесь останется.' : 'Пунктир — пока только идея: дату и рубрику уже видно, снимать ещё нечего. Перетащи выпуск на другой день или в «Без даты».'}</p>
       </div>
       <aside class="ln-aside">
+        ${multi ? `<div style="display: flex; flex-direction: column"><div style="display: flex; align-items: center"><b style="font-weight: 600">Аккаунты</b><span class="muted" style="margin-left: auto; font-size: 12px">${month ? 'в этом месяце' : 'на этой неделе'}</span></div>
+          ${plats.map((p) => `<div style="display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid #F0F0F0; font-size: 13px; ${offPl.has(p.id) ? 'opacity: .45' : ''}"><span class="ln-acc">${esc(platTag(p))}</span><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(p.name)} <span class="muted">${esc(p.account || '')}</span></span><span class="muted" style="font-size: 12px">${platCount(p)}${!month && perWeek(p) ? ' из ' + perWeek(p) : ''}</span></div>`).join('')}
+          ${canEdit() ? twinBox() : ''}</div>` : ''}
         <div style="display: flex; align-items: center"><b style="font-weight: 600">Рубрики</b><span class="muted" style="margin-left: auto; font-size: 12px">${month ? 'в этом месяце' : 'на этой неделе'}</span></div>
         <div>${rubs || '<span class="small muted">Рубрик пока нет.</span>'}</div>
         ${canEdit() ? '<button type="button" id="addRub" style="align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; color: #2F6FEB; font-weight: 600; cursor: pointer">+ Рубрика</button>' : ''}
-        <div class="ln-drop" data-day="" style="display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 2px"><div style="display: flex; align-items: center; margin-top: 8px"><b style="font-weight: 600">Без даты</b><span class="muted" style="margin-left: auto; font-size: 12px">${undated.length}</span></div>${undated.slice(0, 6).map(chip).join('')}${undated.length > 6 ? `<a class="small muted" href="#/all">ещё ${undated.length - 6} — в Выпусках</a>` : ''}</div>
+        <div class="ln-drop" data-day="" style="display: flex; flex-direction: column; gap: 6px; border-radius: 10px; padding: 2px"><div style="display: flex; align-items: center; margin-top: 8px"><b style="font-weight: 600">Без даты</b><span class="muted" style="margin-left: auto; font-size: 12px">${undated.length}</span></div>${undated.slice(0, 6).map((x) => chip(x)).join('')}${undated.length > 6 ? `<a class="small muted" href="#/all">ещё ${undated.length - 6} — в Выпусках</a>` : ''}</div>
         ${igStale().length ? `<div class="rback" style="margin-top: 10px; align-items: flex-start">${svg('ig', 15)}<span style="flex: 1; font-size: 12.5px; line-height: 1.45">Instagram не подключён: в Плане только то, что было видно на снимке ${igStale().map((a) => `@${esc(a.account)} — ${a.media.length} из ${a.posts ?? '?'} на ${new Date(a.fetchedAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'})}`).join(', ')}. ${canEdit() ? '<a href="#/settings/connect">Подключить</a>' : ''}</span></div>` : ''}
         ${found.length ? `<div style="display: flex; flex-direction: column; gap: 2px; margin-top: 8px"><b style="font-weight: 600">Найдено в Instagram</b><span class="small muted" style="line-height: 1.5; padding-bottom: 4px">${found.length} без выпуска в студии. Привяжите свои — остальные можно убрать.</span>
           ${found.slice(0, 5).map(({a, m, offer}) => `<div style="display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #F0F0F0"><a href="${esc(m.permalink)}" target="_blank" rel="noopener" style="flex: none"><img src="${esc(m.thumb || '')}" alt="" style="width: 40px; height: 54px; object-fit: cover; border-radius: 6px; display: block"></a>
@@ -4488,17 +5321,36 @@ async function vPlan(offset = 0, month = true) {
   $('#addRub')?.addEventListener('click', async () => { const name = prompt('Название рубрики'); if (!name?.trim()) return; const {rubric} = await post('/api/strategy/edit', {rubric: {name}}); location.hash = '#/rubric/' + rubric.id; });
   view.querySelectorAll('[data-take]').forEach((b) => (b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); b.disabled = true; await post('/api/items/set', {id: b.dataset.take, take: true}); toast('Взято в план'); redraw(); }));
   view.querySelectorAll('[data-other]').forEach((b) => (b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const x = all.find((y) => y.id === b.dataset.other); sessionStorage.setItem('planAsk', JSON.stringify({text: `Замени идею «${x.title}» на ${(x.at || '').slice(0, 10)} другой — той же рубрики, не повторяя уже вышедшее. Старую убери из ideas.md, новую добавь в «My ideas» с теми же Date: и Rubric:.`, shown: `Другую вместо «${x.title}»`})); location.hash = '#/plan/draft'; }));
+  view.querySelectorAll('[data-by]').forEach((b) => (b.onclick = () => { savePref({by: b.dataset.by}); redraw(); }));
+  view.querySelectorAll('[data-acc]').forEach((b) => (b.onclick = () => { const id = b.dataset.acc; if (offPl.has(id)) offPl.delete(id); else if (offPl.size < plats.length - 1) offPl.add(id); savePref({}); redraw(); }));
+  $('#twinGo')?.addEventListener('click', async () => { const a = $('#twinA').value, b = $('#twinB').value; if (!a || !b || a === b) return toast('Выберите две разные версии'); await post('/api/items/set', {id: a, twin: b}); toast('Связано: один выпуск'); redraw(); });
+  view.querySelectorAll('[data-untwin]').forEach((b) => (b.onclick = async () => { await post('/api/items/set', {id: b.dataset.untwin, twin: null}); toast('Развязано'); redraw(); }));
+  $('#twinAsk')?.addEventListener('click', () => { sessionStorage.setItem('planAsk', JSON.stringify({text: `Найди в items.json выпуски, которые — одна тема на разных языках для разных аккаунтов (${plats.map((p) => p.name + ' ' + (p.account || '')).join(', ')}), например EN- и RU-версия одного рилса. Свяжи каждую пару одинаковым полем "twin": "t-<8 hex>" у обоих (STRATEGY.md «Выходы по аккаунтам»). Разные темы не связывай, уже связанные не трогай. Перечисли, что связал.`, shown: 'Найди пары версий на разных языках'})); location.hash = '#/plan/draft'; });
   let drag = null;
-  view.querySelectorAll('.ln-chip').forEach((c) => { c.ondragstart = () => { drag = c.dataset.id; }; });
+  view.querySelectorAll('.ln-chip[data-id]').forEach((c) => { c.ondragstart = () => { drag = {id: c.dataset.id, pl: c.dataset.pl || ''}; }; });
   view.querySelectorAll('.ln-cell, .ln-drop').forEach((d) => {
     d.ondragover = (e) => { e.preventDefault(); d.classList.add('over'); };
     d.ondragleave = () => d.classList.remove('over');
     d.ondrop = async (e) => {
       e.preventDefault(); d.classList.remove('over');
       if (!drag || !canEdit()) return;
-      const it = all.find((x) => x.id === drag);
-      const time = it?.at?.slice(11, 16) || (st.rhythm?.slots || []).find((s) => s.rubric === it?.rubric)?.time || '19:00';
-      await post('/api/items/set', {id: drag, at: d.dataset.day ? `${d.dataset.day}T${time}` : null});
+      const it = all.find((x) => x.id === drag.id);
+      if (!it) return;
+      const day = d.dataset.day, time = it.at?.slice(11, 16) || (st.rhythm?.slots || []).find((s) => s.rubric === it.rubric)?.time || '19:00';
+      if (!day) await post('/api/items/set', {id: it.id, at: null});
+      else if (lanes && drag.pl) {
+        // One account's date (and, across lanes, its account); ⌥ keeps the old one as well.
+        const cur = planOuts(it, plats).filter((o) => o.platform).map(({platform, at}) => ({platform, at}));
+        const from = cur.find((o) => o.platform === drag.pl), to = d.dataset.pl || drag.pl;
+        const next = cur.filter((o) => o.platform !== to && (e.altKey || o.platform !== drag.pl));
+        next.push({platform: to, at: `${day}T${from?.at.slice(11, 16) || time}`});
+        await post('/api/items/set', {id: it.id, out: next});
+      } else if (!it.at) await post('/api/items/set', {id: it.id, at: `${day}T${time}`});
+      else {
+        // The whole release moves: its twins by the same number of days (the server moves every account's date).
+        const shift = Date.parse(day) - Date.parse(it.at.slice(0, 10));
+        for (const x of it.twin ? all.filter((y) => y.twin === it.twin && y.at) : [it]) await post('/api/items/set', {id: x.id, at: new Date(Date.parse(x.at.slice(0, 10)) + shift).toISOString().slice(0, 10) + x.at.slice(10)});
+      }
       redraw();
     };
   });
@@ -5740,9 +6592,64 @@ document.addEventListener('click', async (e) => {
 window.addEventListener('hashchange', route);
 // «Открыть сбоку» goes back in history; a page restored from the back-forward cache runs no route.
 window.addEventListener('pageshow', (e) => { if (e.persisted && sessionStorage.getItem('peekNext')) route(); });
+// «Сейчас работает» (handbook/DECISIONS.md, 2026-11-22): a corner pill on every screen with what
+// Claude is doing in every chat and project right now and what it finished in the last hour; it
+// opens into a list, a row leads to its chat. Polls /api/running: often while something runs.
+const DOCK = {open: false, prev: new Set(), first: true};
+const dockSeen = () => { try { return Number(localStorage.getItem('dockSeen') || 0); } catch { return 0; } };
+const dockHref = (k) => k === '_project' ? '#/' : k === '_ds' ? '#/memory/ds' : k === '_ideas' ? '#/ideas' : k.startsWith('new-') ? '#/new' : k.startsWith('post-') ? '#/post/' + k.slice(5) : k.startsWith('idea-') ? '#/item/' + k.slice(5) : '#/reel/' + k;
+const dockAgo = (t) => { const m = Math.max(0, Math.round((Date.now() - t) / 6e4)); return m < 1 ? 'только что' : m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин'; };
+async function dockGo(project, key) {
+  if (project !== P) { P = project; localStorage.setItem('project', P); OV = null; ITEMS_AT = 0; await loadMe(); }
+  location.hash = dockHref(key);
+  route();
+}
+async function dockTick() {
+  clearTimeout(DOCK.t);
+  if (!canEdit()) return;
+  let d = null;
+  if (!document.hidden) d = await api('/api/running').catch(() => null);
+  if (d) dockDraw(d);
+  DOCK.t = setTimeout(dockTick, d?.running.length || DOCK.open ? 4000 : 15000);
+}
+function dockDraw(d) {
+  let el = $('#dock');
+  if (!el) { el = document.createElement('div'); el.id = 'dock'; el.className = 'dock'; el.setAttribute('aria-live', 'polite'); document.body.append(el); }
+  const seen = dockSeen(), fresh = d.recent.filter((r) => r.at > seen);
+  // A turn that was running and is gone now: say so, unless its chat is the open screen.
+  const now = new Set(d.running.map((r) => r.project + '|' + r.key));
+  if (!DOCK.first) for (const r of d.recent) if (DOCK.prev.has(r.project + '|' + r.key) && !now.has(r.project + '|' + r.key) && !(r.project === P && location.hash === dockHref(r.key))) toast(`${r.stopped ? 'Остановлено' : r.ok ? 'Готово' : 'Не получилось'}: «${r.title}»`);
+  DOCK.prev = now; DOCK.first = false;
+  const busy = d.running.length + (d.bot ? 1 : 0);
+  const label = busy ? `Claude работает${busy > 1 ? ' · ' + busy : ''}` : fresh.length ? `Готово · ${fresh.length}` : 'Claude свободен';
+  const pill = `<button type="button" class="dock-pill ${busy ? 'busy' : fresh.length ? 'done' : 'idle'}" aria-expanded="${DOCK.open}" aria-controls="dockPanel"><i class="dot"></i>${esc(label)}${busy && !DOCK.open ? `<span style="font-weight: 400; opacity: .7; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${esc(d.running[0]?.title || 'Телеграм-бот')}</span>` : ''}</button>`;
+  const other = (r) => (r.project !== P ? ` · ${esc(r.projectName)}` : '');
+  const rows = [
+    ...d.running.map((r) => `<div class="dock-row" role="link" tabindex="0" data-go="${esc(r.project)}|${esc(r.key)}"><span class="ic"><i class="spin" style="width: 12px; height: 12px"></i></span><span class="tx"><b>${esc(r.title)}</b><span>${esc(r.status || 'Думаю…')}</span><span>${dockAgo(r.started)}${r.by ? ' · ' + esc(r.by) : ''}${other(r)}</span></span><button type="button" class="stop" data-stop="${esc(r.project)}|${esc(r.key)}">Стоп</button></div>`),
+    ...(d.bot ? [`<div class="dock-row" style="cursor: default"><span class="ic">${svg('tg', 15)}</span><span class="tx"><b>Телеграм-бот</b><span>работает для: ${esc(d.bot.for)}${d.bot.queue ? ` · в очереди ${d.bot.queue}` : ''}</span></span></div>`] : []),
+  ];
+  const done = d.recent.slice(0, 8).map((r) => `<div class="dock-row ${r.at > seen ? 'new' : ''}" role="link" tabindex="0" data-go="${esc(r.project)}|${esc(r.key)}"><span class="ic" style="color: ${r.ok ? '#16A34A' : '#DC2626'}">${r.stopped ? '■' : r.ok ? '✓' : '!'}</span><span class="tx"><b>${esc(r.title)}</b>${r.text ? `<span>${esc(r.text)}</span>` : ''}<span>${r.stopped ? 'остановлено' : r.ok ? 'готово' : 'ошибка'} ${dockAgo(r.at)}${dockAgo(r.at) === 'только что' ? '' : ' назад'}${other(r)}</span></span></div>`).join('');
+  el.innerHTML = (DOCK.open ? `<div class="dock-panel" id="dockPanel" role="region" aria-label="Задачи Claude">
+      <div class="dock-h">Сейчас работает<span style="margin-left: auto; font-weight: 400">до ${d.max} задач сразу</span></div>
+      ${rows.join('') || '<p class="small muted" style="padding: 4px 10px 8px; margin: 0">Ничего не идёт. Задачи можно ставить в любом чате — рилса, поста, проекта — они идут параллельно.</p>'}
+      ${done ? `<div class="dock-h" style="border-top: 1px solid var(--line); margin-top: 4px; padding-top: 10px">За последний час${fresh.length ? '<button type="button" id="dockClear" style="all: unset; margin-left: auto; cursor: pointer; font-weight: 400">отметить прочитанным</button>' : ''}</div>${done}` : ''}
+    </div>` : '') + pill;
+  el.querySelector('.dock-pill').onclick = () => { DOCK.open = !DOCK.open; dockDraw(d); if (DOCK.open) dockTick(); };
+  el.querySelectorAll('[data-go]').forEach((r) => {
+    const go = () => { const [pr, k] = r.dataset.go.split('|'); DOCK.open = false; try { localStorage.setItem('dockSeen', String(Date.now())); } catch {} dockGo(pr, k); dockTick(); };
+    r.onclick = (e) => { if (!e.target.closest('[data-stop]')) go(); };
+    r.onkeydown = (e) => { if (e.key === 'Enter') go(); };
+  });
+  el.querySelectorAll('[data-stop]').forEach((b) => (b.onclick = async () => { const [pr, k] = b.dataset.stop.split('|'); b.disabled = true; await fetch(`/api/stop?project=${encodeURIComponent(pr)}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({key: k})}).catch(() => {}); setTimeout(dockTick, 800); }));
+  $('#dockClear')?.addEventListener('click', () => { try { localStorage.setItem('dockSeen', String(Date.now())); } catch {} dockDraw(d); });
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && DOCK.open) { DOCK.open = false; dockTick(); } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) dockTick(); });
+
 (async () => {
   await loadMe();
   route();
+  dockTick();
 })();
 
 </script>
