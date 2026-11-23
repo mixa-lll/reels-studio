@@ -178,8 +178,9 @@
   .sx-steps i { font-style: normal; color: #A3A3A3; font-size: 12px; }
   .sx-work { flex: 1; display: flex; gap: 24px; padding: 6px 28px 28px; align-items: flex-start; }
   .sx-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  .sx-chat { flex: none; position: sticky; top: 64px; align-self: flex-start; height: 70vh; display: flex; }
-  aside.chatcol.inl { height: 100%; width: 360px; border: 0; border-radius: 14px; background: #F7F7F4; overflow: hidden; }
+  .rrow { flex: 1; min-height: 0; display: flex; }
+  aside.chatcol.inl { height: auto; width: 360px; margin: 12px 12px 12px 0; border: 0; border-radius: 14px; background: #F7F7F4; overflow: hidden; }
+  @media (max-width: 860px) { .rrow { flex-direction: column; } aside.chatcol.inl { width: auto; height: 80vh; margin: 12px; border-top: 0; } }
   aside.chatcol.inl .ctx { display: none; }
   aside.chatcol.inl .chead { border-bottom: 1px solid #ECECE8; }
   aside.chatcol.inl form.send { border-top: 0; }
@@ -248,7 +249,7 @@
   .sx-wait { display: flex; gap: 12px; align-items: center; border: 1.5px solid var(--line); border-radius: 14px; padding: 16px 18px; } .sx-wait div { display: flex; flex-direction: column; gap: 2px; }
   .sx-sk { cursor: default; opacity: .6; } .sx-sk .sx-body i { display: block; height: 16px; border-radius: 6px; background: var(--soft); } .sx-sk .sx-body i:last-child { width: 62%; }
   .sx-go { display: none; }
-  @media (max-width: 1100px) { .sx-go { display: flex; position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 40; align-items: center; gap: 10px; background: #fff; border: 1.5px solid var(--ink); border-radius: 14px; padding: 8px 8px 8px 14px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.14); } .sx-go span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sx-work { flex-wrap: wrap; } .sx-chat { position: static; width: 100%; height: 70vh; } aside.chatcol.inl { width: 100%; } .sx-avr { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+  @media (max-width: 860px) { .sx-go { display: flex; position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 40; align-items: center; gap: 10px; background: #fff; border: 1.5px solid var(--ink); border-radius: 14px; padding: 8px 8px 8px 14px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.14); } .sx-go span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sx-work { flex-wrap: wrap; } .sx-avr { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
   @media (max-width: 720px) { .sx-bar, .sx-work { padding-left: 16px; padding-right: 16px; } .sx-r { grid-template-columns: minmax(0, 1fr); gap: 4px; } .sx-p { font-size: 22px; } .sx-paper { padding: 20px; } .sx-txt { font-size: 19px; } }
   .sx-ed { cursor: default; } .sx-ed .sx-body { gap: 8px; } .sx-ed textarea.f { font-size: 19px; line-height: 1.4; min-height: 96px; }
   .sx-player { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -1794,7 +1795,7 @@ async function vItem(id) {
     <div class="ln-top">${x.batch ? `<a href="#/ideas/${esc(x.batch)}" style="color: var(--muted); text-decoration: none">Пачка ${esc(batchName(x.batch))}</a><span>›</span><span>${at + 1} из ${mates.length}</span>
       <a class="ln-btn s" ${prev ? `href="#/item/${esc(prev.id)}"` : 'aria-disabled="true" style="opacity: .4; pointer-events: none"'} aria-label="Предыдущая идея">‹</a><a class="ln-btn s" ${next ? `href="#/item/${esc(next.id)}"` : 'aria-disabled="true" style="opacity: .4; pointer-events: none"'} aria-label="Следующая идея">›</a><span>·</span>` : ''}<span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b>${esc(x.title)}</b><span>· ${r ? esc(r.name) + ' · ' : ''}${FMT_NAME[x.format].toLowerCase()} · ${whenText(x.at)}</span><span style="flex: 1"></span>${x.proposed ? '<span class="small muted">предложение</span>' : ''}</div>
     ${x.proposed ? '' : lifeBarFor(x, {controls: false}).replace('class="lbar"', 'class="lbar" style="padding: 10px 24px"')}
-    <div class="ibody" style="flex: 1; overflow-y: auto; padding: 14px 40px; display: flex; gap: 32px; min-height: 0">
+    <div class="rrow"><div class="ibody" style="flex: 1; min-width: 0; overflow-y: auto; padding: 14px 40px; display: flex; gap: 32px; min-height: 0">
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px">
         <span class="small muted">${x.by === 'Claude' ? 'Предложил Claude' : x.by === 'owner' ? 'Твоя идея' : x.by ? 'Добавил ' + esc(x.by) : 'Идея'}${x.takenBy ? ' · взял ' + esc(x.takenBy) : ''}</span>
         <label style="display: flex; flex-direction: column; gap: 6px"><span class="lbl">Название</span><input class="f" data-i="title" value="${esc(x.title)}" ${ed ? '' : 'readonly'} style="border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 15px"></label>
@@ -1819,8 +1820,8 @@ async function vItem(id) {
           ${prop('Дата', `<input class="f" data-i="at" type="datetime-local" value="${esc((x.at || '').slice(0, 16))}" ${ed ? '' : 'readonly'} style="width: auto; min-height: 30px; font-size: 13px; border-color: transparent">`)}
         </div>
       </div>
-    </div></div>
-    <aside class="chatcol" aria-label="Чат идеи"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат идеи</b><span class="small muted">Claude правит только эту идею</span></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+    </div>
+    <aside class="chatcol inl" aria-label="Чат идеи"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">Чат идеи</b><span class="small muted">Claude правит только эту идею</span></div><div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div></div></div>`;
   wireLifeBar(view, () => vItem(id));
   // Each idea has its own chat (server preamble «idea-<id>»): it edits only this item.
   const box = chatBox('idea-' + x.id, {onDone: () => { ITEMS_AT = 0; sidebar(); if (location.hash === '#/item/' + id) vItem(id); }});
@@ -1880,8 +1881,8 @@ async function vReel(id, tab) {
   const keep = !isNew && REEL_CHAT?.id === id && view.contains(REEL_CHAT.box) ? REEL_CHAT.box : null;
   view.innerHTML = isNew || !r
     ? `<div class="work"><div class="chat">${head}${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`
-    : `<div class="work"><div class="rmain">${head}<div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
-      <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+    : `<div class="work"><div class="rmain">${head}<div class="rrow"><div id="reelHost" style="flex: 1; min-width: 0; overflow-y: auto"></div>
+      <aside class="chatcol inl" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div></div></div>`;
   const box = keep || chatBox(id, {
     onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
     onDone: (k) => {
@@ -1948,12 +1949,8 @@ const secondsOf = (t) => Math.max(1, Math.round(String(t || '').split(/\s+/).fil
 const SX_KIND = {frame: ['Кадр', '#737373'], broll: ['Перебивка', '#737373'], gfx: ['Графика', '#2F6FEB'], text: ['Текст', '#C2620A'], sound: ['Звук', '#0F7F78']};
 const SX_HAVE = {style: ['в стиле', 'y'], ready: ['есть', 'y'], shoot: ['снять', 's'], new: ['нет в стиле', 'n']};
 // The chat column of the reel: inside the stage on «Сценарий», back on the right everywhere else.
-function dockChat(slot) {
-  const a = $('aside.chatcol'), work = $('#view .work');
-  if (!a || !work) return;
-  if (slot) { slot.append(a); a.classList.add('inl'); }
-  else if (a.parentElement !== work) { work.append(a); a.classList.remove('inl'); }
-}
+// The chat of a release is a panel inside the stage on every tab (.rrow); nothing to move.
+function dockChat() {}
 const sxRedraw = (id, s) => stageScript(id, {...REEL_CACHE.get(id)?.data, script: s});
 function stageScript(id, data) {
   dockChat(null);
@@ -1980,13 +1977,9 @@ function stageScript(id, data) {
     bar = `${steps}<span class="small muted">${all.length ? `${cnt('gfx')} графики · ${cnt('text')} текста на экране${shoot ? ` · снять ${shoot}` : ''}` : 'вид ещё не разложен'}</span><span style="flex: 1"></span>${undo}${prompt}
       ${canEdit() && all.length ? (s.look?.ok ? '<a class="btn" href="#/reel/' + esc(id) + '/materials">Вид утверждён → Материалы</a>' : '<button type="button" class="btn primary" id="sxLookOk">Утвердить вид</button>') : ''}`;
   }
-  host.innerHTML = `<div class="sx"><div class="sx-bar">${bar}</div><div class="sx-work"><div class="sx-main" id="sxMain"></div><div class="sx-chat" id="sxChat"></div></div></div>`;
-  dockChat($('#sxChat'));
-  // The chat column fits the visible part of the stage, under the bar, and stays there while the blocks scroll.
-  const fit = () => { const c = $('#sxChat'), b = host.querySelector('.sx-bar'); if (c && b && innerWidth > 1100) c.style.height = Math.max(420, host.clientHeight - b.offsetHeight - 30) + 'px'; else if (c) c.style.height = ''; };
-  fit(); window.onresize = fit;
+  host.innerHTML = `<div class="sx"><div class="sx-bar">${bar}</div><div class="sx-work"><div class="sx-main" id="sxMain"></div></div></div>`;
   // On a phone the chat sits under the blocks and its history scrolls the page down to itself: open on the text.
-  if (innerWidth <= 1100 && !st.seen) { st.seen = true; const top = () => host.querySelector('.sx')?.scrollIntoView({block: 'start'}); top(); chatOf()?.ready?.then(() => setTimeout(top, 60)); }
+  if (innerWidth <= 860 && !st.seen) { st.seen = true; const top = () => host.querySelector('.sx')?.scrollIntoView({block: 'start'}); top(); chatOf()?.ready?.then(() => setTimeout(top, 60)); }
   const act = async (b, msg) => { const r = await post('/api/reel/script', {reel: id, ...b}).catch(() => null); if (!r?.script) return toast('Не получилось — попробуйте ещё раз'); data.script = r.script; if (msg) toast(msg); stageScript(id, data); };
   SX[id].act = act;
   const main = $('#sxMain');
@@ -1997,7 +1990,7 @@ function stageScript(id, data) {
   // Phone: the chat is under the blocks, so what is picked gets a bar at the bottom that leads to it.
   if (st.sel.length || st.phrase) {
     host.querySelector('.sx').insertAdjacentHTML('beforeend', `<div class="sx-go"><span>${esc($('.pinchip')?.firstChild?.textContent || 'Выбрано')} — в чате</span><button type="button" class="btn primary" id="sxGo">Написать ↓</button></div>`);
-    $('#sxGo').onclick = () => { $('#sxChat').scrollIntoView({block: 'end'}); chatOf()?.querySelector('textarea')?.focus(); };
+    $('#sxGo').onclick = () => { $('aside.chatcol').scrollIntoView({block: 'end'}); chatOf()?.querySelector('textarea')?.focus(); };
   }
   host.querySelectorAll('[data-sxstep]').forEach((b) => (b.onclick = () => { st.step = b.dataset.sxstep; st.sel = []; st.phrase = null; st.edit = null; stageScript(id, data); }));
   host.querySelectorAll('[data-sxview]').forEach((b) => (b.onclick = () => { st.view = b.dataset.sxview; st.phrase = null; st.edit = null; stageScript(id, data); }));
@@ -2042,7 +2035,7 @@ function sxPick(main, id, s, st, selector) {
     if (e.shiftKey) st.sel = st.sel.includes(bid) ? st.sel.filter((x) => x !== bid) : [...st.sel, bid];
     else st.sel = st.sel.length === 1 && st.sel[0] === bid ? [] : [bid];
     sxRedraw(id, s);
-    if (innerWidth > 1100) chatOf()?.querySelector('textarea')?.focus();
+    if (innerWidth > 860) chatOf()?.querySelector('textarea')?.focus();
   }));
 }
 // Picking words inside a block's text pins those words (the phrase), not the whole block.
@@ -2283,9 +2276,7 @@ function prompter(s, startId, id) {
 // Before script.json (older reels): scenes on the left, each scene as a card; clicking a scene drafts a note about it.
 function stageScenes(id, data) {
   if (sessionStorage.getItem('sxWriting:' + id) && !Array.isArray(data.scenes)) {
-    $('#reelHost').innerHTML = `<div class="sx"><div class="sx-work"><div class="sx-main"><div class="sx-wait"><i class="spin"></i><div><b>Claude пишет текст по смысловым блокам</b><span class="muted">Обычно около минуты. Блоки появятся здесь сами — их можно будет править по одному, менять местами и утверждать.</span></div></div>${'<div class="sx-b sx-sk"><span class="sx-g"></span><div class="sx-body"><i></i><i></i></div></div>'.repeat(4)}</div><div class="sx-chat" id="sxChat"></div></div></div>`;
-    dockChat($('#sxChat'));
-    const c = $('#sxChat'); if (innerWidth > 1100) c.style.height = Math.max(420, $('#reelHost').clientHeight - 40) + 'px';
+    $('#reelHost').innerHTML = `<div class="sx"><div class="sx-work"><div class="sx-main"><div class="sx-wait"><i class="spin"></i><div><b>Claude пишет текст по смысловым блокам</b><span class="muted">Обычно около минуты. Блоки появятся здесь сами — их можно будет править по одному, менять местами и утверждать.</span></div></div>${'<div class="sx-b sx-sk"><span class="sx-g"></span><div class="sx-body"><i></i><i></i></div></div>'.repeat(4)}</div></div></div>`;
     // The blocks show as soon as the file is written, without waiting for the end of Claude's turn.
     const poll = setInterval(async () => {
       if (!$('.sx-wait') || !location.hash.startsWith('#/reel/' + id)) return clearInterval(poll);
@@ -2542,10 +2533,10 @@ async function vPost(id, stage) {
     ${nav || `    <div class="chead"><div style="flex: 1; min-width: 220px"><div class="small muted"><a href="#/all">Выпуски</a> › ${esc((KIND[p.kind] || 'пост').toLowerCase())}</div><h1 style="font-size: 20px; display: flex; align-items: center; gap: 10px">${esc(p.title || 'Пост')} ${kindBadge(p.kind)}</h1></div>
       ${nav ? '' : `<nav class="stg" aria-label="Этапы">${stages.map(([k, t], i) => `<a href="#/post/${esc(id)}/${k}" class="${k === stage ? 'on' : i < atI ? 'done' : ''}">${t}</a>`).join('')}</nav>`}
       ${canEdit() ? `<select class="f" id="kindSel" aria-label="Тип поста" style="width: auto; min-height: 36px">${[['text', 'Текст'], ['photo', 'С фото'], ['carousel', 'Карусель']].map(([k, t]) => `<option value="${k}" ${k === p.kind ? 'selected' : ''}>${t}</option>`).join('')}</select>` : ''}</div>`}
-    <div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
-    <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
+    <div class="rrow"><div id="reelHost" style="flex: 1; min-width: 0; overflow-y: auto"></div>
+    <aside class="chatcol inl" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat">Новый чат</button>' : ''}</div>
       <div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span><span class="chip">этот пост</span></div>
-      <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
+      <div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div></div></div>`;
   wireRelHead(view, () => vPost(id, stage));
   const box = chatBox('post-' + id, {onDone: () => { sidebar(); if (stage !== 'idea') drawPost(id, stage); }});
   $('#chatHost').append(box);
