@@ -173,12 +173,16 @@
   .sx-bar .seg button { cursor: pointer; }
   .sx-steps { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
   .sx-steps button { border: 0; background: none; border-radius: 7px; padding: 6px 12px; font-size: 13px; color: var(--muted); cursor: pointer; }
-  .sx-steps button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .sx-steps button[aria-pressed="true"], .sx-steps a.on { background: var(--ink); color: #fff; }
+  .sx-steps a { border-radius: 7px; padding: 6px 12px; font-size: 13px; color: var(--muted); text-decoration: none; }
   .sx-steps button:disabled { cursor: not-allowed; opacity: .55; }
   .sx-steps i { font-style: normal; color: #A3A3A3; font-size: 12px; }
   .sx-work { flex: 1; display: flex; gap: 24px; padding: 6px 28px 28px; align-items: flex-start; }
   .sx-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
   .rrow { flex: 1; min-height: 0; display: flex; }
+  .rfoot { flex: none; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 60px; padding: 8px 24px; border-top: 1px solid var(--line); box-sizing: border-box; }
+  .rfoot[hidden] { display: none; } .rfoot .btn { min-height: 38px; display: inline-flex; align-items: center; text-decoration: none; }
+  @media (max-width: 860px) { .rfoot { position: sticky; bottom: 0; background: var(--bg); padding: 8px 16px; z-index: 6; } .rfoot > .small { flex-basis: 100%; } }
   aside.chatcol.inl { height: auto; width: 360px; margin: 12px 12px 12px 0; border: 0; border-radius: 14px; background: #F7F7F4; overflow: hidden; }
   @media (max-width: 860px) { .rrow { flex-direction: column; } aside.chatcol.inl { width: auto; height: 80vh; margin: 12px; border-top: 0; } }
   aside.chatcol.inl .ctx { display: none; }
@@ -249,7 +253,7 @@
   .sx-wait { display: flex; gap: 12px; align-items: center; border: 1.5px solid var(--line); border-radius: 14px; padding: 16px 18px; } .sx-wait div { display: flex; flex-direction: column; gap: 2px; }
   .sx-sk { cursor: default; opacity: .6; } .sx-sk .sx-body i { display: block; height: 16px; border-radius: 6px; background: var(--soft); } .sx-sk .sx-body i:last-child { width: 62%; }
   .sx-go { display: none; }
-  @media (max-width: 860px) { .sx-go { display: flex; position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 40; align-items: center; gap: 10px; background: #fff; border: 1.5px solid var(--ink); border-radius: 14px; padding: 8px 8px 8px 14px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.14); } .sx-go span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sx-work { flex-wrap: wrap; } .sx-avr { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+  @media (max-width: 860px) { .sx-go { display: flex; position: fixed; left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 40; align-items: center; gap: 10px; background: #fff; border: 1.5px solid var(--ink); border-radius: 14px; padding: 8px 8px 8px 14px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.14); } .sx-go span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sx-work { flex-wrap: wrap; } .sx-avr { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
   @media (max-width: 720px) { .sx-bar, .sx-work { padding-left: 16px; padding-right: 16px; } .sx-r { grid-template-columns: minmax(0, 1fr); gap: 4px; } .sx-p { font-size: 22px; } .sx-paper { padding: 20px; } .sx-txt { font-size: 19px; } }
   .sx-ed { cursor: default; } .sx-ed .sx-body { gap: 8px; } .sx-ed textarea.f { font-size: 19px; line-height: 1.4; min-height: 96px; }
   .sx-player { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -1542,15 +1546,18 @@ async function lifeBar(kind, id) {
 }
 // One navigation for a reel or post (LeanRelease): the five stages are the tabs; a stage with
 // more than one screen (Материал: сценарий и материалы) shows them underneath.
-const REEL_STEPS = {idea: ['idea'], material: ['script', 'materials'], build: ['edit'], ready: ['publish'], published: ['publish']};
+// Text and look are steps of «Идея» (canvas «Рилс — концепт», page «★ Все этапы»): 1 · Замысел → 2 · Текст → 3 · Вид.
+const REEL_STEPS = {idea: ['idea', 'script', 'look'], material: ['materials'], build: ['edit'], ready: ['publish'], published: ['publish']};
 const POST_STEPS = (k) => ({idea: ['idea'], material: ['text'], build: k === 'carousel' ? ['struct', 'slides'] : ['text'], ready: ['publish'], published: ['publish']});
-const STEP_NAME = {idea: 'Идея', script: 'Сценарий', materials: 'Материалы', edit: 'Монтаж', publish: 'Выкладка', text: 'Текст и фото', struct: 'Структура', slides: 'Слайды'};
+const STEP_NAME = {idea: 'Замысел', script: 'Текст', look: 'Вид', materials: 'Материалы', edit: 'Монтаж', publish: 'Выкладка', text: 'Текст и фото', struct: 'Структура', slides: 'Слайды'};
+// The steps inside a stage («1 · Замысел → 2 · Текст → 3 · Вид»): one control for every stage that has several.
+const stepsNav = (list, tab, base) => list.length > 1 ? `<div class="lsub"><nav class="sx-steps" aria-label="Шаги этапа">${list.map((t, i) => `${i ? '<i aria-hidden="true">→</i>' : ''}<a href="${base}${t}" ${t === tab ? 'aria-current="step" class="on"' : ''}><b>${i + 1} · ${STEP_NAME[t]}</b></a>`).join('')}</nav></div>` : '';
 async function lifeNav(kind, id, steps, tab, base) {
   await loadItems().catch(() => null);
   const x = ITEMS?.items.find((y) => y.ref?.kind === kind && y.ref.id === id);
   if (!x) return '';
   const viewing = LIFE.map(([s]) => s).find((s) => steps[s].includes(tab) && (s === x.stage || !LIFE.some(([o]) => o === x.stage && steps[o].includes(tab)))) || x.stage;
-  const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
+  const subs = stepsNav(steps[viewing], tab, base);
   return lifeBarFor(x, {href: (s) => base + steps[s][0], viewing}) + subs;
 }
 // The «Идея» screen of a reel or post that already has its folder: the concept, editable.
@@ -1630,7 +1637,7 @@ async function relHead(kind, id, steps, tab, base, title) {
   // «Готово» and «Вышло» share a page, so that page offers both.
   const later = (steps.ready.includes(tab) ? ['ready', 'published'] : [viewing]).filter((st) => LIFE.findIndex(([o]) => o === st) > k);
   const ahead = ed && later.length ? `<div class="rback">${svg('eye', 15)}<span style="flex: 1">Выпуск сейчас на этапе «${LIFE[k][1]}».${later.includes('published') ? ' Уже готов или вышел — отметьте вручную.' : ''}</span>${later.map((st) => `<button type="button" class="ln-btn ${st === later.at(-1) ? 'p' : ''} s" data-setstage="${st}" data-item="${x.id}">${st === 'published' ? 'Отметить «Вышло»' : `Перевести на «${LIFE.find(([o]) => o === st)[1]}»`}</button>`).join('')}</div>` : '';
-  const subs = steps[viewing].length > 1 ? `<div class="lsub"><span class="ln-seg">${steps[viewing].map((t) => `<a href="${base}${t}" class="${t === tab ? 'on' : ''}">${STEP_NAME[t]}</a>`).join('')}</span></div>` : '';
+  const subs = stepsNav(steps[viewing], tab, base);
   return `<div class="rhead" data-item="${x.id}">
     <a href="#/all" class="rcrumb">‹ Выпуски</a><span class="slash">/</span>
     <span class="rsq" style="background: ${esc(r?.color || '#A3A3A3')}"></span><b class="rtitle" title="${esc(title)}">${esc(title)}</b>
@@ -1870,34 +1877,34 @@ async function vReel(id, tab) {
   const [data] = warm ? [cached.data] : await Promise.all([req, loadItems().catch(() => null)]);
   if (warm) req.then((d) => { if (d && JSON.stringify(d) !== JSON.stringify(cached.data) && location.hash.startsWith('#/reel/' + id) && $('#reelHost')) drawStage(id, reelTab() || tab, d); });
   const r = data?.reel;
-  if (r && (!tab || tab === 'files')) tab = tab === 'files' ? 'materials' : stageAt(r);
+  // No tab in the address: the release opens where it is — the text while it is an idea, the files on «Материал».
+  if (r && (!tab || tab === 'files')) { const it = ITEMS?.items.find((y) => y.ref?.kind === 'reel' && y.ref.id === id); tab = tab === 'files' || !r.version && it?.stage === 'material' ? 'materials' : stageAt(r); }
   const nav = r ? await relHead('reel', id, REEL_STEPS, tab, `#/reel/${id}/`, `${r.num} · ${r.title}`) : '';
   title(r ? `${r.num} ${r.title}` : 'Новый выпуск');
   const head = nav || `<div class="chead"><div style="flex: 1; min-width: 200px"><div class="small muted"><a href="#/all">Выпуски</a> › рилс</div><h1 style="font-size: 20px">${r ? `${esc(r.num)} · ${esc(r.title)}` : 'Новый выпуск'}</h1></div>
       ${stages(r, tab)}<span id="dlTop" class="row" style="gap: 8px"></span></div>`;
   const ctx = `<div class="ctx">Claude знает: <span class="chip">бриф</span><span class="chip">правила</span><span class="chip">дизайн-систему</span>${r ? `<span class="chip">сценарий и правки ${esc(r.num)}</span>` : ''}</div>`;
-  const chatName = {script: 'Чат сценария', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
+  const chatName = {idea: 'Чат замысла', script: 'Чат текста', look: 'Чат вида', materials: 'Чат материалов', edit: 'Чат выпуска', compare: 'Чат выпуска', publish: 'Чат выкладки'}[tab] || 'Чат выпуска';
   // A reel that exists: its stage in the middle, its chat as a column on the right (CleanReel, CleanText…).
   const keep = !isNew && REEL_CHAT?.id === id && view.contains(REEL_CHAT.box) ? REEL_CHAT.box : null;
   view.innerHTML = isNew || !r
     ? `<div class="work"><div class="chat">${head}${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`
     : `<div class="work"><div class="rmain">${head}<div class="rrow"><div id="reelHost" style="flex: 1; min-width: 0; overflow-y: auto"></div>
-      <aside class="chatcol inl" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div></div></div>`;
+      <aside class="chatcol inl" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div><div class="rfoot" id="reelFoot" hidden></div></div></div>`;
   const box = keep || chatBox(id, {
     onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
     onDone: (k) => {
       REEL_CACHE.delete(k); sidebar();
       if (k.startsWith('new-')) return;
       const t = reelTab() || tab;
-      if (isNew) vReel(k); else if (['edit', 'script', 'publish'].includes(t) && location.hash.startsWith('#/reel/' + k)) drawStage(k, t);
+      if (isNew) vReel(k); else if (['edit', 'script', 'look', 'idea', 'publish'].includes(t) && location.hash.startsWith('#/reel/' + k)) drawStage(k, t);
     },
   });
   REEL_CHAT = isNew ? null : {id, box};
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id, tab); } });
   wireRelHead(view, () => vReel(id, tab));
-  if (r && tab === 'idea') drawIdea($('#reelHost'), 'reel', id);
-  else if (r) drawStage(id, tab, data);
+  if (r) drawStage(id, tab, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
   if (pending) { sessionStorage.removeItem('firstMsg:' + id); const {text, shown} = JSON.parse(pending); await box.ready; box.say(text, shown); }
 }
@@ -1916,6 +1923,18 @@ async function uploadFile(f, query, onPart) {
   return r.json();
 }
 const chatOf = () => $('#chatHost > div');
+// The bottom bar of a stage: a hint on the left; «вернуть», «назад» and ONE black button forward on the right.
+// {note, undo: fn, back: {label, href}, next: {label, href | run, off: why}} — null hides the bar.
+function setFoot(f) {
+  const el = $('#reelFoot');
+  if (!el) return;
+  el.hidden = !f;
+  if (!f) return (el.innerHTML = '');
+  const n = f.next;
+  el.innerHTML = `<span class="small muted" style="flex: 1; min-width: 0">${esc(f.note || '')}</span>${f.undo ? '<button type="button" class="btn" data-ft="undo" style="border-color: transparent">↩ Вернуть как было</button>' : ''}${f.back ? `<a class="btn" href="${f.back.href}">${esc(f.back.label)}</a>` : ''}${n ? (n.href && !n.off ? `<a class="btn primary" href="${n.href}">${esc(n.label)}</a>` : `<button type="button" class="btn primary" data-ft="next" ${n.off ? `disabled title="${esc(n.off)}"` : ''}>${esc(n.label)}</button>`) : ''}`;
+  el.querySelector('[data-ft="undo"]')?.addEventListener('click', f.undo);
+  if (n?.run && !n.off) el.querySelector('[data-ft="next"]').onclick = (e) => { e.target.disabled = true; n.run(); };
+}
 // Puts text into the reel chat's input (a timecode, a scene) without sending it.
 function draft(text) {
   const ta = $('#chatHost textarea');
@@ -1929,8 +1948,15 @@ const tc = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2
 
 async function drawStage(id, tab, data) {
   data ||= await getReel(id);
-  if (tab !== 'script') { dockChat(null); chatOf()?.pin?.(null); }
-  if (tab === 'script') return stageScript(id, data);
+  if (tab === 'idea') {
+    setFoot(null); chatOf()?.pin?.(null);
+    drawIdea($('#reelHost'), 'reel', id);
+    return setFoot(data.script ? {note: 'Замысел можно править и потом — текст от этого сам не поменяется.', next: {label: 'К тексту →', href: `#/reel/${id}/script`}}
+      : {note: 'Хватит названия: пустые поля Claude заполнит сам.', next: canEdit() ? {label: 'Написать текст →', run: () => { sessionStorage.setItem('sxWriting:' + id, '1'); location.hash = `#/reel/${id}/script`; setTimeout(() => chatOf()?.say('Напиши текст этого рилса по смысловым блокам в script.json (шаг «2 · Текст»): крючок — первым блоком, дальше по ходу, в конце призыв. Замысел — в README и в items.json.', 'Написать текст'), 300); }} : null});
+  }
+  if (tab !== 'script' && tab !== 'look') chatOf()?.pin?.(null);
+  setFoot(null);
+  if (tab === 'script' || tab === 'look') return stageScript(id, data, tab);
   if (tab === 'materials') return reelFiles(id, data);
   if (tab === 'compare') return stageCompare(id, data);
   if (tab === 'publish') return stagePublish(id, data);
@@ -1952,8 +1978,7 @@ const SX_HAVE = {style: ['в стиле', 'y'], ready: ['есть', 'y'], shoot:
 // The chat of a release is a panel inside the stage on every tab (.rrow); nothing to move.
 function dockChat() {}
 const sxRedraw = (id, s) => stageScript(id, {...REEL_CACHE.get(id)?.data, script: s});
-function stageScript(id, data) {
-  dockChat(null);
+function stageScript(id, data, tab = reelTab() === 'look' ? 'look' : 'script') {
   try { speechSynthesis.cancel(); } catch {}
   if (!data.script) return stageScenes(id, data);
   sessionStorage.removeItem('sxWriting:' + id);
@@ -1961,21 +1986,19 @@ function stageScript(id, data) {
   const ids = new Set(s.blocks.map((b) => b.id));
   st.sel = st.sel.filter((x) => ids.has(x));
   if (st.phrase && !ids.has(st.phrase.id)) st.phrase = null;
-  if (!st.step) st.step = s.text?.ok ? 'look' : 'text';
+  if (st.step !== (tab === 'look' ? 'look' : 'text')) { st.sel = []; st.phrase = null; st.edit = null; }
+  st.step = tab === 'look' ? 'look' : 'text';
   const look = st.step === 'look', okN = s.blocks.filter((b) => b.ok).length;
-  const steps = `<div class="sx-steps" role="group" aria-label="Шаг сценария"><button type="button" data-sxstep="text" aria-pressed="${!look}"><b>1 · Текст${s.text?.ok ? ' ✓' : ''}</b></button><i aria-hidden="true">→</i><button type="button" data-sxstep="look" aria-pressed="${look}" ${s.text?.ok ? '' : 'disabled title="Сначала утвердите текст"'}><b>2 · Вид</b></button></div>`;
-  const undo = canEdit() && s.canUndo ? '<button type="button" class="btn" id="sxUndo" title="Вернуть сценарий, каким он был до последней правки">↩ Вернуть как было</button>' : '';
   const prompt = `<button type="button" class="btn" id="sxPrompt" title="Суфлёр на весь экран: текст по блокам, запись дублей">${'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"></path></svg>'}Суфлёр</button>`;
   let bar;
   if (!look) {
-    bar = `${steps}<nav class="seg" aria-label="Как показать"><button type="button" class="${st.view === 'blocks' ? 'on' : ''}" data-sxview="blocks">Блоками</button><button type="button" class="${st.view === 'read' ? 'on' : ''}" data-sxview="read">Сплошным</button></nav>
-      <span class="small muted">${s.blocks.length} ${sxPlural(s.blocks.length, 'блок', 'блока', 'блоков')} · ≈ ${mmss(s.total)}${s.text?.ok ? ' · текст утверждён' : ` · утверждено ${okN}`}</span><span style="flex: 1"></span>${undo}${prompt}
+    bar = `<nav class="seg" aria-label="Как показать"><button type="button" class="${st.view === 'blocks' ? 'on' : ''}" data-sxview="blocks">Блоками</button><button type="button" class="${st.view === 'read' ? 'on' : ''}" data-sxview="read">Сплошным</button></nav>
+      <span class="small muted">${s.blocks.length} ${sxPlural(s.blocks.length, 'блок', 'блока', 'блоков')} · ≈ ${mmss(s.total)}${s.text?.ok ? ' · текст утверждён' : ` · утверждено ${okN}`}</span><span style="flex: 1"></span>${prompt}
       ${canEdit() && !s.text?.ok && st.view === 'blocks' ? '<button type="button" class="btn" id="sxAdd">+ Блок</button>' : ''}
-      ${canEdit() ? (s.text?.ok ? '<button type="button" class="btn" id="sxReopen" title="Текст снова можно править; вид останется">Открыть текст</button>' : '<button type="button" class="btn primary" id="sxOk">Утвердить текст</button>') : ''}`;
+      ${canEdit() && s.text?.ok ? '<button type="button" class="btn" id="sxReopen" title="Текст снова можно править; вид останется">Открыть текст</button>' : ''}`;
   } else {
     const all = s.blocks.flatMap((b) => b.look || []), cnt = (k) => all.filter((x) => x.kind === k).length, shoot = all.filter((x) => x.have === 'shoot').length;
-    bar = `${steps}<span class="small muted">${all.length ? `${cnt('gfx')} графики · ${cnt('text')} текста на экране${shoot ? ` · снять ${shoot}` : ''}` : 'вид ещё не разложен'}</span><span style="flex: 1"></span>${undo}${prompt}
-      ${canEdit() && all.length ? (s.look?.ok ? '<a class="btn" href="#/reel/' + esc(id) + '/materials">Вид утверждён → Материалы</a>' : '<button type="button" class="btn primary" id="sxLookOk">Утвердить вид</button>') : ''}`;
+    bar = `<span class="small muted">${!s.text?.ok ? 'вид раскладывается по утверждённому тексту' : all.length ? `${cnt('gfx')} графики · ${cnt('text')} текста на экране${shoot ? ` · снять ${shoot}` : ''}${s.look?.ok ? ' · вид утверждён' : ''}` : 'вид ещё не разложен'}</span><span style="flex: 1"></span>${prompt}`;
   }
   host.innerHTML = `<div class="sx"><div class="sx-bar">${bar}</div><div class="sx-work"><div class="sx-main" id="sxMain"></div></div></div>`;
   // On a phone the chat sits under the blocks and its history scrolls the page down to itself: open on the text.
@@ -1992,12 +2015,14 @@ function stageScript(id, data) {
     host.querySelector('.sx').insertAdjacentHTML('beforeend', `<div class="sx-go"><span>${esc($('.pinchip')?.firstChild?.textContent || 'Выбрано')} — в чате</span><button type="button" class="btn primary" id="sxGo">Написать ↓</button></div>`);
     $('#sxGo').onclick = () => { $('aside.chatcol').scrollIntoView({block: 'end'}); chatOf()?.querySelector('textarea')?.focus(); };
   }
-  host.querySelectorAll('[data-sxstep]').forEach((b) => (b.onclick = () => { st.step = b.dataset.sxstep; st.sel = []; st.phrase = null; st.edit = null; stageScript(id, data); }));
   host.querySelectorAll('[data-sxview]').forEach((b) => (b.onclick = () => { st.view = b.dataset.sxview; st.phrase = null; st.edit = null; stageScript(id, data); }));
-  $('#sxUndo')?.addEventListener('click', () => act({op: 'undo'}, 'Вернул как было'));
-  $('#sxOk')?.addEventListener('click', () => act({op: 'step', step: 'text'}, 'Текст утверждён — дальше «2 · Вид»').then(() => { st.step = 'look'; st.sel = []; st.phrase = null; stageScript(id, data); }));
   $('#sxReopen')?.addEventListener('click', () => act({op: 'step', step: 'text', on: false}));
-  $('#sxLookOk')?.addEventListener('click', () => act({op: 'step', step: 'look'}, 'Вид утверждён'));
+  const undo = canEdit() && s.canUndo ? () => act({op: 'undo'}, 'Вернул как было') : null;
+  const base = `#/reel/${id}/`, hasLook = s.blocks.some((b) => b.look?.length);
+  if (!look) setFoot({note: s.text?.ok ? 'Текст утверждён. Чтобы править блоки, нажмите «Открыть текст».' : 'Клик по блоку — он в чате. Утверждённые блоки Claude не трогает.', undo, back: {label: '← К замыслу', href: base + 'idea'},
+    next: s.text?.ok ? {label: 'К виду →', href: base + 'look'} : canEdit() ? {label: 'Текст готов → Вид', run: async () => { await act({op: 'step', step: 'text'}, 'Текст утверждён'); location.hash = base + 'look'; }} : null});
+  else setFoot({note: 'Вид держится за слова текста: поменяется текст блока — поправьте и его вид.', undo, back: {label: '← К тексту', href: base + 'script'},
+    next: s.look?.ok ? {label: 'К материалу →', href: base + 'materials'} : canEdit() ? {label: 'Вид готов → Материал', off: !s.text?.ok ? 'Сначала утвердите текст' : !hasLook ? 'Сначала разложите вид по блокам' : '', run: async () => { await act({op: 'step', step: 'look'}, 'Вид утверждён'); location.hash = base + 'materials'; }} : null});
   $('#sxAdd')?.addEventListener('click', () => { st.edit = {id: null, after: st.sel[0] || s.blocks.at(-1)?.id}; stageScript(id, data); });
   $('#sxPrompt')?.addEventListener('click', () => prompter(s, st.sel[0] || st.phrase?.id, id));
 }
@@ -2148,9 +2173,10 @@ function sxFrame(b, big) {
 // «2 · Вид»: what is said on the left, what is on screen on the right; the words graphics start on are underlined.
 function sxLook(main, id, s, st) {
   const any = s.blocks.some((b) => b.look?.length);
+  if (!s.text?.ok && !any) { main.innerHTML = `<div class="sx-empty"><b>Сначала текст</b><span class="muted">Вид раскладывается по утверждённому тексту: что на экране на каждом блоке и на каких словах.</span><a class="btn" href="#/reel/${esc(id)}/script">← К тексту</a></div>`; return; }
   if (!any) {
     main.innerHTML = `<div class="sx-empty"><b>Вид ещё не разложен</b><span class="muted">Claude пройдёт по утверждённому тексту и для каждого блока напишет, что на экране: кадр, графика из стиля проекта, текст на экране, звук — и на каких словах это появляется.</span>${canEdit() ? '<button type="button" class="btn primary" id="sxLookMake">Разложить вид по блокам</button>' : ''}</div>`;
-    $('#sxLookMake')?.addEventListener('click', () => chatOf().say('(step «2 · Вид» of script.json) Разложи вид по всем блокам: что на экране на каждом, на каких словах, из какого шаблона стиля, что нужно доснять.', 'Разложить вид по блокам'));
+    $('#sxLookMake')?.addEventListener('click', () => chatOf().say('(step «3 · Вид» of script.json) Разложи вид по всем блокам: что на экране на каждом, на каких словах, из какого шаблона стиля, что нужно доснять.', 'Разложить вид по блокам'));
     return;
   }
   const under = (b) => {
@@ -2171,7 +2197,7 @@ function sxLook(main, id, s, st) {
       <div class="sx-say">${under(b)}</div>
       <div class="sx-els">${(b.look || []).map((x) => { const [n, c] = SX_KIND[x.kind] || SX_KIND.gfx, h = SX_HAVE[x.have]; return `<div class="sx-el"><span class="sx-k" style="color: ${c}"><i style="background: ${c}"></i>${n}</span><span class="sx-w">${esc(x.what)}${x.at || x.tpl ? `<small>${x.at ? `на «${esc(x.at)}»` : 'весь блок'}${x.tpl ? ` · шаблон «${esc(x.tpl)}»` : ''}</small>` : ''}</span>${h ? `<span class="sx-have ${h[1]}">${h[0]}</span>` : ''}</div>`; }).join('') || '<span class="small muted">пока ничего</span>'}</div>
     </div>`).join('')}</div>
-    ${shoot.length ? `<div class="sx-shoot"><b>Доснять · ${shoot.length}</b>${shoot.map((x) => `<span>${esc(x)}</span>`).join('')}<a href="#/reel/${esc(id)}/materials" class="small">Весь список — в «Материалах»</a></div>` : ''}`;
+    ${shoot.length ? `<div class="sx-shoot"><b>Доснять · ${shoot.length}</b>${shoot.map((x) => `<span>${esc(x)}</span>`).join('')}<a href="#/reel/${esc(id)}/materials" class="small">Весь список — на этапе «Материал»</a></div>` : ''}`;
   main.querySelectorAll('[data-fr]').forEach((f) => (f.onclick = () => { st.phrase = null; st.sel = st.sel[0] === f.dataset.fr ? [] : [f.dataset.fr]; sxRedraw(id, s); main.querySelector(`.sx-avr[data-id="${f.dataset.fr}"]`)?.scrollIntoView({block: 'nearest'}); }));
   sxPick(main, id, s, st, '.sx-avr');
   sxWords(main, id, s, st, '.sx-say');
@@ -2277,6 +2303,7 @@ function prompter(s, startId, id) {
 function stageScenes(id, data) {
   if (sessionStorage.getItem('sxWriting:' + id) && !Array.isArray(data.scenes)) {
     $('#reelHost').innerHTML = `<div class="sx"><div class="sx-work"><div class="sx-main"><div class="sx-wait"><i class="spin"></i><div><b>Claude пишет текст по смысловым блокам</b><span class="muted">Обычно около минуты. Блоки появятся здесь сами — их можно будет править по одному, менять местами и утверждать.</span></div></div>${'<div class="sx-b sx-sk"><span class="sx-g"></span><div class="sx-body"><i></i><i></i></div></div>'.repeat(4)}</div></div></div>`;
+    setFoot({note: 'Claude пишет текст — можно пока дописать в чат, что важно сказать.', back: {label: '← К замыслу', href: `#/reel/${id}/idea`}});
     // The blocks show as soon as the file is written, without waiting for the end of Claude's turn.
     const poll = setInterval(async () => {
       if (!$('.sx-wait') || !location.hash.startsWith('#/reel/' + id)) return clearInterval(poll);
@@ -2732,6 +2759,9 @@ async function reelFiles(id, data) {
     load();
   }
   $('#buildCopy')?.addEventListener('click', () => chatOf().say(bo.prompt, `Собери v1 по образцу ${bo.from.slice(0, 2)}`));
+  const it = ITEMS?.items.find((y) => y.ref?.kind === 'reel' && y.ref.id === id);
+  setFoot({note: sx ? `Снято ${sxNeed.filter((x) => x.done).length} из ${sxNeed.length}. В «Сборку» можно идти и так — недостающее доснимается потом.` : 'Загрузите исходники — или сразу к сборке.', back: sx ? {label: '← К виду', href: `#/reel/${id}/look`} : null,
+    next: canEdit() ? {label: 'Материал собран → Сборка', run: async () => { if (it && ['idea', 'material'].includes(it.stage)) await post('/api/items/set', {id: it.id, stage: 'build'}); location.hash = `#/reel/${id}/edit`; }} : null});
   $('#sxShoot')?.addEventListener('click', () => prompter(sx, null, id));
   $('#sxTask')?.addEventListener('click', async () => {
     const r = data.reel, text = sx.blocks.map((b) => b.text.replace(/\s+/g, ' ')).join('\n');

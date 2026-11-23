@@ -50,7 +50,8 @@ function clean(s) {
 /** The script for the page, with seconds per block and whether «Вернуть как было» has something to return. */
 export function readScript(dir) {
   const s = clean(load(join(dir, 'script.json')));
-  if (!s) return null;
+  // No blocks yet (the studio made the file when the reel started; Claude is writing): nothing to show.
+  if (!s || !s.blocks.length) return null;
   let t = 0;
   for (const b of s.blocks) { b.from = t; b.sec = seconds(b.text); t += b.sec; }
   const before = load(join(dir, 'script.before.json'));

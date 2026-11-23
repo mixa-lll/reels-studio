@@ -276,13 +276,13 @@ function preamble(p, k) {
     'The page shows the reel in four stages (Сценарий, Материалы, Монтаж, Выкладка) from two optional files in the reel folder; keep them current when the script, materials or captions change. ' +
     '`scenes.json`: [{"t":"0:00","name":"Хук","screen":"what is on screen","text":"text on screen","sound":"…","need":"what material it needs","have":"what file covers it","status":"готово|нужно|переснять"}]. ' +
     '`publish.json`: {"captions":[{"platform":"Instagram RU","account":"@…","text":"caption"}],"checks":[{"ok":true,"text":"…"}]}. ' +
-    'The text of the reel is written by meaning blocks in `script.json` (format at the top of web/script.mjs), stage «Сценарий», two steps: «1 · Текст» and «2 · Вид». ' +
+    'The text of the reel is written by meaning blocks in `script.json` (format at the top of web/script.mjs), stage «Идея», its steps «2 · Текст» and «3 · Вид» (step 1 is the idea itself). ' +
     'A block is one thought of 1–3 spoken sentences (hook, each point, the turn, the call): it becomes one take in the prompter, one clip of cut.json and the words graphics hang on. Roles are short Russian nouns (Хук, Карта, Цены, Призыв). ' +
     'For a new reel whose idea is taken, or when the owner asks to lay out the text, write script.json first (the README «Сценарий» section stays a short summary). ' +
     'A block may carry "takes" (files in sources/ the owner filmed in the studio prompter, one block per take; "good": true is the one they picked): cut from them, the good one first; never remove "takes". ' +
     'Messages starting with «(about blocks …)» or «(about the words «…» of block …)» are about exactly those blocks: change only them, keep the ids, never touch other blocks. A block with "ok": true is approved — leave it unless the message is about it. ' +
     'When asked for variants, put 2–3 in that block\'s "alts" ([{"label":"боль","text":"…"}]) and keep "text" as it is; the page shows them under the block with «Взять». Reordering is moving blocks in the array. Say in 1–2 lines what changed, never «было → стало» walls: the page shows the text itself. ' +
-    'Step «2 · Вид» (only after "text":{"ok":true}): for every block fill "look" — what is on screen while it is said: frame (who and how), broll (a cutaway to film: name it so it can go to the shot list), gfx (graphics), text (text on screen), sound; "at" = the exact words of the block it starts on, "tpl" = the template of the project style it uses, "have" = style (exists in the style), ready (the file is there), shoot (still to film), new (not in the style yet). Take looks from the project design system first. ' +
+    'Step «3 · Вид» (only after "text":{"ok":true}): for every block fill "look" — what is on screen while it is said: frame (who and how), broll (a cutaway to film: name it so it can go to the shot list), gfx (graphics), text (text on screen), sound; "at" = the exact words of the block it starts on, "tpl" = the template of the project style it uses, "have" = style (exists in the style), ready (the file is there), shoot (still to film), new (not in the style yet). Take looks from the project design system first. ' +
     'Later, in «Монтаж» and «Графика», build from it: one clip per block in its order, graphics on the "at" words; if the text changes after «Вид» is approved, update that block\'s look too. ' +
     'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version. ' +
     'Comments for the next version live in `edits.json` (format in web/edits.mjs): [{"id","stage":"script|scenes|video","t":seconds,"text","quote"?,"scene"?,"shape"?:{"kind":"rect|brush|point|frame",…fractions of the frame},"hint"?:"blur|replace|trim|remove","state":"open|sent|done|note","forV":"v4","by"}]; they come from the page and from the mini app\'s editor. When you have built that version, set each sent comment to "done" and add "result": what you changed, in a few words — the page shows it as «что поменялось». Your own pre-build findings (faces, subtitles, consents) go there as "state":"note" with "by":"Claude".');
@@ -1218,6 +1218,8 @@ createServer(async (req, res) => {
     const id = basename(dir), idea = item.idea || {};
     writeFileSync(join(dir, 'README.md'), [`# ${id.slice(0, 2)} «${item.title}»`, '', 'Status: in work', '', '## Идея', idea.about || item.title,
       ...(idea.hook ? ['', `Крючок: ${idea.hook}`] : []), ...((idea.flow || []).length ? ['', 'Ход:', ...idea.flow.map((l, i) => `${i + 1}. ${l}`)] : []), ''].join('\n'));
+    // The empty script keeps the release on «Идея» until its text and look are approved (items.mjs).
+    writeFileSync(join(dir, 'script.json'), JSON.stringify({blocks: []}));
     syncItems(studio);
     log(me.name, `завёл рилс ${id} из идеи «${item.title}»`);
     return json(200, {id});

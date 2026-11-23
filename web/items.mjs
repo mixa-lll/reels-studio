@@ -59,7 +59,9 @@ export function readSources(studio) {
     const versions = existsSync(vd) ? readdirSync(vd).filter((v) => /^v\d+$/.test(v)).length : 0;
     const title = (/^#\s*(.+)/m.exec(read(join(dir, 'README.md')))?.[1] || r).replace(/^\d+[\s—–-]*/, '').replace(/[«»]/g, '').replace(/\s*\(.*\)\s*$/, '').trim();
     const scenes = readJson(join(dir, 'scenes.json'), []);
-    return {id: r, title, status: status[reelNumber(r)] || 'none', versions, need: Array.isArray(scenes) ? scenes : []};
+    // script.json without an approved «Вид»: the reel is still on «Идея» (text and look are its steps).
+    const script = readJson(join(dir, 'script.json'), null);
+    return {id: r, title, status: status[reelNumber(r)] || 'none', versions, need: Array.isArray(scenes) ? scenes : [], writing: !!script && !script.look?.ok};
   });
   const posts = listPosts(studio, () => null).map((x) => {
     const post = readJson(join(studio, 'posts', x.id, 'post.json'), {});
@@ -78,7 +80,7 @@ export function derivedStage(item, src) {
     if (!r) return null;
     if (r.status === 'published') return 'published';
     if (r.status === 'done') return 'ready';
-    return r.versions ? 'build' : 'material';
+    return r.versions ? 'build' : r.writing ? null : 'material';
   }
   if (ref?.kind === 'post') {
     const x = src.posts.find((y) => y.id === ref.id);
