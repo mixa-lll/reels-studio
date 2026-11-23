@@ -4696,8 +4696,8 @@ async function renderVersions(id, data) {
     if (!$('#eBuild')) return;
     $('#eBuild').disabled = !n && !cutCh;
     // Only the cut changed: the studio joins it itself in seconds. Notes in words need the agent.
-    $('#eBuild').textContent = !n && cutCh ? `Собрать монтаж ${nextV}` : `Собрать ${nextV}${n ? ` · правок: ${n}` : ''}${cutCh ? ' · нарезка' : ''}`;
-    $('#bNote').textContent = n || cutCh ? [n ? `${n} ${n === 1 ? 'правка' : n < 5 ? 'правки' : 'правок'} к ${nextV}` : '', cutCh ? 'нарезка поправлена' : ''].filter(Boolean).join(' · ') : 'Новая версия собирается только по кнопке — правки сначала копятся.';
+    $('#eBuild').textContent = !n && cutCh ? `Сохранить монтаж · ${nextV}` : `Собрать ${nextV}${n ? ` · правок: ${n}` : ''}${cutCh ? ' · нарезка' : ''}`;
+    $('#bNote').textContent = n || cutCh ? [n ? `${n} ${n === 1 ? 'правка' : n < 5 ? 'правки' : 'правок'} к ${nextV}` : '', cutCh ? 'монтаж изменён — сохраните: графика и правки пойдут от сохранённого' : ''].filter(Boolean).join(' · ') : cur?.stage === 'montage' ? `Монтаж сохранён в ${cur.v}. Дальше — «Собрать с графикой» или правки словами.` : 'Новая версия собирается только по кнопке — правки сначала копятся.';
   };
   foot();
   // The two steps of «Сборка»: 1 · Монтаж (the cut: clips, takes, trimming — live) and 2 · Графика (the rendered version).
@@ -4764,21 +4764,23 @@ async function renderVersions(id, data) {
   });
   $('#acceptV')?.addEventListener('click', () => chatOf().say(`Принимаю ${cur.v}. Собери мастер 1440p этой версии (без --draft, 1440×2560, CRF 15) и скажи, когда будет готов.`, `Принять ${cur.v}`));
   // Two stages (REELS.md «Сборка, потом графика»): «Собрать» is the edit only; graphics are their own pass.
-  $('#eGfx')?.addEventListener('click', () => chatOf().say(`Собери ${nextV} с графикой — этап «Графика» (REELS.md), один полный рендер поверх монтажа ${cur.v}${cur.stage === 'montage' ? ' (он собран студией из лёгкой копии: времена графики в Montage.jsx уже перенесены на эту нарезку через layers.mjs place — не трогай их; если cut.json отличается от cut.applied.json, сначала node scripts/cut.mjs <рилс> cut и words — полная склейка)' : ''}. Плашки, карточки, цифры по сценам и дизайн-системе: если в Montage.jsx графика уже есть — оставь её, если нет — наложи. Субтитры по словам новой нарезки. Маску человека режь только на тех отрезках, где графика уходит за спину (scripts/mask.mjs --from --to), а не по всему ролику; за спину ничего — без маски. Нарезку, порядок и звук не меняй: cut.json — окончательный, ни одного куска не убирай, не подрезай и не переставляй; открытые правки про нарезку не выполняй, только перечисли их в ответе. После — node scripts/layers.mjs, чтобы слои совпадали. Собери ${nextV} черновиком.`, `Собрать ${nextV} с графикой`));
+  $('#eGfx')?.addEventListener('click', () => CUT[id]?.changed && !open.length ? saveMontage($('#eGfx'), () => $('#eGfx')?.click()) : chatOf().say(`Собери ${nextV} с графикой — этап «Графика» (REELS.md), один полный рендер поверх монтажа ${cur.v}${cur.stage === 'montage' ? ' (он собран студией из лёгкой копии: времена графики в Montage.jsx уже перенесены на эту нарезку через layers.mjs place — не трогай их; если cut.json отличается от cut.applied.json, сначала node scripts/cut.mjs <рилс> cut и words — полная склейка)' : ''}. Плашки, карточки, цифры по сценам и дизайн-системе: если в Montage.jsx графика уже есть — оставь её, если нет — наложи. Субтитры по словам новой нарезки. Маску человека режь только на тех отрезках, где графика уходит за спину (scripts/mask.mjs --from --to), а не по всему ролику; за спину ничего — без маски. Нарезку, порядок и звук не меняй: cut.json — окончательный, ни одного куска не убирай, не подрезай и не переставляй; открытые правки про нарезку не выполняй, только перечисли их в ответе. После — node scripts/layers.mjs, чтобы слои совпадали. Собери ${nextV} черновиком.`, `Собрать ${nextV} с графикой`));
+  // «Сохранить монтаж»: the studio joins the changed cut into a new version in seconds; what comes after
+  // (graphics, notes in words) starts from that saved version. `then` runs on the redrawn page.
+  const saveMontage = async (b, then) => {
+    b.disabled = true;
+    if (CUT[id].flush && !(await CUT[id].flush())) { b.disabled = false; return; }
+    const r = await post('/api/reel/montage', {reel: id}).catch((e) => ({state: 'error', step: e.message}));
+    const poll = async (j) => {
+      if (!b.isConnected) return;
+      if (j.state === 'run') { b.textContent = `Сохраняю монтаж ${j.v}: ${j.step}…`; setTimeout(async () => poll(await api('/api/reel/montage?reel=' + encodeURIComponent(id)).catch(() => j)), 1200); return; }
+      if (j.state === 'done') { toast(then ? `Монтаж сохранён в ${j.v} — собираю графику поверх него` : `Монтаж сохранён в ${j.v} — графика и правки пойдут от него`); CUT[id].changed = false; await renderVersions(id); then?.(); return; }
+      toast('Монтаж не сохранился: ' + (j.step || '')); b.disabled = false; foot();
+    };
+    poll(r);
+  };
   $('#eBuild')?.addEventListener('click', async () => {
-    if (!open.length && CUT[id]?.changed) {
-      const b = $('#eBuild'); b.disabled = true;
-      if (CUT[id].flush && !(await CUT[id].flush())) { b.disabled = false; return; }
-      const r = await post('/api/reel/montage', {reel: id}).catch((e) => ({state: 'error', step: e.message}));
-      const poll = async (j) => {
-        if (!b.isConnected) return;
-        if (j.state === 'run') { b.textContent = `Монтаж ${j.v}: ${j.step}…`; setTimeout(async () => poll(await api('/api/reel/montage?reel=' + encodeURIComponent(id)).catch(() => j)), 1200); return; }
-        if (j.state === 'done') { toast(`Монтаж ${j.v} готов — графика, субтитры и маска позже, кнопкой «Собрать с графикой»`); CUT[id].changed = false; renderVersions(id); return; }
-        toast('Монтаж не собрался: ' + (j.step || '')); b.disabled = false; foot();
-      };
-      poll(r);
-      return;
-    }
+    if (!open.length && CUT[id]?.changed) return saveMontage($('#eBuild'));
     const cutCh = CUT[id]?.changed, folder = `projects/${P}/reels/${id}`, clips = CUT[id]?.clips || [];
     if (open.length) await post('/api/reel/edits', {reel: id, action: 'send', forV: nextV});
     const cutLine = cutCh ? `\nНарезка поправлена в ${folder}/cut.json (${clips.length} кусков): примени её — \`node scripts/cut.mjs ${folder} cut\` и \`words\` (если ролик собран из другого чернового файла, переведи его на sources/cut.mov); если есть ${folder}/graphics.json — \`node scripts/layers.mjs ${folder} place\`: все времена графики в Montage.jsx сами переедут на новую нарезку вместе со своими словами, руками их не двигай; иначе \`node scripts/cut.mjs ${folder} map\` и сдвинь времена по таблице. Субтитры — заново по новым словам; маску — только на отрезках под графикой. Это этап «Сборка»: новую графику не добавляй.` : '';
