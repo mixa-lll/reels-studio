@@ -1474,7 +1474,13 @@ function chatBox(key, {onDone, onRebind} = {}) {
           if (ev.freed) toast(`Освобождено ${mb(ev.freed)}: старые версии ушли в архив`);
         }
       }
-    } catch (err) { render({from: 'bot', kind: 'error', text: err.message}); }
+    } catch (err) {
+      // The line to the studio dropped (the relay reconnects in a second), but the turn goes on there:
+      // say so and follow it like a reload does, instead of showing an error over working Claude.
+      const h = await api('/api/chat?key=' + encodeURIComponent(key)).catch(() => null);
+      if (h?.busy) { toast('Связь со студией прервалась на секунду — Claude продолжает работать'); await load(); return; }
+      render({from: 'bot', kind: 'error', text: /^Ошибка 5\d\d$/.test(err.message) ? `Студия не ответила (${err.message.toLowerCase()}). Сообщение не ушло — отправьте ещё раз.` : err.message});
+    }
     setBusy(false);
     // What was written meanwhile runs as the next turn on the server: follow it like a reload does.
     if (followUp) { followUp = false; await load(); }
@@ -1560,10 +1566,12 @@ function chatBox(key, {onDone, onRebind} = {}) {
       if (rec) rec.stop();
     };
     mic.onclick = () => (on ? stopVoice() : startVoice());
+    let sending = false; // a second Enter while the files upload must not send the message twice
     form.onsubmit = async (e) => {
       e.preventDefault();
       const files = [...picked], text = ta.value.trim();
-      if (!text && !files.length) return;
+      if (!text && !files.length || sending) return;
+      sending = true; setTimeout(() => { sending = false; }, 60000);
       stopVoice();
       const parts = [], shown = [], was = busy;
       const loading = (t) => (was ? toast(t) : setBusy(true, t));
@@ -1579,12 +1587,14 @@ function chatBox(key, {onDone, onRebind} = {}) {
       } catch (err) {
         // Nothing is sent: the text and the files stay in the box to try again.
         if (!was) setBusy(false);
+        sending = false;
         toast(err.message === 'Failed to fetch' ? 'Файл не загрузился: связь оборвалась. Текст и вложения остались — попробуйте ещё раз' : err.message);
         return;
       }
       if (!was) setBusy(false);
       ta.value = ''; ta.style.height = 'auto';
       picked = []; showPicked();
+      sending = false;
       say([pinned?.note, text, ...parts].filter(Boolean).join('\n'), [pinned && '◎ ' + pinned.label, text, ...shown].filter(Boolean).join('\n'));
     };
   }
