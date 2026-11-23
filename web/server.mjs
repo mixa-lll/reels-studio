@@ -279,6 +279,7 @@ function preamble(p, k) {
     'The text of the reel is written by meaning blocks in `script.json` (format at the top of web/script.mjs), stage «Сценарий», two steps: «1 · Текст» and «2 · Вид». ' +
     'A block is one thought of 1–3 spoken sentences (hook, each point, the turn, the call): it becomes one take in the prompter, one clip of cut.json and the words graphics hang on. Roles are short Russian nouns (Хук, Карта, Цены, Призыв). ' +
     'For a new reel whose idea is taken, or when the owner asks to lay out the text, write script.json first (the README «Сценарий» section stays a short summary). ' +
+    'A block may carry "takes" (files in sources/ the owner filmed in the studio prompter, one block per take; "good": true is the one they picked): cut from them, the good one first; never remove "takes". ' +
     'Messages starting with «(about blocks …)» or «(about the words «…» of block …)» are about exactly those blocks: change only them, keep the ids, never touch other blocks. A block with "ok": true is approved — leave it unless the message is about it. ' +
     'When asked for variants, put 2–3 in that block\'s "alts" ([{"label":"боль","text":"…"}]) and keep "text" as it is; the page shows them under the block with «Взять». Reordering is moving blocks in the array. Say in 1–2 lines what changed, never «было → стало» walls: the page shows the text itself. ' +
     'Step «2 · Вид» (only after "text":{"ok":true}): for every block fill "look" — what is on screen while it is said: frame (who and how), broll (a cutaway to film: name it so it can go to the shot list), gfx (graphics), text (text on screen), sound; "at" = the exact words of the block it starts on, "tpl" = the template of the project style it uses, "have" = style (exists in the style), ready (the file is there), shoot (still to film), new (not in the style yet). Take looks from the project design system first. ' +
@@ -1452,7 +1453,7 @@ createServer(async (req, res) => {
     mkdirSync(join(studio, 'inbox'), {recursive: true});
     appendFileSync(join(studio, 'inbox', 'history.md'), `- ${new Date().toISOString()} (web, ${me.name}${rdir ? `, reel ${reel}` : ''}) ${path}\n`);
     log(me.name, `загрузил ${basename(path)}${rdir ? ` в рилс ${reel}` : ''}`);
-    return json(200, {path, url: mediaUrl(path), digest});
+    return json(200, {path, name: basename(path), url: mediaUrl(path), digest});
   }
   // Inbox → variants (Д2): an author's material becomes a post whose chat writes 2–3 variants.
   if (req.method === 'POST' && url.pathname === '/api/authors/variants') {

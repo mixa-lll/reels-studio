@@ -1,5 +1,6 @@
 // The reel's text by meaning blocks and what is on screen in each (reels/<id>/script.json), stage «Сценарий»:
 //   {blocks: [{id, role, text, ok?: true, alts?: [{label?, text}],
+//              takes?: [{file: name in sources/, good?, sec?}] — takes filmed in the prompter,
 //              look?: [{kind: 'frame'|'broll'|'gfx'|'text'|'sound', what, at?: words of the text it starts on,
 //                       tpl?: template of the project's style, have?: 'style'|'ready'|'shoot'|'new'}]}],
 //    text?: {ok, by, at} — step «1 · Текст» approved, look?: {ok, by, at} — step «2 · Вид» approved}
@@ -37,6 +38,8 @@ function clean(s) {
       ...(HAVE.includes(x.have) ? {have: x.have} : {}),
     })) : [];
     if (look.length) out.look = look;
+    const takes = Array.isArray(b.takes) ? b.takes.filter((t) => t && /^[\w .()-]+$/.test(t.file || '')).slice(0, 30).map((t) => ({file: t.file, ...(t.good ? {good: true} : {}), ...(Number(t.sec) ? {sec: Math.round(Number(t.sec) * 10) / 10} : {})})) : [];
+    if (takes.length) out.takes = takes;
     return out;
   });
   const out = {blocks};
@@ -63,6 +66,7 @@ export function snapshot(dir) {
 }
 
 /** Applies a page action; returns the new script for the page, or null for a bad request.
+ *  {op: 'add', text, role?, after?} · {op: 'edit', id, text, role?} · {op: 'remove', id} · {op: 'shot', id, file, sec} · {op: 'good', id, file}
  *  {op: 'order', ids} · {op: 'ok', ids, on} · {op: 'take', id, alt} · {op: 'step', step: 'text'|'look', on} · {op: 'undo'} */
 export function changeScript(dir, b, by) {
   const f = join(dir, 'script.json');
@@ -90,6 +94,25 @@ export function changeScript(dir, b, by) {
     if (!alt) return null;
     x.text = alt.text;
     delete x.alts;
+  } else if (b.op === 'add' && str(b.text, 4000)) {
+    const x = {id: 'b' + randomBytes(3).toString('hex'), role: str(b.role, 40), text: str(b.text, 4000)};
+    const i = s.blocks.findIndex((y) => y.id === b.after);
+    s.blocks.splice(i < 0 ? s.blocks.length : i + 1, 0, x);
+    delete s.text;
+  } else if (b.op === 'edit' && byId.has(b.id) && str(b.text, 4000)) {
+    const x = byId.get(b.id);
+    if (x.text !== str(b.text, 4000)) { delete x.ok; delete x.alts; }
+    x.text = str(b.text, 4000);
+    if (b.role !== undefined) x.role = str(b.role, 40);
+  } else if (b.op === 'remove' && byId.has(b.id) && s.blocks.length > 1) {
+    s.blocks = s.blocks.filter((y) => y.id !== b.id);
+  } else if (b.op === 'shot' && byId.has(b.id) && /^[\w .()-]+$/.test(b.file || '')) {
+    const x = byId.get(b.id);
+    x.takes = [...(x.takes || []), {file: b.file, sec: Number(b.sec) || 0}];
+  } else if (b.op === 'good' && byId.has(b.id)) {
+    const x = byId.get(b.id);
+    if (!x.takes?.some((t) => t.file === b.file)) return null;
+    for (const t of x.takes) { if (t.file === b.file && !t.good) t.good = true; else delete t.good; }
   } else if (b.op === 'step' && ['text', 'look'].includes(b.step)) {
     if (b.on === false) delete s[b.step];
     else {
@@ -97,7 +120,7 @@ export function changeScript(dir, b, by) {
       if (b.step === 'text') for (const x of s.blocks) { x.ok = true; delete x.alts; }
     }
   } else return null;
-  snapshot(dir);
+  if (!['shot', 'good'].includes(b.op)) snapshot(dir);
   save(f, s);
   return readScript(dir);
 }

@@ -229,8 +229,31 @@
   .sx-have.y { background: #E6F2EA; color: #1F6B3B; } .sx-have.s { background: #E4ECFA; color: #1D4C9E; } .sx-have.n { background: #FBE7E5; color: #A2322A; }
   .sx-shoot { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 14px; }
   .sx-empty { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; max-width: 560px; border: 1px dashed #D4D4D4; border-radius: 16px; padding: 24px; }
-  @media (max-width: 1100px) { .sx-work { flex-wrap: wrap; } .sx-chat { position: static; width: 100%; height: 70vh; } aside.chatcol.inl { width: 100%; } .sx-avr { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+  .sx-go { display: none; }
+  @media (max-width: 1100px) { .sx-go { display: flex; position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 40; align-items: center; gap: 10px; background: #fff; border: 1.5px solid var(--ink); border-radius: 14px; padding: 8px 8px 8px 14px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.14); } .sx-go span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sx-work { flex-wrap: wrap; } .sx-chat { position: static; width: 100%; height: 70vh; } aside.chatcol.inl { width: 100%; } .sx-avr { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
   @media (max-width: 720px) { .sx-bar, .sx-work { padding-left: 16px; padding-right: 16px; } .sx-r { grid-template-columns: minmax(0, 1fr); gap: 4px; } .sx-p { font-size: 22px; } .sx-paper { padding: 20px; } .sx-txt { font-size: 19px; } }
+  .sx-ed { cursor: default; } .sx-ed .sx-body { gap: 8px; } .sx-ed textarea.f { font-size: 19px; line-height: 1.4; min-height: 96px; }
+  .sx-player { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .sx-track { flex: 1; min-width: 120px; display: flex; gap: 3px; } .sx-track i { height: 6px; border-radius: 3px; background: #DAD9D4; } .sx-track i.d { background: var(--ink); } .sx-track i.n { background: #2F6FEB; }
+  .sx-r.said .sx-p { color: #A3A3A3; } .sx-r.say { border-left-color: #2F6FEB; } .sx-r.say .sx-p { color: var(--ink); }
+  .sx-sb { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; }
+  .sx-fr { flex: none; width: 76px; display: flex; flex-direction: column; gap: 5px; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; }
+  .sx-fr > span:last-child { font-size: 11px; font-weight: 700; color: var(--ink2); line-height: 1.2; } .sx-fr small { display: block; font-weight: 500; color: #8C8B86; }
+  .sx-fr.on .sx-scr { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .sx-scr { display: block; position: relative; width: 76px; aspect-ratio: 9 / 16; border-radius: 8px; background: #D9D6CE; overflow: hidden; }
+  .sx-scr.br { background: #A9A59A; }
+  .sx-scr i { position: absolute; display: block; font-style: normal; }
+  .sx-scr .p { left: 26%; right: 26%; bottom: 0; height: 52%; border-radius: 999px 999px 0 0; background: #8C8B86; }
+  .sx-scr .g { inset: 0 0 46% 0; background: #B8C9E6; }
+  .sx-scr .t { left: 10%; right: 10%; top: 12%; height: 12%; border-radius: 4px; background: #C2620A; }
+  .sx-scr.big { width: 104px; border-radius: 10px; margin-top: 8px; }
+  .sx-scr.big i { font-size: 9px; line-height: 1.25; font-weight: 700; padding: 4px 5px; overflow: hidden; }
+  .sx-scr.big .g { color: #1D4C9E; } .sx-scr.big .t { height: auto; min-height: 12%; color: #fff; }
+  .sx-scr.big .b { inset: auto 0 0 0; color: #fff; background: rgba(0,0,0,.35); }
+  .sx-scr.big .g2 { left: 8%; right: 30%; bottom: 8%; border-radius: 5px; background: #fff; color: #1D4C9E; }
+  .rshoot { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .rshoot:first-of-type { border-top: 0; }
+  @media (max-width: 720px) { .rshoot { grid-template-columns: minmax(0, 1fr) auto; } .rshoot > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; } }
   /* Суфлёр: dark, the text up by the camera; the overlap with the neighbours in yellow. */
   .pr { position: fixed; inset: 0; z-index: 90; background: #0E0E0D; color: #F2F2EF; display: flex; flex-direction: column; }
   .pr-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 24px; border-bottom: 1px solid #262624; font-size: 14px; color: #B9B8B3; }
@@ -250,6 +273,16 @@
   .pr-rb { width: 54px; height: 54px; border-radius: 50%; border: 1px solid #3A3936; background: none; color: #F2F2EF; font-size: 26px; line-height: 1; cursor: pointer; }
   .pr-rb:disabled { opacity: .3; cursor: default; }
   .pr-keys { font-size: 12px; color: #6B6A66; margin-left: auto; }
+  .pr-ui { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .pr-bot { flex-wrap: wrap; }
+  .pr-rec { height: 54px; padding: 0 24px; border-radius: 27px; border: 0; background: #F2F2EF; color: #0E0E0D; font-size: 16px; font-weight: 800; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+  .pr-rec i { width: 14px; height: 14px; border-radius: 50%; background: #E5484D; } .pr-rec.on i { border-radius: 3px; } .pr-rec:disabled { opacity: .6; }
+  .pr-tk { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 999px; border: 0; background: #262624; color: #B9B8B3; cursor: pointer; } .pr-tk.ok { background: #1E3A2A; color: #8FD4A8; }
+  .pr-segs i.h { background: #8C8B86; } .pr-segs i.cur { box-shadow: 0 0 0 2px #0E0E0D, 0 0 0 3px #F2F2EF; }
+  .pr-cam { position: absolute; right: 24px; top: 76px; width: 132px; aspect-ratio: 9 / 16; border-radius: 12px; overflow: hidden; background: #262624; }
+  .pr-cam[hidden] { display: none; } .pr-cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  .pr-cam span { position: absolute; left: 8px; bottom: 6px; font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+  @media (max-width: 720px) { .pr-cam { width: 84px; right: 12px; top: auto; bottom: 110px; } }
   @media (max-width: 720px) { .pr-top { padding: 10px 14px; } .pr-segs, .pr-keys { display: none; } .pr-stage { padding: 20px 18px; } .pr-bot { justify-content: space-between; } }
 
   /* «Как увидят» (NX0–NX7): the release inside each platform's interface, before publishing */
@@ -1871,7 +1904,7 @@ const tc = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2
 
 async function drawStage(id, tab, data) {
   data ||= await getReel(id);
-  if (tab !== 'script') dockChat(null);
+  if (tab !== 'script') { dockChat(null); chatOf()?.pin?.(null); }
   if (tab === 'script') return stageScript(id, data);
   if (tab === 'materials') return reelFiles(id, data);
   if (tab === 'compare') return stageCompare(id, data);
@@ -1884,9 +1917,10 @@ async function drawStage(id, tab, data) {
 // step «1 · Текст» — blocks as cards or as one text, «2 · Вид» — what is on screen on each block.
 // The chat column moves inside the stage; a picked block or phrase is pinned in it, and every message is about it.
 const SX = {};
-const sxState = (id) => (SX[id] ||= {sel: [], view: 'blocks', step: null, phrase: null});
+const sxState = (id) => (SX[id] ||= {sel: [], view: 'blocks', step: null, phrase: null, edit: null});
 const sxPlural = (n, a, b, c) => (n % 10 === 1 && n % 100 !== 11 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const secondsOf = (t) => Math.max(1, Math.round(String(t || '').split(/\s+/).filter(Boolean).length / 2.5));
 const SX_KIND = {frame: ['Кадр', '#737373'], broll: ['Перебивка', '#737373'], gfx: ['Графика', '#2F6FEB'], text: ['Текст', '#C2620A'], sound: ['Звук', '#0F7F78']};
 const SX_HAVE = {style: ['в стиле', 'y'], ready: ['есть', 'y'], shoot: ['снять', 's'], new: ['нет в стиле', 'n']};
 // The chat column of the reel: inside the stage on «Сценарий», back on the right everywhere else.
@@ -1896,8 +1930,10 @@ function dockChat(slot) {
   if (slot) { slot.append(a); a.classList.add('inl'); }
   else if (a.parentElement !== work) { work.append(a); a.classList.remove('inl'); }
 }
+const sxRedraw = (id, s) => stageScript(id, {...REEL_CACHE.get(id)?.data, script: s});
 function stageScript(id, data) {
   dockChat(null);
+  try { speechSynthesis.cancel(); } catch {}
   if (!data.script) return stageScenes(id, data);
   const s = data.script, st = sxState(id), host = $('#reelHost');
   const ids = new Set(s.blocks.map((b) => b.id));
@@ -1907,11 +1943,12 @@ function stageScript(id, data) {
   const look = st.step === 'look', okN = s.blocks.filter((b) => b.ok).length;
   const steps = `<div class="sx-steps" role="group" aria-label="Шаг сценария"><button type="button" data-sxstep="text" aria-pressed="${!look}"><b>1 · Текст${s.text?.ok ? ' ✓' : ''}</b></button><i aria-hidden="true">→</i><button type="button" data-sxstep="look" aria-pressed="${look}" ${s.text?.ok ? '' : 'disabled title="Сначала утвердите текст"'}><b>2 · Вид</b></button></div>`;
   const undo = canEdit() && s.canUndo ? '<button type="button" class="btn" id="sxUndo" title="Вернуть сценарий, каким он был до последней правки">↩ Вернуть как было</button>' : '';
-  const prompt = `<button type="button" class="btn" id="sxPrompt" title="Суфлёр на весь экран">${'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"></path></svg>'}Суфлёр</button>`;
+  const prompt = `<button type="button" class="btn" id="sxPrompt" title="Суфлёр на весь экран: текст по блокам, запись дублей">${'<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4"></path></svg>'}Суфлёр</button>`;
   let bar;
   if (!look) {
     bar = `${steps}<nav class="seg" aria-label="Как показать"><button type="button" class="${st.view === 'blocks' ? 'on' : ''}" data-sxview="blocks">Блоками</button><button type="button" class="${st.view === 'read' ? 'on' : ''}" data-sxview="read">Сплошным</button></nav>
       <span class="small muted">${s.blocks.length} ${sxPlural(s.blocks.length, 'блок', 'блока', 'блоков')} · ≈ ${mmss(s.total)}${s.text?.ok ? ' · текст утверждён' : ` · утверждено ${okN}`}</span><span style="flex: 1"></span>${undo}${prompt}
+      ${canEdit() && !s.text?.ok && st.view === 'blocks' ? '<button type="button" class="btn" id="sxAdd">+ Блок</button>' : ''}
       ${canEdit() ? (s.text?.ok ? '<button type="button" class="btn" id="sxReopen" title="Текст снова можно править; вид останется">Открыть текст</button>' : '<button type="button" class="btn primary" id="sxOk">Утвердить текст</button>') : ''}`;
   } else {
     const all = s.blocks.flatMap((b) => b.look || []), cnt = (k) => all.filter((x) => x.kind === k).length, shoot = all.filter((x) => x.have === 'shoot').length;
@@ -1921,57 +1958,66 @@ function stageScript(id, data) {
   host.innerHTML = `<div class="sx"><div class="sx-bar">${bar}</div><div class="sx-work"><div class="sx-main" id="sxMain"></div><div class="sx-chat" id="sxChat"></div></div></div>`;
   dockChat($('#sxChat'));
   // The chat column fits the visible part of the stage, under the bar, and stays there while the blocks scroll.
-  const fit = () => { const c = $('#sxChat'), bar = host.querySelector('.sx-bar'); if (c && bar && innerWidth > 1100) c.style.height = Math.max(420, host.clientHeight - bar.offsetHeight - 30) + 'px'; else if (c) c.style.height = ''; };
+  const fit = () => { const c = $('#sxChat'), b = host.querySelector('.sx-bar'); if (c && b && innerWidth > 1100) c.style.height = Math.max(420, host.clientHeight - b.offsetHeight - 30) + 'px'; else if (c) c.style.height = ''; };
   fit(); window.onresize = fit;
+  // On a phone the chat sits under the blocks and its history scrolls the page down to itself: open on the text.
+  if (innerWidth <= 1100 && !st.seen) { st.seen = true; const top = () => host.querySelector('.sx')?.scrollIntoView({block: 'start'}); top(); chatOf()?.ready?.then(() => setTimeout(top, 60)); }
+  const act = async (b, msg) => { const r = await post('/api/reel/script', {reel: id, ...b}).catch(() => null); if (!r?.script) return toast('Не получилось — попробуйте ещё раз'); data.script = r.script; if (msg) toast(msg); stageScript(id, data); };
+  SX[id].act = act;
   const main = $('#sxMain');
   if (look) sxLook(main, id, s, st);
   else if (st.view === 'read') sxRead(main, id, s, st);
   else sxBlocks(main, id, s, st);
   sxPin(id, s);
-  host.querySelectorAll('[data-sxstep]').forEach((b) => (b.onclick = () => { st.step = b.dataset.sxstep; st.sel = []; st.phrase = null; stageScript(id, data); }));
-  host.querySelectorAll('[data-sxview]').forEach((b) => (b.onclick = () => { st.view = b.dataset.sxview; st.phrase = null; stageScript(id, data); }));
-  const act = async (b, msg) => { const r = await post('/api/reel/script', {reel: id, ...b}).catch(() => null); if (!r?.script) return toast('Не получилось — попробуйте ещё раз'); data.script = r.script; if (msg) toast(msg); stageScript(id, data); };
-  SX[id].act = act;
+  // Phone: the chat is under the blocks, so what is picked gets a bar at the bottom that leads to it.
+  if (st.sel.length || st.phrase) {
+    host.querySelector('.sx').insertAdjacentHTML('beforeend', `<div class="sx-go"><span>${esc($('.pinchip')?.firstChild?.textContent || 'Выбрано')} — в чате</span><button type="button" class="btn primary" id="sxGo">Написать ↓</button></div>`);
+    $('#sxGo').onclick = () => { $('#sxChat').scrollIntoView({block: 'end'}); chatOf()?.querySelector('textarea')?.focus(); };
+  }
+  host.querySelectorAll('[data-sxstep]').forEach((b) => (b.onclick = () => { st.step = b.dataset.sxstep; st.sel = []; st.phrase = null; st.edit = null; stageScript(id, data); }));
+  host.querySelectorAll('[data-sxview]').forEach((b) => (b.onclick = () => { st.view = b.dataset.sxview; st.phrase = null; st.edit = null; stageScript(id, data); }));
   $('#sxUndo')?.addEventListener('click', () => act({op: 'undo'}, 'Вернул как было'));
   $('#sxOk')?.addEventListener('click', () => act({op: 'step', step: 'text'}, 'Текст утверждён — дальше «2 · Вид»').then(() => { st.step = 'look'; st.sel = []; st.phrase = null; stageScript(id, data); }));
   $('#sxReopen')?.addEventListener('click', () => act({op: 'step', step: 'text', on: false}));
   $('#sxLookOk')?.addEventListener('click', () => act({op: 'step', step: 'look'}, 'Вид утверждён'));
-  $('#sxPrompt')?.addEventListener('click', () => prompter(s, st.sel[0] || st.phrase?.id));
+  $('#sxAdd')?.addEventListener('click', () => { st.edit = {id: null, after: st.sel[0] || s.blocks.at(-1)?.id}; stageScript(id, data); });
+  $('#sxPrompt')?.addEventListener('click', () => prompter(s, st.sel[0] || st.phrase?.id, id));
 }
 // The chip in the chat: the picked blocks or the picked words, with quick asks for them.
 function sxPin(id, s) {
   const box = chatOf(), st = SX[id];
   if (!box?.pin) return;
   const num = (bid) => s.blocks.findIndex((b) => b.id === bid) + 1, blk = (bid) => s.blocks.find((b) => b.id === bid);
-  const clear = () => { st.sel = []; st.phrase = null; $('#reelHost .sx') && stageScript(id, {...REEL_CACHE.get(id)?.data, script: s}); };
+  const clear = () => { st.sel = []; st.phrase = null; $('#reelHost .sx') && sxRedraw(id, s); };
   if (st.phrase) {
     const b = blk(st.phrase.id);
-    return box.pin({label: `«${short(st.phrase.words, 40)}» · блок ${num(b.id)}`, note: `(about the words «${st.phrase.words}» of block #${num(b.id)} «${b.role}» id=${b.id} in script.json${st.step === 'look' ? ', step «Вид»: what is on screen on these words' : ''})`, onClear: clear,
-      acts: st.step === 'look' ? [{label: 'Графика на этих словах', text: 'Поставь на эти слова графику из стиля проекта'}, {label: 'Перебивка', text: 'Здесь перебивка — что снять?'}] : [{label: 'Переписать', text: 'Перепиши эти слова'}, {label: 'Новый блок отсюда', text: 'Начни с этих слов новый блок'}]});
+    return box.pin({label: `«${short(st.phrase.words).slice(0, 40)}» · блок ${num(b.id)}`, note: `(about the words «${st.phrase.words}» of block #${num(b.id)} «${b.role}» id=${b.id} in script.json${st.step === 'look' ? ', step «Вид»: what is on screen on these words' : ''})`, onClear: clear,
+      acts: st.step === 'look' ? [{label: 'Графика из стиля', text: 'Поставь на эти слова графику из стиля проекта'}, {label: 'Цифра крупно', text: 'На этих словах — цифра крупно'}, {label: 'Плашка с текстом', text: 'На этих словах — плашка с текстом'}, {label: 'Перебивка', text: 'На этих словах перебивка — что снять?'}] : [{label: 'Переписать', text: 'Перепиши эти слова'}, {label: 'Новый блок отсюда', text: 'Начни с этих слов новый блок'}]});
   }
   if (!st.sel.length) return box.pin(null);
   const list = st.sel.map(blk);
   const label = list.length === 1 ? `Блок ${num(list[0].id)} · ${list[0].role || 'без названия'}` : `Блоки ${list.map((b) => num(b.id)).sort((a, b) => a - b).join(', ')}`;
   const note = `(about blocks of script.json${st.step === 'look' ? ', step «Вид»' : ''}: ${list.map((b) => `#${num(b.id)} «${b.role}» id=${b.id}`).join(', ')})`;
-  const okAll = list.every((b) => b.ok);
+  const okAll = list.every((b) => b.ok), open = canEdit() && !s.text?.ok;
   const acts = st.step === 'look'
     ? [{label: 'Другой кадр', text: 'Предложи другой кадр'}, {label: 'Меньше графики', text: 'Меньше графики, проще'}, {label: 'Из стиля', text: 'Возьми элементы из стиля проекта'}]
     : [{label: 'Варианты', text: 'Дай 2–3 варианта'}, {label: 'Короче', text: 'Короче, смысл тот же'}, {label: 'Проще', text: 'Проще, разговорнее'},
       ...(list.length === 1 ? [{label: 'Разбить на два', text: 'Разбей этот блок на два'}] : []),
-      ...(canEdit() && !s.text?.ok ? [{label: okAll ? 'Снять утверждение' : 'Утвердить', run: () => { st.sel = []; SX[id].act({op: 'ok', ids: list.map((b) => b.id), on: !okAll}); }}] : [])];
+      ...(open && list.length === 1 ? [{label: 'Править руками', run: () => { st.edit = {id: list[0].id}; sxRedraw(id, s); }}] : []),
+      ...(open ? [{label: okAll ? 'Снять утверждение' : 'Утвердить', run: () => { st.sel = []; SX[id].act({op: 'ok', ids: list.map((b) => b.id), on: !okAll}); }}] : [])];
   box.pin({label, note, acts, onClear: clear});
 }
-const sxHead = (b, i, st, extra = '') => `<div class="sx-top"><span class="sx-role">${i + 1} · ${esc(b.role || 'Блок')}</span><span class="sx-t">${mmss(b.from)} · ${b.sec} с</span>${st.sel.includes(b.id) || st.phrase?.id === b.id ? '<span class="sx-in">в чате</span>' : b.ok ? '<span class="sx-ok">✓ утверждён</span>' : ''}${extra}</div>`;
-// Clicking a card picks it (shift: several); the dots drag it to another place.
+const sxHead = (b, i, st) => `<div class="sx-top"><span class="sx-role">${i + 1} · ${esc(b.role || 'Блок')}</span><span class="sx-t">${mmss(b.from)} · ${b.sec} с</span>${b.takes ? `<span class="sx-t">· ${b.takes.length} ${sxPlural(b.takes.length, 'дубль', 'дубля', 'дублей')}</span>` : ''}${st.sel.includes(b.id) || st.phrase?.id === b.id ? '<span class="sx-in">в чате</span>' : b.ok ? '<span class="sx-ok">✓ утверждён</span>' : ''}</div>`;
+// Clicking a card picks it (shift: several).
 function sxPick(main, id, s, st, selector) {
   main.querySelectorAll(selector).forEach((el) => el.addEventListener('click', (e) => {
-    if (e.target.closest('button, a') || String(getSelection()).trim()) return;
+    if (e.target.closest('button, a, textarea, input') || String(getSelection()).trim()) return;
     const bid = el.dataset.id;
     st.phrase = null;
     if (e.shiftKey) st.sel = st.sel.includes(bid) ? st.sel.filter((x) => x !== bid) : [...st.sel, bid];
     else st.sel = st.sel.length === 1 && st.sel[0] === bid ? [] : [bid];
-    stageScript(id, {...REEL_CACHE.get(id)?.data, script: s});
-    chatOf()?.querySelector('textarea')?.focus();
+    sxRedraw(id, s);
+    if (innerWidth > 1100) chatOf()?.querySelector('textarea')?.focus();
   }));
 }
 // Picking words inside a block's text pins those words (the phrase), not the whole block.
@@ -1983,7 +2029,7 @@ function sxWords(main, id, s, st, selector) {
     if (!a || a !== b) return;
     st.phrase = {id: a.closest('[data-id]').dataset.id, words}; st.sel = [];
     sel.removeAllRanges();
-    stageScript(id, {...REEL_CACHE.get(id)?.data, script: s});
+    sxRedraw(id, s);
   });
 }
 const sxMark = (text, st, bid) => {
@@ -1993,46 +2039,93 @@ const sxMark = (text, st, bid) => {
 };
 function sxBlocks(main, id, s, st) {
   const grip = '<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor" aria-hidden="true"><circle cx="3" cy="3" r="1.6"></circle><circle cx="9" cy="3" r="1.6"></circle><circle cx="3" cy="9" r="1.6"></circle><circle cx="9" cy="9" r="1.6"></circle><circle cx="3" cy="15" r="1.6"></circle><circle cx="9" cy="15" r="1.6"></circle></svg>';
-  main.innerHTML = s.blocks.map((b, i) => `<article class="sx-b${st.sel.includes(b.id) ? ' on' : ''}" data-id="${esc(b.id)}">
+  // «+ Блок» and «Править руками»: the block's name and text in fields, saved by the page itself.
+  const editor = (b) => `<article class="sx-b on sx-ed" data-ed="${esc(b?.id || '')}"><span class="sx-g"></span><div class="sx-body">
+      <label class="lbl" for="sxRole">Название блока</label><input class="f" id="sxRole" value="${esc(b?.role || '')}" placeholder="Хук, Цены, Призыв…" maxlength="40">
+      <label class="lbl" for="sxText">Что звучит</label><textarea class="f" id="sxText" rows="3" placeholder="1–3 фразы так, как их скажут">${esc(b?.text || '')}</textarea>
+      <div class="row" style="gap: 8px"><button type="button" class="btn primary" id="sxSave">${b ? 'Сохранить' : 'Добавить блок'}</button><button type="button" class="btn" id="sxCancel">Отмена</button><span style="flex: 1"></span>${b && s.blocks.length > 1 ? '<button type="button" class="btn" id="sxDel" style="color: #B4231A">Удалить блок</button>' : ''}</div></div></article>`;
+  const card = (b, i) => st.edit?.id === b.id ? editor(b) : `<article class="sx-b${st.sel.includes(b.id) ? ' on' : ''}" data-id="${esc(b.id)}">
       <span class="sx-g" ${canEdit() ? `title="Перетащить" data-grip="1"` : ''}>${canEdit() ? grip : ''}</span>
       <div class="sx-body">${sxHead(b, i, st)}
         <div class="sx-txt${b.alts ? ' was' : ''}">${sxMark(b.text, st, b.id)}</div>
         ${b.alts ? `<div class="sx-alts">${b.alts.map((a, j) => `<div class="sx-alt"><b>${'АБВГДЕ'[j]}</b><span>${esc(a.text)}</span><small>${a.label ? esc(a.label) + ' · ' : ''}${secondsOf(a.text)} с</small>${canEdit() ? `<button type="button" class="btn${j ? '' : ' primary'}" data-take="${j}">Взять</button>` : ''}</div>`).join('')}</div>` : ''}
-      </div></article>`).join('')
-    + `<p class="small muted" style="margin: 4px 2px 0">Клик по блоку — он уходит в чат, пишите, что поменять. Shift + клик — несколько. Выделите слова — в чат уйдут только они.${canEdit() ? ' Тяните за точки, чтобы переставить.' : ''}</p>`;
+      </div></article>${st.edit && !st.edit.id && st.edit.after === b.id ? editor(null) : ''}`;
+  main.innerHTML = s.blocks.map(card).join('')
+    + `<p class="small muted" style="margin: 4px 2px 0">Клик по блоку — он уходит в чат, пишите, что поменять. Shift + клик — несколько. Выделите слова — в чат уйдут только они.${canEdit() ? ' Тяните за точки, чтобы переставить; двойной клик — править руками.' : ''}</p>`;
   main.querySelectorAll('[data-take]').forEach((b) => (b.onclick = () => SX[id].act({op: 'take', id: b.closest('[data-id]').dataset.id, alt: +b.dataset.take})));
-  sxPick(main, id, s, st, '.sx-b');
+  sxPick(main, id, s, st, '.sx-b[data-id]');
   sxWords(main, id, s, st, '.sx-txt');
+  if (st.edit) {
+    const ta = $('#sxText'); ta?.focus(); ta?.scrollIntoView({block: 'nearest'});
+    const done = () => { const e = st.edit; st.edit = null; return e; };
+    $('#sxCancel').onclick = () => { done(); sxRedraw(id, s); };
+    $('#sxSave').onclick = () => { const text = ta.value.trim(), role = $('#sxRole').value.trim(); if (!text) return ta.focus(); const e = done(); SX[id].act(e.id ? {op: 'edit', id: e.id, text, role} : {op: 'add', text, role, after: e.after}); };
+    $('#sxDel')?.addEventListener('click', () => { if (!confirm('Удалить этот блок? Вернуть можно кнопкой «Вернуть как было».')) return; const e = done(); st.sel = []; SX[id].act({op: 'remove', id: e.id}); });
+    ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) $('#sxSave').click(); if (e.key === 'Escape') $('#sxCancel').click(); });
+  }
   if (!canEdit()) return;
+  if (!s.text?.ok) main.querySelectorAll('.sx-txt').forEach((t) => t.addEventListener('dblclick', () => { getSelection().removeAllRanges(); st.edit = {id: t.closest('[data-id]').dataset.id}; st.phrase = null; sxRedraw(id, s); }));
   // Drag by the dots: the card follows the pointer between the others; dropping saves the order.
   let drag = null;
   main.querySelectorAll('[data-grip]').forEach((g) => g.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    const card = g.closest('.sx-b');
-    drag = card; card.classList.add('drag');
+    drag = g.closest('.sx-b'); drag.classList.add('drag');
     const move = (ev) => {
       const cards = [...main.querySelectorAll('.sx-b:not(.drag)')];
       const after = cards.find((c) => { const r = c.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; });
-      if (after) main.insertBefore(drag, after); else main.insertBefore(drag, main.querySelector('p'));
+      main.insertBefore(drag, after || main.querySelector('p'));
     };
     const up = () => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up);
       drag.classList.remove('drag');
-      const order = [...main.querySelectorAll('.sx-b')].map((c) => c.dataset.id);
+      const order = [...main.querySelectorAll('.sx-b[data-id]')].map((c) => c.dataset.id);
       drag = null;
       if (order.join() !== s.blocks.map((b) => b.id).join()) SX[id].act({op: 'order', ids: order});
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up);
   }));
 }
-const secondsOf = (t) => Math.max(1, Math.round(String(t || '').split(/\s+/).filter(Boolean).length / 2.5));
+// «Сплошным»: the whole text as it will sound; the browser's voice reads it block by block.
 function sxRead(main, id, s, st) {
-  main.innerHTML = `<div class="sx-paper">${s.blocks.map((b, i) => `<div class="sx-r${b.ok ? ' ok' : ''}${st.sel.includes(b.id) || st.phrase?.id === b.id ? ' on' : ''}" data-id="${esc(b.id)}">
+  const can = 'speechSynthesis' in window;
+  main.innerHTML = `${can ? `<div class="sx-player"><button type="button" class="btn" id="sxSay">▶ Прочитать вслух</button><div class="sx-track" aria-hidden="true">${s.blocks.map((b) => `<i style="flex: ${b.sec}" data-seg="${esc(b.id)}"></i>`).join('')}</div><span class="small muted" id="sxSayT" style="font-variant-numeric: tabular-nums">${mmss(0)} / ${mmss(s.total)}</span>
+      <select class="f" id="sxRate" aria-label="Темп чтения" style="width: auto; min-height: 36px; padding: 4px 8px"><option value="0.85">медленно</option><option value="1" selected>обычно</option><option value="1.2">быстро</option></select></div>` : ''}
+    <div class="sx-paper">${s.blocks.map((b, i) => `<div class="sx-r${b.ok ? ' ok' : ''}${st.sel.includes(b.id) || st.phrase?.id === b.id ? ' on' : ''}" data-id="${esc(b.id)}">
       <div class="sx-mk"><b>${i + 1} · ${esc(b.role || 'Блок')}</b><span>${mmss(b.from)}${b.ok ? ' · утверждён' : ''}</span></div>
       <p class="sx-p">${sxMark(b.text, st, b.id)}${st.sel.includes(b.id) || st.phrase?.id === b.id ? ' <span class="sx-in">в чате</span>' : ''}</p></div>`).join('')}</div>
     <p class="small muted" style="margin: 0 2px">Так, как прозвучит. Выделите слова — они уйдут в чат; клик по подписи слева — весь блок.</p>`;
-  main.querySelectorAll('.sx-mk').forEach((m) => m.addEventListener('click', () => { const bid = m.parentElement.dataset.id; st.phrase = null; st.sel = st.sel[0] === bid ? [] : [bid]; stageScript(id, {...REEL_CACHE.get(id)?.data, script: s}); }));
+  main.querySelectorAll('.sx-mk').forEach((m) => m.addEventListener('click', () => { const bid = m.parentElement.dataset.id; st.phrase = null; st.sel = st.sel[0] === bid ? [] : [bid]; sxRedraw(id, s); }));
   sxWords(main, id, s, st, '.sx-p');
+  const btn = $('#sxSay');
+  if (!btn) return;
+  let on = false;
+  const mark = (i) => {
+    main.querySelectorAll('.sx-r').forEach((r, j) => { r.classList.toggle('say', j === i); r.classList.toggle('said', i >= 0 && j < i); });
+    main.querySelectorAll('[data-seg]').forEach((x, j) => { x.className = i < 0 ? '' : j < i ? 'd' : j === i ? 'n' : ''; });
+    $('#sxSayT').textContent = `${mmss(i < 0 ? 0 : s.blocks[i].from)} / ${mmss(s.total)}`;
+    if (i >= 0) main.querySelectorAll('.sx-r')[i]?.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+  };
+  const stop = () => { on = false; speechSynthesis.cancel(); btn.textContent = '▶ Прочитать вслух'; mark(-1); };
+  const say = (i) => {
+    if (!on || !btn.isConnected) return;
+    if (i >= s.blocks.length) return stop();
+    mark(i);
+    const u = new SpeechSynthesisUtterance(s.blocks[i].text);
+    u.lang = /[а-яё]/i.test(s.blocks[i].text) ? 'ru-RU' : 'en-US';
+    u.rate = Number($('#sxRate')?.value) || 1;
+    u.onend = () => say(i + 1);
+    u.onerror = () => on && stop();
+    speechSynthesis.speak(u);
+  };
+  btn.onclick = () => { if (on) return stop(); on = true; btn.textContent = '■ Стоп'; say(Math.max(0, s.blocks.findIndex((b) => b.id === (st.sel[0] || st.phrase?.id)))); };
+}
+// A schematic frame of a block from its look: who is in the frame, where graphics and text sit.
+function sxFrame(b, big) {
+  const L = b.look || [], has = (k) => L.find((x) => x.kind === k);
+  const broll = has('broll') && !has('frame'), gfx = L.filter((x) => x.kind === 'gfx'), txt = L.filter((x) => x.kind === 'text');
+  return `<span class="sx-scr${big ? ' big' : ''}${broll ? ' br' : ''}" ${big ? 'role="img" aria-label="Набросок кадра"' : 'aria-hidden="true"'}>
+    ${gfx.length ? `<i class="g">${big ? esc(short(gfx[0].what).slice(0, 46)) : ''}</i>` : ''}${broll ? (big ? `<i class="b">${esc(short(has('broll').what).slice(0, 50))}</i>` : '') : '<i class="p"></i>'}
+    ${txt.length ? `<i class="t">${big ? esc(short(txt[0].what).slice(0, 40)) : ''}</i>` : ''}${big && gfx[1] ? `<i class="g2">${esc(short(gfx[1].what).slice(0, 40))}</i>` : ''}</span>`;
 }
 // «2 · Вид»: what is said on the left, what is on screen on the right; the words graphics start on are underlined.
 function sxLook(main, id, s, st) {
@@ -2052,29 +2145,37 @@ function sxLook(main, id, s, st) {
     return t;
   };
   const shoot = s.blocks.flatMap((b, i) => (b.look || []).filter((x) => x.have === 'shoot').map((x) => `${i + 1} · ${x.what}`));
-  main.innerHTML = `<div class="sx-legend">${Object.entries(SX_KIND).filter(([k]) => k !== 'broll').map(([, [n, c]]) => `<span><i style="background: ${c}"></i>${n}</span>`).join('')}<span class="muted">подчёркнуто — на этих словах появляется</span></div>
+  const on = (b) => st.sel.includes(b.id) || st.phrase?.id === b.id;
+  main.innerHTML = `<div class="sx-sb" aria-label="Раскадровка">${s.blocks.map((b, i) => `<button type="button" class="sx-fr${on(b) ? ' on' : ''}" data-fr="${esc(b.id)}" title="${esc(b.role || '')}">${sxFrame(b)}<span>${i + 1} ${esc(short(b.role || 'Блок').slice(0, 12))}<small>${b.sec} с</small></span></button>`).join('')}</div>
+    <div class="sx-legend">${Object.entries(SX_KIND).filter(([k]) => k !== 'broll').map(([, [n, c]]) => `<span><i style="background: ${c}"></i>${n}</span>`).join('')}<span class="muted">подчёркнуто — на этих словах появляется</span></div>
     <div class="sx-av">${s.blocks.map((b, i) => `<div class="sx-avr${st.sel.includes(b.id) ? ' on' : ''}" data-id="${esc(b.id)}">
-      <div class="sx-avn"><b>${i + 1} · ${esc(b.role || 'Блок')}</b><span>${mmss(b.from)} · ${b.sec} с</span>${st.sel.includes(b.id) || st.phrase?.id === b.id ? '<span class="sx-in">в чате</span>' : ''}</div>
+      <div class="sx-avn"><b>${i + 1} · ${esc(b.role || 'Блок')}</b><span>${mmss(b.from)} · ${b.sec} с</span>${on(b) ? '<span class="sx-in">в чате</span>' : ''}${on(b) && b.look?.length ? sxFrame(b, true) : ''}</div>
       <div class="sx-say">${under(b)}</div>
       <div class="sx-els">${(b.look || []).map((x) => { const [n, c] = SX_KIND[x.kind] || SX_KIND.gfx, h = SX_HAVE[x.have]; return `<div class="sx-el"><span class="sx-k" style="color: ${c}"><i style="background: ${c}"></i>${n}</span><span class="sx-w">${esc(x.what)}${x.at || x.tpl ? `<small>${x.at ? `на «${esc(x.at)}»` : 'весь блок'}${x.tpl ? ` · шаблон «${esc(x.tpl)}»` : ''}</small>` : ''}</span>${h ? `<span class="sx-have ${h[1]}">${h[0]}</span>` : ''}</div>`; }).join('') || '<span class="small muted">пока ничего</span>'}</div>
     </div>`).join('')}</div>
-    ${shoot.length ? `<div class="sx-shoot"><b>Доснять · ${shoot.length}</b>${shoot.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}`;
+    ${shoot.length ? `<div class="sx-shoot"><b>Доснять · ${shoot.length}</b>${shoot.map((x) => `<span>${esc(x)}</span>`).join('')}<a href="#/reel/${esc(id)}/materials" class="small">Весь список — в «Материалах»</a></div>` : ''}`;
+  main.querySelectorAll('[data-fr]').forEach((f) => (f.onclick = () => { st.phrase = null; st.sel = st.sel[0] === f.dataset.fr ? [] : [f.dataset.fr]; sxRedraw(id, s); main.querySelector(`.sx-avr[data-id="${f.dataset.fr}"]`)?.scrollIntoView({block: 'nearest'}); }));
   sxPick(main, id, s, st, '.sx-avr');
   sxWords(main, id, s, st, '.sx-say');
 }
 // Суфлёр (Т4/Т5): the text on the whole screen, one block per take, the end of the previous phrase and the
 // start of the next one in yellow — say them too, the cut then joins in the middle of the overlap.
-function prompter(s, startId) {
+// With a reel (id) it also films: the camera in the corner, each take goes to the reel's sources/ under its block.
+function prompter(s, startId, id) {
   let i = Math.max(0, s.blocks.findIndex((b) => b.id === startId)), size = Number(UI.get('prompt.size')) || 1, lap = UI.get('prompt.lap') !== 'off', mirror = false, flow = false;
+  let stream = null, rec = null, t0 = 0, tick = 0, busy = '';
+  const film = !!id && canEdit() && !!navigator.mediaDevices?.getUserMedia && 'MediaRecorder' in window;
   const ov = document.createElement('div');
   ov.className = 'pr'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Суфлёр');
+  ov.innerHTML = '<div class="pr-ui"></div><div class="pr-cam" hidden><video muted playsinline autoplay></video><span></span></div>';
+  const ui = ov.firstChild, camBox = ov.lastChild, camV = camBox.firstChild, camT = camBox.lastChild;
   const words = (t) => String(t || '').split(/\s+/).filter(Boolean);
   const tail = (t) => { const w = words(t); return w.slice(Math.max(0, w.length - Math.min(3, Math.ceil(w.length / 2)))).join(' '); };
   const head = (t) => { const w = words(t); return w.slice(0, Math.min(3, Math.ceil(w.length / 2))).join(' '); };
   const draw = () => {
-    const b = s.blocks[i], prev = s.blocks[i - 1], next = s.blocks[i + 1];
-    ov.innerHTML = `<div class="pr-top"><button type="button" class="pr-b" data-x="close">✕ Выйти · Esc</button><b>Блок ${i + 1} из ${s.blocks.length}</b><span>${esc(b.role || '')}</span>
-        <span class="pr-segs" aria-hidden="true">${s.blocks.map((_, j) => `<i class="${j < i ? 'd' : j === i ? 'n' : ''}"></i>`).join('')}</span><span style="flex: 1"></span>
+    const b = s.blocks[i], prev = s.blocks[i - 1], next = s.blocks[i + 1], takes = b.takes || [];
+    ui.innerHTML = `<div class="pr-top"><button type="button" class="pr-b" data-x="close">✕ Выйти · Esc</button><b>Блок ${i + 1} из ${s.blocks.length}</b><span>${esc(b.role || '')}</span>
+        <span class="pr-segs" aria-hidden="true">${s.blocks.map((x, j) => `<i class="${x.takes?.some((t) => t.good) ? 'd' : j === i ? 'n' : x.takes ? 'h' : ''}${j === i ? ' cur' : ''}"></i>`).join('')}</span><span style="flex: 1"></span>
         <button type="button" class="pr-b${flow ? '' : ' on'}" data-x="blocks">По блокам</button><button type="button" class="pr-b${flow ? ' on' : ''}" data-x="flow">Подряд</button>
         <button type="button" class="pr-b${lap ? ' on' : ''}" data-x="lap" aria-pressed="${lap}">Нахлёст</button><button type="button" class="pr-b${mirror ? ' on' : ''}" data-x="mirror" aria-pressed="${mirror}">Зеркально</button>
         <button type="button" class="pr-b" data-x="minus" aria-label="Мельче">A−</button><button type="button" class="pr-b" data-x="plus" aria-label="Крупнее">A+</button></div>
@@ -2082,17 +2183,56 @@ function prompter(s, startId) {
         ? s.blocks.map((x, j) => `<p class="pr-flow${j === i ? ' now' : ''}" data-j="${j}">${esc(x.text)}</p>`).join('')
         : `${lap && prev ? `<p class="pr-side">…<span class="pr-lap">${esc(tail(prev.text))}</span></p>` : ''}<p class="pr-cur">${esc(b.text)}</p>${lap && next ? `<p class="pr-side"><span class="pr-lap">${esc(head(next.text))}</span> ${esc(words(next.text).slice(words(head(next.text)).length).join(' '))}</p>` : ''}
         ${lap && (prev || next) ? '<span class="pr-hint">Жёлтое — нахлёст: скажите конец прошлой фразы и начало следующей, монтаж склеит по середине</span>' : ''}`}</div></div>
-      <div class="pr-bot"><button type="button" class="pr-rb" data-x="prev" aria-label="Прошлый блок" ${i ? '' : 'disabled'}>‹</button><button type="button" class="pr-rb" data-x="next" aria-label="Следующий блок" ${i < s.blocks.length - 1 ? '' : 'disabled'}>›</button>
-        <span class="pr-keys">← → блоки · A− A+ размер · Esc выйти</span></div>`;
-    ov.querySelector(flow ? '.pr-flow.now' : '.pr-cur')?.scrollIntoView({block: 'start'});
+      <div class="pr-bot"><button type="button" class="pr-rb" data-x="prev" aria-label="Прошлый блок" ${i && !rec ? '' : 'disabled'}>‹</button>
+        ${film && !flow ? `<button type="button" class="pr-rec${rec ? ' on' : ''}" data-x="rec" ${busy ? 'disabled' : ''}><i></i>${busy || (rec ? 'Стоп · дубль готов' : stream ? `Записать дубль ${takes.length + 1}` : 'Включить камеру и записать')}</button>` : ''}
+        <button type="button" class="pr-rb" data-x="next" aria-label="Следующий блок" ${i < s.blocks.length - 1 && !rec ? '' : 'disabled'}>›</button>
+        ${!flow ? takes.map((t, j) => `<button type="button" class="pr-tk${t.good ? ' ok' : ''}" data-good="${esc(t.file)}" title="Отметить лучшим дублем">Дубль ${j + 1}${t.sec ? ' · ' + mmss(t.sec) : ''}${t.good ? ' · ✓ лучший' : ''}</button>`).join('') : ''}
+        <span class="pr-keys">${film ? 'Пробел — запись и стоп · ' : ''}← → блоки · Esc выйти</span></div>`;
+    ui.querySelector(flow ? '.pr-flow.now' : '.pr-cur')?.scrollIntoView({block: 'start'});
   };
-  const go = (d) => { i = Math.min(s.blocks.length - 1, Math.max(0, i + d)); draw(); };
-  const close = () => { document.removeEventListener('keydown', keys); ov.remove(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); };
-  ov.addEventListener('click', (e) => {
-    const x = e.target.closest('[data-x]')?.dataset.x, j = e.target.closest('[data-j]')?.dataset.j;
-    if (j !== undefined) { i = +j; return draw(); }
+  const go = (d) => { if (rec) return; i = Math.min(s.blocks.length - 1, Math.max(0, i + d)); draw(); };
+  const sync = (r) => { if (r?.script) { s.blocks.forEach((b) => { const n = r.script.blocks.find((x) => x.id === b.id); if (n?.takes) b.takes = n.takes; }); } };
+  async function record() {
+    if (busy) return;
+    if (rec) return rec.stop();
+    if (!stream) {
+      try { stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'user', width: {ideal: 1920}, height: {ideal: 1080}}, audio: true}); }
+      catch { return toast('Нет доступа к камере или микрофону — разрешите их в настройках браузера'); }
+      camV.srcObject = stream; camBox.hidden = false;
+    }
+    const b = s.blocks[i], chunks = [];
+    const type = ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t)) || '';
+    rec = new MediaRecorder(stream, type ? {mimeType: type, videoBitsPerSecond: 12e6} : undefined);
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = async () => {
+      const sec = (Date.now() - t0) / 1000, mime = rec.mimeType || 'video/webm';
+      rec = null; clearInterval(tick); camT.textContent = '';
+      busy = 'Сохраняю дубль…'; draw();
+      try {
+        const name = `take-${String(i + 1).padStart(2, '0')}-${(b.takes?.length || 0) + 1}.${/mp4/.test(mime) ? 'mp4' : 'webm'}`;
+        const u = await uploadFile(new File(chunks, name, {type: mime}), `&reel=${encodeURIComponent(id)}`);
+        sync(await post('/api/reel/script', {reel: id, op: 'shot', id: b.id, file: u.name, sec}));
+      } catch (err) { toast(err.message || 'Дубль не сохранился'); }
+      busy = ''; draw();
+    };
+    t0 = Date.now(); rec.start();
+    tick = setInterval(() => { camT.textContent = `● ${mmss((Date.now() - t0) / 1000)}`; }, 250);
+    draw();
+  }
+  const close = () => {
+    if (rec) { rec.onstop = null; try { rec.stop(); } catch {} }
+    clearInterval(tick); stream?.getTracks().forEach((x) => x.stop());
+    document.removeEventListener('keydown', keys); ov.remove();
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    if (id && location.hash.startsWith('#/reel/' + id)) drawStage(id, reelTab() || 'script');
+  };
+  ov.addEventListener('click', async (e) => {
+    const x = e.target.closest('[data-x]')?.dataset.x, j = e.target.closest('[data-j]')?.dataset.j, good = e.target.closest('[data-good]')?.dataset.good;
+    if (good) { sync(await post('/api/reel/script', {reel: id, op: 'good', id: s.blocks[i].id, file: good}).catch(() => null)); return draw(); }
+    if (j !== undefined && !rec) { i = +j; return draw(); }
     if (!x) return;
     if (x === 'close') return close();
+    if (x === 'rec') return record();
     if (x === 'prev') return go(-1);
     if (x === 'next') return go(1);
     if (x === 'blocks' || x === 'flow') flow = x === 'flow';
@@ -2103,7 +2243,8 @@ function prompter(s, startId) {
   });
   const keys = (e) => {
     if (e.key === 'Escape') { e.preventDefault(); close(); }
-    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); go(1); }
+    else if (e.key === ' ') { e.preventDefault(); if (film && !flow) record(); else go(1); }
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); go(1); }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); go(-1); }
   };
   document.addEventListener('keydown', keys);
@@ -2522,8 +2663,16 @@ async function reelFiles(id, data) {
   const sc = Array.isArray(data?.scenes) ? data.scenes : null;
   const stColor = (t) => /готов/i.test(t || '') ? 'var(--green)' : /пересн/i.test(t || '') ? 'var(--amber)' : 'var(--blue)';
   const bo = data?.basedOn && !(data.versions || []).length ? data.basedOn : null;
+  // From script.json: one take per block (filmed in the prompter) and every cutaway its «Вид» asks to film.
+  const sx = data?.script?.blocks?.length ? data.script : null;
+  const sxNeed = sx ? sx.blocks.flatMap((b, i) => [
+    {name: `${i + 1} · ${b.role || 'Блок'}`, what: b.text, done: !!b.takes?.length, state: b.takes?.length ? `${b.takes.length} ${sxPlural(b.takes.length, 'дубль', 'дубля', 'дублей')}${b.takes.some((t) => t.good) ? ' · выбран' : ''}` : 'снять'},
+    ...(b.look || []).filter((x) => x.kind === 'broll' || x.have === 'shoot' && x.kind !== 'frame').map((x) => ({name: `↳ ${SX_KIND[x.kind]?.[0] || 'Кадр'}`, what: x.what + (x.at ? ` — на «${x.at}»` : ''), done: x.have === 'ready', state: x.have === 'ready' ? 'есть' : 'снять'})),
+  ]) : [];
   host.innerHTML = `<div class="page" style="max-width: 1000px">
     ${bo ? `<div class="rback" style="margin-bottom: 14px">${svg('idea', 15)}<span style="flex: 1">Сделан по образцу <a href="#/reel/${esc(bo.from)}">${esc(bo.from.slice(0, 2))}</a>. ${bo.mode === 'material' ? 'Загрузите новый материал — сцены ниже подскажут, что где нужно. Claude соберёт v1 в том же ритме и оформлении.' : bo.mode === 'theme' ? 'Напишите в чате, о чём рилс, и загрузите материал.' : 'Материал уже на месте: Claude переведёт и соберёт.'}</span>${canEdit() ? `<button type="button" class="ln-btn p s" id="buildCopy">Собрать по образцу</button>` : ''}</div>` : ''}
+    ${sx ? `<section><div class="row" style="justify-content: space-between; margin-bottom: 6px; gap: 8px; flex-wrap: wrap"><h2>Что снять · ${sxNeed.filter((x) => x.done).length} из ${sxNeed.length}</h2><span class="row" style="gap: 8px">${canEdit() ? '<button type="button" class="btn" id="sxTask" title="Задание со всем текстом по блокам — человеку в мини-приложение «Съёмка»">Отдать на съёмку</button>' : ''}<button type="button" class="btn primary" id="sxShoot">Суфлёр · снять дубли</button></span></div>
+      ${sxNeed.map((x) => `<div class="rshoot"><b style="font-weight: 600">${esc(x.name)}</b><span class="muted">${esc(x.what)}</span><span class="st" style="color: ${x.done ? 'var(--green)' : 'var(--blue)'}">${esc(x.state)}</span></div>`).join('')}</section>` : ''}
     ${sc ? `<section><div class="row" style="justify-content: space-between; margin-bottom: 6px"><h2>Готовность · ${sc.filter((x) => /готов/i.test(x.status || '')).length} из ${sc.length}</h2>${canEdit() ? '<button type="button" class="btn" id="shotList">Шот-лист в Телеграм</button>' : ''}</div>
       <div class="grid4 lbl" style="border-top: 0"><span>Сцена</span><span>Что нужно</span><span>Что есть</span><span>Статус</span></div>
       ${sc.map((x, i) => `<div class="grid4"><b style="font-weight: 600">${i + 1} · ${esc(x.name || '')}</b><span class="muted">${esc(x.need || x.screen || '')}</span><span class="small muted">${esc(x.have || '—')}</span><span class="st" style="color: ${stColor(x.status)}">${esc(x.status || 'нужно')}</span></div>`).join('')}</section>`
@@ -2555,6 +2704,12 @@ async function reelFiles(id, data) {
     load();
   }
   $('#buildCopy')?.addEventListener('click', () => chatOf().say(bo.prompt, `Собери v1 по образцу ${bo.from.slice(0, 2)}`));
+  $('#sxShoot')?.addEventListener('click', () => prompter(sx, null, id));
+  $('#sxTask')?.addEventListener('click', async () => {
+    const r = data.reel, text = sx.blocks.map((b) => b.text.replace(/\s+/g, ' ')).join('\n');
+    const ok = await post('/api/tasks', {action: 'add', title: `${r.num} · ${r.title}`.slice(0, 120), text, seconds: sx.total, lang: /[а-яё]/i.test(text) ? 'ru' : 'en'}).catch(() => null);
+    toast(ok ? 'Задание в «Съёмке»: текст по блокам, каждый блок — отдельная фраза' : 'Не получилось создать задание');
+  });
   $('#shotList')?.addEventListener('click', () => chatOf().say('Составь шот-лист по сценам: что снять, как держать телефон, сколько секунд; отметь, что уже есть в материалах. Обнови scenes.json и пришли шот-лист сюда.', 'Шот-лист'));
   const drop = $('#drop');
   if (drop) {
