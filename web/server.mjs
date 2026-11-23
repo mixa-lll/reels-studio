@@ -8,7 +8,7 @@
 // (Whisper, masks, Python, downloads). Only editors reach the chats. DENIED keeps it away
 // from this server's own files (sessions, passwords, invites).
 import {createServer} from 'node:http';
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
@@ -1200,6 +1200,27 @@ createServer(async (req, res) => {
     writeJson(join(dir, 'ready.json'), {v: b.v, by: me.name, at: Date.now()});
     log(me.name, `${b.v} ролика ${b.reel} идёт в «Готово»`);
     return json(200, {ready: b.v});
+  }
+  // «Написать текст» on an idea: the studio makes the reel folder itself (no agent turn for that), writes the idea
+  // into its README and links the item, so the page opens «Сценарий» at once and Claude only writes the text.
+  if (req.method === 'POST' && url.pathname === '/api/reel/start') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const item = loadItems(studio).items.find((x) => x.id === String(b.item || ''));
+    if (!item || item.format !== 'reel') return json(404, {});
+    if (item.ref?.kind === 'reel' && reelDir(p, item.ref.id)) return json(200, {id: item.ref.id, existed: true});
+    const RU = {а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya'};
+    const slug = [...item.title.toLowerCase()].map((c) => RU[c] ?? c).join('').replace(/[^a-z0-9]+/g, '-').split('-').filter(Boolean).slice(0, 4).join('-').slice(0, 40) || 'reel';
+    changeItem(studio, item.id, {take: true, starting: true}, {by: me.name});
+    const run = spawnSync(process.execPath, [join(BOT, 'scripts', 'new-reel.mjs'), slug], {cwd: BOT, env: {...process.env, REELS_STUDIO: studio}, encoding: 'utf8'});
+    const dir = String(run.stdout || '').trim().split('\n').pop();
+    if (run.status !== 0 || !dir || !existsSync(dir)) return json(500, {error: 'Папка рилса не создалась'});
+    const id = basename(dir), idea = item.idea || {};
+    writeFileSync(join(dir, 'README.md'), [`# ${id.slice(0, 2)} «${item.title}»`, '', 'Status: in work', '', '## Идея', idea.about || item.title,
+      ...(idea.hook ? ['', `Крючок: ${idea.hook}`] : []), ...((idea.flow || []).length ? ['', 'Ход:', ...idea.flow.map((l, i) => `${i + 1}. ${l}`)] : []), ''].join('\n'));
+    syncItems(studio);
+    log(me.name, `завёл рилс ${id} из идеи «${item.title}»`);
+    return json(200, {id});
   }
   // «Сценарий» by meaning blocks (web/script.mjs): order, approve, take a variant, approve a step, undo.
   if (req.method === 'POST' && url.pathname === '/api/reel/script') {
