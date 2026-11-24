@@ -127,8 +127,12 @@ function reels(p) {
     const last = vs.at(-1);
     const thumb = last && readdirSync(join(dir, 'versions', last)).find((f) => /\.(thumb\.jpg|png|jpg)$/i.test(f));
     const best = last && bestVideo(join(dir, 'versions', last));
-    // A new version changes versions/<v>, not the reel's own folder.
-    const touched = [dir, join(dir, 'README.md'), join(dir, 'publish.json'), join(dir, 'versions'), last && join(dir, 'versions', last)].filter((f) => f && existsSync(f)).map((f) => statSync(f).mtimeMs);
+    // When the owner last worked on it: the reel's own files and the latest version's files, not
+    // folder dates (sync's files.json, a player preview or a cleanup change those without any work).
+    const own = ['README.md', 'publish.json', 'cut.json', 'cut.applied.json', 'edits.json', 'graphics.json', 'scenes.json', 'script.json', 'ready.json'].map((f) => join(dir, f));
+    const made = last ? readdirSync(join(dir, 'versions', last)).filter((f) => !f.startsWith('.') && !/^(ARCHIVED|variant)\.json$|^project-snapshot$/.test(f)).map((f) => join(dir, 'versions', last, f)) : [];
+    const touched = [...own, ...made].filter((f) => existsSync(f)).map((f) => statSync(f).mtimeMs);
+    if (!touched.length) touched.push(statSync(dir).mtimeMs);
     return {id: r, num: reelNumber(r), title, status: status[reelNumber(r)] || 'none', version: last || null, versions: vs.length,
       thumb: thumb ? mediaUrl(join(dir, 'versions', last, thumb)) : null, updated: Math.max(...touched),
       file: best ? {name: basename(best), size: statSync(best).size, url: mediaUrl(best)} : null};
