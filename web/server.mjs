@@ -8,7 +8,6 @@
 // (Whisper, masks, Python, downloads). Only editors reach the chats. DENIED keeps it away
 // from this server's own files (sessions, passwords, invites).
 import {createServer} from 'node:http';
-import os from 'node:os';
 import {spawn} from 'node:child_process';
 import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
@@ -31,6 +30,7 @@ import {telegramDigest} from '../bot/tgexport.mjs';
 import {cloudBytes, cloudConfig, fetchBack, offloadTrash} from '../bot/cloud.mjs';
 import {deviceName, deviceNode, relayBase} from '../bot/device.mjs';
 import * as sync from '../bot/sync.mjs';
+import {uptime} from 'node:os';
 import {apply as storageApply, dirSize, inTrash, isPacked, outboxVersions, plan as storagePlan, publishedAt, readPolicy, restore as storageRestore, sweep as storageSweep, versionDirs} from '../bot/storage.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -784,6 +784,22 @@ createServer(async (req, res) => {
     const st = await syncNow(p);
     return json(200, {at: st?.at || null, error: st?.error || null, conflicts: sync.conflicts(projectDir(p))});
   }
+  // The reel opened on the page (web/index.html asks for it next to /api/reel): free → held here;
+  // its missing media starts coming down; the answer says where it is and how far the download is.
+  if (req.method === 'GET' && url.pathname === '/api/reel/hold') {
+    const r = url.searchParams.get('reel');
+    const dir = reelDir(p, r);
+    if (!dir) return json(404, {});
+    if (SYNC && isEditor(me)) {
+      const before = sync.holderOf(dir);
+      sync.open(dir, {node: NODE, name: NAME});
+      if (!before && sync.holderOf(dir)) syncSoon(p, 500);
+      // Waiting for another computer to hand it over: look every 10 s, not once a minute.
+      if (sync.readFiles(dir).handoff?.to === NODE && Date.now() - (SYNC_STATE.get(p)?.at || 0) > 10e3) syncSoon(p, 0);
+      fetchReel(p, r);
+    }
+    return json(200, {hold: holdInfo(p, r)});
+  }
   // «Забрать сюда»: asks the holder to hand the reel over; force takes it now (the holder sleeps).
   if (req.method === 'POST' && url.pathname === '/api/reel/hold') {
     if (!can('editor') || !SYNC) return json(400, {});
@@ -1265,15 +1281,7 @@ createServer(async (req, res) => {
     const r = url.searchParams.get('reel');
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
-    if (SYNC && isEditor(me)) {
-      const before = sync.holderOf(dir);
-      sync.open(dir, {node: NODE, name: NAME});
-      if (!before && sync.holderOf(dir)) syncSoon(p, 500);
-      // Waiting for another computer to hand it over: look every 10 s, not once a minute.
-      if (sync.readFiles(dir).handoff?.to === NODE && Date.now() - (SYNC_STATE.get(p)?.at || 0) > 10e3) syncSoon(p, 0);
-      fetchReel(p, r);
-    }
-    return json(200, {hold: holdInfo(p, r), reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
+    return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
       ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10),
       storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}, basedOn: readJson(join(dir, 'based-on.json'), null)});
@@ -1748,7 +1756,7 @@ function openOnBoot() {
   const base = process.env.STUDIO_URL || relayBase();
   if (!SYNC || !base || process.env.DEVICE_OPEN === '0' || process.platform !== 'darwin') return;
   const stamp = join(DATA, 'device-opened.txt');
-  const boot = Date.now() - os.uptime() * 1000;
+  const boot = Date.now() - uptime() * 1000;
   if (Number(read(stamp)) > boot) return;
   writeFileSync(stamp, String(Date.now()));
   spawn('open', [`${base}/?device=${encodeURIComponent(NODE)}`], {stdio: 'ignore', detached: true}).unref();

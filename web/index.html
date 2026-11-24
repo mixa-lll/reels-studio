@@ -887,30 +887,54 @@ function fetchLine(hold) {
   }
   return '';
 }
-function wireHold(id, tab, hold) {
-  if (hold !== undefined) wireHold.here = hold?.here;
+// The bar goes in by itself whenever a reel's page is drawn (#reelHost appears), above the stage and
+// its chat, so the reel page's own code does not need to know about devices.
+const holdApi = (id) => api('/api/reel/hold?reel=' + encodeURIComponent(id)).then((d) => d.hold).catch(() => null);
+const holdReel = () => /^#\/reel\/([^/]+)/.exec(location.hash)?.[1];
+function holdPlace(html) {
+  $('#holdBar')?.remove();
+  const host = $('#reelHost');
+  if (!html || !host) return null;
+  (host.closest('.rrow') || host).insertAdjacentHTML('beforebegin', html);
+  return $('#holdBar');
+}
+async function showHold(id) {
+  if (!DEVICE) await loadDevice();
+  if (!DEVICE?.multi) return;
+  const hold = await holdApi(id);
+  if (!hold || holdReel() !== id || !$('#reelHost')) return;
+  const el = holdPlace(holdBar(id, hold));
+  if (el) wireHold(id, hold);
+}
+function wireHold(id, hold) {
   const el = $('#holdBar');
   if (!el) return;
+  const redraw = () => { REEL_CACHE.delete(id); vReel(id, reelTab()); };
   el.querySelectorAll('[data-hold]').forEach((b) => b.onclick = async () => {
     b.disabled = true;
-    if (b.dataset.hold === 'retry') { REEL_CACHE.delete(id); return vReel(id, tab); }
+    if (b.dataset.hold === 'retry') return redraw();
     const r = await post('/api/reel/hold', {reel: id, force: b.dataset.hold === 'force'}).catch(() => null);
     toast(r?.held ? 'Выпуск теперь здесь' : r ? 'Попросил — выпуск перейдёт, как только тот компьютер отправит правки' : 'Не получилось');
-    REEL_CACHE.delete(id); vReel(id, tab);
+    redraw();
   });
   // While waiting for it, or while its media comes down: look again in a moment.
   clearTimeout(wireHold.t);
   wireHold.t = setTimeout(async () => {
-    if (!location.hash.startsWith('#/reel/' + id) || !$('#holdBar')) return;
-    const d = await getReel(id).catch(() => null);
-    if (!d) return;
-    const was = el.outerHTML, now = holdBar(id, d.hold);
+    if (holdReel() !== id || !$('#holdBar')) return;
+    const now = await holdApi(id);
+    if (!now || holdReel() !== id || !$('#holdBar')) return;
     // The media came down, or the reel came here: draw the page again with it.
-    if (!now || (/holdbar get/.test(was) && !fetchLine(d.hold)) || d.hold?.here !== wireHold.here) { wireHold.here = d.hold?.here; vReel(id, tab); return; }
-    if (now !== was) { el.outerHTML = now; }
-    wireHold(id, tab);
+    if ((fetchLine(hold) && !fetchLine(now)) || now.here !== hold.here) return redraw();
+    const html = holdBar(id, now);
+    if (!html) return holdPlace(null);
+    if (html !== $('#holdBar').outerHTML) holdPlace(html);
+    wireHold(id, now);
   }, 1500);
 }
+new MutationObserver(() => {
+  const host = $('#reelHost'), id = holdReel();
+  if (host && id && !id.startsWith('new-') && host.dataset.hold !== id) { host.dataset.hold = id; showHold(id); }
+}).observe($('#view'), {childList: true, subtree: true});
 
 // ⌘K: jump to any reel or screen by name.
 function search() {
@@ -1832,7 +1856,7 @@ async function vReel(id, tab) {
   const keep = !isNew && REEL_CHAT?.id === id && view.contains(REEL_CHAT.box) ? REEL_CHAT.box : null;
   view.innerHTML = isNew || !r
     ? `<div class="work"><div class="chat">${head}${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></div></div>`
-    : `<div class="work"><div class="rmain">${head}${holdBar(id, data?.hold)}<div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
+    : `<div class="work"><div class="rmain">${head}<div id="reelHost" style="flex: 1; overflow-y: auto"></div></div>
       <aside class="chatcol" aria-label="${chatName}"><div class="chead" style="padding: 12px 16px"><b style="flex: 1">${chatName}</b>${canEdit() ? '<button type="button" class="btn" id="resetChat" title="История чата сотрётся, рилс и файлы останутся">Новый чат</button>' : ''}</div>${ctx}<div id="chatHost" style="display: flex; flex-direction: column; flex: 1; min-height: 0"></div></aside></div>`;
   const box = keep || chatBox(id, {
     onRebind: (k) => { history.replaceState(null, '', '#/reel/' + k); sidebar(); },
@@ -1847,7 +1871,6 @@ async function vReel(id, tab) {
   $('#chatHost').append(box);
   $('#resetChat')?.addEventListener('click', async () => { if (confirm('Начать чат выпуска заново? Рилс, версии и файлы останутся.')) { await post('/api/chat/reset', {key: id}); vReel(id, tab); } });
   wireRelHead(view, () => vReel(id, tab));
-  wireHold(id, tab, data?.hold);
   if (r && tab === 'idea') drawIdea($('#reelHost'), 'reel', id);
   else if (r) drawStage(id, tab, data);
   const pending = sessionStorage.getItem('firstMsg:' + id);
