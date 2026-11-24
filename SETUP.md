@@ -69,3 +69,15 @@ Works on macOS, Linux and Windows. Commands below are given per OS where they di
    - The studio's agent never gets unrestricted permissions: only file tools, web search and the reel scripts (see `web/server.mjs`, `ALLOWED`).
 
 Security note to pass on in one line: the bot runs the agent without permission prompts inside its folder, so it serves only its owner; keep the token private. If it ever leaks, send `/revoke` to @BotFather and give the new token to the agent.
+
+## Another computer of the same owner
+
+When the user says this is **another computer for a studio they already have** (the message names a device node such as `misha-2` and a project repository), the bot and its Telegram bot already exist: no new bot, no BotFather, no questions about ideas. Talk the same way (short lines, buttons). macOS only for now.
+
+1. Steps 0–4 above as usual (check, folder `~/reels-bot`, agent, Node 22+, Remotion). git is needed here: on macOS, if `xcode-select -p` fails, run `xcode-select --install` and tell the user to press «Install» in the window that opens; wait until `git --version` works.
+2. **Cloud keys.** Create `.env` from `.env.example` with `R2_ACCOUNT_ID` and `R2_BUCKET` from the user's message. The two secret lines the user pastes themselves: open `.env` in TextEdit (`open -e .env`), say which two values from their R2 API token go after `R2_ACCESS_KEY_ID=` and `R2_SECRET_ACCESS_KEY=`, and wait for «готово».
+3. **Settings.** `node scripts/device-setup.mjs <node>` — brings the bot token, relay and device lines from the cloud. Then set `AGENT_BIN` (step 2 above) and `REELS_MEMBERS=<repo>/data/shared/access.json`.
+4. **Project.** The repository is private: if `git ls-remote <repo>` asks for a login, download GitHub's `gh` (the macOS zip from github.com/cli/cli/releases, into `~/.local/gh`, no Homebrew), run `gh auth login --web --git-protocol https` (the user confirms in the browser) and `gh auth setup-git`. Then `node scripts/sync-setup.mjs --clone <repo> main`. Media is not copied now: each reel's comes from the cloud when it is opened.
+5. **Autostart** like step 7 and 10 above, all three with `deploy/mac/`: `com.reels-bot.plist`, `com.reels-web.plist`, `com.reels-relay.plist` (replace `__ROOT__`, `__NODE__`, `__PATH__`). Check `data/bot.log` says `telegram relay up`, `data/web.log` says `as <device name>`.
+6. **Owner.** The bot on this computer confirms its owner separately: send `https://t.me/<bot username>?start=<node>--<OWNER_CODE from .env>` («Open it and press Start — the bot on this computer becomes yours too»), then `node bot/claim.mjs --wait-owner 900`. The bot username: `curl -s https://api.telegram.org/bot<TOKEN>/getMe`.
+7. **Done.** One line: the studio is at the usual address; the first time the browser asks which computer to open; a reel opened on the other computer shows «Забрать сюда». Then step 9 (sleep) as above.
