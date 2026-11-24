@@ -80,20 +80,36 @@ export async function head(cfg, key) {
 }
 
 // Uploads a file and checks the cloud got all of it (single PUT: up to 5 GB a file).
+// A home connection drops now and then (EPIPE, reset, timeout, a 5xx): try again, then give up.
+const TRIES = 4;
+async function retry(what, fn) {
+  for (let i = 1; ; i++) {
+    try { return await fn(); } catch (e) {
+      if (i >= TRIES || e.final) throw e;
+      await new Promise((r) => setTimeout(r, 2000 * i));
+    }
+  }
+}
+const final = (e) => Object.assign(e, {final: true});
+
 export async function put(cfg, key, file) {
   const size = statSync(file).size;
-  const r = await request(cfg, 'PUT', key, {headers: {'content-length': size}, body: createReadStream(file)});
-  if (r.status !== 200) throw fail('put', r);
-  if ((await head(cfg, key)) !== size) throw new Error(`cloud put: ${key} arrived incomplete`);
-  return size;
+  return retry('put', async () => {
+    const r = await request(cfg, 'PUT', key, {headers: {'content-length': size}, body: createReadStream(file)});
+    if (r.status !== 200) throw r.status >= 500 ? fail('put', r) : final(fail('put', r));
+    if ((await head(cfg, key)) !== size) throw new Error(`cloud put: ${key} arrived incomplete`);
+    return size;
+  });
 }
 
 export async function get(cfg, key, file) {
   mkdirSync(dirname(file), {recursive: true});
   const part = file + '.part';
-  const r = await request(cfg, 'GET', key, {to: part});
-  if (r.status !== 200) { rmSync(part, {force: true}); throw fail('get', r); }
-  renameSync(part, file);
+  return retry('get', async () => {
+    const r = await request(cfg, 'GET', key, {to: part});
+    if (r.status !== 200) { rmSync(part, {force: true}); throw r.status >= 500 ? fail('get', r) : final(fail('get', r)); }
+    renameSync(part, file);
+  });
 }
 
 export async function del(cfg, key) {
