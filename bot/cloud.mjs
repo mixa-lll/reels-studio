@@ -81,22 +81,24 @@ export async function head(cfg, key) {
 
 // Uploads a file and checks the cloud got all of it (single PUT: up to 5 GB a file).
 // A home connection drops now and then (EPIPE, reset, timeout, a 5xx): try again, then give up.
-const TRIES = 4;
+const TRIES = 5;
 async function retry(what, fn) {
   for (let i = 1; ; i++) {
     try { return await fn(); } catch (e) {
       if (i >= TRIES || e.final) throw e;
-      await new Promise((r) => setTimeout(r, 2000 * i));
+      await new Promise((r) => setTimeout(r, (e.slow ? 15000 : 2000) * i));
     }
   }
 }
 const final = (e) => Object.assign(e, {final: true});
+// 5xx and 429 («slow down», R2 says it for one object written too often) are worth another try.
+const judge = (what, r) => r.status === 429 ? Object.assign(fail(what, r), {slow: true}) : r.status >= 500 ? fail(what, r) : final(fail(what, r));
 
 export async function put(cfg, key, file) {
   const size = statSync(file).size;
   return retry('put', async () => {
     const r = await request(cfg, 'PUT', key, {headers: {'content-length': size}, body: createReadStream(file)});
-    if (r.status !== 200) throw r.status >= 500 ? fail('put', r) : final(fail('put', r));
+    if (r.status !== 200) throw judge('put', r);
     if ((await head(cfg, key)) !== size) throw new Error(`cloud put: ${key} arrived incomplete`);
     return size;
   });
@@ -107,7 +109,7 @@ export async function get(cfg, key, file) {
   const part = file + '.part';
   return retry('get', async () => {
     const r = await request(cfg, 'GET', key, {to: part});
-    if (r.status !== 200) { rmSync(part, {force: true}); throw r.status >= 500 ? fail('get', r) : final(fail('get', r)); }
+    if (r.status !== 200) { rmSync(part, {force: true}); throw judge('get', r); }
     renameSync(part, file);
   });
 }
