@@ -51,6 +51,7 @@ Worker → `Router` (чей человек) → `TgQueue` нужной студ�
 - **Проект.** Тексты — git-репозиторий проекта, медиа — R2 по хешу (`bot/sync.mjs`). Первый компьютер:
   `node scripts/sync-setup.mjs main <приватный репозиторий>`, второй: `node scripts/sync-setup.mjs --clone <репозиторий> main`.
   У обоих одинаковые `R2_*`; `OWNER_CODE` / владелец бота подтверждается на каждом (у каждого свой `data/state.json`).
+- Добавить устройство, не переписывая `NODES` (секреты чужих узлов не прочитать): секрет `NODES_MORE` — те же поля поверх `NODES` по узлам, например `{"misha": {"owner": "misha", "name": "MacBook"}, "misha-2": {"secret", "host", "name", "owner": "misha"}}`.
 - Локальная проверка: в `.dev.vars` `host` узлов — `reels.mygudauri.org` (wrangler dev подставляет host маршрута),
   `TG_API=http://127.0.0.1:<порт>` уводит ответы Worker'а в поддельный Телеграм.
 - Открыто: второй компьютер — Мак или Windows (установка, автозапуск и `open` при старте сейчас только для macOS).

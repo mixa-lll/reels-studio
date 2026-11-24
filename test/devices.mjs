@@ -154,4 +154,11 @@ assert.equal(last('seva').message.text, '/device');
 await tgPost({message: {message_id: 2, from: {id: 400}, chat: {id: 400, type: 'private'}, text: '/start misha-macbook--inv_abc'}});
 assert.equal(last('misha-macbook').message.text, '/start inv_abc');
 
+// NODES_MORE adds a device and fields over NODES without rewriting other nodes (their secrets stay).
+const merged = W.nodesOf({NODES: JSON.stringify({misha: {secret: 's1', host: 'reels.mygudauri.org', default: true, users: [1]}, seva: {secret: 's2', host: 'seva.reels.mygudauri.org'}}),
+  NODES_MORE: JSON.stringify({misha: {owner: 'misha', name: 'MacBook'}, 'misha-2': {secret: 's3', host: 'reels.mygudauri.org', name: 'Mac 2', owner: 'misha'}})});
+assert.deepEqual(merged.misha, {secret: 's1', host: 'reels.mygudauri.org', default: true, users: [1], owner: 'misha', name: 'MacBook'});
+assert.equal(merged.seva.secret, 's2');
+assert.deepEqual(W.devicesOf(merged, 'misha'), ['misha', 'misha-2']);
+
 console.log('devices: ok');

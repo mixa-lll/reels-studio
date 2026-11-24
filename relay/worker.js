@@ -33,10 +33,16 @@
 
 const CHUNK = 256 * 1024;
 
-function nodesOf(env) {
+export function nodesOf(env) {
   let nodes = null;
   try { nodes = env.NODES ? JSON.parse(env.NODES) : null; } catch {}
-  return nodes || {misha: {secret: env.RELAY_SECRET, host: 'reels.mygudauri.org', name: 'Миши', default: true, users: []}};
+  nodes ||= {misha: {secret: env.RELAY_SECRET, host: 'reels.mygudauri.org', name: 'Миши', default: true, users: []}};
+  // NODES_MORE adds nodes and fields to existing ones without rewriting NODES (whose other nodes'
+  // secrets nobody can read back): {"misha": {"owner": "misha", "name": "MacBook"}, "misha-2": {...}}.
+  let more = null;
+  try { more = env.NODES_MORE ? JSON.parse(env.NODES_MORE) : null; } catch {}
+  for (const [n, x] of Object.entries(more || {})) nodes[n] = {...nodes[n], ...x};
+  return nodes;
 }
 const defaultNode = (nodes) => Object.keys(nodes).find((n) => nodes[n].default) || Object.keys(nodes)[0];
 const TG_API = (env) => env.TG_API || 'https://api.telegram.org';
