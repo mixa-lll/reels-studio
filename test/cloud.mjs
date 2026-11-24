@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fakeS3} from './fake-s3.mjs';
 
-const {objects, cfg, close} = await fakeS3();
+const {objects, cfg, state, close} = await fakeS3();
 
 const C = await import('../bot/cloud.mjs');
 const S = await import('../bot/storage.mjs');
@@ -51,6 +51,14 @@ writeFileSync(S.cloudIndexFile(proj), JSON.stringify(idx));
 const x = await C.offloadTrash(proj, 'main', cfg);
 assert.equal(x.expired, 600);
 assert.deepEqual([...objects.keys()], ['/reels/main/archive/01-погода sources/C1 (1).mp4']);
+
+// A dropped connection is tried again.
+state.dropPuts = 2;
+const once = join(home, 'один.bin');
+writeFileSync(once, Buffer.alloc(500, 3));
+assert.equal(await C.put(cfg, 'retry/один.bin', once), 500);
+assert.equal(objects.get('/reels/retry/один.bin').length, 500);
+objects.delete('/reels/retry/один.bin');
 
 // A folder sent by hand leaves a note and comes back from it.
 const old = join(home, 'монтаж');
