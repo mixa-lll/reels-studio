@@ -27,6 +27,7 @@ import {bestVideo, linkPath, projectPath, readLink, signLink} from './dllink.mjs
 import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
 import {telegramDigest} from '../bot/tgexport.mjs';
+import {cloudBytes, cloudConfig, fetchBack, offloadTrash} from '../bot/cloud.mjs';
 import {apply as storageApply, dirSize, inTrash, isPacked, outboxVersions, plan as storagePlan, publishedAt, readPolicy, restore as storageRestore, sweep as storageSweep, versionDirs} from '../bot/storage.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -187,19 +188,31 @@ function retainOpts(p, r, mode = 'rules') {
   const dir = reelDir(p, r);
   const status = statusOf(p)(r);
   const accepted = ['done', 'published'].includes(status) || Boolean(publishedAt(dir, {items: reelItems(p), status}));
-  return {policy: policy(), accepted, mode, protect: outboxVersions(OUTBOX, p, r)};
+  return {policy: policy(), accepted, mode, protect: outboxVersions(OUTBOX, p, r), cloud: Boolean(cloudConfig())};
+}
+// The bin goes to the cloud right away when R2 is set (bot/cloud.mjs); a failure waits for the next pass.
+function offload(p) {
+  if (!cloudConfig()) return;
+  offloadTrash(join(PROJECTS, p), p).then(({sent, bytes, expired, errors}) => {
+    if (sent) console.log(`storage ${p}: ${Math.round(bytes / 1e6)} MB sent to the cloud`);
+    if (expired) console.log(`storage ${p}: ${Math.round(expired / 1e6)} MB expired in the cloud`);
+    for (const e of errors) console.error('cloud', e);
+  }).catch((e) => console.error('cloud', e.message));
 }
 function retain(p, r, mode) {
   const dir = reelDir(p, r);
-  return dir ? storageApply(dir, retainOpts(p, r, mode)) : 0;
+  const freed = dir ? storageApply(dir, retainOpts(p, r, mode)) : 0;
+  if (freed) offload(p);
+  return freed;
 }
 const reclaimable = (p, r, mode) => { const dir = reelDir(p, r); return dir ? storagePlan(dir, retainOpts(p, r, mode)).reduce((s, x) => s + x.size, 0) : 0; };
 // Once a night: the rules over every reel, and packing for reels out for a while.
 function nightly() {
   for (const {slug: p} of projects()) {
-    const {freed, reels: done, emptied} = storageSweep(join(PROJECTS, p), {policy: policy(), statusOf: statusOf(p), busy: (r) => Boolean(jobOf(p, r)), outbox: OUTBOX, project: p});
+    const {freed, reels: done, emptied} = storageSweep(join(PROJECTS, p), {policy: policy(), statusOf: statusOf(p), busy: (r) => Boolean(jobOf(p, r)), outbox: OUTBOX, project: p, cloud: Boolean(cloudConfig())});
     if (freed) console.log(`storage ${p}: ${Math.round(freed / 1e6)} MB to the bin (${done.map((x) => x.reel + (x.packed ? ' packed' : '')).join(', ')})`);
     if (emptied) console.log(`storage ${p}: emptied ${Math.round(emptied / 1e6)} MB from the bin`);
+    offload(p);
   }
 }
 
@@ -1507,7 +1520,7 @@ createServer(async (req, res) => {
       return {id: r.id, title: r.title, num: r.num, versions: dirSize(join(dir, 'versions')), sources: dirSize(join(dir, 'sources')) + dirSize(join(dir, 'project')),
         reclaim: reclaimable(p, r.id), reclaimLatest: reclaimable(p, r.id, 'latest'), trash: inTrash(dir), packed: isPacked(dir)};
     }).sort((a, b) => b.versions + b.sources - a.versions - a.sources);
-    return json(200, {reels: list, inbox: dirSize(join(studio, 'inbox')), total: dirSize(realpathSync(studio)), reclaim: list.reduce((n, r) => n + r.reclaim, 0), trash: list.reduce((n, r) => n + r.trash, 0), policy: policy()});
+    return json(200, {reels: list, inbox: dirSize(join(studio, 'inbox')), total: dirSize(realpathSync(studio)), reclaim: list.reduce((n, r) => n + r.reclaim, 0), trash: list.reduce((n, r) => n + r.trash, 0), policy: policy(), cloud: cloudConfig() ? {bytes: cloudBytes(studio)} : null});
   }
   if (req.method === 'POST' && url.pathname === '/api/policy') {
     if (!can('owner')) return json(403, {});
@@ -1524,6 +1537,7 @@ createServer(async (req, res) => {
     const {reel} = await body(req);
     const dir = reelDir(p, reel);
     if (!dir) return json(404, {});
+    try { await fetchBack(dir); } catch (e) { return json(502, {error: `Облако не ответило: ${e.message}`}); }
     const n = storageRestore(dir);
     log(me.name, `вернул из корзины ${n} файл(а) рилса «${reel}»`);
     return json(200, {restored: n});
