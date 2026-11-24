@@ -41,6 +41,20 @@
   .meter { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; } .meter i { display: block; height: 100%; background: var(--ink); }
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .top { display: none; }
+  /* This computer among the owner's devices (issue #142) */
+  .devw { position: relative; padding: 0 6px 10px; } .top .devw { padding: 0; }
+  .dev { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 11px 4px 9px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
+  .dev i, .devm i { width: 8px; height: 8px; border-radius: 50%; background: #2E8A4F; flex: none; } .dev.off i, .devm .off i { background: #B9B7B1; }
+  .dev .chev { color: var(--muted); font-weight: 400; font-size: 11px; }
+  .devm { position: absolute; z-index: 30; top: calc(100% + 4px); left: 6px; min-width: 220px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.12); padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+  .top .devm { left: auto; right: 0; }
+  .devm a, .devm button { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; color: var(--ink); text-decoration: none; font: inherit; font-size: 13px; border: 0; background: none; text-align: left; cursor: pointer; }
+  .devm a:hover { background: var(--sel); } .devm .on { background: var(--sel); font-weight: 600; } .devm small { margin-left: auto; color: var(--muted); }
+  .devm p { margin: 4px 10px 6px; font-size: 12px; color: var(--muted); }
+  .holdbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 24px 12px; padding: 11px 14px; border-radius: 10px; background: #FFF6E5; border: 1px solid #F1DDB4; font-size: 14px; }
+  .holdbar.get { background: #F3F6FA; border-color: #DCE3EC; }
+  .holdbar .bar { flex: 1 1 160px; height: 6px; border-radius: 999px; background: #DCE3EC; overflow: hidden; } .holdbar .bar i { display: block; height: 100%; background: var(--ink); transition: width .3s; }
+  .syncq { margin: 0 6px 8px; padding: 9px 10px; border-radius: 9px; background: #FFF6E5; border: 1px solid #F1DDB4; font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
   .page { padding: 28px 36px; display: flex; flex-direction: column; gap: 22px; max-width: 1400px; width: 100%; }
   h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; }
   h2 { margin: 0; font-size: 16px; font-weight: 600; }
@@ -611,7 +625,7 @@
 <div class="app">
   <nav class="side" id="side" aria-label="Проект"></nav>
   <main>
-    <div class="top"><button class="icon" id="menuBtn" aria-label="Меню" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button><b id="topTitle">Рилсы</b></div>
+    <div class="top"><button class="icon" id="menuBtn" aria-label="Меню" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></button><b id="topTitle">Рилсы</b><span id="devTop"></span></div>
     <div id="view" style="flex: 1; display: flex; flex-direction: column; min-height: 0"></div>
   </main>
 </div>
@@ -776,6 +790,7 @@ async function sidebar() {
     <div class="ph"><button type="button" class="fold" data-fold="side" title="Свернуть панель (⌘\\)" aria-label="Свернуть панель">${svg('panel', 16)}</button><span class="logo">${esc(initials)}</span>
       <select id="projSel" aria-label="Проект">${PROJECTS.map((x) => `<option value="${esc(x.slug)}" ${x.slug === P ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
       ${canEdit() ? `<a class="icon" style="width: 26px; height: 26px; border: 0; background: none; color: var(--muted)" href="#/new" title="Новый выпуск" aria-label="Новый выпуск">${svg('pen')}</a>` : ''}</div>
+    <div id="devSide"></div>
     ${TEST ? `<a class="testbar" href="${PLAN?.mode ? '#/settings/tests' : '#/start'}">Тестовый аккаунт${PLAN?.mode ? '' : ' · начните с «Чья это студия?»'}</a>` : ''}
     <button type="button" class="srch" id="srchBtn">${svg('search', 15)}<span>Поиск</span><kbd>⌘K</kbd></button>
     ${item('#/', 'home', 'Сегодня')}
@@ -789,9 +804,137 @@ async function sidebar() {
       ${item('#/settings', 'sliders', 'Настройки')}
       <div class="me"><i></i><span>${esc(ME.name)}</span><span class="small muted" style="margin-left: auto">${roleName(ME)}</span></div>
     </div>`;
+  drawDevice();
   $('#projSel').onchange = async (e) => { P = e.target.value; localStorage.setItem('project', P); OV = null; ITEMS_AT = 0; await loadMe(); location.hash = '#/'; route(); };
   $('#srchBtn').onclick = search;
 }
+
+// ---------- devices (issue #142) ----------
+// «● MacBook» with the owner's other computers: the relay (relay/worker.js) lists them at /__devices
+// with who is online; switching opens /?device=<node>, the relay keeps the choice in a cookie.
+let DEVICE = null, DEVICES = null, DEV_AT = 0;
+async function loadDevice() {
+  if (DEVICE && Date.now() - DEV_AT < 30000) return;
+  DEV_AT = Date.now();
+  DEVICE = await api('/api/device').catch(() => null);
+  if (!DEVICE?.multi) return;
+  // Opened through the relay, /__devices answers; opened straight from this computer, it does not.
+  const list = direct() ? null : await fetch('/__devices', {cache: 'no-store'}).then((r) => r.ok && /json/.test(r.headers.get('content-type') || '') ? r.json() : null).catch(() => null);
+  DEVICES = list?.devices?.length ? list.devices : [{node: DEVICE.node, name: DEVICE.name, online: true}];
+}
+const direct = () => Boolean(DEVICE?.local) && location.origin === DEVICE.local.replace('localhost', location.hostname);
+const devHref = (node) => direct() && DEVICE?.relay ? `${DEVICE.relay}/?device=${encodeURIComponent(node)}` : `/?device=${encodeURIComponent(node)}`;
+function deviceChip() {
+  if (!DEVICE?.multi) return '';
+  const others = (DEVICES || []).filter((d) => d.node !== DEVICE.node);
+  const sy = DEVICE.sync;
+  const syncLine = !sy?.repo ? 'Проект не подключён к синхронизации (scripts/sync-setup.mjs).' : sy.error ? `Синхронизация: ошибка — ${sy.error}` : sy.at ? `Синхронизировано ${ago(sy.at)}` : 'Синхронизация…';
+  return `<div class="devw"><button type="button" class="dev" data-devbtn aria-haspopup="true" aria-expanded="false" title="Этот компьютер"><i></i>${esc(DEVICE.name)}${others.length ? '<span class="chev">▾</span>' : ''}</button></div>`
+    + `<template data-devmenu><div class="devm" role="menu"><p>Работа идёт на компьютере, с которого открыта студия.</p>
+      ${(DEVICES || []).map((d) => d.node === DEVICE.node ? `<a class="on" role="menuitem" href="#" data-devclose><i></i>${esc(d.name)}<small>этот</small></a>` : `<a role="menuitem" href="${devHref(d.node)}" class="${d.online ? '' : 'off'}"><i></i>${esc(d.name)}<small>${d.online ? 'на связи' : 'спит'}</small></a>`).join('')}
+      <p>${esc(syncLine)}</p></div></template>`;
+}
+function wireDevice(host) {
+  const btn = host.querySelector('[data-devbtn]');
+  if (!btn) return;
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const open = host.querySelector('.devm');
+    document.querySelectorAll('.devm').forEach((m) => m.remove());
+    if (open) return btn.setAttribute('aria-expanded', 'false');
+    const m = host.querySelector('[data-devmenu]').content.firstElementChild.cloneNode(true);
+    btn.parentElement.append(m);
+    btn.setAttribute('aria-expanded', 'true');
+    m.querySelector('[data-devclose]')?.addEventListener('click', (ev) => { ev.preventDefault(); m.remove(); });
+  };
+}
+document.addEventListener('click', (e) => { if (!e.target.closest('.devm')) document.querySelectorAll('.devm').forEach((m) => m.remove()); });
+async function drawDevice() {
+  await loadDevice();
+  for (const id of ['#devSide', '#devTop']) { const h = $(id); if (h) { h.innerHTML = deviceChip(); wireDevice(h); } }
+  // A merge git could not do: both versions are kept, the owner decides (bot/sync.mjs).
+  const q = DEVICE?.sync?.conflicts || [];
+  const side = $('#devSide');
+  if (side && q.length && canEdit()) {
+    side.insertAdjacentHTML('beforeend', q.slice(0, 3).map((c) => `<div class="syncq"><span><b>Две версии ${esc(c.file)}</b> — правили на двух компьютерах сразу. ${c.copy ? `Здесь оставлена версия ${esc(c.by)}, версия ${esc(c.from)} — рядом, в ${esc(c.copy)}.` : esc(c.note || '')} Попросите Claude свести их или удалите лишнее.</span>
+      <span class="row" style="gap: 6px">${c.copy ? `<button type="button" class="ln-btn s" data-syncrm="${esc(c.file)}">Удалить копию</button>` : ''}<button type="button" class="ln-btn s g" data-syncok="${esc(c.file)}">Понятно</button></span></div>`).join(''));
+    side.querySelectorAll('[data-syncok],[data-syncrm]').forEach((b) => b.onclick = async () => { await post('/api/sync', {dismiss: b.dataset.syncok || b.dataset.syncrm, removeCopy: !!b.dataset.syncrm}); DEV_AT = 0; drawDevice(); });
+  }
+}
+
+// The reel on this page and its computer: «сейчас на MacBook · Забрать сюда», or its media coming down.
+function holdBar(id, hold) {
+  if (!hold) return '';
+  const bar = holdLine(hold) + fetchLine(hold);
+  return bar ? `<div id="holdBar">${bar}</div>` : '';
+}
+function holdLine(hold) {
+  if (!hold.here) {
+    const mine = hold.handoff?.to === hold.me.node;
+    const waited = mine && Date.now() - hold.handoff.at > 120000;
+    return `<div class="holdbar"><span style="flex: 1 1 240px">${mine ? `Ждём, пока <b>${esc(hold.holder.name)}</b> отправит последние правки и файлы — потом выпуск перейдёт сюда.` : `Выпуск сейчас на <b>${esc(hold.holder.name)}</b> · ${ago(hold.holder.at)}. Здесь его можно смотреть; собирать и править — на том компьютере или заберите сюда.`}</span>
+      ${canEdit() ? (mine ? (waited ? `<button type="button" class="ln-btn s" data-hold="force" title="${esc(hold.holder.name)} не отвечает: правки, которые он не успел отправить, останутся на нём">Забрать без ожидания</button>` : '') : `<button type="button" class="ln-btn p s" data-hold="ask">Забрать сюда</button>`) : ''}</div>`;
+  }
+  return '';
+}
+// Its media coming down from the cloud: «качаю 340 МБ».
+function fetchLine(hold) {
+  const f = hold.fetching;
+  if (f?.error) return `<div class="holdbar">Не докачалось: ${esc(f.error)} <button type="button" class="ln-btn s" data-hold="retry">Ещё раз</button></div>`;
+  if (f || hold.missing) {
+    const total = f?.total || hold.missing, done = f?.done || 0;
+    return `<div class="holdbar get"><span>${hold.cloud ? `Качаю ${mb(total - done)} из облака` : `Нет ${mb(total)} файлов: облако не подключено`}</span>${hold.cloud ? `<span class="bar"><i style="width: ${total ? Math.round(done / total * 100) : 0}%"></i></span>` : ''}</div>`;
+  }
+  return '';
+}
+// The bar goes in by itself whenever a reel's page is drawn (#reelHost appears), above the stage and
+// its chat, so the reel page's own code does not need to know about devices.
+const holdApi = (id) => api('/api/reel/hold?reel=' + encodeURIComponent(id)).then((d) => d.hold).catch(() => null);
+const holdReel = () => /^#\/reel\/([^/]+)/.exec(location.hash)?.[1];
+function holdPlace(html) {
+  $('#holdBar')?.remove();
+  const host = $('#reelHost');
+  if (!html || !host) return null;
+  (host.closest('.rrow') || host).insertAdjacentHTML('beforebegin', html);
+  return $('#holdBar');
+}
+async function showHold(id) {
+  if (!DEVICE) await loadDevice();
+  if (!DEVICE?.multi) return;
+  const hold = await holdApi(id);
+  if (!hold || holdReel() !== id || !$('#reelHost')) return;
+  const el = holdPlace(holdBar(id, hold));
+  if (el) wireHold(id, hold);
+}
+function wireHold(id, hold) {
+  const el = $('#holdBar');
+  if (!el) return;
+  const redraw = () => { REEL_CACHE.delete(id); vReel(id, reelTab()); };
+  el.querySelectorAll('[data-hold]').forEach((b) => b.onclick = async () => {
+    b.disabled = true;
+    if (b.dataset.hold === 'retry') return redraw();
+    const r = await post('/api/reel/hold', {reel: id, force: b.dataset.hold === 'force'}).catch(() => null);
+    toast(r?.held ? 'Выпуск теперь здесь' : r ? 'Попросил — выпуск перейдёт, как только тот компьютер отправит правки' : 'Не получилось');
+    redraw();
+  });
+  // While waiting for it, or while its media comes down: look again in a moment.
+  clearTimeout(wireHold.t);
+  wireHold.t = setTimeout(async () => {
+    if (holdReel() !== id || !$('#holdBar')) return;
+    const now = await holdApi(id);
+    if (!now || holdReel() !== id || !$('#holdBar')) return;
+    // The media came down, or the reel came here: draw the page again with it.
+    if ((fetchLine(hold) && !fetchLine(now)) || now.here !== hold.here) return redraw();
+    const html = holdBar(id, now);
+    if (!html) return holdPlace(null);
+    if (html !== $('#holdBar').outerHTML) holdPlace(html);
+    wireHold(id, now);
+  }, 1500);
+}
+new MutationObserver(() => {
+  const host = $('#reelHost'), id = holdReel();
+  if (host && id && !id.startsWith('new-') && host.dataset.hold !== id) { host.dataset.hold = id; showHold(id); }
+}).observe($('#view'), {childList: true, subtree: true});
 
 // ⌘K: jump to any reel or screen by name.
 function search() {
