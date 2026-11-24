@@ -1,13 +1,18 @@
 // Disk housekeeping for reels, shared by the web studio and the bot.
 //
 // A reel keeps every version it ever had, and a version is a 300 MB video. The rules:
-// - the current version, the one picked for «Готово», masters (1080p/1440p/master), variants
-//   and versions waiting in the outbox are never touched;
-// - the previous version keeps only its light copy (to compare), older ones only a frame,
-//   ARCHIVED.json and project-snapshot/ (the reel's code, enough to rebuild);
-// - an accepted reel (done/published) drops the draft copies of all its old versions;
-// - a reel published N days ago is packed: also its project/public media goes.
-// Files go to the project's bin (.trash/) for 30 days, so a mistake can be undone (restore()).
+// - the current version, the one picked for «Готово», versions waiting in the outbox and the
+//   latest version of each variant (RU, EN…) are never touched;
+// - while the reel is in work the previous version stays whole too (two versions to compare),
+//   older ones keep only a frame, ARCHIVED.json and project-snapshot/ (the reel's code);
+//   a master no longer keeps an old version alive;
+// - a master on the current version, or an accepted reel (done/published): only the current
+//   version keeps its videos;
+// - a reel published N days ago is packed: its project/public media go, and its sources too
+//   when the cloud (bot/cloud.mjs) is on.
+// Files go to the project's bin (.trash/); with the cloud on it is emptied into Cloudflare R2
+// (kept there 30 days, packed media for good), without it on the disk for TRASH_DAYS.
+// restore() puts back what is still on disk; cloud.mjs fetchBack() first downloads the rest.
 // Each move is recorded next to the version.
 
 import {cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync} from 'node:fs';
@@ -71,39 +76,48 @@ export function publishedAt(reelDir, {items = [], status} = {}) {
 
 // What a pass would remove, without removing anything.
 // mode: 'rules' (the policy), 'latest' (the «keep only the latest» button), 'pack'.
-export function plan(reelDir, {policy = DEFAULT_POLICY, accepted = false, mode = 'rules', protect = []} = {}) {
+// cloud: true packs the sources as well (they are only ever removed into the cloud).
+export function plan(reelDir, {policy = DEFAULT_POLICY, accepted = false, mode = 'rules', protect = [], cloud = false} = {}) {
   const vs = versionDirs(reelDir);
   const out = [];
   if (!vs.length) return out;
+  const vdir = (v) => join(reelDir, 'versions', v);
+  const latest = vs.at(-1);
   const ready = readJson(join(reelDir, 'ready.json'), {}).v;
-  const keepV = new Set([vs.at(-1), ready, ...protect].filter(Boolean));
-  const older = vs.slice(0, -1);
-  older.forEach((v, i) => {
-    if (keepV.has(v)) return;
-    const vdir = join(reelDir, 'versions', v);
-    const files = readdirSync(vdir);
-    // A master is a deliverable, not a draft (RU v1, EN v2…): such a version stays whole.
-    if (files.some((f) => MASTER.test(f)) || files.includes('variant.json')) return;
-    const videos = files.filter((f) => VIDEO.test(f)).map((f) => ({path: join(vdir, f), size: statSync(join(vdir, f)).size, v})).sort((a, b) => a.size - b.size);
-    if (!videos.length) return;
-    const previous = i === older.length - 1;
-    let drop = [];
-    if (mode === 'latest' || mode === 'pack' || (accepted && policy.finalOnly)) drop = videos;
-    else if (previous) drop = policy.keepPrevious ? videos.slice(1) : policy.archiveOlder ? videos : [];
-    else if (policy.archiveOlder) drop = videos;
-    out.push(...drop);
-  });
+  // The latest version of each variant (RU v1, EN v2…) is a deliverable of its own.
+  const variants = {};
+  for (const v of vs) { const label = readJson(join(vdir(v), 'variant.json'), null)?.label; if (label) variants[label] = v; }
+  const keepV = new Set([latest, ready, ...protect, ...Object.values(variants)].filter(Boolean));
+  const mastered = readdirSync(vdir(latest)).some((f) => MASTER.test(f) && VIDEO.test(f));
+  const finished = mode === 'latest' || mode === 'pack' || (policy.finalOnly && (accepted || mastered));
+  for (const v of vs.slice(0, -1)) {
+    if (keepV.has(v)) continue;
+    const files = readdirSync(vdir(v));
+    const videos = files.filter((f) => VIDEO.test(f)).map((f) => ({path: join(vdir(v), f), size: statSync(join(vdir(v), f)).size, v})).sort((a, b) => a.size - b.size);
+    // The player's light copy and frame strip go with the version's videos.
+    if (videos.length && files.includes('.preview')) videos.push({path: join(vdir(v), '.preview'), size: dirSize(join(vdir(v), '.preview')), v});
+    if (!videos.length) continue;
+    const previous = v === vs.at(-2);
+    if (finished) out.push(...videos);
+    else if (previous) { if (!policy.keepPrevious && policy.archiveOlder) out.push(...videos); }
+    else if (policy.archiveOlder) out.push(...videos);
+  }
   if (mode === 'pack') {
-    const pub = join(reelDir, 'project', 'public');
-    const size = dirSize(pub);
-    if (size) out.push({path: pub, size, v: null, public: true});
+    for (const [sub, kind] of [[join('project', 'public'), 'public'], ...(cloud ? [['sources', 'sources']] : [])]) {
+      const p = join(reelDir, sub);
+      const size = dirSize(p);
+      if (size) out.push({path: p, size, v: null, [kind]: true});
+    }
   }
   return out;
 }
 
 // The studio's own bin: projects/<p>/.trash/, same disk (a move, not a copy), readable by the
-// studio (the macOS Trash is not, for a background service), emptied after TRASH_DAYS.
+// studio (the macOS Trash is not, for a background service), emptied into the cloud or after TRASH_DAYS.
 export const TRASH_DAYS = 30;
+// What the bin sent to the cloud (bot/cloud.mjs): {<name in the bin>: {key, files, size, at, keep}}.
+export const cloudIndexFile = (projectDir) => join(projectDir, '.trash-cloud.json');
+export const readCloudIndex = (projectDir) => readJson(cloudIndexFile(projectDir), {});
 export const trashDir = (reelDir) => join(reelDir, '..', '..', '.trash');
 
 function toTrash(path, trash, label) {
@@ -125,6 +139,8 @@ export function emptyTrash(projectDir, days = TRASH_DAYS) {
   for (const f of readdirSync(trash)) {
     const full = join(trash, f);
     if (Date.now() - lstatSync(full).mtimeMs < days * DAY) continue;
+    // Sources are originals: they only ever leave the disk into the cloud (cloud.mjs), never from here.
+    if (/ sources( \d+)?$/.test(f)) continue;
     freed += dirSize(full);
     rmSync(full, {recursive: true, force: true});
   }
@@ -140,10 +156,10 @@ export function apply(reelDir, opts = {}) {
   let freed = 0;
   for (const x of plan(reelDir, opts)) {
     if (!existsSync(x.path)) continue;
-    const to = toTrash(x.path, trashDir(reelDir), `${reel} ${x.public ? 'project-public' : `${x.v} ${basename(x.path)}`}`);
+    const to = toTrash(x.path, trashDir(reelDir), `${reel} ${x.public ? 'project-public' : x.sources ? 'sources' : `${x.v} ${basename(x.path)}`}`);
     freed += x.size;
     const rec = {from: x.path, to, size: x.size, at: Date.now()};
-    if (x.public) {
+    if (x.public || x.sources) {
       const meta = readJson(join(reelDir, 'storage.json'), {});
       writeJson(join(reelDir, 'storage.json'), {...meta, packed: Date.now(), trash: [...(meta.trash || []), rec]});
     } else {
@@ -178,16 +194,22 @@ export function restore(reelDir) {
   const meta = readJson(mf, null);
   if (meta?.trash) {
     const left = back(meta.trash);
-    writeJson(mf, {...meta, trash: left, packed: left.some((r) => r.from.endsWith('public')) ? meta.packed : null});
+    writeJson(mf, {...meta, trash: left, packed: left.some((r) => /(public|sources)$/.test(r.from)) ? meta.packed : null});
   }
   return n;
 }
 
-// What is still in the Trash for this reel (bytes), so the page can offer «вернуть».
-export const inTrash = (reelDir) => [
+// Every move of this reel into the bin that has not come back yet.
+export const trashRecords = (reelDir) => [
   ...versionDirs(reelDir).flatMap((v) => readJson(join(reelDir, 'versions', v, 'ARCHIVED.json'), {}).trash || []),
   ...(readJson(join(reelDir, 'storage.json'), {}).trash || []),
-].filter((r) => r.to && existsSync(r.to)).reduce((s, r) => s + r.size, 0);
+].filter((r) => r.to && !existsSync(r.from));
+
+// What is still in the bin, on disk or in the cloud, for this reel (bytes), so the page can offer «вернуть».
+export function inTrash(reelDir) {
+  const cloud = readCloudIndex(join(reelDir, '..', '..'));
+  return trashRecords(reelDir).filter((r) => existsSync(r.to) || cloud[basename(r.to)]).reduce((s, r) => s + r.size, 0);
+}
 
 export const isPacked = (reelDir) => Boolean(readJson(join(reelDir, 'storage.json'), {}).packed);
 
@@ -196,7 +218,7 @@ export const outboxVersions = (outboxFile, project, reel) => readJson(outboxFile
 
 // One pass over a project's reels: rules everywhere, packing for reels out for N days.
 // statusOf(reel) → 'done' | 'published' | …; busy(reel) → true skips a reel being worked on.
-export function sweep(projectDir, {policy = DEFAULT_POLICY, statusOf = () => null, busy = () => false, outbox, project, dry = false} = {}) {
+export function sweep(projectDir, {policy = DEFAULT_POLICY, statusOf = () => null, busy = () => false, outbox, project, dry = false, cloud = false} = {}) {
   const root = join(projectDir, 'reels');
   if (!existsSync(root)) return {freed: 0, reels: [], emptied: 0};
   const items = readJson(join(projectDir, 'items.json'), {}).items || [];
@@ -210,7 +232,7 @@ export function sweep(projectDir, {policy = DEFAULT_POLICY, statusOf = () => nul
     const accepted = ['done', 'published'].includes(status) || Boolean(pub);
     const protect = outbox ? outboxVersions(outbox, project, r) : [];
     const pack = Boolean(pub && policy.packAfterDays > 0 && Date.now() - pub >= policy.packAfterDays * DAY);
-    const opts = {policy, accepted, protect, mode: pack ? 'pack' : 'rules'};
+    const opts = {policy, accepted, protect, cloud, mode: pack ? 'pack' : 'rules'};
     const n = dry ? plan(dir, opts).reduce((s, x) => s + x.size, 0) : apply(dir, opts);
     if (n) reels.push({reel: r, freed: n, packed: pack});
     freed += n;

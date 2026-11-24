@@ -32,6 +32,7 @@ import {isEditor} from './roles.mjs';
 import {claim as claimInvite, FILE as memberFile, member, publishBot, touch} from './members.mjs';
 import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
 import {apply as storageApply, outboxVersions, publishedAt, readPolicy} from './storage.mjs';
+import {cloudConfig, offloadTrash} from './cloud.mjs';
 
 // Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
 for (const level of ['log', 'error']) {
@@ -728,8 +729,12 @@ function tidyReel(reel) {
     let items = [];
     try { items = JSON.parse(readFileSync(join(PROJECTS, project, 'items.json'), 'utf8')).items || []; } catch {}
     const outbox = process.env.REELS_MEMBERS ? join(dirname(process.env.REELS_MEMBERS), 'outbox.json') : '';
-    const freed = storageApply(dir, {policy: readPolicy(join(ROOT, 'web', 'data', 'policy.json')), accepted: Boolean(publishedAt(dir, {items})), protect: outbox ? outboxVersions(outbox, project, reel) : []});
+    const freed = storageApply(dir, {policy: readPolicy(join(ROOT, 'web', 'data', 'policy.json')), accepted: Boolean(publishedAt(dir, {items})), protect: outbox ? outboxVersions(outbox, project, reel) : [], cloud: Boolean(cloudConfig())});
     if (freed) console.log(`storage ${reel}: ${Math.round(freed / 1e6)} MB to the bin`);
+    if (freed && cloudConfig()) offloadTrash(join(PROJECTS, project), project).then(({bytes, errors}) => {
+      if (bytes) console.log(`storage ${reel}: ${Math.round(bytes / 1e6)} MB sent to the cloud`);
+      for (const e of errors) console.error('cloud', e);
+    }).catch((e) => console.error('cloud', e.message));
   } catch (e) {
     console.error('storage', e.message);
   }

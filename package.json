@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node bot/bot.mjs",
     "send": "node bot/send.mjs",
-    "test": "node test/selftest.mjs && node test/storage.mjs && node test/copyreel.mjs"
+    "test": "node test/selftest.mjs && node test/storage.mjs && node test/cloud.mjs && node test/copyreel.mjs"
   },
   "license": "MIT"
 }
