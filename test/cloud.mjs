@@ -1,27 +1,11 @@
 // The cloud (bot/cloud.mjs) against a fake S3 server on localhost: the bin goes up and comes back.
 import assert from 'node:assert/strict';
 import {existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
-import {createServer} from 'node:http';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {fakeS3} from './fake-s3.mjs';
 
-const objects = new Map();
-const server = createServer((req, res) => {
-  if (!/^AWS4-HMAC-SHA256 Credential=test\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=[\w;-]+, Signature=[0-9a-f]{64}$/.test(req.headers.authorization || '')) { res.writeHead(403).end('no signature'); return; }
-  const key = decodeURIComponent(req.url);
-  if (req.method === 'PUT') {
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => { objects.set(key, Buffer.concat(chunks)); res.writeHead(200).end(); });
-  } else if (req.method === 'HEAD' || req.method === 'GET') {
-    const b = objects.get(key);
-    if (!b) { res.writeHead(404).end(); return; }
-    res.writeHead(200, {'content-length': b.length});
-    res.end(req.method === 'GET' ? b : undefined);
-  } else if (req.method === 'DELETE') { objects.delete(key); res.writeHead(204).end(); }
-});
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const cfg = {endpoint: `http://127.0.0.1:${server.address().port}`, id: 'test', secret: 'secret', bucket: 'reels'};
+const {objects, cfg, close} = await fakeS3();
 
 const C = await import('../bot/cloud.mjs');
 const S = await import('../bot/storage.mjs');
@@ -79,6 +63,6 @@ await C.unarchiveFolder(note, cfg);
 assert.equal(readFileSync(join(old, 'день 1', 'a.mov')).length, 1000);
 assert.ok(!existsSync(note));
 
-server.close();
+close();
 rmSync(home, {recursive: true, force: true});
 console.log('cloud: ok');

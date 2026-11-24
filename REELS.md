@@ -144,6 +144,10 @@ Start a remake from the closest earlier reel's own `project/` (copy it, keep its
 - When the owner starts a new reel (picks an idea, tells their own), switch to it completely. Leave unfinished reels as they are (`Status: in review` / `in work`) and never remind about them, not in replies and not with ideas.
 - `/unfinished` is the owner's way back: the bot lists unfinished reels from the README `Status:` lines and sends you `(the owner wants to continue the unfinished reel …)`. Read that reel's README and versions, then send its latest version again exactly as in hand-over (video with the accept button, your review with the edit keyboard and the menu) and wait.
 
+## Several computers
+
+With `DEVICE_NAME` and `RELAY_NODE` set the owner works from several computers (bot/sync.mjs). A reel's `files.json` says which one holds it (`holder.node`). If it is not `$RELAY_NODE`, do not render, edit or clean that reel here: say in one line that it is on `holder.name` now and that «Забрать сюда» on its page in the studio brings it here (or answer on that computer). Its heavy files (`sources/`, `versions/`, `project/public/`) may be missing here until it is opened; never recreate them.
+
 ## 3. Feedback
 
 1. A reply, voice note, pressed suggestion or applied settings menu is a change request for the next version. Quote it under the idea, make vN+1 with exactly those changes, hand it over the same way.

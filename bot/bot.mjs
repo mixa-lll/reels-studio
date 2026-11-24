@@ -32,6 +32,7 @@ import {isEditor} from './roles.mjs';
 import {claim as claimInvite, FILE as memberFile, member, publishBot, touch} from './members.mjs';
 import {chatOf, due as outboxDue, filesThere, mark as outboxMark} from './outbox.mjs';
 import {apply as storageApply, outboxVersions, publishedAt, readPolicy} from './storage.mjs';
+import {heldHere} from './sync.mjs';
 import {cloudConfig, offloadTrash} from './cloud.mjs';
 
 // Log lines carry the time; network errors their real cause (ECONNRESET, ETIMEDOUT…).
@@ -726,6 +727,8 @@ function tidyReel(reel) {
     const project = state.project || FIRST_PROJECT;
     const dir = join(PROJECTS, project, 'reels', reel);
     if (!existsSync(dir)) return;
+    // Held by another of the owner's computers (bot/sync.mjs): it is cleaned there.
+    if (process.env.DEVICE_NAME && !heldHere(dir, process.env.RELAY_NODE)) return;
     let items = [];
     try { items = JSON.parse(readFileSync(join(PROJECTS, project, 'items.json'), 'utf8')).items || []; } catch {}
     const outbox = process.env.REELS_MEMBERS ? join(dirname(process.env.REELS_MEMBERS), 'outbox.json') : '';

@@ -33,6 +33,9 @@ import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
 import {telegramDigest} from '../bot/tgexport.mjs';
 import {cloudBytes, cloudConfig, fetchBack, offloadTrash} from '../bot/cloud.mjs';
+import {deviceName, deviceNode, relayBase} from '../bot/device.mjs';
+import * as sync from '../bot/sync.mjs';
+import {uptime} from 'node:os';
 import {apply as storageApply, dirSize, inTrash, isPacked, outboxVersions, plan as storagePlan, publishedAt, readPolicy, restore as storageRestore, sweep as storageSweep, versionDirs} from '../bot/storage.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -252,7 +255,14 @@ const reclaimable = (p, r, mode) => { const dir = reelDir(p, r); return dir ? st
 // Once a night: the rules over every reel, and packing for reels out for a while.
 function nightly() {
   for (const {slug: p} of projects()) {
-    const {freed, reels: done, emptied} = storageSweep(join(PROJECTS, p), {policy: policy(), statusOf: statusOf(p), busy: (r) => Boolean(jobOf(p, r)), outbox: OUTBOX, project: p, cloud: Boolean(cloudConfig())});
+    // Only reels this computer holds (bot/sync.mjs): another device's reel is cleaned there.
+    const busy = (r) => Boolean(jobOf(p, r)) || !heldHere(p, r);
+    const {freed, reels: done, emptied} = storageSweep(join(PROJECTS, p), {policy: policy(), statusOf: statusOf(p), busy, outbox: OUTBOX, project: p, cloud: Boolean(cloudConfig())});
+    // Reels not opened here for two weeks keep their media only in the cloud.
+    if (SYNC && cloudConfig() && sync.isRepo(join(PROJECTS, p))) {
+      const gone = sync.evictIdle(join(PROJECTS, p), {busy: (r) => Boolean(jobOf(p, r))});
+      if (gone) console.log(`sync ${p}: ${Math.round(gone / 1e6)} MB left only in the cloud`);
+    }
     if (freed) console.log(`storage ${p}: ${Math.round(freed / 1e6)} MB to the bin (${done.map((x) => x.reel + (x.packed ? ' packed' : '')).join(', ')})`);
     if (emptied) console.log(`storage ${p}: emptied ${Math.round(emptied / 1e6)} MB from the bin`);
     offload(p);
@@ -266,6 +276,70 @@ setInterval(() => {
   writeFileSync(NIGHTLY, today());
   try { nightly(); } catch (e) { console.error('storage', e.message); }
 }, 15 * 60e3).unref();
+
+// ---------- devices and sync (bot/sync.mjs, issue #142) ----------
+// One owner's computers share a project: its light part through the project's own git repository,
+// the media through R2 by hash. A reel is worked on where it is held (files.json.holder).
+
+const NODE = deviceNode();
+const NAME = deviceName() || NODE;
+const SYNC = Boolean(NODE && process.env.DEVICE_NAME);
+const SYNC_STATE = new Map(); // project → {at, error, pulled, pushed, conflicts, running}
+const FETCHING = new Map(); // project/reel → {total, done, file, error}
+const heldHere = (p, r) => { const dir = reelDir(p, r); return !SYNC || !dir || sync.heldHere(dir, NODE); };
+const syncTimers = new Map();
+async function syncNow(p) {
+  const dir = projectDir(p);
+  if (!SYNC || !dir || !sync.isRepo(dir)) return null;
+  const st = SYNC_STATE.get(p) || {};
+  if (st.running) { st.again = true; return st; }
+  st.running = true;
+  SYNC_STATE.set(p, st);
+  try {
+    const r = await sync.syncProject(dir, p, {node: NODE, name: NAME, cfg: cloudConfig(), busy: (reel) => Boolean(jobOf(p, reel))});
+    Object.assign(st, {at: Date.now(), error: null, pulled: r.git?.pulled, pushed: r.git?.pushed, handed: r.handed});
+    if (r.git?.conflicts?.length) console.log(`sync ${p}: both versions kept for ${r.git.conflicts.join(', ')}`);
+    if (r.git?.big?.length) console.log(`sync ${p}: too big for git, left out: ${r.git.big.join(', ')}`);
+    if (r.handed.length) console.log(`sync ${p}: handed over ${r.handed.join(', ')}`);
+  } catch (e) {
+    st.error = e.message;
+    st.at = Date.now();
+    console.error('sync', p, e.message);
+  } finally {
+    st.running = false;
+    if (st.again) { st.again = false; syncSoon(p); }
+  }
+  return st;
+}
+// After an edit or a Claude turn: a few seconds later, so a burst of saves is one commit.
+function syncSoon(p, ms = 3000) {
+  if (!SYNC) return;
+  clearTimeout(syncTimers.get(p));
+  syncTimers.set(p, setTimeout(() => syncNow(p), ms).unref());
+}
+if (SYNC) {
+  setTimeout(() => { for (const {slug} of projects()) syncNow(slug); }, 2000).unref();
+  setInterval(() => { for (const {slug} of projects()) syncNow(slug); }, 60e3).unref();
+}
+// A reel opened here: free → held here; its missing media comes down (to watch it, or to work on it).
+function fetchReel(p, r) {
+  const dir = reelDir(p, r), k = `${p}/${r}`;
+  if (!SYNC || !dir || FETCHING.get(k)?.running || !sync.needed(dir).length) return;
+  const st = {running: true, total: 0, done: 0, file: null, error: null};
+  FETCHING.set(k, st);
+  sync.fetchMedia(dir, p, cloudConfig(), (x) => Object.assign(st, x))
+    .catch((e) => { st.error = e.message; console.error('sync fetch', k, e.message); })
+    .finally(() => { st.running = false; });
+}
+function holdInfo(p, r) {
+  const dir = reelDir(p, r);
+  if (!SYNC || !dir) return null;
+  const {holder, handoff} = sync.readFiles(dir);
+  const st = FETCHING.get(`${p}/${r}`);
+  const need = sync.needed(dir).reduce((s, f) => s + f.size, 0);
+  return {holder, handoff, here: !holder || holder.node === NODE, me: {node: NODE, name: NAME}, missing: need,
+    fetching: st && (st.running || st.error) ? {total: st.total, done: st.done, error: st.error} : null, cloud: Boolean(cloudConfig())};
+}
 
 // ---------- chats ----------
 // One chat per reel, plus «_project» (general) and «_ds» (design system); a new reel
@@ -460,6 +534,7 @@ function startTurn(p, k, text, send) {
       const freed = retain(p, key);
       if (freed) send({freed});
     }
+    syncSoon(p);
     send({done: true, ms: result?.duration_ms});
     jobs.delete(job);
     RECENT.unshift({p, key, by: job.by, started: job.started, at: Date.now(), ok: !(code && !result) || job.stopped, stopped: job.stopped, text: String(lastText || '').replace(/\s+/g, ' ').slice(0, 160)});
@@ -587,10 +662,12 @@ const newPin = (a) => { for (;;) { const pin = String(100000 + randomBytes(4).re
 const startOf = (payload) => `${process.env.RELAY_NODE && process.env.TG_RELAY ? `${process.env.RELAY_NODE}--` : ''}${payload}`;
 const inviteLinks = (inv) => ({web: inv.web ? `/invite/${inv.code}` : null, telegram: inv.telegram && botUsername() ? `https://t.me/${botUsername()}?start=${startOf(`inv_${inv.code}`)}` : null});
 function whoIs(req) {
-  const sid = /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie || '')?.[1];
-  if (!sid) return null;
+  // This device's own cookie, else the plain one from before devices (still valid if it is ours).
+  const sids = [SID, 'sid'].map((n) => new RegExp(`(?:^|;\\s*)${n}=([^;]+)`).exec(req.headers.cookie || '')?.[1]).filter(Boolean);
+  if (!sids.length) return null;
   const a = access();
-  const s = a.sessions.find((x) => x.id === sid);
+  const s = a.sessions.find((x) => sids.includes(x.id));
+  const sid = s?.id;
   const person = s && a.people.find((x) => x.id === s.person);
   if (!person) return null;
   if (Date.now() - s.seen > 60_000) { s.seen = Date.now(); saveAccess(a); }
@@ -607,7 +684,9 @@ function telegramSessions(a) {
   for (const x of a.people) if (x.telegram && !x.isOwner) out.push({kind: 'telegram', id: x.id, name: x.name, device: `Телеграм-бот${x.telegram.username ? ' · @' + x.telegram.username : ''}`, seen: x.telegram.seen || x.added || 0, note: bot.holder === x.name && bot.pending ? 'Claude сейчас работает для него' : ''});
   return out;
 }
-const cookie = (req, sid) => `sid=${sid}; Path=/; HttpOnly;${req.headers['x-forwarded-proto'] === 'https' ? ' Secure;' : ''} SameSite=Lax; Max-Age=31536000`;
+// Several devices behind one address share the browser's cookies: each signs in under its own name.
+const SID = process.env.RELAY_NODE ? `sid_${process.env.RELAY_NODE.replace(/[^\w-]/g, '')}` : 'sid';
+const cookie = (req, sid) => `${SID}=${sid}; Path=/; HttpOnly;${req.headers['x-forwarded-proto'] === 'https' ? ' Secure;' : ''} SameSite=Lax; Max-Age=31536000`;
 
 // ---------- http ----------
 
@@ -745,6 +824,51 @@ createServer(async (req, res) => {
   const p = dsPath?.[1] || url.searchParams.get('project') || 'main';
   // A test account's person never reaches a real project, and real people never reach a test one.
   if (url.pathname.startsWith('/api/') && url.pathname !== '/api/me' && !me.isOwner && projectDir(p) && (me.project ? p !== me.project : isTestProject(p))) return json(403, {error: 'нет доступа к этому проекту'});
+
+  // Every saved edit goes to the other computers a few seconds later.
+  if (SYNC && req.method === 'POST' && url.pathname.startsWith('/api/')) res.on('finish', () => { if (res.statusCode < 300 && projectDir(p)) syncSoon(p); });
+
+  // This computer among the owner's devices; the list with who is online comes from the relay (/__devices).
+  if (req.method === 'GET' && url.pathname === '/api/device') {
+    const st = SYNC_STATE.get(p);
+    return json(200, {node: NODE, name: NAME, multi: SYNC, local: `http://localhost:${PORT}`, relay: relayBase(),
+      sync: SYNC ? {repo: Boolean(projectDir(p) && sync.isRepo(projectDir(p))), at: st?.at || null, error: st?.error || null, running: !!st?.running, conflicts: projectDir(p) ? sync.conflicts(projectDir(p)) : []} : null});
+  }
+  if (req.method === 'POST' && url.pathname === '/api/sync') {
+    if (!can('editor') || !projectDir(p)) return json(400, {});
+    const b = await body(req).catch(() => ({}));
+    if (b.dismiss) sync.dismissConflict(projectDir(p), String(b.dismiss), {removeCopy: !!b.removeCopy});
+    const st = await syncNow(p);
+    return json(200, {at: st?.at || null, error: st?.error || null, conflicts: sync.conflicts(projectDir(p))});
+  }
+  // The reel opened on the page (web/index.html asks for it next to /api/reel): free → held here;
+  // its missing media starts coming down; the answer says where it is and how far the download is.
+  if (req.method === 'GET' && url.pathname === '/api/reel/hold') {
+    const r = url.searchParams.get('reel');
+    const dir = reelDir(p, r);
+    if (!dir) return json(404, {});
+    if (SYNC && isEditor(me)) {
+      const before = sync.holderOf(dir);
+      sync.open(dir, {node: NODE, name: NAME});
+      if (!before && sync.holderOf(dir)) syncSoon(p, 500);
+      // Waiting for another computer to hand it over: look every 10 s, not once a minute.
+      if (sync.readFiles(dir).handoff?.to === NODE && Date.now() - (SYNC_STATE.get(p)?.at || 0) > 10e3) syncSoon(p, 0);
+      fetchReel(p, r);
+    }
+    return json(200, {hold: holdInfo(p, r)});
+  }
+  // «Забрать сюда»: asks the holder to hand the reel over; force takes it now (the holder sleeps).
+  if (req.method === 'POST' && url.pathname === '/api/reel/hold') {
+    if (!can('editor') || !SYNC) return json(400, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir) return json(404, {});
+    const out = sync.claim(dir, {node: NODE, name: NAME, force: !!b.force});
+    log(me.name, `${b.force ? 'забрал' : 'попросил'} «${b.reel}» на ${NAME}`);
+    await syncNow(p);
+    if (out.held) fetchReel(p, b.reel);
+    return json(200, {...out, hold: holdInfo(p, b.reel)});
+  }
 
   if (req.method === 'GET' && url.pathname === '/') {
     res.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store'});
@@ -1605,6 +1729,8 @@ createServer(async (req, res) => {
     if (!can('editor')) return json(403, {});
     const {key: k, text, shown} = await body(req);
     if (!chatKey(k) || !text?.trim()) return json(400, {});
+    // A reel held by another computer is worked on there: Claude does not start on it here.
+    if (!heldHere(p, k)) return json(409, {heldBy: sync.holderOf(reelDir(p, k)), error: `Этот выпуск сейчас на ${sync.holderOf(reelDir(p, k))?.name}. Заберите его сюда, чтобы работать здесь.`});
     // Claude is still on this chat: the message waits and goes as the next turn (startTurn).
     const running = jobOf(p, k);
     if (running) {
@@ -1858,4 +1984,19 @@ createServer(async (req, res) => {
     return sendFile(req, res, f, url.searchParams.has('dl') ? {'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`} : keep);
   }
   res.writeHead(404).end();
-}).listen(PORT, '127.0.0.1', () => console.log(`reels web on 127.0.0.1:${PORT}`));
+}).listen(PORT, '127.0.0.1', () => {
+  console.log(`reels web on 127.0.0.1:${PORT}${SYNC ? ` as ${NAME} (${NODE})` : ''}`);
+  openOnBoot();
+});
+
+// On this computer's start the studio opens its address with ?device=<node>: this browser then
+// opens this computer's studio (relay/worker.js keeps the choice in a cookie). Once per boot.
+function openOnBoot() {
+  const base = process.env.STUDIO_URL || relayBase();
+  if (!SYNC || !base || process.env.DEVICE_OPEN === '0' || process.platform !== 'darwin') return;
+  const stamp = join(DATA, 'device-opened.txt');
+  const boot = Date.now() - uptime() * 1000;
+  if (Number(read(stamp)) > boot) return;
+  writeFileSync(stamp, String(Date.now()));
+  spawn('open', [`${base}/?device=${encodeURIComponent(NODE)}`], {stdio: 'ignore', detached: true}).unref();
+}

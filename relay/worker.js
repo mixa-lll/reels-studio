@@ -13,6 +13,14 @@
 // "seva": {...}}; TG_WEBHOOK_SECRET; TELEGRAM_BOT_TOKEN. Without NODES: one node «misha» with
 // RELAY_SECRET (the original single-Mac setup).
 //
+// Devices (#142): one owner's computers are nodes with the same "owner" and the same host
+// ({"misha-macbook": {..., "name": "MacBook", "owner": "misha"}, "misha-imac": {..., "owner": "misha"}}).
+// The browser's cookie `device` picks the computer (`?device=<node>` sets it; the studio opens that
+// link on its computer at start); no cookie → a page to choose, with who is online. /__devices
+// lists them for the studio's header. In Telegram a reply goes to the device that sent the message
+// (Router remembers message_id → node, the bots report them to /__tgsent); anything else goes to the
+// owner's active device — where the studio was opened last, or the one picked with /device.
+//
 // Web frames on the socket:
 //   text  {t:'req', id, method, path, headers, body}  Worker → Mac (body: bool, bytes follow)
 //   text  {t:'reqend', id}                            Worker → Mac, request body finished
@@ -25,12 +33,61 @@
 
 const CHUNK = 256 * 1024;
 
-function nodesOf(env) {
+export function nodesOf(env) {
   let nodes = null;
   try { nodes = env.NODES ? JSON.parse(env.NODES) : null; } catch {}
-  return nodes || {misha: {secret: env.RELAY_SECRET, host: 'reels.mygudauri.org', name: 'Миши', default: true, users: []}};
+  nodes ||= {misha: {secret: env.RELAY_SECRET, host: 'reels.mygudauri.org', name: 'Миши', default: true, users: []}};
+  // NODES_MORE adds nodes and fields to existing ones without rewriting NODES (whose other nodes'
+  // secrets nobody can read back): {"misha": {"owner": "misha", "name": "MacBook"}, "misha-2": {...}}.
+  let more = null;
+  try { more = env.NODES_MORE ? JSON.parse(env.NODES_MORE) : null; } catch {}
+  for (const [n, x] of Object.entries(more || {})) nodes[n] = {...nodes[n], ...x};
+  return nodes;
 }
 const defaultNode = (nodes) => Object.keys(nodes).find((n) => nodes[n].default) || Object.keys(nodes)[0];
+const TG_API = (env) => env.TG_API || 'https://api.telegram.org';
+
+// The owner's devices: every node with the same owner (a node without one is alone).
+export const devicesOf = (nodes, node) => {
+  const owner = nodes[node]?.owner;
+  return owner ? Object.keys(nodes).filter((n) => nodes[n].owner === owner) : nodes[node] ? [node] : [];
+};
+export const readCookie = (header, name) => new RegExp(`(?:^|;\\s*)${name}=([^;]+)`).exec(header || '')?.[1] || null;
+// Which studio a browser request goes to: {node} or {choose: [nodes]} (several devices, no cookie);
+// `set` — a ?device= link: remember it in the cookie and drop it from the address.
+export function pickWeb(nodes, host, {device = null, cookie = null} = {}) {
+  const here = Object.keys(nodes).filter((n) => nodes[n].host === host);
+  if (!here.length) return {node: defaultNode(nodes)};
+  if (device && here.includes(device)) return {node: device, set: device};
+  if (cookie && here.includes(cookie)) return {node: cookie};
+  if (here.length === 1) return {node: here[0]};
+  return {choose: here};
+}
+const deviceCookie = (node) => `device=${node}; Path=/; Secure; SameSite=Lax; Max-Age=31536000`;
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+
+async function online(env, node) {
+  try { return (await (await relayOf(env, node).fetch('https://relay/__status')).json()).online; } catch { return false; }
+}
+async function botOnline(env, node) {
+  try { return (await (await env.TGQUEUE.get(env.TGQUEUE.idFromName(`tg:${node}`)).fetch('https://queue/status')).json()).online; } catch { return false; }
+}
+const router = (env) => env.ROUTER.get(env.ROUTER.idFromName('router'));
+const routerCall = async (env, path, body) => (await router(env).fetch(`https://router${path}`, {method: 'POST', body: JSON.stringify(body)})).json();
+
+// The owner's devices with who is online: the picker, the «спит» page, the studio's header, /device.
+async function deviceList(env, nodes, node, {bots = false} = {}) {
+  const list = devicesOf(nodes, node);
+  const owner = nodes[node]?.owner;
+  const {node: active} = owner ? await routerCall(env, '/active', {owner}) : {};
+  return Promise.all(list.map(async (n) => ({node: n, name: nodes[n].name || n, online: await (bots ? botOnline : online)(env, n), active: n === active})));
+}
+
+const page = (title, inner, {status = 200, refresh = 0, headers = {}} = {}) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+${refresh ? `<meta http-equiv="refresh" content="${refresh}">` : ''}<title>${esc(title)}</title><body style="font:16px/1.5 system-ui;padding:40px 20px;max-width:560px;margin:auto;color:#222">
+<style>a.d{display:flex;align-items:center;gap:10px;padding:14px 16px;margin:8px 0;border:1px solid #ddd;border-radius:12px;color:#222;text-decoration:none}a.d:hover{border-color:#222}a.d i{width:9px;height:9px;border-radius:50%;background:#2E8A4F}a.d.off i{background:#B9B7B1}a.d span{margin-left:auto;color:#777;font-size:14px}</style>
+${inner}`, {status, headers: {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...headers}});
+const deviceLinks = (list) => list.map((d) => `<a class="d ${d.online ? '' : 'off'}" href="/?device=${encodeURIComponent(d.node)}"><i></i><b>${esc(d.name)}</b><span>${d.online ? 'на связи' : 'спит'}</span></a>`).join('');
 // One relay object per studio node, placed in Western Europe next to the studio server (Amsterdam):
 // each browser request goes Worker → this object → the server's WebSocket and back, so a far
 // object adds its distance twice to every request. A new name (v6) because placement is fixed
@@ -52,18 +109,57 @@ export default {
       if (!env.TG_WEBHOOK_SECRET || req.headers.get('x-telegram-bot-api-secret-token') !== env.TG_WEBHOOK_SECRET) return new Response('forbidden', {status: 403});
       const u = await req.json().catch(() => null);
       if (!u) return new Response('ok');
-      const router = env.ROUTER.get(env.ROUTER.idFromName('router'));
-      const route = await (await router.fetch('https://router/route', {method: 'POST', body: JSON.stringify({user: fromOf(u), text: u.message?.text ?? null, nodes: Object.fromEntries(Object.entries(nodes).map(([k, v]) => [k, {users: v.users || [], default: !!v.default}]))})})).json();
+      const tg = (method, body) => env.TELEGRAM_BOT_TOKEN ? fetch(`${TG_API(env)}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)}).catch(() => {}) : null;
+      const cb = u.callback_query;
+      const msg = u.message || u.edited_message || cb?.message;
+      const route = await routerCall(env, '/route', {user: fromOf(u), text: u.message?.text ?? null, chat: msg?.chat?.id ?? null,
+        replyTo: (u.message || u.edited_message)?.reply_to_message?.message_id ?? cb?.message?.message_id ?? null,
+        nodes: Object.fromEntries(Object.entries(nodes).map(([k, v]) => [k, {users: v.users || [], default: !!v.default, owner: v.owner || null}]))});
       if (route.text != null && u.message) u.message.text = route.text;
+      const group = devicesOf(nodes, route.node);
+
+      // The relay's own buttons and /device: they never reach a studio.
+      const devMenu = async (chatId, edit) => {
+        const list = await deviceList(env, nodes, route.node, {bots: true});
+        const text = `Куда идут новые сообщения: ${list.find((d) => d.active)?.name || nodes[route.node]?.name || route.node}.\nОтвет на сообщение уходит тому компьютеру, который его прислал.`;
+        const reply_markup = {inline_keyboard: list.map((d) => [{text: `${d.active ? '● ' : ''}${d.name} · ${d.online ? 'на связи' : 'спит'}`, callback_data: `dev:${d.node}`}])};
+        return edit ? tg('editMessageText', {chat_id: chatId, message_id: edit, text, reply_markup}) : tg('sendMessage', {chat_id: chatId, text, reply_markup});
+      };
+      if (group.length > 1 && /^\/device(@\w+)?$/.test(u.message?.text || '')) { await devMenu(u.message.chat.id); return new Response('ok'); }
+      const dev = /^dev(send)?:([\w-]+)$/.exec(cb?.data || '');
+      if (dev && group.includes(dev[2])) {
+        const to = dev[2];
+        await routerCall(env, '/active', {owner: nodes[to].owner, node: to});
+        if (dev[1]) {
+          // «MacBook спит, отправить на iMac?» — what waits for the sleeping one goes to the other.
+          for (const n of group) if (n !== to) {
+            const {updates} = await (await env.TGQUEUE.get(env.TGQUEUE.idFromName(`tg:${n}`)).fetch('https://queue/drain', {method: 'POST'})).json();
+            for (const w of updates) await env.TGQUEUE.get(env.TGQUEUE.idFromName(`tg:${to}`)).fetch('https://queue/push', {method: 'POST', body: JSON.stringify(w)});
+          }
+          await tg('answerCallbackQuery', {callback_query_id: cb.id, text: `Отправил на ${nodes[to].name || to}`});
+          await tg('editMessageText', {chat_id: cb.message.chat.id, message_id: cb.message.message_id, text: `➡️ Сообщения ушли на ${nodes[to].name || to}, новые тоже пойдут туда (/device — переключить).`});
+        } else {
+          await tg('answerCallbackQuery', {callback_query_id: cb.id, text: `Теперь — ${nodes[to].name || to}`});
+          await devMenu(cb.message.chat.id, cb.message.message_id);
+        }
+        return new Response('ok');
+      }
+
       const queue = env.TGQUEUE.get(env.TGQUEUE.idFromName(`tg:${route.node}`));
-      const {online} = await (await queue.fetch('https://queue/push', {method: 'POST', body: JSON.stringify(u)})).json();
+      const {online: up} = await (await queue.fetch('https://queue/push', {method: 'POST', body: JSON.stringify(u)})).json();
       // Offline: the update waits; the person hears it once (per half hour), not on every message.
       const chat = u.message?.chat;
-      if (!online && chat?.type === 'private' && env.TELEGRAM_BOT_TOKEN) {
-        const {send} = await (await router.fetch('https://router/notice', {method: 'POST', body: JSON.stringify({chat: chat.id})})).json();
+      if (!up && chat?.type === 'private' && env.TELEGRAM_BOT_TOKEN) {
+        const {send} = await routerCall(env, '/notice', {chat: chat.id});
         if (send) {
-          await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {method: 'POST', headers: {'content-type': 'application/json'},
-            body: JSON.stringify({chat_id: chat.id, text: `💤 Компьютер студии ${nodes[route.node]?.name || route.node} сейчас не на связи (спит или выключен). Сообщение сохранено — бот ответит, как только он проснётся.`})}).catch(() => {});
+          const name = nodes[route.node]?.name || route.node;
+          const awake = group.length > 1 ? (await Promise.all(group.filter((n) => n !== route.node).map(async (n) => ((await botOnline(env, n)) ? n : null)))).filter(Boolean) : [];
+          if (awake.length) {
+            await tg('sendMessage', {chat_id: chat.id, text: `💤 ${name} спит. Отправить на ${awake.map((n) => nodes[n].name || n).join(' или ')}?`,
+              reply_markup: {inline_keyboard: awake.map((n) => [{text: `Отправить на ${nodes[n].name || n}`, callback_data: `devsend:${n}`}])}});
+          } else {
+            await tg('sendMessage', {chat_id: chat.id, text: group.length > 1 ? `💤 ${name} сейчас не на связи (спит или выключен). Сообщение сохранено — ответ придёт, как только он проснётся.` : `💤 Компьютер студии ${name} сейчас не на связи (спит или выключен). Сообщение сохранено — бот ответит, как только он проснётся.`});
+          }
         }
       }
       return new Response('ok');
@@ -82,8 +178,45 @@ export default {
       return relayOf(env, nodeParam).fetch(req);
     }
 
-    // A browser: the node whose host this is.
-    const node = Object.keys(nodes).find((n) => nodes[n].host === url.host) || defaultNode(nodes);
+    // A device reports a message it sent to Telegram: a reply to it comes back to that device.
+    if (url.pathname === '/__tgsent' && req.method === 'POST') {
+      if (!authorized(req, nodes[nodeParam])) return new Response('forbidden', {status: 403});
+      const b = await req.json().catch(() => ({}));
+      if (b.chat == null || !Array.isArray(b.ids)) return new Response('bad request', {status: 400});
+      await routerCall(env, '/sent', {chat: b.chat, ids: b.ids.slice(0, 100), node: nodeParam});
+      return Response.json({ok: true});
+    }
+
+    // A browser: the node whose host this is; with several devices on one host, the cookie's.
+    const pick = pickWeb(nodes, url.host, {device: url.searchParams.get('device'), cookie: readCookie(req.headers.get('cookie'), 'device')});
+    const anyHere = pick.node || pick.choose[0];
+    const isPage = req.method === 'GET' && (req.headers.get('accept') || '').includes('text/html');
+    if (url.pathname === '/__devices') {
+      const list = await deviceList(env, nodes, anyHere);
+      return Response.json({current: pick.node || null, devices: list}, {headers: {'cache-control': 'no-store'}});
+    }
+    if (pick.choose) {
+      const list = await deviceList(env, nodes, anyHere);
+      return page('Какой компьютер?', `<h1 style="font-size:22px">Какой компьютер открыть?</h1><p>Студия работает на нескольких компьютерах. Выберите, на каком работать из этого браузера — он запомнит.</p>${deviceLinks(list)}`, {refresh: list.some((d) => d.online) ? 0 : 10});
+    }
+    const node = pick.node;
+    if (pick.set) {
+      url.searchParams.delete('device');
+      if (nodes[node]?.owner) await routerCall(env, '/active', {owner: nodes[node].owner, node});
+      return new Response(null, {status: 302, headers: {location: url.pathname + url.search + url.hash, 'set-cookie': deviceCookie(node), 'cache-control': 'no-store'}});
+    }
+    // The picked device sleeps and another of the owner's is online: offer it at once (pages only;
+    // API calls keep waiting a little, the socket often comes back within seconds).
+    const group = devicesOf(nodes, node);
+    if (isPage && group.length > 1) {
+      if (!(await online(env, node))) {
+        const others = (await deviceList(env, nodes, node)).filter((d) => d.node !== node && d.online);
+        if (others.length) return page('Компьютер спит', `<h1 style="font-size:22px">${esc(nodes[node].name || node)} спит</h1><p>Открыть ${others.map((d) => esc(d.name)).join(' или ')}? Эта страница сама откроет ${esc(nodes[node].name || node)}, как только он проснётся.</p>${deviceLinks(others)}`, {status: 503, refresh: 10});
+      } else if (url.pathname === '/' && nodes[node].owner) {
+        // Opening the studio makes this device the active one: new Telegram messages go here.
+        await routerCall(env, '/active', {owner: nodes[node].owner, node});
+      }
+    }
     const r = new Request(req);
     r.headers.set('x-relay-node-name', encodeURIComponent(nodes[node]?.name || node));
     return relayOf(env, node).fetch(r);
@@ -118,6 +251,7 @@ export class Relay {
 
   async fetch(req) {
     const url = new URL(req.url);
+    if (url.pathname === '/__status') return Response.json({online: !!this.mac()});
     if (url.pathname === '/__relay') {
       if (req.headers.get('upgrade') !== 'websocket') return new Response('expected websocket', {status: 426});
       for (const old of this.ctx.getWebSockets('mac')) try { old.close(1012, 'replaced'); } catch {}
@@ -261,6 +395,13 @@ export class TgQueue {
       await this.flush(server);
       return new Response(null, {status: 101, webSocket: client});
     }
+    if (url.pathname === '/status') return Response.json({online: !!this.bot()});
+    // Everything waiting here, handed to another device of the same owner.
+    if (url.pathname === '/drain') {
+      const all = await this.ctx.storage.list({prefix: 'u:'});
+      await this.ctx.storage.delete([...all.keys()]);
+      return Response.json({updates: [...all.values()]});
+    }
     if (url.pathname === '/push') {
       const u = await req.json();
       await this.ctx.storage.put(this.key(u.update_id), u);
@@ -280,29 +421,60 @@ export class TgQueue {
 // Whose studio each Telegram user belongs to. A link t.me/<bot>?start=<node>--<payload> (owner
 // links, invites from that studio) sends the person there for good and passes «/start <payload>» on;
 // «/start <node>--» alone just switches. Unknown people: the node listing them in NODES, else default.
+// Among one owner's devices: a reply (or a button) goes to the device whose message it is
+// (m:<chat>:<message_id>, reported by /__tgsent), anything else to the owner's active device.
 export class Router {
   constructor(ctx) { this.ctx = ctx; }
   async fetch(req) {
     const url = new URL(req.url);
     const b = await req.json();
+    const st = this.ctx.storage;
     if (url.pathname === '/notice') {
       const k = `n:${b.chat}`;
-      const last = (await this.ctx.storage.get(k)) || 0;
+      const last = (await st.get(k)) || 0;
       if (Date.now() - last < 30 * 60_000) return Response.json({send: false});
-      await this.ctx.storage.put(k, Date.now());
+      await st.put(k, Date.now());
       return Response.json({send: true});
+    }
+    if (url.pathname === '/sent') {
+      const day = Math.floor(Date.now() / 864e5);
+      for (const id of b.ids) await st.put(`m:${b.chat}:${id}`, b.node);
+      // Old message marks go after 90 days, one day's list at a time.
+      await st.put(`d:${day}:${b.chat}:${b.ids[0]}`, b.ids.map((id) => `m:${b.chat}:${id}`));
+      // Day numbers have the same length for centuries, so the oldest lists come first.
+      for (const [k, keys] of await st.list({prefix: 'd:', limit: 20})) {
+        if (Number(k.split(':')[1]) > day - 90) break;
+        await st.delete(keys); await st.delete(k);
+      }
+      return Response.json({ok: true});
+    }
+    if (url.pathname === '/active') {
+      if (b.node) await st.put(`active:${b.owner}`, b.node);
+      return Response.json({node: (await st.get(`active:${b.owner}`)) || null});
     }
     const nodes = b.nodes || {};
     let text = b.text;
     let node = null;
-    const link = /^\/start\s+([a-z0-9]+)--(\S*)$/i.exec(text || '');
+    let linked = false;
+    const link = /^\/start\s+([a-z0-9-]+?)--(\S*)$/i.exec(text || '');
     if (link && nodes[link[1]]) {
       node = link[1];
+      linked = true;
       text = link[2] ? `/start ${link[2]}` : '/start';
-      if (b.user) await this.ctx.storage.put(`user:${b.user}`, node);
+      if (b.user) await st.put(`user:${b.user}`, node);
     }
-    if (!node && b.user) node = await this.ctx.storage.get(`user:${b.user}`);
+    if (!node && b.user) node = await st.get(`user:${b.user}`);
     if (!node || !nodes[node]) node = Object.keys(nodes).find((n) => (nodes[n].users || []).map(Number).includes(Number(b.user))) || Object.keys(nodes).find((n) => nodes[n].default) || Object.keys(nodes)[0];
-    return Response.json({node, text: text === b.text ? null : text});
+    const owner = nodes[node]?.owner;
+    const group = owner ? Object.keys(nodes).filter((n) => nodes[n].owner === owner) : [node];
+    let via = 'person';
+    if (group.length > 1) {
+      const mine = b.replyTo != null && b.chat != null ? await st.get(`m:${b.chat}:${b.replyTo}`) : null;
+      const active = await st.get(`active:${owner}`);
+      if (linked) { await st.put(`active:${owner}`, node); via = 'link'; }
+      else if (mine && group.includes(mine)) { node = mine; via = 'reply'; }
+      else if (active && group.includes(active)) { node = active; via = 'active'; }
+    }
+    return Response.json({node, via, text: text === b.text ? null : text});
   }
 }
