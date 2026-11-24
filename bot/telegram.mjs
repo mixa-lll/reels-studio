@@ -4,6 +4,7 @@ import {writeFile} from 'node:fs/promises';
 import {basename} from 'node:path';
 import {chunks, toHtml} from './format.mjs';
 import {fitForTelegram, videoInfo, videoThumbnail} from './media.mjs';
+import {noteSent, sign} from './device.mjs';
 
 // Every request has a deadline: after sleep or a network change a TCP connection can
 // die silently, and a fetch without one would wait forever and freeze the bot.
@@ -16,7 +17,18 @@ const deadline = (method, params) => (method === 'getUpdates' ? ((params.timeout
 export function telegram(token) {
   const base = `${API}/bot${token}`;
 
+  // One of several devices (bot/device.mjs): its messages carry its name, and the relay learns
+  // which messages are its own, so a reply goes back to the device that sent the message.
+  const SIGNED = new Set(['sendMessage', 'editMessageText']);
+  const sent = (r, chat) => {
+    const ids = (Array.isArray(r) ? r : [r]).map((m) => m?.message_id).filter(Number.isFinite);
+    const to = chat ?? (Array.isArray(r) ? r[0] : r)?.chat?.id;
+    if (ids.length && to != null) noteSent(to, ids).catch(() => {});
+  };
+
   async function callOnce(method, params) {
+    if (SIGNED.has(method) && params.text) params = {...params, text: sign(params.text, {html: params.parse_mode === 'HTML'})};
+    if (params.caption && /^send/.test(method)) params = {...params, caption: sign(params.caption, {html: params.parse_mode === 'HTML'})};
     const res = await fetch(`${base}/${method}`, {
       method: 'POST',
       headers: {'content-type': 'application/json'},
@@ -30,6 +42,7 @@ export function telegram(token) {
       e.retryAfter = json.parameters?.retry_after;
       throw e;
     }
+    if (/^send/.test(method)) sent(json.result, params.chat_id);
     return json.result;
   }
 
@@ -49,6 +62,7 @@ export function telegram(token) {
 
   async function upload(method, field, path, params = {}, files = {}) {
     const form = new FormData();
+    if (params.caption) params = {...params, caption: sign(params.caption, {html: params.parse_mode === 'HTML'})};
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined) form.append(k, typeof v === 'string' ? v : JSON.stringify(v));
     }
@@ -57,6 +71,7 @@ export function telegram(token) {
     const res = await fetch(`${base}/${method}`, {method: 'POST', body: form, signal: AbortSignal.timeout(300_000)});
     const json = await res.json();
     if (!json.ok) throw new Error(`${method}: ${json.description}`);
+    sent(json.result, params.chat_id);
     return json.result;
   }
 
