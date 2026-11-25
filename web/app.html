@@ -571,7 +571,8 @@ function drawEdit({id, text, own, mode}) {
 let cam = null;
 const SPEEDS = {slow: [0.75, 'Медленно', 1.9], normal: [1, 'Обычно', 2.4], fast: [1.25, 'Быстро', 3]};
 const speedKey = () => { const v = S.profile.speed; return v <= 0.8 ? 'slow' : v >= 1.2 ? 'fast' : 'normal'; };
-const phrasesOf = (text) => String(text || '').split(/(?<=[.!?…])\s+/).map((x) => x.trim()).filter(Boolean);
+// A text with line breaks comes from the studio's script by meaning blocks: one line — one block — one take.
+const phrasesOf = (text) => (/\n/.test(String(text || '').trim()) ? String(text).split(/\n+/) : String(text || '').split(/(?<=[.!?…])\s+/)).map((x) => x.trim()).filter(Boolean);
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 let shot = null; // {id, mode, segs: [{blob, from, to, keep}]}
 

@@ -8,21 +8,26 @@
 // (Whisper, masks, Python, downloads). Only editors reach the chats. DENIED keeps it away
 // from this server's own files (sessions, passwords, invites).
 import {createServer} from 'node:http';
-import {spawn} from 'node:child_process';
+import {spawn, spawnSync} from 'node:child_process';
 import {randomBytes, scryptSync, timingSafeEqual} from 'node:crypto';
 import {isEditor, normalize} from '../bot/roles.mjs';
 import {transcribe} from '../bot/stt.mjs';
 import {changeEdits, readEdits} from './edits.mjs';
+import {changeScript, readScript, snapshot as scriptSnapshot} from './script.mjs';
 import {changeItem, createItems, deleteItem, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
 import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
 import {readKit} from './dskit.mjs';
+import {fpsOf, joinArgs, snapClips, voiceOf as voiceFileOf} from '../scripts/join.mjs';
+import {firstCut, footageOf, takesOf} from '../scripts/takes.mjs';
+import {micSync} from '../scripts/micsync.mjs';
 import {accountOf, addToken, igDir, listAccounts, match, readProfile, refreshSafe, refreshTokens, setTokenFile, shortcodeTime, tokenAccounts, tokenFor, typical, writeProfile} from './instagram.mjs';
 import {listPosts, newPost, postDir, postFiles, processPhoto, readPost, renderSlides, savePost, TEMPLATES} from './posts.mjs';
 import {appendFileSync, closeSync, copyFileSync, cpSync, createReadStream, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, realpathSync, renameSync, rmSync, statfsSync, statSync, writeFileSync} from 'node:fs';
-import {basename, dirname, extname, join, relative} from 'node:path';
+import {basename, dirname, extname, join, relative, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {makeApp} from './app.mjs';
+import {dropOrphans, previewOf, scrubOf, voiceOf} from './preview.mjs';
 import {bestVideo, linkPath, projectPath, readLink, signLink} from './dllink.mjs';
 import {access as planAccess} from '../bot/plans.mjs';
 import {createSandbox, listSandboxes, removeSandbox} from '../bot/sandbox.mjs';
@@ -140,6 +145,36 @@ function disk() {
 }
 const reelDir = (p, r) => (projectDir(p) && safe(r) && existsSync(join(PROJECTS, p, 'reels', r)) ? join(PROJECTS, p, 'reels', r) : null);
 
+// The rough cut for the «Нарезка» screen: cut.json, whether it differs from the applied one, and
+// the source's light copy and frame strip (web/preview.mjs) to trim on.
+function cutView(dir) {
+  const cut = readJson(join(dir, 'cut.json'), null);
+  if (!cut?.source || !Array.isArray(cut.clips)) return null;
+  const src = join(dir, cut.source);
+  if (!existsSync(src)) return {...cut, missing: true};
+  const pv = previewOf(src, {rotate: Number(cut.rotate) || 0});
+  const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
+  const applied = readJson(join(dir, 'cut.applied.json'), null);
+  // Changed = the clips or where their sound joins (jt) differ.
+  const sig = (x) => JSON.stringify([(x?.clips || []).map((c) => [c.in, c.out, c.jt || 0]), x?.voice || '', Number(x?.gainDb) || 0]);
+  const same = (a, b) => sig(a) === sig(b);
+  // Graphics as layers (scripts/layers.mjs): each tied to a moment of the source, so the studio can lay
+  // them over the live cut while the render is still the old one.
+  const g = readJson(join(dir, 'graphics.json'), null);
+  const graphics = Array.isArray(g?.items) ? g.items.filter((x) => x.layer && existsSync(join(dir, x.layer))).map((x) => ({...x, url: stamp(join(dir, x.layer))})) : null;
+  const lastV = versionDirs(dir).at(-1), mont = lastV && readJson(join(dir, 'versions', lastV, 'stage.json'), null);
+  // The voice the player plays under the cut — the same one «Собрать монтаж» joins (the lavalier, else
+  // the camera's sound), with the same gain: what the owner hears while trimming is what gets built.
+  const vf = voiceFileOf(dir, cut), vo = voiceOf(vf || src);
+  const so = pv?.video ? scrubOf(pv.video) : null;
+  const scrub = so ? {sheets: so.sheets.map(stamp), fps: so.fps, per: so.per, cols: so.cols, w: so.w, h: so.h, n: so.n} : null;
+  const voice = vo ? {url: stamp(vo.audio), peaks: stamp(vo.peaks), lav: !!vf, gainDb: Number(cut.gainDb) || 0} : null;
+  // The lavalier the reel has, chosen or not: the «Звук» tab switches between it and the camera.
+  const micFile = cut.voice && cut.voice !== 'camera' ? cut.voice : existsSync(join(dir, 'sources/mic-synced.wav')) ? 'sources/mic-synced.wav' : null;
+  const mic = micFile ? {file: micFile, on: !!vf, ...(cut.mic || {})} : null;
+  return {...cut, graphics, voice, mic, changed: !same(cut, applied) && !(mont?.stage === 'montage' && same(cut, mont)), preview: pv ? {scrub, video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null};
+}
+
 function versions(p, r) {
   const dir = reelDir(p, r);
   if (!dir) return [];
@@ -154,9 +189,17 @@ function versions(p, r) {
     const archived = readJson(join(vdir, 'ARCHIVED.json'), null);
     // A variant (RU, EN, short cut…) is a finished parallel version, not a draft: versions/vN/variant.json.
     const variant = readJson(join(vdir, 'variant.json'), null)?.label || null;
+    // A montage-only version (the cut joined, no graphics): versions/vN/stage.json {stage: 'montage'}.
+    const stage = readJson(join(vdir, 'stage.json'), null)?.stage || null;
     // When the version was made: its own files, not the folder — cleaning a version touches the folder.
     const made = readdirSync(vdir).filter((f) => !/^(ARCHIVED|variant)\.json$|^project-snapshot$/.test(f)).map((f) => statSync(join(vdir, f)).mtimeMs);
-    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, archived, variant, at: made.length ? Math.min(...made) : statSync(vdir).mtimeMs};
+    // The player's light copy and frame strip (web/preview.mjs), made in the background.
+    dropOrphans(vdir);
+    const play = files.filter((f) => /\.(mp4|mov|webm)$/i.test(f.name) && !/^raw/i.test(f.name)).sort((a, b) => a.size - b.size)[0];
+    const pv = play && previewOf(join(vdir, play.name));
+    const stamp = (f) => `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}`;
+    const preview = pv ? {video: stamp(pv.video), sprite: pv.sprite ? stamp(pv.sprite) : null, every: pv.every, cols: pv.cols, w: pv.w, h: pv.h, n: pv.n} : null;
+    return {v, state: i === vs.length - 1 ? 'current' : archived?.state || (i === vs.length - 2 ? 'previous' : 'old'), files, preview, archived, variant, stage, at: made.length ? Math.min(...made) : statSync(vdir).mtimeMs};
   }).reverse();
 }
 
@@ -330,6 +373,9 @@ function preamble(p, k) {
     `- Old versions are archived by the page to save disk: older ones keep only a frame, \`ARCHIVED.json\` and \`project-snapshot/\` (the reel's code at that version). To rebuild one, copy its snapshot back into the reel's \`project/\` with Read/Write and render.`,
     `The active project is \`${relative(BOT, studio)}/\` (\`<project>/\` in REELS.md). The Telegram bot works on the same project, so re-read ideas.md and PLAYBOOK.md before changing them.`,
   ];
+  // The project's design system is the law for every plate and caption; a reel's ds/ copied from an older
+  // reel may be out of date (18.11.2026: reel 21 came out in Oswald caps with dark shadows).
+  if (k !== '_ds' && existsSync(join(studio, 'design-system', 'STYLE.md'))) lines.push(`THE DESIGN SYSTEM of this project is \`${relative(BOT, studio)}/design-system/STYLE.md\` (+ tokens.json, fonts/). Before the graphics stage, and before any render with text on it, read it and make the reel's own \`project/src/ds/\` and every plate, title and caption match it: fonts, weights, case, glow or shadows, colours, sizes. Where the reel's code (often copied from an older reel) disagrees with STYLE.md, STYLE.md wins — fix the code, do not keep the old look. After the render, look at a frame of each kind of plate and compare it with STYLE.md before handing over.`);
   if (k === '_ds') lines.push(`THIS CHAT develops the project's design system for its reels. The result is ONE self-contained HTML page, \`${relative(BOT, studio)}/design-system/index.html\` (inline CSS/JS, Google Fonts allowed, images as relative files next to it): a small landing page with the system's name and idea, color and type tokens, spacing and motion rules, and a library of the components (plates, price receipts, titles, subtitles, phone mockup…) drawn in HTML/CSS as they look in the reels, each with its name, when to use it and its Remotion component name if there is one. Read the brief, PLAYBOOK.md, \`template/src\` and the reels' code to stay true to what is really used. After each change, rewrite the page and tell the owner in one or two lines what changed; the page reloads by itself. Keep \`design-system/tokens.json\` in sync with the tokens on the page.`);
   else if (k === '_project') lines.push('THIS CHAT is the project\'s general chat: ideas, brief, rules, settings, strategy and plan. Reels and posts themselves are made in their own chats; if the owner asks to make one here, say that «+ Новый выпуск» starts it in its own chat.',
     `Strategy and plan follow STRATEGY.md: \`${relative(BOT, studio)}/strategy.json\` (platforms, rubrics, weekly rhythm, events) and \`${relative(BOT, studio)}/plan.json\` (dates and rubrics of reels and posts); the page draws Strategy and the Calendar from them.`,
@@ -366,12 +412,23 @@ function preamble(p, k) {
     'The page shows the reel in four stages (Сценарий, Материалы, Монтаж, Выкладка) from two optional files in the reel folder; keep them current when the script, materials or captions change. ' +
     '`scenes.json`: [{"t":"0:00","name":"Хук","screen":"what is on screen","text":"text on screen","sound":"…","need":"what material it needs","have":"what file covers it","status":"готово|нужно|переснять"}]. ' +
     '`publish.json`: {"captions":[{"platform":"Instagram RU","account":"@…","text":"caption"}],"checks":[{"ok":true,"text":"…"}]}. ' +
+    'The text of the reel is written by meaning blocks in `script.json` (format at the top of web/script.mjs), stage «Идея», its steps «2 · Текст» and «3 · Вид» (step 1 is the idea itself). ' +
+    'A block is one thought of 1–3 spoken sentences (hook, each point, the turn, the call): it becomes one take in the prompter, one clip of cut.json and the words graphics hang on. Roles are short Russian nouns (Хук, Карта, Цены, Призыв). ' +
+    'For a new reel whose idea is taken, or when the owner asks to lay out the text, write script.json first (the README «Сценарий» section stays a short summary). ' +
+    'A block may carry "takes" (files in sources/ the owner filmed in the studio prompter, one block per take; "good": true is the one they picked): cut from them, the good one first; never remove "takes". ' +
+    'Messages starting with «(about blocks …)» or «(about the words «…» of block …)» are about exactly those blocks: change only them, keep the ids, never touch other blocks. A block with "ok": true is approved — leave it unless the message is about it. ' +
+    'When asked for variants, put 2–3 in that block\'s "alts" ([{"label":"боль","text":"…"}]) and keep "text" as it is; the page shows them under the block with «Взять». Reordering is moving blocks in the array. Say in 1–2 lines what changed, never «было → стало» walls: the page shows the text itself. ' +
+    'Step «3 · Вид» (only after "text":{"ok":true}): for every block fill "look" — what is on screen while it is said: frame (who and how), broll (a cutaway to film: name it so it can go to the shot list), gfx (graphics), text (text on screen), sound; "at" = the exact words of the block it starts on, "tpl" = the template of the project style it uses, "have" = style (exists in the style), ready (the file is there), shoot (still to film), new (not in the style yet). Take looks from the project design system first. ' +
+    'Later, in «Монтаж» and «Графика», build from it: one clip per block in its order, graphics on the "at" words; if the text changes after «Вид» is approved, update that block\'s look too. ' +
     'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version. ' +
     'Comments for the next version live in `edits.json` (format in web/edits.mjs): [{"id","stage":"script|scenes|video","t":seconds,"text","quote"?,"scene"?,"shape"?:{"kind":"rect|brush|point|frame",…fractions of the frame},"hint"?:"blur|replace|trim|remove","state":"open|sent|done|note","forV":"v4","by"}]; they come from the page and from the mini app\'s editor. When you have built that version, set each sent comment to "done" and add "result": what you changed, in a few words — the page shows it as «что поменялось». Your own pre-build findings (faces, subtitles, consents) go there as "state":"note" with "by":"Claude".');
   return lines.join('\n');
 }
 
 const jobs = new Set();
+const MONTAGE = new Map();
+const AUTOCUT = new Map();
+const MICSYNC = new Map();
 // Finished turns for the «Сейчас работает» dock (web/index.html): newest first, kept in memory.
 const RECENT = [];
 const jobOf = (p, k) => [...jobs].find((j) => j.p === p && j.key === k);
@@ -1286,9 +1343,152 @@ createServer(async (req, res) => {
     const dir = reelDir(p, r);
     if (!dir) return json(404, {});
     return json(200, {reel: reels(p).find((x) => x.id === r), versions: versions(p, r), readme: read(join(dir, 'README.md')),
-      ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
+      ready: readJson(join(dir, 'ready.json'), {}).v || null, scenes: readJson(join(dir, 'scenes.json'), null), script: readScript(dir), publish: readJson(join(dir, 'publish.json'), null), edits: readEdits(dir), template: readJson(join(dir, 'project', 'src', 'reel.json'), null),
       outbox: readJson(OUTBOX, []).filter((o) => o.project === p && o.reel === r && !o.cancelled).slice(-10),
-      storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}, basedOn: readJson(join(dir, 'based-on.json'), null)});
+      storage: {reclaimLatest: reclaimable(p, r, 'latest'), trash: inTrash(dir), packed: isPacked(dir)}, basedOn: readJson(join(dir, 'based-on.json'), null), cut: cutView(dir)});
+  }
+  // Нарезка (scripts/cut.mjs): the owner trims, moves, splits and deletes the clips of the rough cut;
+  // the page saves the whole list, the agent applies it on «Применить нарезку».
+  if (req.method === 'POST' && url.pathname === '/api/reel/cut') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel), cut = dir && readJson(join(dir, 'cut.json'), null);
+    if (!cut) return json(404, {});
+    if (!Array.isArray(b.clips) || !b.clips.length || b.clips.length > 600) return json(400, {});
+    if (b.clips.some((c) => !(Number(c.in) >= 0 && Number(c.out) > Number(c.in)))) return json(400, {});
+    // Revision: a save made over an older cut (another tab, the agent) is refused, not silently lost.
+    const rev = Number(cut.rev) || 0;
+    if (b.rev != null && Number(b.rev) !== rev) return json(409, {rev, clips: cut.clips});
+    // In and out on the frame grid of the source (scripts/join.mjs): the player, «Собрать монтаж»
+    // and the final join all cut the same frames.
+    const clips = snapClips(b.clips.map((c) => ({in: Number(c.in), out: Number(c.out), ...(c.text ? {text: String(c.text).slice(0, 300)} : {}), ...(Number(c.jt) ? {jt: Number(c.jt)} : {})})), fpsOf(cut));
+    writeJson(join(dir, 'cut.json'), {...cut, clips, rev: rev + 1, editedBy: me.name, editedAt: new Date().toISOString()});
+    return json(200, {ok: true, rev: rev + 1, clips: clips.map((c) => ({in: c.in, out: c.out, jt: c.jt || 0}))});
+  }
+  // Takes of every line of the script found in the recording by its words (scripts/takes.mjs), and the
+  // words themselves — for the panel under the track: other takes of a clip, words under the trim strip.
+  if (req.method === 'GET' && url.pathname === '/api/reel/takes') {
+    const dir = reelDir(p, url.searchParams.get('reel')), cut = dir && readJson(join(dir, 'cut.json'), null);
+    if (!cut) return json(404, {});
+    const vf = voiceFileOf(dir, cut), vo = voiceOf(vf || join(dir, cut.source || ''));
+    return json(200, takesOf(dir, vo?.peaks) || {phrases: [], words: []});
+  }
+  // «Разложить на дубли»: a new recording into its first cut with no agent — the transcript with word
+  // times if there is none yet (local Whisper), the takes of every line of the script, the last clean
+  // take of each into cut.json. The owner then swaps takes and trims in the studio.
+  if (req.method === 'POST' && url.pathname === '/api/reel/cut/auto') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir) return json(404, {});
+    if (existsSync(join(dir, 'cut.json'))) return json(200, {state: 'done', step: 'нарезка уже есть'});
+    const key = `${p}/${b.reel}`;
+    if (AUTOCUT.get(key)?.state === 'run') return json(200, AUTOCUT.get(key));
+    const job = {state: 'run', step: 'готовлю', at: Date.now()};
+    AUTOCUT.set(key, job);
+    const sh = (args, step) => new Promise((ok, no) => { job.step = step; const c = spawn(args[0], args.slice(1), {cwd: BOT, stdio: ['ignore', 'ignore', 'pipe']}); let err = ''; c.stderr.on('data', (d) => (err = (err + d).slice(-600))); c.on('close', (code) => (code ? no(new Error(`${step}: ${err.trim().split('\n').pop() || code}`)) : ok())); });
+    (async () => {
+      const source = footageOf(dir);
+      if (!source) throw new Error('в «Материалах» нет видео съёмки');
+      const wf = join(dir, 'sources', 'words.json'), vf = voiceFileOf(dir, {}) || join(dir, source);
+      if (!existsSync(wf)) await sh(['node', 'scripts/transcribe.mjs', vf, '--out', wf], 'расшифровываю запись по словам');
+      // The voice's loudness (web/preview.mjs) sharpens the takes' edges; made in the background — wait a little for it.
+      job.step = 'ищу дубли каждой фразы';
+      let vo = voiceOf(vf);
+      for (let i = 0; i < 40 && !vo; i++) { await new Promise((r) => setTimeout(r, 1500)); vo = voiceOf(vf); }
+      const {cut, missing} = firstCut(dir, {source, peaksFile: vo?.peaks});
+      writeJson(join(dir, 'cut.json'), {...cut, rev: 1, editedBy: me.name, editedAt: new Date().toISOString()});
+      Object.assign(job, {state: 'done', step: 'готово', clips: cut.clips.length, missing});
+    })().catch((e) => Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}));
+    return json(200, job);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/reel/cut/auto') {
+    return json(200, AUTOCUT.get(`${p}/${url.searchParams.get('reel')}`) || {state: 'none'});
+  }
+  // The lavalier: an uploaded recording synced to the camera by their sound (scripts/micsync.mjs) — the offset,
+  // the clocks' drift — written as sources/<name>-synced.wav on the camera's timeline; the voice becomes it.
+  if (req.method === 'POST' && url.pathname === '/api/reel/mic') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel), cut = dir && readJson(join(dir, 'cut.json'), null);
+    if (!cut?.source) return json(404, {});
+    // The uploaded file (its absolute path from /api/upload) or one already in the reel (sources/…, a nudge).
+    const src = /^sources\//.test(String(b.file || '')) ? resolve(dir, String(b.file)) : resolve(String(b.file || ''));
+    if (!src.startsWith(join(dir, 'sources') + '/') || !existsSync(src) || !/\.(wav|m4a|mp3|aac|flac|aif|aiff|ogg|mp4|mov)$/i.test(src)) return json(400, {});
+    const key = `${p}/${b.reel}`;
+    if (MICSYNC.get(key)?.state === 'run') return json(200, MICSYNC.get(key));
+    const job = {state: 'run', step: 'свожу с камерой по звуку', at: Date.now()};
+    MICSYNC.set(key, job);
+    const name = basename(src).replace(/\.[^.]+$/, '').replace(/-synced$/, ''), rel = `sources/${name}-synced.wav`;
+    (async () => {
+      const r = await micSync(join(dir, cut.source), src, join(dir, rel), {nudge: Number(b.nudge) || 0});
+      // A lavalier at the mouth and a camera across the room sound different: one window may match weakly
+      // (reel 22: 23 %) while the windows along the recording agree on the same offset. Those are the proof.
+      if (r.score < 0.25 && (r.windows || 0) < 3) throw new Error(`не похоже на звук этой записи (совпадение ${Math.round(r.score * 100)} %) — тот ли файл?`);
+      const now = readJson(join(dir, 'cut.json'), cut);
+      writeJson(join(dir, 'cut.json'), {...now, voice: rel, mic: {from: `sources/${basename(src)}`, offset: r.offset, drift: r.drift, score: r.score, nudge: Number(b.nudge) || 0}, rev: (Number(now.rev) || 0) + 1, editedBy: me.name, editedAt: new Date().toISOString()});
+      Object.assign(job, {state: 'done', step: 'готово', ...r});
+    })().catch((e) => Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}));
+    return json(200, job);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/reel/mic') {
+    return json(200, MICSYNC.get(`${p}/${url.searchParams.get('reel')}`) || {state: 'none'});
+  }
+  // The voice of the cut: the camera's sound or the lavalier, and its gain — for the player and every join.
+  if (req.method === 'POST' && url.pathname === '/api/reel/voice') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel), cut = dir && readJson(join(dir, 'cut.json'), null);
+    if (!cut) return json(404, {});
+    const rev = Number(cut.rev) || 0;
+    if (b.rev != null && Number(b.rev) !== rev) return json(409, {rev});
+    const next = {...cut};
+    if (b.voice === 'camera') next.voice = 'camera';
+    else if (typeof b.voice === 'string' && /^sources\/[^/]+\.wav$/.test(b.voice) && existsSync(join(dir, b.voice))) next.voice = b.voice;
+    if (b.gainDb != null) next.gainDb = Math.max(-12, Math.min(18, Math.round(Number(b.gainDb) * 2) / 2)) || 0;
+    writeJson(join(dir, 'cut.json'), {...next, rev: rev + 1, editedBy: me.name, editedAt: new Date().toISOString()});
+    return json(200, {ok: true, rev: rev + 1});
+  }
+  // «Собрать монтаж»: the cut alone, without the agent and without a render — the clips joined
+  // (scripts/cut.mjs cut, words), the graphics' times moved to it (scripts/layers.mjs place) and the
+  // joined file made the next version as an mp4. Seconds, not minutes: the owner trims and checks as
+  // often as needed; graphics, subtitles and the mask come later, once, from the agent.
+  if (req.method === 'POST' && url.pathname === '/api/reel/montage') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir || !existsSync(join(dir, 'cut.json'))) return json(404, {});
+    const key = `${p}/${b.reel}`;
+    if (MONTAGE.get(key)?.state === 'run') return json(200, MONTAGE.get(key));
+    const vs = versionDirs(dir), v = `v${(Number((vs.at(-1) || 'v0').slice(1)) || 0) + 1}`;
+    const last = vs.length ? readdirSync(join(dir, 'versions', vs.at(-1))).find((f) => /-v\d+\.mp4$/.test(f)) : null;
+    const base = last ? last.replace(/-v\d+\.mp4$/, '') : basename(dir).replace(/^\d+-/, '');
+    const job = {state: 'run', v, step: 'готовлю', at: Date.now()};
+    MONTAGE.set(key, job);
+    const sh = (args, step) => new Promise((ok, no) => { job.step = step; const c = spawn(args[0], args.slice(1), {cwd: BOT, stdio: ['ignore', 'ignore', 'pipe']}); let err = ''; c.stderr.on('data', (d) => (err = (err + d).slice(-600))); c.on('close', (code) => (code ? no(new Error(`${step}: ${err.trim().split('\n').pop() || code}`)) : ok())); });
+    // From the source's light copy (web/preview.mjs, already made for the player): 720p, a few seconds.
+    // The full-quality join (scripts/cut.mjs cut → sources/cut.mov) is left to the graphics build.
+    const cut = readJson(join(dir, 'cut.json'), {});
+    const pv = previewOf(join(dir, cut.source || ''), {rotate: Number(cut.rotate) || 0});
+    // All or nothing: the join goes to a temporary file first; only when it is whole are the
+    // graphics moved (layers.mjs place) and the version folder made — a failure leaves no half state.
+    const tmp = join(dir, `.montage-${v}.mp4`);
+    (async () => {
+      if (!pv?.video) throw new Error('лёгкая копия исходника ещё готовится — через минуту');
+      // The same recipe as the final join (scripts/join.mjs): frames of the source, the lavalier
+      // when there is one, 12 ms fades at the joints, gain and a limiter.
+      await sh(['ffmpeg', ...joinArgs({reel: dir, cut, video: pv.video, out: tmp, draft: true})], 'склеиваю куски');
+      if (existsSync(join(dir, 'graphics.json'))) await sh(['node', 'scripts/layers.mjs', dir, 'place'], 'переношу графику');
+      const vdir = join(dir, 'versions', v);
+      mkdirSync(vdir, {recursive: true});
+      renameSync(tmp, join(vdir, `${base}-${v}.mp4`));
+      writeJson(join(vdir, 'stage.json'), {stage: 'montage', by: me.name, at: new Date().toISOString(), rev: cut.rev || 0, ...(cut.voice ? {voice: cut.voice} : {}), ...(cut.gainDb ? {gainDb: cut.gainDb} : {}), clips: cut.clips.map((c) => ({in: c.in, out: c.out, ...(c.jt ? {jt: c.jt} : {})}))});
+      Object.assign(job, {state: 'done', step: 'готово'});
+    })().catch((e) => { try { rmSync(tmp, {force: true}); } catch {} Object.assign(job, {state: 'error', step: String(e.message || e).slice(0, 300)}); });
+    return json(200, job);
+  }
+  if (req.method === 'GET' && url.pathname === '/api/reel/montage') {
+    return json(200, MONTAGE.get(`${p}/${url.searchParams.get('reel')}`) || {state: 'none'});
   }
   // Правки по секундам (Д3): the list of notes for the next version, by voice or text, with a
   // point on the frame; «Собрать vN» hands the open ones to the reel chat (edits.json).
@@ -1332,6 +1532,40 @@ createServer(async (req, res) => {
     writeJson(join(dir, 'ready.json'), {v: b.v, by: me.name, at: Date.now()});
     log(me.name, `${b.v} ролика ${b.reel} идёт в «Готово»`);
     return json(200, {ready: b.v});
+  }
+  // «Написать текст» on an idea: the studio makes the reel folder itself (no agent turn for that), writes the idea
+  // into its README and links the item, so the page opens «Сценарий» at once and Claude only writes the text.
+  if (req.method === 'POST' && url.pathname === '/api/reel/start') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const item = loadItems(studio).items.find((x) => x.id === String(b.item || ''));
+    if (!item || item.format !== 'reel') return json(404, {});
+    if (item.ref?.kind === 'reel' && reelDir(p, item.ref.id)) return json(200, {id: item.ref.id, existed: true});
+    const RU = {а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'c', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya'};
+    const slug = [...item.title.toLowerCase()].map((c) => RU[c] ?? c).join('').replace(/[^a-z0-9]+/g, '-').split('-').filter(Boolean).slice(0, 4).join('-').slice(0, 40) || 'reel';
+    changeItem(studio, item.id, {take: true, starting: true}, {by: me.name});
+    const run = spawnSync(process.execPath, [join(BOT, 'scripts', 'new-reel.mjs'), slug], {cwd: BOT, env: {...process.env, REELS_STUDIO: studio}, encoding: 'utf8'});
+    const dir = String(run.stdout || '').trim().split('\n').pop();
+    if (run.status !== 0 || !dir || !existsSync(dir)) return json(500, {error: 'Папка рилса не создалась'});
+    const id = basename(dir), idea = item.idea || {};
+    writeFileSync(join(dir, 'README.md'), [`# ${id.slice(0, 2)} «${item.title}»`, '', 'Status: in work', '', '## Идея', idea.about || item.title,
+      ...(idea.hook ? ['', `Крючок: ${idea.hook}`] : []), ...((idea.flow || []).length ? ['', 'Ход:', ...idea.flow.map((l, i) => `${i + 1}. ${l}`)] : []), ''].join('\n'));
+    // The empty script keeps the release on «Идея» until its text and look are approved (items.mjs).
+    writeFileSync(join(dir, 'script.json'), JSON.stringify({blocks: []}));
+    syncItems(studio);
+    log(me.name, `завёл рилс ${id} из идеи «${item.title}»`);
+    return json(200, {id});
+  }
+  // «Сценарий» by meaning blocks (web/script.mjs): order, approve, take a variant, approve a step, undo.
+  if (req.method === 'POST' && url.pathname === '/api/reel/script') {
+    if (!can('editor')) return json(403, {});
+    const b = await body(req);
+    const dir = reelDir(p, b.reel);
+    if (!dir) return json(404, {});
+    const s = changeScript(dir, b, me.name);
+    if (!s) return json(400, {});
+    log(me.name, `сценарий ${b.reel}: ${b.op}${b.step ? ' ' + b.step : ''}`);
+    return json(200, {script: s});
   }
   if (req.method === 'POST' && url.pathname === '/api/reel/edits') {
     if (!can('editor')) return json(403, {});
@@ -1510,6 +1744,9 @@ createServer(async (req, res) => {
       return json(202, {queued: how});
     }
     if (full()) return json(429, {max: MAX_JOBS});
+    // «↩ Вернуть как было» on the script stage returns what the text was before this turn.
+    const rdir = !k.startsWith('_') && !k.startsWith('new-') && !k.startsWith('post-') && reelDir(p, k);
+    if (rdir) scriptSnapshot(rdir);
     record(p, k, {from: 'me', kind: 'text', text: shown || text, by: me.name});
     log(me.name, `написал в чат «${k}»: ${(shown || text).slice(0, 80)}`);
     res.writeHead(200, {'content-type': 'text/event-stream', 'cache-control': 'no-store'});
@@ -1573,7 +1810,7 @@ createServer(async (req, res) => {
     mkdirSync(join(studio, 'inbox'), {recursive: true});
     appendFileSync(join(studio, 'inbox', 'history.md'), `- ${new Date().toISOString()} (web, ${me.name}${rdir ? `, reel ${reel}` : ''}) ${path}\n`);
     log(me.name, `загрузил ${basename(path)}${rdir ? ` в рилс ${reel}` : ''}`);
-    return json(200, {path, url: mediaUrl(path), digest});
+    return json(200, {path, name: basename(path), url: mediaUrl(path), digest});
   }
   // Inbox → variants (Д2): an author's material becomes a post whose chat writes 2–3 variants.
   if (req.method === 'POST' && url.pathname === '/api/authors/variants') {
@@ -1746,7 +1983,9 @@ createServer(async (req, res) => {
     if (f && !isEditor(me) && !f.includes('/inbox/')) return res.writeHead(403).end();
     if (!f) return res.writeHead(404).end();
     if (url.searchParams.has('dl')) log(me.name, `скачал ${basename(f)}`);
-    return sendFile(req, res, f, url.searchParams.has('dl') ? {'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`} : {});
+    // A preview link carries its file's time (&m=), so the browser may keep it.
+    const keep = url.searchParams.has('m') ? {'cache-control': 'private, max-age=604800, immutable'} : {};
+    return sendFile(req, res, f, url.searchParams.has('dl') ? {'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(basename(f))}`} : keep);
   }
   res.writeHead(404).end();
 }).listen(PORT, '127.0.0.1', () => {
