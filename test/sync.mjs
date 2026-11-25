@@ -3,7 +3,7 @@
 // changes hands, a conflict keeps both versions.
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync} from 'node:fs';
+import {appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fakeS3} from './fake-s3.mjs';
@@ -15,8 +15,9 @@ const git = (cwd, ...a) => { const r = spawnSync('git', ['-c', 'core.quotepath=f
 const remote = join(home, 'remote.git');
 git(home, 'init', '-q', '--bare', '-b', 'main', remote);
 
-const A = {node: 'misha-macbook', name: 'MacBook', cfg};
-const B = {node: 'misha-imac', name: 'iMac', cfg};
+// settle: 0 — the files here are written whole at once; the real wait is tested at the end.
+const A = {node: 'misha-macbook', name: 'MacBook', cfg, settle: 0};
+const B = {node: 'misha-imac', name: 'iMac', cfg, settle: 0};
 const a = join(home, 'macbook', 'main');
 const b = join(home, 'imac', 'main');
 
@@ -130,6 +131,66 @@ assert.ok(!existsSync(join(reelB, 'sources', 'C1.mp4')));
 assert.ok(S.isEvicted(reelB));
 await S.fetchMedia(reelB, 'main', cfg);
 assert.ok(existsSync(join(reelB, 'sources', 'C1.mp4')) && !S.isEvicted(reelB));
+
+// Issue #150: on the computer that holds a reel its disk is the truth; the cloud never deletes or overwrites it.
+const old = (f, s = 60) => { const t = new Date(Date.now() - s * 1e3); utimesSync(f, t, t); };
+const entry = (dir, path) => S.readFiles(dir).files.find((f) => f.path === path);
+const parts = (dir) => readdirSync(dir).filter((f) => f.endsWith('.part'));
+assert.ok(S.heldHere(reelA, A.node));
+// A rough cut still being written: the pass waits for it instead of hashing half of it.
+const cut = join(reelA, 'sources', 'cut.mov');
+writeFileSync(cut, Buffer.alloc(4000, 7));
+await S.manifest(reelA);
+assert.equal(entry(reelA, 'sources/cut.mov'), undefined, 'a file changed seconds ago is not listed yet');
+assert.equal(await S.pushMedia(reelA, 'main', cfg), 0);
+appendFileSync(cut, Buffer.alloc(2000, 7));
+old(cut);
+await S.manifest(reelA);
+assert.equal(entry(reelA, 'sources/cut.mov').size, 6000, 'once it settles it is listed whole');
+// Changed again after the manifest: its new bytes never go up under the old hash.
+const h6000 = entry(reelA, 'sources/cut.mov').hash;
+appendFileSync(cut, Buffer.alloc(1000, 7));
+assert.equal(await S.pushMedia(reelA, 'main', cfg), 0);
+assert.ok(!objects.has(`/reels/main/media/${h6000}`));
+// files.json is stale (says 6000, the disk has 7000, the cloud has nothing): opening the reel keeps the file.
+assert.deepEqual(S.needed(reelA, {node: A.node}), []);
+await S.fetchMedia(reelA, 'main', cfg, () => {}, {node: A.node});
+assert.equal(statSync(cut).size, 7000, 'the whole cut is still there');
+// A version replaced here is not swapped back for the old one from the cloud.
+const v2 = join(reelA, 'versions', 'v2', 'погода-v2.mp4');
+writeFileSync(v2, Buffer.alloc(2700, 8));
+assert.deepEqual(S.needed(reelA, {node: A.node}), []);
+await S.fetchMedia(reelA, 'main', cfg, () => {}, {node: A.node});
+assert.ok(readFileSync(v2).equals(Buffer.alloc(2700, 8)), 'the new version stays');
+old(cut); old(v2);
+await S.manifest(reelA);
+assert.equal(entry(reelA, 'versions/v2/погода-v2.mp4').size, 2700, 'and the manifest catches up');
+// A replaced file keeps its previous entry while it is being written.
+writeFileSync(v2, Buffer.alloc(100, 9));
+await S.manifest(reelA);
+assert.equal(entry(reelA, 'versions/v2/погода-v2.mp4').size, 2700);
+
+// On a reel held elsewhere a differing file is replaced — but only by a whole download with the right hash.
+S.claim(reelB, {...A, force: true}); // as the iMac sees it after the MacBook took the reel back
+assert.ok(!S.heldHere(reelB, B.node));
+const c1 = join(reelB, 'sources', 'C1.mp4');
+writeFileSync(c1, Buffer.alloc(10, 1));
+assert.deepEqual(S.needed(reelB, {node: B.node}).map((f) => f.path), ['sources/C1.mp4']);
+const c1key = `/reels/main/media/${entry(reelB, 'sources/C1.mp4').hash}`;
+const good = objects.get(c1key);
+objects.delete(c1key);
+await assert.rejects(S.fetchMedia(reelB, 'main', cfg, () => {}, {node: B.node}));
+assert.ok(readFileSync(c1).equals(Buffer.alloc(10, 1)), 'a 404 leaves the local file as it was');
+objects.set(c1key, Buffer.alloc(good.length + 5, 1));
+await assert.rejects(S.fetchMedia(reelB, 'main', cfg, () => {}, {node: B.node}), /arrived 3005 of 3000/);
+assert.ok(readFileSync(c1).equals(Buffer.alloc(10, 1)), 'so does a wrong size');
+objects.set(c1key, Buffer.alloc(good.length, 2));
+await assert.rejects(S.fetchMedia(reelB, 'main', cfg, () => {}, {node: B.node}), /another hash/);
+assert.ok(readFileSync(c1).equals(Buffer.alloc(10, 1)), 'and a wrong hash');
+assert.deepEqual(parts(join(reelB, 'sources')), [], 'no half-downloads left behind');
+objects.set(c1key, good);
+await S.fetchMedia(reelB, 'main', cfg, () => {}, {node: B.node});
+assert.ok(readFileSync(c1).equals(good), 'the right file takes its place');
 
 close();
 rmSync(home, {recursive: true, force: true});

@@ -20,7 +20,7 @@
 
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {createReadStream, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
+import {createReadStream, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {basename, dirname, extname, join, relative, sep} from 'node:path';
 import {get, head, put} from './cloud.mjs';
 
@@ -31,6 +31,8 @@ export const EVICT_DAYS = 14;
 const GIT_MAX = 5 * 1024 * 1024;
 // Older versions' files under this size (frames, json, snapshots) come along when a reel is opened.
 const SMALL = 2 * 1024 * 1024;
+// A file changed this recently may still be being written (a render, a rough cut): manifest() waits for it.
+export const SETTLE_MS = 10e3;
 
 export const GITIGNORE = `# Reels Studio (bot/sync.mjs): only the light part of the project is in git.
 # Media lives in Cloudflare R2 by hash, listed in each reel's files.json.
@@ -215,20 +217,23 @@ export const readFiles = (reelDir) => ({files: [], holder: null, handoff: null, 
 const projectOf = (reelDir) => join(reelDir, '..', '..');
 
 // Lists the reel's heavy files with hashes (cached by size and time) and writes files.json.
-export async function manifest(reelDir) {
+// A file still being written (changed within `settle` ms) keeps its previous entry, or none yet.
+export async function manifest(reelDir, {settle = SETTLE_MS} = {}) {
   const proj = projectOf(reelDir);
   const cache = readJson(local(proj, 'hashes.json'), {});
+  const cur = readFiles(reelDir);
+  const before = new Map(cur.files.map((f) => [f.path, f]));
   const files = [];
   for (const top of HEAVY) for (const f of walk(join(reelDir, top))) {
     const path = toPosix(join(top, f.rel));
     const key = `${basename(reelDir)}/${path}`;
+    if (Date.now() - f.mtime < settle) { if (before.has(path)) files.push(before.get(path)); continue; }
     const c = cache[key];
     const hash = c && c.size === f.size && c.mtime === f.mtime ? c.hash : await hashFile(join(reelDir, top, f.rel));
     cache[key] = {size: f.size, mtime: f.mtime, hash};
     files.push({path, size: f.size, hash});
   }
   writeJson(local(proj, 'hashes.json'), cache);
-  const cur = readFiles(reelDir);
   files.sort((a, b) => a.path.localeCompare(b.path));
   if (JSON.stringify(cur.files) !== JSON.stringify(files)) writeJson(filesJson(reelDir), {...cur, files});
   return files;
@@ -244,10 +249,19 @@ export async function pushMedia(reelDir, project, cfg) {
   const proj = projectOf(reelDir);
   const sent = inCloud(proj);
   let bytes = 0;
+  const cache = readJson(local(proj, 'hashes.json'), {});
   for (const f of readFiles(reelDir).files) {
     if (sent[f.hash]) continue;
     const key = mediaKey(project, f.hash);
-    if ((await head(cfg, key)) !== f.size) { await put(cfg, key, join(reelDir, f.path)); bytes += f.size; }
+    if ((await head(cfg, key)) !== f.size) {
+      // Only the very bytes that were hashed go up under the hash: a file changed since waits for the next manifest().
+      const c = cache[`${basename(reelDir)}/${f.path}`];
+      let st;
+      try { st = statSync(join(reelDir, f.path)); } catch { continue; }
+      if (st.size !== f.size || c?.hash !== f.hash || c.mtime !== Math.floor(st.mtimeMs)) continue;
+      await put(cfg, key, join(reelDir, f.path));
+      bytes += f.size;
+    }
     markCloud(proj, [f.hash]);
   }
   return bytes;
@@ -255,19 +269,25 @@ export async function pushMedia(reelDir, project, cfg) {
 
 const latestVersion = (files) => files.map((f) => /^versions\/(v\d+)\//.exec(f.path)?.[1]).filter(Boolean).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))).at(-1);
 // What opening the reel needs here: its sources, project/public, the latest version, small files of the rest.
-export function needed(reelDir) {
+// On a reel this computer holds (or with no node given) the files on its disk are the truth — newer than
+// files.json may say — so only missing ones come down; elsewhere a file that differs is replaced too.
+export function needed(reelDir, {node} = {}) {
   const {files} = readFiles(reelDir);
+  const mine = !node || heldHere(reelDir, node);
   const latest = latestVersion(files);
   return files.filter((f) => {
     const want = !f.path.startsWith('versions/') || f.path.startsWith(`versions/${latest}/`) || f.size <= SMALL;
     if (!want) return false;
-    try { return statSync(join(reelDir, f.path)).size !== f.size; } catch { return true; }
+    let size;
+    try { size = statSync(join(reelDir, f.path)).size; } catch { return true; }
+    return !mine && size !== f.size;
   });
 }
 
-// Downloads what the reel lacks. progress({total, done, file}) after each file.
-export async function fetchMedia(reelDir, project, cfg, progress = () => {}) {
-  const want = needed(reelDir);
+// Downloads what the reel lacks. progress({total, done, file}) after each file. Each file comes into a
+// temporary name and takes its place only whole and with the right hash: a failure leaves the disk as it was.
+export async function fetchMedia(reelDir, project, cfg, progress = () => {}, {node} = {}) {
+  const want = needed(reelDir, {node});
   const total = want.reduce((s, f) => s + f.size, 0);
   let done = 0;
   progress({total, done, file: null});
@@ -275,9 +295,14 @@ export async function fetchMedia(reelDir, project, cfg, progress = () => {}) {
   for (const f of want) {
     progress({total, done, file: f.path});
     const to = join(reelDir, f.path);
-    await get(cfg, mediaKey(project, f.hash), to);
-    const got = statSync(to).size;
-    if (got !== f.size) { rmSync(to, {force: true}); throw new Error(`${f.path}: arrived ${got} of ${f.size} bytes`); }
+    const tmp = `${to}.sync.part`;
+    try {
+      await get(cfg, mediaKey(project, f.hash), tmp);
+      const got = statSync(tmp).size;
+      if (got !== f.size) throw new Error(`${f.path}: arrived ${got} of ${f.size} bytes`);
+      if ((await hashFile(tmp)) !== f.hash) throw new Error(`${f.path}: arrived with another hash`);
+      renameSync(tmp, to);
+    } finally { rmSync(tmp, {force: true}); }
     // What came from the cloud is in it: never sent again, and may be dropped from this disk later.
     const proj = projectOf(reelDir);
     markCloud(proj, [f.hash]);
@@ -323,13 +348,13 @@ export function claim(reelDir, {node, name, force = false}) {
 
 // On the holder: reels someone asked for are handed over after their last edits and media went up.
 // busy(reel) → true waits (Claude is still working on it).
-export async function handOver(projectDir, project, {node, cfg, busy = () => false}) {
+export async function handOver(projectDir, project, {node, cfg, busy = () => false, settle}) {
   const out = [];
   for (const reel of reelNames(projectDir)) {
     const dir = join(projectDir, 'reels', reel);
     const {holder, handoff} = readFiles(dir);
     if (!handoff || holder?.node !== node || handoff.to === node || busy(reel)) continue;
-    await manifest(dir);
+    await manifest(dir, {settle});
     await pushMedia(dir, project, cfg);
     setHold(dir, {holder: {node: handoff.to, name: handoff.name, at: Date.now()}, handoff: null});
     out.push(reel);
@@ -376,18 +401,18 @@ export function evictIdle(projectDir, {days = EVICT_DAYS, busy = () => false} = 
 
 // The whole round for one project, as the studio runs it every minute:
 // media of reels held here up → light part through git → hand over what was asked for.
-export async function syncProject(projectDir, project, {node, name, cfg, busy = () => false} = {}) {
+export async function syncProject(projectDir, project, {node, name, cfg, busy = () => false, settle} = {}) {
   const out = {media: 0, handed: [], git: null};
   if (cfg && node) for (const reel of reelNames(projectDir)) {
     const dir = join(projectDir, 'reels', reel);
     if (!heldHere(dir, node) || isEvicted(dir)) continue;
     // A reel without a holder that has media becomes this computer's: it is where the files are.
     if (!holderOf(dir) && HEAVY.some((h) => existsSync(join(dir, h)))) setHold(dir, {holder: {node, name, at: Date.now()}});
-    await manifest(dir);
+    await manifest(dir, {settle});
     out.media += await pushMedia(dir, project, cfg);
   }
   out.git = syncGit(projectDir, {node, name});
-  out.handed = node ? await handOver(projectDir, project, {node, cfg, busy}) : [];
+  out.handed = node ? await handOver(projectDir, project, {node, cfg, busy, settle}) : [];
   if (out.handed.length) out.git = syncGit(projectDir, {node, name});
   return out;
 }
