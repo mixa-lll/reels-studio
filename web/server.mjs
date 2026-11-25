@@ -328,10 +328,10 @@ if (SYNC) {
 // A reel opened here: free → held here; its missing media comes down (to watch it, or to work on it).
 function fetchReel(p, r) {
   const dir = reelDir(p, r), k = `${p}/${r}`;
-  if (!SYNC || !dir || FETCHING.get(k)?.running || !sync.needed(dir).length) return;
+  if (!SYNC || !dir || FETCHING.get(k)?.running || !sync.needed(dir, {node: NODE}).length) return;
   const st = {running: true, total: 0, done: 0, file: null, error: null};
   FETCHING.set(k, st);
-  sync.fetchMedia(dir, p, cloudConfig(), (x) => Object.assign(st, x))
+  sync.fetchMedia(dir, p, cloudConfig(), (x) => Object.assign(st, x), {node: NODE})
     .catch((e) => { st.error = e.message; console.error('sync fetch', k, e.message); })
     .finally(() => { st.running = false; });
 }
@@ -340,7 +340,7 @@ function holdInfo(p, r) {
   if (!SYNC || !dir) return null;
   const {holder, handoff} = sync.readFiles(dir);
   const st = FETCHING.get(`${p}/${r}`);
-  const need = sync.needed(dir).reduce((s, f) => s + f.size, 0);
+  const need = sync.needed(dir, {node: NODE}).reduce((s, f) => s + f.size, 0);
   return {holder, handoff, here: !holder || holder.node === NODE, me: {node: NODE, name: NAME}, missing: need,
     fetching: st && (st.running || st.error) ? {total: st.total, done: st.done, error: st.error} : null, cloud: Boolean(cloudConfig())};
 }
