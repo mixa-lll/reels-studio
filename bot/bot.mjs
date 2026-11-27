@@ -4,6 +4,7 @@
 import {createSandbox, isTest, listSandboxes, removeSandbox, sandboxName} from './sandbox.mjs';
 import {editor as makeEditor, KEYS as EDITOR_KEYS, LABELS as EDITOR_LABELS} from './editor.mjs';
 import {listReels, reelsUi} from './reels.mjs';
+import {coverUi} from './cover.mjs';
 import {relayUpdates} from './tgrelay.mjs';
 import {spawn} from 'node:child_process';
 import {existsSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
@@ -201,6 +202,9 @@ const state = loadState();
 const panelOrigin = process.env.MINIAPP_URL ? new URL(process.env.MINIAPP_URL).origin : null;
 const reels = reelsUi({tg, studio, project: () => state.project, state, save: saveState, send: (p) => enqueue(p), root: ROOT,
   panel: (folder) => (panelOrigin ? `${panelOrigin}/#/reel/${encodeURIComponent(folder)}` : null)});
+// «🖼 Обложка» under a reel's video: frame → text → design in Telegram (bot/cover.mjs, web/cover.mjs).
+const coverFlow = coverUi({tg, state, save: () => saveState(state), studio, project: () => state.project, enqueue: (p) => enqueue(p)});
+setInterval(() => coverFlow.tick(), 4000);
 // «Основа» (bot/itemcard.mjs): the same card for an item of any format, when lean is on.
 const items = itemsUi({tg, studio, project: () => state.project, state, save: saveState, send: (p) => enqueue(p), root: ROOT,
   panel: (item) => (panelOrigin && item.ref?.kind === 'reel' ? `${panelOrigin}/#/reel/${encodeURIComponent(item.ref.id)}` : null)});
@@ -1121,6 +1125,13 @@ async function onMessage(msg) {
   }
   if (cmd === 'usage') return tg.sendText(state.chatId, usageText(state.limits, LANG), {silent: true});
   if (state.awaitingTime && msg.text && !cmd) return onSettingsTime(msg.text);
+  // /cover or «обложка»: the cover of the reel in focus, its latest version; a typed answer to an open cover step.
+  if (cmd === 'cover' || /^обложк[аиу]\s*$/i.test(msg.text || '')) {
+    const r = listReels(studio()).find((x) => x.folder === state.focus?.[state.project]);
+    if (!r?.versions?.length) return tg.sendText(state.chatId, 'Сначала выбери ролик в «🎬 Ролики» — обложка делается к его последней версии.', {silent: true});
+    return coverFlow.start(r.folder, r.versions[0].v).catch((e) => console.error('cover', e));
+  }
+  if (msg.text && !cmd && await coverFlow.onText(msg.text).catch(() => false)) return;
 
   // 👀 = seen: while the agent is busy (the message joins its task) or while a voice note is transcribed.
   if (current || msg.voice || msg.video_note) {
@@ -1236,6 +1247,7 @@ async function onButton(q) {
   if (q.from.id !== state.ownerId && who?.role !== 'editor') return;
   if (who && /^(set:|p:|px:|upd:)/.test(q.data)) return;
   if (!takeTurn(q.message.chat.id, who)) return;
+  if (q.data.startsWith('cv:')) return coverFlow.onButton(q).catch((e) => console.error('cover', e));
   if (/^(rl|rla|rx|rn)$|^r[spvm]:/.test(q.data)) return reels.onButton(q).catch((e) => console.error('reels', e));
   if (/^it[lx]$|^it[snbwprud]:/.test(q.data)) return items.onButton(q).catch((e) => console.error('items', e));
   if (q.data.startsWith('set:')) return onSettings(q);

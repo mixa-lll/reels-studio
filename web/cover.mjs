@@ -10,7 +10,7 @@
 //
 // The look is the brand's cover system («Правила: обложки, метки, формы»): template/src/cover/CoverDS.tsx.
 import {spawn, spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, copyFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, copyFileSync} from 'node:fs';
 import {basename, join} from 'node:path';
 import {ffCommand, videoInfo} from '../bot/media.mjs';
 import {bestVideo} from './dllink.mjs';
@@ -89,6 +89,8 @@ export function takeFrame(reel, v, t, by = 'user') {
     const p = ff('ffmpeg', ['-y', '-loglevel', 'error', '-c:v', 'libvpx-vp9', '-ss', String(t), '-i', mask, '-frames:v', '1', '-vf', 'scale=1080:1920,format=rgba', join(dir, pf)]);
     if (p.status === 0 && existsSync(join(dir, pf))) person = pf;
   }
+  // New frame, new texts: the old ones were written for another frame.
+  rmSync(join(dir, 'texts.json'), {force: true});
   const st = read(reel, v);
   return save(reel, v, {...st, v, frame: {t, by, file, person}, designs: [], chosen: null});
 }
@@ -192,4 +194,22 @@ export function choose(reel, v, id) {
 export function agentNote(reel, v, st, rubric, prompt = '') {
   const rel = `${basename(reel)}/versions/${v}/cover`;
   return `(cover generator, version ${v}) The owner picked the frame at ${sec(st.frame.t)} s for the cover of this reel (rubric: ${RUBRIC_NAMES[rubric] || rubric}; file ${rel}/${st.frame.file} — look at it). Propose FOUR texts for the cover by the meaning of the video (script, README, scenes) and write them to \`${rel}/texts.json\` as {"texts": [{"why": "5–8 words: what this angle says", ${TEXT_FIELDS[rubric] || TEXT_FIELDS.useful}}]} — exactly this file and shape, valid JSON; the page picks them up. Follow the project's design system and facts; numbers only from facts or the script. Four DIFFERENT angles (the main point, the sharpest number, what the viewer should do, a question). Reply in one or two lines; the page shows the texts. ${prompt ? `The owner adds: ${prompt}` : ''}`.trim();
+}
+
+// ---------- Telegram (bot/cover.mjs): one picture per step instead of an album ----------
+
+/** A frame of the cover source at `t`, small (for a contact sheet). */
+export function framePreview(reel, v, t, out, width = 360) {
+  const src = sourceOf(reel, v);
+  const r = src && ff('ffmpeg', ['-y', '-loglevel', 'error', '-ss', String(sec(t)), '-i', src, '-frames:v', '1', '-vf', `scale=${width}:${Math.round(width * 16 / 9)}:force_original_aspect_ratio=increase,crop=${width}:${Math.round(width * 16 / 9)}`, '-q:v', '3', out]);
+  return r?.status === 0 && existsSync(out) ? out : null;
+}
+
+/** Pictures side by side, each scaled to `width`, with a gap — the numbers go in the caption, left to right. */
+export function sheet(files, out, width = 360) {
+  const h = Math.round(width * 16 / 9);
+  if (files.length === 1) return ff('ffmpeg', ['-y', '-loglevel', 'error', '-i', files[0], '-vf', `scale=${width}:${h}`, '-q:v', '3', out]).status === 0 ? out : null;
+  const ins = files.flatMap((f) => ['-i', f]);
+  const fc = files.map((_, i) => `[${i}]scale=${width}:${h},pad=${width + 12}:${h}:0:0:white[v${i}]`).join(';') + ';' + files.map((_, i) => `[v${i}]`).join('') + `hstack=${files.length}`;
+  return ff('ffmpeg', ['-y', '-loglevel', 'error', ...ins, '-filter_complex', fc, '-q:v', '3', out]).status === 0 ? out : null;
 }
