@@ -92,6 +92,9 @@ assert.equal(S.holderOf(reelA).node, 'misha-imac');
 await S.syncProject(b, 'main', B);
 assert.ok(S.heldHere(reelB, 'misha-imac'), 'now the iMac holds it');
 assert.match(readFileSync(join(reelB, 'README.md'), 'utf8'), /дождь/, 'with the last edits');
+// 27.11.2026: the new holder's next pass ran before the media came down and dropped every cloud-only file.
+await S.syncProject(b, 'main', B);
+assert.ok(S.readFiles(reelB).files.some((f) => f.path === 'versions/v2/погода-v2-1440p.mp4'), 'a file not here yet stays listed');
 await S.fetchMedia(reelB, 'main', cfg);
 assert.equal(statSync(join(reelB, 'versions', 'v2', 'погода-v2-1440p.mp4')).size, 4000, 'and the last media');
 // The MacBook does not hold it any more: its passes leave the manifest alone.
