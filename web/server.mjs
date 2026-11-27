@@ -17,6 +17,7 @@ import {changeScript, readScript, snapshot as scriptSnapshot} from './script.mjs
 import {changeItem, createItems, deleteItem, dropIdea, ideaBank, loadItems, followPlan, needOf, saveItems, syncItems, undropIdea} from './items.mjs';
 import {addRef, changeRef, loadRefs, prepRef, refView} from './refs.mjs';
 import {copyReel, MODES as COPY_MODES} from './copyreel.mjs';
+import * as cover from './cover.mjs';
 import {readKit} from './dskit.mjs';
 import {fpsOf, joinArgs, snapClips, voiceOf as voiceFileOf} from '../scripts/join.mjs';
 import {firstCut, footageOf, takesOf} from '../scripts/takes.mjs';
@@ -45,6 +46,7 @@ const BOT = process.env.REELS_BOT_ROOT || join(HERE, '..');
 try { process.loadEnvFile(join(BOT, '.env')); } catch {}
 const PROJECTS = join(BOT, 'projects');
 const DATA = join(HERE, 'data');
+const coverBuilds = new Set(); // reel+version while its cover designs render
 const CHATS = join(DATA, 'chats');
 // Every running turn gets its own folder for events.jsonl and status.txt (REELS_CHANNEL).
 const CHANNELS = join(DATA, 'channels');
@@ -421,6 +423,7 @@ function preamble(p, k) {
     'Step «3 · Вид» (only after "text":{"ok":true}): for every block fill "look" — what is on screen while it is said: frame (who and how), broll (a cutaway to film: name it so it can go to the shot list), gfx (graphics), text (text on screen), sound; "at" = the exact words of the block it starts on, "tpl" = the template of the project style it uses, "have" = style (exists in the style), ready (the file is there), shoot (still to film), new (not in the style yet). Take looks from the project design system first. ' +
     'Later, in «Монтаж» and «Графика», build from it: one clip per block in its order, graphics on the "at" words; if the text changes after «Вид» is approved, update that block\'s look too. ' +
     'Messages starting with a timecode like «0:11 —» are notes about that moment of the current version. ' +
+    'Messages starting with «(cover generator, version vN)» come from the cover generator on «Готово» (web/cover.mjs): write the four texts to versions/<vN>/cover/texts.json exactly as the message says (headline lines at most 18 characters — the cover never shrinks a headline), reply in 1–2 lines; the page renders the designs itself. ' +
     'Comments for the next version live in `edits.json` (format in web/edits.mjs): [{"id","stage":"script|scenes|video","t":seconds,"text","quote"?,"scene"?,"shape"?:{"kind":"rect|brush|point|frame",…fractions of the frame},"hint"?:"blur|replace|trim|remove","state":"open|sent|done|note","forV":"v4","by"}]; they come from the page and from the mini app\'s editor. When you have built that version, set each sent comment to "done" and add "result": what you changed, in a few words — the page shows it as «что поменялось». Your own pre-build findings (faces, subtitles, consents) go there as "state":"note" with "by":"Claude".');
   return lines.join('\n');
 }
@@ -1523,6 +1526,58 @@ createServer(async (req, res) => {
     }
     log(me.name, `сделал рилс «${made.id}» по образцу «${b.reel}» (${b.mode})`);
     return json(200, made);
+  }
+  // ---------- cover generator (web/cover.mjs, issue #152): frame → text → design ----------
+  if (url.pathname.startsWith('/api/cover')) {
+    const post = req.method === 'POST';
+    const b = post ? await body(req) : {};
+    const r = post ? b.reel : url.searchParams.get('reel'), v = post ? b.v : url.searchParams.get('v');
+    const dir = reelDir(p, r);
+    if (!dir || !/^v\d+$/.test(v || '') || !existsSync(join(dir, 'versions', v))) return json(404, {});
+    if (post && !can('editor')) return json(403, {});
+    const studio = join(PROJECTS, p);
+    const strat = readJson(join(studio, 'strategy.json'), {});
+    const names = {...cover.RUBRIC_NAMES, ...Object.fromEntries((strat.rubrics || []).map((x) => [x.id, x.name]))};
+    const rubricOf = (st) => st.rubric || loadItems(studio).items.find((x) => x.ref?.kind === 'reel' && x.ref.id === r)?.rubric || null;
+    const cdir = join(dir, 'versions', v, 'cover');
+    const stamp = (f) => (existsSync(f) ? `${mediaUrl(f)}&m=${Math.round(statSync(f).mtimeMs)}` : null);
+    const view = () => {
+      const st = cover.read(dir, v), rubric = rubricOf(st);
+      return {v, rubric, rubricName: rubric ? names[rubric] || rubric : null, rubrics: Object.keys(cover.TEXT_FIELDS).filter((x) => x !== 'news').map((id) => ({id, name: names[id] || id})),
+        frame: st.frame ? {...st.frame, url: stamp(join(cdir, st.frame.file))} : null, maskable: Boolean(cover.maskOf(dir, v)),
+        source: cover.sourceOf(dir, v) ? {url: stamp(cover.sourceOf(dir, v)), clean: cover.isClean(dir, v)} : null,
+        texts: cover.texts(dir, v), text: st.text || null, designs: (st.designs || []).map((d) => ({...d, url: stamp(join(cdir, d.file))})), chosen: st.chosen || null,
+        cover: stamp(join(dir, 'versions', v, 'cover.png')), building: coverBuilds.has(r + v)};
+    };
+    if (!post && url.pathname === '/api/cover') return json(200, view());
+    if (!post && url.pathname === '/api/cover/suggest') {
+      try { return json(200, {suggest: cover.suggest(dir, v).map((x) => ({t: x.t, url: stamp(join(cdir, x.file))}))}); } catch (e) { return json(200, {suggest: [], error: e.message}); }
+    }
+    if (post && url.pathname === '/api/cover/frame') {
+      try {
+        const st = cover.takeFrame(dir, v, Number(b.t) || 0, b.by === 'auto' ? 'auto' : 'user');
+        if (b.rubric && cover.TEXT_FIELDS[b.rubric]) cover.save(dir, v, {...st, rubric: b.rubric});
+        const rubric = b.rubric || rubricOf(st) || 'useful';
+        log(me.name, `кадр ${st.frame.t} с — для обложки ${v} ролика ${r}`);
+        return json(200, {...view(), note: cover.agentNote(dir, v, st, rubric, String(b.prompt || '').slice(0, 600))});
+      } catch (e) { return json(500, {error: e.message}); }
+    }
+    if (post && url.pathname === '/api/cover/build') {
+      const rubric = cover.TEXT_FIELDS[b.rubric] ? b.rubric : rubricOf(cover.read(dir, v)) || 'useful';
+      const t = b.text || {};
+      const text = {t1: String(t.t1 || '').slice(0, 60), t2: String(t.t2 || '').slice(0, 60), zone: String(t.zone || '').slice(0, 12), zoneAlt: String(t.zoneAlt || '').slice(0, 12), right: String(t.right || '').slice(0, 40), caption: String(t.caption || '').slice(0, 140), place: String(t.place || '').slice(0, 60),
+        items: Array.isArray(t.items) ? t.items.map((x) => String(x).slice(0, 24)).slice(0, 4) : []};
+      if (coverBuilds.has(r + v)) return json(409, {error: 'обложка уже собирается'});
+      coverBuilds.add(r + v);
+      try {
+        await cover.build(dir, v, {text, rubric}, {cache: join(DATA, 'cover-cache')});
+        return json(200, view());
+      } catch (e) { return json(500, {error: e.message}); } finally { coverBuilds.delete(r + v); }
+    }
+    if (post && url.pathname === '/api/cover/pick') {
+      try { cover.choose(dir, v, String(b.id || '')); log(me.name, `обложка ${v} ролика ${r}: ${b.id}`); return json(200, view()); } catch (e) { return json(400, {error: e.message}); }
+    }
+    return json(404, {});
   }
   if (req.method === 'POST' && url.pathname === '/api/reel/ready') {
     if (!can('editor')) return json(403, {});
