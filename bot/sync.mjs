@@ -233,6 +233,11 @@ export async function manifest(reelDir, {settle = SETTLE_MS} = {}) {
     cache[key] = {size: f.size, mtime: f.mtime, hash};
     files.push({path, size: f.size, hash});
   }
+  // A file this computer never had (not in its hash cache) is not gone, only not here yet: a reel just
+  // handed over keeps its cloud-only files listed until they come down (27.11.2026: a hand-over dropped 25).
+  // One it had and that left the disk was deleted here (a cleanup, a removed version): it leaves the list.
+  const seen = new Set(files.map((f) => f.path));
+  for (const f of cur.files) if (!seen.has(f.path) && !cache[`${basename(reelDir)}/${f.path}`]) files.push(f);
   writeJson(local(proj, 'hashes.json'), cache);
   files.sort((a, b) => a.path.localeCompare(b.path));
   if (JSON.stringify(cur.files) !== JSON.stringify(files)) writeJson(filesJson(reelDir), {...cur, files});
