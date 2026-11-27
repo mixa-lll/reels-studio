@@ -1545,6 +1545,7 @@ createServer(async (req, res) => {
       const st = cover.read(dir, v), rubric = rubricOf(st);
       return {v, rubric, rubricName: rubric ? names[rubric] || rubric : null, rubrics: Object.keys(cover.TEXT_FIELDS).filter((x) => x !== 'news').map((id) => ({id, name: names[id] || id})),
         frame: st.frame ? {...st.frame, url: stamp(join(cdir, st.frame.file))} : null, maskable: Boolean(cover.maskOf(dir, v)),
+        source: cover.sourceOf(dir, v) ? {url: stamp(cover.sourceOf(dir, v)), clean: cover.isClean(dir, v)} : null,
         texts: cover.texts(dir, v), text: st.text || null, designs: (st.designs || []).map((d) => ({...d, url: stamp(join(cdir, d.file))})), chosen: st.chosen || null,
         cover: stamp(join(dir, 'versions', v, 'cover.png')), building: coverBuilds.has(r + v)};
     };

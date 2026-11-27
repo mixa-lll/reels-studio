@@ -42,8 +42,17 @@ function ff(bin, args, opts = {}) {
   return spawnSync(cmd, full, {encoding: 'utf8', maxBuffer: 64 << 20, ...opts});
 }
 
-/** The video a cover frame is taken from: the master if there is one, else the version's best copy. */
-export const sourceOf = (reel, v) => bestVideo(join(reel, 'versions', v));
+/**
+ * The video a cover frame is taken from: the reel's clean cut without graphics (project/public/cut-graded.mov, else
+ * cut.mov) — the cover lays its own text, the reel's plates must not show through. The generator scrubs this very file,
+ * so the frame on screen is the frame cut. Without a clean cut: the version's master, else its best copy.
+ */
+export function sourceOf(reel, v) {
+  const pub = join(reel, 'project', 'public');
+  for (const f of ['cut-graded.mov', 'cut-graded.mp4', 'cut.mov', 'cut.mp4']) if (existsSync(join(pub, f))) return join(pub, f);
+  return bestVideo(join(reel, 'versions', v));
+}
+export const isClean = (reel, v) => sourceOf(reel, v)?.startsWith(join(reel, 'project', 'public')) || false;
 
 /**
  * The host's cut-out (a webm with alpha the reel's project made) — only when it runs as long as the
@@ -52,13 +61,14 @@ export const sourceOf = (reel, v) => bestVideo(join(reel, 'versions', v));
  */
 export function maskOf(reel, v) {
   const src = sourceOf(reel, v);
-  const dur = src && videoInfo(src)?.duration;
   const pub = join(reel, 'project', 'public');
-  if (!dur || !existsSync(pub)) return null;
+  if (!src || !existsSync(pub)) return null;
+  const dur = Number(ff('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', src]).stdout.trim());
+  if (!dur) return null;
   const ms = readdirSync(pub).filter((f) => /^person.*\.(webm|mov)$/i.test(f) && !/^person-\d/.test(f));
   for (const f of ms) {
     const d = Number(ff('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', join(pub, f)]).stdout.trim());
-    if (Math.abs(d - dur) <= 0.6) return join(pub, f);
+    if (Math.abs(d - dur) <= 0.3) return join(pub, f);
   }
   return null;
 }
