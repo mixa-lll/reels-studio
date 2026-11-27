@@ -1,0 +1,12 @@
+{
+  "_": "Fixed places and sizes of a reel cover (1080×1920), the brand's system «Правила: обложки, метки, формы» (26.11.2026). One source for the generator; never scaled to fit a text — a text that does not fit is made shorter.",
+  "crop": {"y0": 240, "y1": 1680},
+  "label": {"x": 64, "y": 296, "font": 30, "weight": 500, "padX": 18, "padTop": 12, "padBottom": 14, "radius": 8, "icon": 30, "gap": 11},
+  "series": {"gap": 6, "padX": 15},
+  "right": {"x": 64, "y": 302, "font": 26},
+  "title": {"x": 64, "y": 1216, "font": 100, "weight": 400, "lineHeight": 1.04, "tracking": -0.045, "maxChars": 18},
+  "zone": {"y": 392, "word": 270, "number": 300, "list": {"x": 64, "y": 400, "font": 80}},
+  "counter": {"x": 64, "y": 1470, "w": 520, "h": 190},
+  "meme": {"icon": {"x": 60, "y": 284, "size": 64}, "plate": {"x": 74, "w": 932, "top": 470, "bottom": 1010, "font": 62}},
+  "place": {"x": 64, "y": 296, "font": 30}
+}
