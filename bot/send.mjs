@@ -81,6 +81,12 @@ if (o.text) {
     markup ??= {inline_keyboard: []};
     markup.inline_keyboard.push([{text: process.env.BOT_LANG === 'en' ? '✎ Open the editor' : '✎ Открыть редактор', web_app: {url: `${process.env.MINIAPP_URL}?ed=${encodeURIComponent(reel)}`}}]);
   }
+  // A reel's version gets «🖼 Обложка»: the cover generator in the chat (bot/cover.mjs).
+  const ver = video && /\/reels\/([\w-]+)\/versions\/(v\d+)\//.exec(o.file);
+  if (ver && `cv:o:${ver[1]}:${ver[2]}`.length <= 64) {
+    markup ??= {inline_keyboard: []};
+    markup.inline_keyboard.push([{text: process.env.BOT_LANG === 'en' ? '🖼 Cover' : '🖼 Обложка', callback_data: `cv:o:${ver[1]}:${ver[2]}`}]);
+  }
   // A file in Telegram is hard to find later: the master also gets a direct link from the site.
   const link = reelLink(o.file, {projects: PROJECTS});
   if (link) {
